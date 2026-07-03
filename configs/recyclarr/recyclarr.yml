@@ -1,0 +1,13 @@
+sonarr:
+  atlas-sonarr:
+    base_url: http://sonarr:8989
+    api_key: REPLACE_WITH_SONARR_API_KEY
+    quality_definition:
+      type: series
+
+radarr:
+  atlas-radarr:
+    base_url: http://radarr:7878
+    api_key: REPLACE_WITH_RADARR_API_KEY
+    quality_definition:
+      type: movie
