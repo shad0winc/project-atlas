@@ -68,3 +68,12 @@ Implement centralized media quality management using Recyclarr and TRaSH Guides.
 Atlas now uses centrally managed, version-controlled media quality standards based on TRaSH Guides.
 
 Status: Complete
+
+## M-004 Completed
+
+- Configured Jellyfin media libraries
+- Integrated Jellyseerr with Jellyfin
+- Configured Movies, TV, Anime Movies, and Anime TV services
+- Added anime root folders to Radarr Anime and Sonarr Anime
+- Verified Prowlarr synchronization across all Arr applications
+- Validated Discovery subsystem
