@@ -47,3 +47,24 @@ Engineering Notes
 - Removed unnecessary Docker startup dependencies
 - Adopted runtime resilience philosophy
 - Separated anime from standard media management
+
+## M-003B - Media Intelligence (2026-07-05)
+
+### Objective
+Implement centralized media quality management using Recyclarr and TRaSH Guides.
+
+### Completed
+- Added Recyclarr service to Docker Compose (manual profile).
+- Configured Recyclarr v8 using environment variables for API keys.
+- Implemented TRaSH Guide quality profiles:
+  - Radarr: Remux + WEB 1080p
+  - Sonarr: WEB-1080p
+- Imported recommended Custom Formats.
+- Updated Quality Definitions.
+- Successfully validated configuration using preview mode.
+- Successfully synchronized configuration to Radarr and Sonarr.
+
+### Result
+Atlas now uses centrally managed, version-controlled media quality standards based on TRaSH Guides.
+
+Status: Complete
