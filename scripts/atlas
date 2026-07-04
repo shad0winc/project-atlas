@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$PROJECT_DIR"
+
+command="${1:-help}"
+
+case "$command" in
+  help)
+    cat <<'HELP'
+Project Atlas CLI
+
+Usage:
+  atlas status
+  atlas verify
+  atlas update
+  atlas backup
+  atlas restart
+  atlas logs <container>
+  atlas git
+HELP
+    ;;
+
+  status)
+    docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+    ;;
+
+  verify)
+    ./scripts/verify.sh
+    ;;
+
+  update)
+    git pull
+    docker compose pull
+    docker compose up -d
+    docker image prune -f
+    ;;
+
+  backup)
+    ./scripts/backup.sh
+    ;;
+
+  restart)
+    docker compose restart
+    ;;
+
+  logs)
+    if [ -z "${2:-}" ]; then
+      echo "Usage: atlas logs <container>"
+      exit 1
+    fi
+    docker logs "$2" --tail=100 -f
+    ;;
+
+  git)
+    git status
+    ;;
+
+  *)
+    echo "Unknown command: $command"
+    echo "Run: atlas help"
+    exit 1
+    ;;
+esac
