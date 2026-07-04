@@ -6,28 +6,114 @@ cd "$PROJECT_DIR"
 
 command="${1:-help}"
 
+print_header() {
+  echo "Project Atlas"
+  echo "Simplicity Meets Ingenuity"
+  echo
+}
+
 case "$command" in
   help)
+    print_header
     cat <<'HELP'
-Project Atlas CLI
-
 Usage:
+  atlas help
+  atlas version
   atlas status
+  atlas services
+  atlas urls
+  atlas git
   atlas verify
+  atlas doctor
   atlas update
   atlas backup
   atlas restart
   atlas logs <container>
-  atlas git
 HELP
+    ;;
+
+  version)
+    print_header
+    echo -n "Version: "
+    cat VERSION 2>/dev/null || echo "unknown"
+    echo "Branch:  $(git branch --show-current 2>/dev/null || echo unknown)"
     ;;
 
   status)
     docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
     ;;
 
+  services)
+    docker compose ps
+    ;;
+
+  urls)
+    source .env
+    cat <<URLS
+Homepage:      http://${LXC_IP}:3000
+Jellyfin:      http://${LXC_IP}:8096
+Jellyseerr:    http://${LXC_IP}:5055
+Sonarr:        http://${LXC_IP}:8989
+Sonarr Anime:  http://${LXC_IP}:8990
+Radarr:        http://${LXC_IP}:7878
+Radarr Anime:  http://${LXC_IP}:7879
+Prowlarr:      http://${LXC_IP}:9696
+qBittorrent:   http://${LXC_IP}:8080
+Bazarr:        http://${LXC_IP}:6767
+Maintainerr:   http://${LXC_IP}:6246
+Tautulli:      http://${LXC_IP}:8181
+Dozzle:        http://${LXC_IP}:9999
+URLS
+    ;;
+
+  git)
+    git status
+    ;;
+
   verify)
     ./scripts/verify.sh
+    ;;
+
+  doctor)
+    print_header
+
+    echo "Docker:"
+    docker info >/dev/null 2>&1 && echo "  OK Docker is running" || echo "  FAIL Docker is not running"
+
+    echo
+    echo "Git:"
+    if git diff --quiet && git diff --cached --quiet; then
+      echo "  OK Working tree clean"
+    else
+      echo "  WARN Working tree has changes"
+    fi
+
+    echo
+    echo "VPN:"
+    if docker ps --format '{{.Names}}' | grep -qx gluetun; then
+      echo "  OK Gluetun container running"
+    else
+      echo "  FAIL Gluetun container not running"
+    fi
+
+    echo
+    echo "qBittorrent VPN IP:"
+    docker exec qbittorrent sh -c "curl -s ifconfig.io || wget -qO- ifconfig.io" 2>/dev/null || echo "  WARN Could not check qBittorrent public IP"
+
+    echo
+    echo "Storage writable:"
+    for path in "/mnt/storage/media/Movies" "/mnt/storage/media/TV" "/mnt/storage/media/Anime Movies" "/mnt/storage/media/Anime TV" "/mnt/storage/downloads"; do
+      if touch "$path/.atlas-write-test" 2>/dev/null; then
+        rm -f "$path/.atlas-write-test"
+        echo "  OK $path"
+      else
+        echo "  FAIL $path"
+      fi
+    done
+
+    echo
+    echo "Container status:"
+    docker ps --format "  {{.Names}} - {{.Status}}"
     ;;
 
   update)
@@ -51,10 +137,6 @@ HELP
       exit 1
     fi
     docker logs "$2" --tail=100 -f
-    ;;
-
-  git)
-    git status
     ;;
 
   *)
