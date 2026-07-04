@@ -217,6 +217,10 @@ services:
     image: golift/unpackerr:latest
     container_name: unpackerr
     networks: [atlas]
+
+    profiles:
+      - advanced
+
     environment:
       - TZ=${TZ}
       - UN_SONARR_0_URL=http://sonarr:8989
