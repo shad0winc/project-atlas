@@ -6,29 +6,27 @@ Every indexer must have a purpose.
 
 Atlas prioritizes reliability, maintainability, and simplicity over having the largest possible number of indexers.
 
-## Approved Indexer Tiers
+# Atlas Discovery Catalog
 
-### Tier 1 - Core
+## Core Indexers
 
-| Indexer | Purpose |
-|---|---|
-| Nyaa | Anime TV and Anime Movies |
-| 1337x | General Movies and TV |
+| Indexer | Purpose | Status |
+|----------|---------|--------|
+| Knaben | General Movies & TV | Approved |
+| LimeTorrents | General Backup | Approved |
+| Nyaa.si | Anime | Approved |
+| Tokyo Toshokan | Anime Backup | Approved |
 
-### Tier 2 - Optional
+## Deferred
 
-| Indexer | Purpose |
-|---|---|
-| TorrentGalaxy | General fallback |
-| EZTV | TV fallback |
-| LimeTorrents | General fallback |
+| Indexer | Reason |
+|----------|--------|
+| 1337x | Cloudflare protection |
+| EZTV | Cloudflare protection |
+| Torrent Downloads | Server unavailable (HTTP 522) |
 
-### Tier 3 - Last Resort
+## Philosophy
 
-| Indexer | Purpose |
-|---|---|
-| The Pirate Bay | Backup only |
+Atlas favors a small set of reliable, natively supported indexers over a large collection requiring additional infrastructure.
 
-## Current Rule
-
-Do not add FlareSolverr unless an approved indexer requires it and the benefit outweighs the added complexity.
+FlareSolverr is not part of the Atlas Core and will only be introduced if a future requirement clearly justifies the added complexity.
