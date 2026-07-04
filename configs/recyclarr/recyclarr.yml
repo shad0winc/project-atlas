@@ -8,6 +8,16 @@ sonarr:
       - trash_id: 72dae194fc92bf828f32cde7744e51a1 # WEB-1080p
         reset_unmatched_scores:
           enabled: true
+  anime_tv:
+    base_url: http://sonarr-anime:8989
+    api_key: !env_var SONARR_ANIME_API_KEY
+    quality_definition:
+      type: anime
+    quality_profiles:
+      - trash_id: 20e0fc959f1f1704bed501f23bdae76f # Anime Remux-1080p
+        reset_unmatched_scores:
+          enabled: true
+
 
 radarr:
   movies:
@@ -17,5 +27,14 @@ radarr:
       type: movie
     quality_profiles:
       - trash_id: 9ca12ea80aa55ef916e3751f4b874151 # Remux + WEB 1080p
+        reset_unmatched_scores:
+          enabled: true
+  anime_movies:
+    base_url: http://radarr-anime:7878
+    api_key: !env_var RADARR_ANIME_API_KEY
+    quality_definition:
+      type: movie
+    quality_profiles:
+      - trash_id: 722b624f9af1e492284c4bc842153a38 # Anime Remux-1080p
         reset_unmatched_scores:
           enabled: true
