@@ -112,6 +112,37 @@ URLS
     done
 
     echo
+    echo "Project Files:"
+
+    check_file() {
+        if [ -e "$1" ]; then
+            echo "  OK $1"
+        else
+            echo "  FAIL $1"
+        fi
+    }
+
+    check_dir() {
+        if [ -d "$1" ]; then
+            echo "  OK $1"
+        else
+            echo "  FAIL $1"
+        fi
+    }
+
+    check_file VERSION
+    check_file CHARTER.md
+    check_file ROADMAP.md
+    check_file CHANGELOG.md
+
+    check_dir docs
+    check_dir docs/adr
+    check_dir docs/milestones
+
+    check_file docs/BUILD_LOG.md
+    check_file docs/MATURITY.md
+
+    echo
     echo "Container status:"
     docker ps --format "  {{.Names}} - {{.Status}}"
     ;;
