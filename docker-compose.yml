@@ -83,14 +83,32 @@ services:
       - qbittorrent
       - prowlarr
 
-  qbittorrent:
-    image: lscr.io/linuxserver/qbittorrent:latest
-    container_name: qbittorrent
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
     networks: [atlas]
     ports:
       - "${QBITTORRENT_PORT:-8080}:8080"
       - "6881:6881"
       - "6881:6881/udp"
+    environment:
+      - VPN_SERVICE_PROVIDER=windscribe
+      - VPN_TYPE=openvpn
+      - OPENVPN_USER=${WINDSCRIBE_USER}
+      - OPENVPN_PASSWORD=${WINDSCRIBE_PASSWORD}
+      - SERVER_REGIONS=${VPN_REGION}
+      - TZ=${TZ}
+      - FIREWALL=on
+    restart: unless-stopped
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    network_mode: "service:gluetun"
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
@@ -100,6 +118,8 @@ services:
       - ${CONFIG}/qbittorrent:/config
       - ${DOWNLOADS}:/downloads
     restart: unless-stopped
+    depends_on:
+      - gluetun
 
   jellyseerr:
     image: fallenbagel/jellyseerr:latest
