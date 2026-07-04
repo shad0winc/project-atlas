@@ -60,9 +60,22 @@ services:
       - ${MEDIA}:/media
       - ${DOWNLOADS}:/downloads
     restart: unless-stopped
-    depends_on:
-      - qbittorrent
-      - prowlarr
+
+  sonarr-anime:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr-anime
+    networks: [atlas]
+    ports:
+      - "${SONARR_ANIME_PORT:-8990}:8989"
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG}/sonarr-anime:/config
+      - ${MEDIA}:/media
+      - ${DOWNLOADS}:/downloads
+    restart: unless-stopped
 
   radarr:
     image: lscr.io/linuxserver/radarr:latest
@@ -79,9 +92,22 @@ services:
       - ${MEDIA}:/media
       - ${DOWNLOADS}:/downloads
     restart: unless-stopped
-    depends_on:
-      - qbittorrent
-      - prowlarr
+
+  radarr-anime:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr-anime
+    networks: [atlas]
+    ports:
+      - "${RADARR_ANIME_PORT:-7879}:7878"
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG}/radarr-anime:/config
+      - ${MEDIA}:/media
+      - ${DOWNLOADS}:/downloads
+    restart: unless-stopped
 
   gluetun:
     image: qmcgaw/gluetun:latest
@@ -119,7 +145,8 @@ services:
       - ${DOWNLOADS}:/downloads
     restart: unless-stopped
     depends_on:
-      - gluetun
+      gluetun:
+        condition: service_started
 
   jellyseerr:
     image: fallenbagel/jellyseerr:latest
