@@ -189,6 +189,31 @@ report() {
   "Anime Movies:  \(.libraries.anime_movies.count)",
   "Anime TV:      \(.libraries.anime_tv.count)"
   ' "$LATEST_FILE"
+
+  echo
+  echo "Library Validation"
+  echo "------------------"
+
+  local expected_libraries=(
+    "Movies"
+    "TV"
+    "Anime Movies"
+    "Anime TV"
+  )
+
+  for library in "${expected_libraries[@]}"; do
+    if validate_jellyfin_libraries | grep -Fxq "$library"; then
+      echo "✓ $library"
+    else
+      echo "✗ $library"
+    fi
+  done
+}
+
+validate_jellyfin_libraries() {
+    jq -r '
+        .jellyfin.libraries[].name
+    ' "$LATEST_FILE"
 }
 
 case "${1:-}" in
