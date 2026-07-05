@@ -239,7 +239,56 @@ URLS
     ;;
 
   backup)
-    ./scripts/backup.sh
+    print_header
+
+    timestamp="$(date +%Y%m%d-%H%M%S)"
+    backup_dir="/mnt/storage/backups/atlas"
+    backup_file="${backup_dir}/atlas-${timestamp}.tar.gz"
+    manifest="$(mktemp)"
+
+    echo "Creating Atlas backup..."
+    echo
+
+    mkdir -p "$backup_dir"
+
+    cat > "$manifest" <<EOF
+Project Atlas Backup
+
+Created: $(date)
+Version: $(cat VERSION)
+Branch: $(git branch --show-current)
+
+EOF
+
+    tar \
+      --exclude='.git' \
+      --exclude='backups' \
+      --transform="s|.*$(basename "$manifest")|BACKUP_INFO.txt|" \
+      -czf "$backup_file" \
+      docker-compose.yml \
+      .env.example \
+      VERSION \
+      CHARTER.md \
+      ROADMAP.md \
+      CHANGELOG.md \
+      configs \
+      docs \
+      scripts \
+      "$manifest"
+
+    rm -f "$manifest"
+
+    echo "Backup complete:"
+    echo "$backup_file"
+
+    echo
+    echo "Removing old backups (keeping newest 10)..."
+
+    ls -1t "$backup_dir"/atlas-*.tar.gz 2>/dev/null \
+      | tail -n +11 \
+      | xargs -r rm -f
+
+    echo "Backup rotation complete."
     ;;
 
   restart)
