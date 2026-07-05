@@ -232,7 +232,7 @@ report() {
   ((.jellyfin.users // [])[] | "  - \(.name) | admin=\(.administrator) disabled=\(.disabled) hidden=\(.hidden) last_activity=\(.last_activity // "never")"),
   "",
   "Jellyfin Counts",
-  "----------------",
+  "---------------",
   "Movies:      \(.jellyfin.counts.movies // 0)",
   "Series:      \(.jellyfin.counts.series // 0)",
   "Episodes:    \(.jellyfin.counts.episodes // 0)",
