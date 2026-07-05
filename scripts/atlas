@@ -29,6 +29,8 @@ Usage:
   atlas backup
   atlas restart
   atlas logs <container>
+  atlas ari collect
+  atlas ari report
 HELP
     ;;
 
@@ -334,6 +336,10 @@ EOF
       exit 1
     fi
     docker logs "$2" --tail=100 -f
+    ;;
+
+  ari)
+    "$PROJECT_DIR/scripts/atlas-ari.sh" "${@:2}"
     ;;
 
   *)
