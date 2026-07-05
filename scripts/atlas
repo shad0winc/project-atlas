@@ -245,6 +245,11 @@ URLS
     backup_dir="/mnt/storage/backups/atlas"
     backup_file="${backup_dir}/atlas-${timestamp}.tar.gz"
     manifest="$(mktemp)"
+    notes=""
+
+    if [ "${2:-}" = "--notes" ]; then
+      notes="${3:-}"
+    fi
 
     echo "Creating Atlas backup..."
     echo
@@ -257,6 +262,9 @@ Project Atlas Backup
 Created: $(date)
 Version: $(cat VERSION)
 Branch: $(git branch --show-current)
+
+Notes:
+${notes:-None}
 
 EOF
 
