@@ -190,6 +190,10 @@ report() {
   "Anime TV:      \(.libraries.anime_tv.count)"
   ' "$LATEST_FILE"
 
+  print_library_validation
+}
+
+print_library_validation() {
   echo
   echo "Library Validation"
   echo "------------------"
@@ -211,9 +215,9 @@ report() {
 }
 
 validate_jellyfin_libraries() {
-    jq -r '
-        .jellyfin.libraries[].name
-    ' "$LATEST_FILE"
+  jq -r '
+    (.jellyfin.libraries // [])[].name
+  ' "$LATEST_FILE"
 }
 
 case "${1:-}" in
