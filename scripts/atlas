@@ -241,8 +241,28 @@ URLS
   backup)
     print_header
 
-    timestamp="$(date +%Y%m%d-%H%M%S)"
     backup_dir="/mnt/storage/backups/atlas"
+    mkdir -p "$backup_dir"
+
+    if [ "${2:-}" = "--list" ]; then
+      echo "Atlas Backups"
+      echo
+
+      if ! ls "$backup_dir"/atlas-*.tar.gz >/dev/null 2>&1; then
+        echo "No backups found."
+        exit 0
+      fi
+
+      ls -1t "$backup_dir"/atlas-*.tar.gz | while read -r file; do
+        echo "$(basename "$file")"
+        tar -xOzf "$file" BACKUP_INFO.txt 2>/dev/null | sed 's/^/  /' || echo "  No manifest found"
+        echo
+      done
+
+      exit 0
+    fi
+
+    timestamp="$(date +%Y%m%d-%H%M%S-%3N)"
     backup_file="${backup_dir}/atlas-${timestamp}.tar.gz"
     manifest="$(mktemp)"
     notes=""
@@ -253,8 +273,6 @@ URLS
 
     echo "Creating Atlas backup..."
     echo
-
-    mkdir -p "$backup_dir"
 
     cat > "$manifest" <<EOF
 Project Atlas Backup
@@ -286,17 +304,24 @@ EOF
 
     rm -f "$manifest"
 
-    echo "Backup complete:"
-    echo "$backup_file"
-
+    echo "Backup complete"
     echo
-    echo "Removing old backups (keeping newest 10)..."
+    echo "File:"
+    echo "  $backup_file"
+    echo
+    echo "Size:"
+    echo "  $(du -h "$backup_file" | awk '{print $1}')"
+    echo
+    echo "Retention:"
+    echo "  Keeping newest 10 backups"
 
     ls -1t "$backup_dir"/atlas-*.tar.gz 2>/dev/null \
       | tail -n +11 \
       | xargs -r rm -f
 
-    echo "Backup rotation complete."
+    echo
+    echo "Status:"
+    echo "  SUCCESS"
     ;;
 
   restart)
