@@ -17,18 +17,28 @@ case "$command" in
     print_header
     cat <<'HELP'
 Usage:
+  atlas <command> [options]
+
+Core Commands
+-------------
   atlas help
   atlas version
   atlas status
   atlas services
   atlas urls
   atlas git
+
+Maintenance
+-----------
   atlas verify
   atlas doctor
   atlas update
   atlas backup
   atlas restart
   atlas logs <container>
+
+Intelligence
+------------
   atlas ari collect
   atlas ari report
 HELP
@@ -196,8 +206,8 @@ URLS
     check_file CHANGELOG.md
 
     check_dir docs
-    check_dir docs/adr
-    check_dir docs/milestones
+    check_dir docs/ADR
+    check_dir docs/EDR
 
     check_file docs/BUILD_LOG.md
     check_file docs/MATURITY.md
