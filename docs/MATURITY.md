@@ -27,6 +27,58 @@
 | Operations | 1 | 5 |
 | Engineering Handbook | 4 | 5 |
 
+## Atlas Retention Intelligence (ARI)
+
+### Current Stage
+
+**Operational Observability**
+
+Atlas can currently observe, normalize, and validate the operational state of the media platform.
+
+### Current Capabilities
+
+#### Platform
+
+- Atlas version
+- Hostname
+- Snapshot schema version
+
+#### Storage
+
+- Capacity
+- Used space
+- Available space
+- Utilization percentage
+
+#### Filesystem
+
+- Media library inventory
+- Library counts
+
+#### Jellyfin
+
+- Server metadata
+- Library inventory
+- Library path discovery
+- User observation
+
+#### Validation
+
+- Library existence validation
+- Library path validation
+
+### Next Stage
+
+**Operational Intelligence**
+
+Future milestones include:
+
+- Filesystem ↔ Jellyfin item comparison
+- Snapshot trend analysis
+- Storage growth forecasting
+- User activity analytics
+- Retention recommendations
+
 ## Notes
 
 Maturity measures maintainability, recoverability, automation, and operational clarity — not container count.
