@@ -86,6 +86,27 @@ collect() {
   })'
   )"
 
+  local jellyfin_users jellyfin_user_summary
+  jellyfin_users="[]"
+
+  if [[ -n "${ATLAS_JELLYFIN_API_KEY:-}" ]]; then
+  jellyfin_users="$(curl -s \
+    -H "X-Emby-Token: $ATLAS_JELLYFIN_API_KEY" \
+    "$ATLAS_JELLYFIN_URL/Users" || echo "[]")"
+  fi
+
+  jellyfin_user_summary="$(
+  echo "$jellyfin_users" | jq '
+  map({
+    name: .Name,
+    id: .Id,
+    administrator: (.Policy.IsAdministrator // false),
+    disabled: (.Policy.IsDisabled // false),
+    hidden: (.Policy.IsHidden // false),
+    last_activity: (.LastActivityDate // null)
+})'
+)"
+
   jellyfin_server_name="$(echo "$jellyfin_info" | jq -r '.ServerName // "unknown"')"
   jellyfin_version="$(echo "$jellyfin_info" | jq -r '.Version // "unknown"')"
   jellyfin_id="$(echo "$jellyfin_info" | jq -r '.Id // "unknown"')"
@@ -119,7 +140,8 @@ collect() {
   "server_name": "$jellyfin_server_name",
   "version": "$jellyfin_version",
   "id": "$jellyfin_id",
-  "libraries": $jellyfin_library_summary
+  "libraries": $jellyfin_library_summary,
+  "users": $jellyfin_user_summary
   },
 
   "libraries": {
@@ -181,6 +203,11 @@ report() {
   "Jellyfin Libraries",
   "------------------",
   ((.jellyfin.libraries // [])[] | "  - \(.name) [\(.type)] → \(.path) (\(.status))"),
+  "",
+  "Jellyfin Users",
+  "--------------",
+  "User Count: \((.jellyfin.users // []) | length)",
+  ((.jellyfin.users // [])[] | "  - \(.name) | admin=\(.administrator) disabled=\(.disabled) hidden=\(.hidden) last_activity=\(.last_activity // "never")"),
   "",
   "Libraries",
   "---------",
