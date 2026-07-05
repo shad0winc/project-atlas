@@ -11,6 +11,11 @@ fi
 
 source "$ATLAS_CONFIG_FILE"
 
+ATLAS_ENV_FILE="$ATLAS_ROOT/.env"
+if [[ -f "$ATLAS_ENV_FILE" ]]; then
+  source "$ATLAS_ENV_FILE"
+fi
+
 ARI_DATA_DIR="$ATLAS_ARI_DIR"
 ARI_SNAPSHOT_DIR="$ATLAS_ARI_SNAPSHOT_DIR"
 LATEST_FILE="$ATLAS_ARI_LATEST_FILE"
@@ -53,6 +58,19 @@ collect() {
   storage_available="$(df -h "$MEDIA_ROOT" 2>/dev/null | awk 'NR==2 {print $4}')"
   storage_use_percent="$(df -h "$MEDIA_ROOT" 2>/dev/null | awk 'NR==2 {gsub("%","",$5); print $5}')"
 
+  local jellyfin_info jellyfin_server_name jellyfin_version jellyfin_id
+  jellyfin_info="{}"
+
+  if [[ -n "${ATLAS_JELLYFIN_API_KEY:-}" ]]; then
+  jellyfin_info="$(curl -s \
+    -H "X-Emby-Token: $ATLAS_JELLYFIN_API_KEY" \
+    "$ATLAS_JELLYFIN_URL/System/Info" || echo "{}")"
+  fi
+
+  jellyfin_server_name="$(echo "$jellyfin_info" | jq -r '.ServerName // "unknown"')"
+  jellyfin_version="$(echo "$jellyfin_info" | jq -r '.Version // "unknown"')"
+  jellyfin_id="$(echo "$jellyfin_info" | jq -r '.Id // "unknown"')"
+
   local movie_count tv_count anime_movie_count anime_tv_count
 
   movie_count="$(find "$MEDIA_ROOT/Movies" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)"
@@ -76,6 +94,12 @@ collect() {
     "used": "$storage_used",
     "available": "$storage_available",
     "utilization_percent": $storage_use_percent
+  },
+
+  "jellyfin": {
+    "server_name": "$jellyfin_server_name",
+    "version": "$jellyfin_version",
+    "id": "$jellyfin_id"
   },
 
   "libraries": {
@@ -126,6 +150,12 @@ report() {
   "Used:       \(.storage.used)",
   "Available:  \(.storage.available)",
   "Usage:      \(.storage.utilization_percent)%",
+  "",
+  "Jellyfin",
+  "--------",
+  "Server:  \(.jellyfin.server_name // "unknown")",
+  "Version: \(.jellyfin.version // "unknown")",
+  "ID:      \(.jellyfin.id // "unknown")",
   "",
   "Libraries",
   "---------",
