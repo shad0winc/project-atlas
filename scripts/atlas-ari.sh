@@ -32,17 +32,26 @@ collect() {
   local timestamp
   timestamp="$(date -Iseconds)"
 
+  local atlas_version
+  atlas_version="$(cat "$ATLAS_PROJECT_DIR/VERSION" 2>/dev/null || echo "unknown")"
+
+  local hostname
+  hostname="$(hostname)"
+
+  local schema_version
+  schema_version=1
+
   local safe_timestamp
   safe_timestamp="$(date +"%Y-%m-%dT%H-%M-%S%z")"
 
   local snapshot_file
   snapshot_file="$ARI_SNAPSHOT_DIR/$safe_timestamp.json"
 
-  local total_media_size
-  total_media_size="$(du -sh "$MEDIA_ROOT" 2>/dev/null | awk '{print $1}')"
-
-  local available_storage
-  available_storage="$(df -h "$MEDIA_ROOT" 2>/dev/null | awk 'NR==2 {print $4}')"
+  local storage_capacity storage_used storage_available storage_use_percent
+  storage_capacity="$(df -h "$MEDIA_ROOT" 2>/dev/null | awk 'NR==2 {print $2}')"
+  storage_used="$(df -h "$MEDIA_ROOT" 2>/dev/null | awk 'NR==2 {print $3}')"
+  storage_available="$(df -h "$MEDIA_ROOT" 2>/dev/null | awk 'NR==2 {print $4}')"
+  storage_use_percent="$(df -h "$MEDIA_ROOT" 2>/dev/null | awk 'NR==2 {gsub("%","",$5); print $5}')"
 
   local movie_count tv_count anime_movie_count anime_tv_count
 
@@ -54,14 +63,34 @@ collect() {
   cat > "$snapshot_file" <<EOF
 {
   "timestamp": "$timestamp",
-  "media_root": "$MEDIA_ROOT",
-  "total_media_size": "$total_media_size",
-  "available_storage": "$available_storage",
+
+  "atlas": {
+    "version": "$atlas_version",
+    "hostname": "$hostname",
+    "schema_version": $schema_version
+  },
+
+  "storage": {
+    "media_root": "$MEDIA_ROOT",
+    "capacity": "$storage_capacity",
+    "used": "$storage_used",
+    "available": "$storage_available",
+    "utilization_percent": $storage_use_percent
+  },
+
   "libraries": {
-    "movies": $movie_count,
-    "tv": $tv_count,
-    "anime_movies": $anime_movie_count,
-    "anime_tv": $anime_tv_count
+    "movies": {
+      "count": $movie_count
+    },
+    "tv": {
+      "count": $tv_count
+    },
+    "anime_movies": {
+      "count": $anime_movie_count
+    },
+    "anime_tv": {
+      "count": $anime_tv_count
+    }
   }
 }
 EOF
