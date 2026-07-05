@@ -377,14 +377,30 @@ print_snapshot_comparison() {
   current_users="$(jq -r '(.jellyfin.users // []) | length' "$LATEST_FILE")"
   previous_users="$(jq -r '(.jellyfin.users // []) | length' "$previous_snapshot")"
 
+  local changes=0
+
+  [[ "$current_movies" != "$previous_movies" ]] && ((changes++))
+  [[ "$current_tv" != "$previous_tv" ]] && ((changes++))
+  [[ "$current_users" != "$previous_users" ]] && ((changes++))
+
   echo
   echo "Snapshot Comparison"
   echo "-------------------"
   echo "Previous: $previous_timestamp"
   echo "Current:  $current_timestamp"
   echo
-  echo "Library Changes"
-  echo "---------------"
+  echo "Summary"
+  echo "-------"
+
+  if [[ "$changes" -eq 0 ]]; then
+  echo "✓ No operational changes detected."
+  else
+  echo "⚠ $changes operational change(s) detected."
+  fi
+
+  echo
+  echo "Details"
+  echo "-------"
   echo "Movies: $previous_movies → $current_movies"
   echo "TV:     $previous_tv → $current_tv"
   echo "Users:  $previous_users → $current_users"
