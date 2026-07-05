@@ -264,6 +264,7 @@ report() {
 print_library_validation
 print_library_path_validation
 print_library_synchronization
+print_snapshot_comparison
 }
 
 print_library_validation() {
@@ -347,6 +348,48 @@ print_library_synchronization() {
   fi
 }
 
+print_snapshot_comparison() {
+  local previous_snapshot
+  previous_snapshot="$(get_previous_snapshot)"
+
+  if [[ -z "$previous_snapshot" || ! -f "$previous_snapshot" ]]; then
+    echo
+    echo "Snapshot Comparison"
+    echo "-------------------"
+    echo "No previous snapshot available."
+    return 0
+  fi
+
+  local current_timestamp previous_timestamp
+  current_timestamp="$(jq -r '.timestamp // "unknown"' "$LATEST_FILE")"
+  previous_timestamp="$(jq -r '.timestamp // "unknown"' "$previous_snapshot")"
+
+  local current_movies previous_movies
+  local current_tv previous_tv
+  local current_users previous_users
+
+  current_movies="$(jq -r '.libraries.movies.count // 0' "$LATEST_FILE")"
+  previous_movies="$(jq -r '.libraries.movies.count // 0' "$previous_snapshot")"
+
+  current_tv="$(jq -r '.libraries.tv.count // 0' "$LATEST_FILE")"
+  previous_tv="$(jq -r '.libraries.tv.count // 0' "$previous_snapshot")"
+
+  current_users="$(jq -r '(.jellyfin.users // []) | length' "$LATEST_FILE")"
+  previous_users="$(jq -r '(.jellyfin.users // []) | length' "$previous_snapshot")"
+
+  echo
+  echo "Snapshot Comparison"
+  echo "-------------------"
+  echo "Previous: $previous_timestamp"
+  echo "Current:  $current_timestamp"
+  echo
+  echo "Library Changes"
+  echo "---------------"
+  echo "Movies: $previous_movies → $current_movies"
+  echo "TV:     $previous_tv → $current_tv"
+  echo "Users:  $previous_users → $current_users"
+}
+
 ###############################################################################
 # Helper Functions
 ###############################################################################
@@ -359,6 +402,13 @@ get_jellyfin_library_path() {
     | map(select(.name == $name))
     | .[0].path // ""
   ' "$LATEST_FILE"
+}
+
+get_previous_snapshot() {
+  ls -1 "$ARI_SNAPSHOT_DIR"/*.json 2>/dev/null \
+    | sort \
+    | tail -2 \
+    | head -1
 }
 
 ###############################################################################
