@@ -2,10 +2,19 @@
 set -euo pipefail
 
 ATLAS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ARI_DATA_DIR="/mnt/storage/configs/atlas/ari"
-MEDIA_ROOT="/mnt/storage/media"
-ARI_SNAPSHOT_DIR="$ARI_DATA_DIR/snapshots"
-LATEST_FILE="$ARI_DATA_DIR/latest.json"
+ATLAS_CONFIG_FILE="$ATLAS_ROOT/config/atlas.conf"
+
+if [[ ! -f "$ATLAS_CONFIG_FILE" ]]; then
+  echo "Missing Atlas config: $ATLAS_CONFIG_FILE"
+  exit 1
+fi
+
+source "$ATLAS_CONFIG_FILE"
+
+ARI_DATA_DIR="$ATLAS_ARI_DIR"
+ARI_SNAPSHOT_DIR="$ATLAS_ARI_SNAPSHOT_DIR"
+LATEST_FILE="$ATLAS_ARI_LATEST_FILE"
+MEDIA_ROOT="$ATLAS_MEDIA_ROOT"
 
 usage() {
   cat <<EOF

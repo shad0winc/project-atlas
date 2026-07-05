@@ -2,7 +2,16 @@
 set -euo pipefail
 
 PROJECT_DIR="/opt/project-atlas"
-cd "$PROJECT_DIR"
+ATLAS_CONFIG_FILE="$PROJECT_DIR/config/atlas.conf"
+
+if [[ ! -f "$ATLAS_CONFIG_FILE" ]]; then
+  echo "Missing Atlas config: $ATLAS_CONFIG_FILE"
+  exit 1
+fi
+
+source "$ATLAS_CONFIG_FILE"
+
+cd "$ATLAS_PROJECT_DIR"
 
 command="${1:-help}"
 
@@ -104,8 +113,8 @@ URLS
     echo "--------------"
     check "Docker Engine" docker info
     check "Docker Compose" docker compose version
-    check "Project Directory" test -d /opt/project-atlas
-    check "Storage Mounted" test -d /mnt/storage
+    check "Project Directory" test -d "$ATLAS_PROJECT_DIR"
+    check "Storage Mounted" test -d "$ATLAS_STORAGE_ROOT"
     check "Intel GPU Available" test -e /dev/dri/renderD128
 
     echo
@@ -118,7 +127,7 @@ URLS
     echo
     echo "Storage Paths"
     echo "-------------"
-    for path in "/mnt/storage/media/Movies" "/mnt/storage/media/TV" "/mnt/storage/media/Anime Movies" "/mnt/storage/media/Anime TV" "/mnt/storage/downloads"; do
+    for path in "$ATLAS_MEDIA_ROOT/Movies" "$ATLAS_MEDIA_ROOT/TV" "$ATLAS_MEDIA_ROOT/Anime Movies" "$ATLAS_MEDIA_ROOT/Anime TV" "$ATLAS_DOWNLOADS_ROOT"; do
       check "$path writable" sh -c "touch '$path/.atlas-test' && rm '$path/.atlas-test'"
     done
 
@@ -172,7 +181,7 @@ URLS
 
     echo
     echo "Storage writable:"
-    for path in "/mnt/storage/media/Movies" "/mnt/storage/media/TV" "/mnt/storage/media/Anime Movies" "/mnt/storage/media/Anime TV" "/mnt/storage/downloads"; do
+    for path in "$ATLAS_MEDIA_ROOT/Movies" "$ATLAS_MEDIA_ROOT/TV" "$ATLAS_MEDIA_ROOT/Anime Movies" "$ATLAS_MEDIA_ROOT/Anime TV" "$ATLAS_DOWNLOADS_ROOT"; do
       if touch "$path/.atlas-write-test" 2>/dev/null; then
         rm -f "$path/.atlas-write-test"
         echo "  OK $path"
@@ -253,7 +262,7 @@ URLS
   backup)
     print_header
 
-    backup_dir="/mnt/storage/backups/atlas"
+    backup_dir="$ATLAS_BACKUP_DIR"
     mkdir -p "$backup_dir"
 
     if [ "${2:-}" = "--list" ]; then
