@@ -251,6 +251,7 @@ report() {
 
 print_library_validation
 print_library_path_validation
+analyze_library_synchronization
 }
 
 print_library_validation() {
@@ -301,6 +302,37 @@ print_library_path_validation() {
       echo "    Found:    ${actual_path:-<missing>}"
     fi
   done
+}
+
+analyze_library_synchronization() {
+  local filesystem_movies filesystem_tv
+  local jellyfin_movies jellyfin_series
+
+  filesystem_movies="$(jq -r '.libraries.movies.count // 0' "$LATEST_FILE")"
+  filesystem_tv="$(jq -r '.libraries.tv.count // 0' "$LATEST_FILE")"
+
+  jellyfin_movies="$(jq -r '.jellyfin.counts.movies // 0' "$LATEST_FILE")"
+  jellyfin_series="$(jq -r '.jellyfin.counts.series // 0' "$LATEST_FILE")"
+
+  echo
+  echo "Library Synchronization"
+  echo "-----------------------"
+
+  if [[ "$filesystem_movies" == "$jellyfin_movies" ]]; then
+    echo "✓ Movies synchronized"
+  else
+    echo "✗ Movies out of sync"
+    echo "    Filesystem: $filesystem_movies"
+    echo "    Jellyfin:   $jellyfin_movies"
+  fi
+
+  if [[ "$filesystem_tv" == "$jellyfin_series" ]]; then
+    echo "✓ TV synchronized"
+  else
+    echo "✗ TV out of sync"
+    echo "    Filesystem: $filesystem_tv"
+    echo "    Jellyfin:   $jellyfin_series"
+  fi
 }
 
 get_jellyfin_library_path() {
