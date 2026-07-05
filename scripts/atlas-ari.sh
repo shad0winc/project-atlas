@@ -110,7 +110,30 @@ report() {
 
   echo "Atlas Retention Intelligence Report"
   echo "-----------------------------------"
-  cat "$LATEST_FILE"
+  echo
+
+  jq -r '
+  "Atlas",
+  "------",
+  "Version: \(.atlas.version)",
+  "Host: \(.atlas.hostname)",
+  "Schema: \(.atlas.schema_version)",
+  "",
+  "Storage",
+  "-------",
+  "Media Root: \(.storage.media_root)",
+  "Capacity:   \(.storage.capacity)",
+  "Used:       \(.storage.used)",
+  "Available:  \(.storage.available)",
+  "Usage:      \(.storage.utilization_percent)%",
+  "",
+  "Libraries",
+  "---------",
+  "Movies:        \(.libraries.movies.count)",
+  "TV:            \(.libraries.tv.count)",
+  "Anime Movies:  \(.libraries.anime_movies.count)",
+  "Anime TV:      \(.libraries.anime_tv.count)"
+  ' "$LATEST_FILE"
 }
 
 case "${1:-}" in
