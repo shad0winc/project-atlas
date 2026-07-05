@@ -67,6 +67,25 @@ collect() {
     "$ATLAS_JELLYFIN_URL/System/Info" || echo "{}")"
   fi
 
+  local jellyfin_libraries jellyfin_library_summary
+  jellyfin_libraries="[]"
+
+  if [[ -n "${ATLAS_JELLYFIN_API_KEY:-}" ]]; then
+  jellyfin_libraries="$(curl -s \
+    -H "X-Emby-Token: $ATLAS_JELLYFIN_API_KEY" \
+    "$ATLAS_JELLYFIN_URL/Library/VirtualFolders" || echo "[]")"
+  fi
+
+  jellyfin_library_summary="$(
+  echo "$jellyfin_libraries" | jq '
+  map({
+  name: .Name,
+  type: .CollectionType,
+  path: .Locations[0],
+  status: .RefreshStatus
+  })'
+  )"
+
   jellyfin_server_name="$(echo "$jellyfin_info" | jq -r '.ServerName // "unknown"')"
   jellyfin_version="$(echo "$jellyfin_info" | jq -r '.Version // "unknown"')"
   jellyfin_id="$(echo "$jellyfin_info" | jq -r '.Id // "unknown"')"
@@ -97,9 +116,10 @@ collect() {
   },
 
   "jellyfin": {
-    "server_name": "$jellyfin_server_name",
-    "version": "$jellyfin_version",
-    "id": "$jellyfin_id"
+  "server_name": "$jellyfin_server_name",
+  "version": "$jellyfin_version",
+  "id": "$jellyfin_id",
+  "libraries": $jellyfin_library_summary
   },
 
   "libraries": {
@@ -156,6 +176,11 @@ report() {
   "Server:  \(.jellyfin.server_name // "unknown")",
   "Version: \(.jellyfin.version // "unknown")",
   "ID:      \(.jellyfin.id // "unknown")",
+  "Library Count: \((.jellyfin.libraries // []) | length)",
+  "",
+  "Jellyfin Libraries",
+  "------------------",
+  ((.jellyfin.libraries // [])[] | "  - \(.name) [\(.type)] → \(.path) (\(.status))"),
   "",
   "Libraries",
   "---------",
