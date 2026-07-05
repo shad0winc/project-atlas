@@ -190,7 +190,8 @@ report() {
   "Anime TV:      \(.libraries.anime_tv.count)"
   ' "$LATEST_FILE"
 
-  print_library_validation
+print_library_validation
+print_library_path_validation
 }
 
 print_library_validation() {
@@ -212,6 +213,45 @@ print_library_validation() {
       echo "✗ $library"
     fi
   done
+}
+
+print_library_path_validation() {
+  echo
+  echo "Library Path Validation"
+  echo "-----------------------"
+
+  local library_checks=(
+    "Movies:$ATLAS_JELLYFIN_MOVIES_PATH"
+    "TV:$ATLAS_JELLYFIN_TV_PATH"
+    "Anime Movies:$ATLAS_JELLYFIN_ANIME_MOVIES_PATH"
+    "Anime TV:$ATLAS_JELLYFIN_ANIME_TV_PATH"
+  )
+
+  for check in "${library_checks[@]}"; do
+    local library="${check%%:*}"
+    local expected_path="${check#*:}"
+
+    local actual_path
+    actual_path="$(get_jellyfin_library_path "$library")"
+
+    if [[ "$actual_path" == "$expected_path" ]]; then
+      echo "✓ $library"
+    else
+      echo "✗ $library"
+      echo "    Expected: $expected_path"
+      echo "    Found:    ${actual_path:-<missing>}"
+    fi
+  done
+}
+
+get_jellyfin_library_path() {
+  local library_name="$1"
+
+  jq -r --arg name "$library_name" '
+    (.jellyfin.libraries // [])
+    | map(select(.name == $name))
+    | .[0].path // ""
+  ' "$LATEST_FILE"
 }
 
 validate_jellyfin_libraries() {
