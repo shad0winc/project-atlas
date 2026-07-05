@@ -107,6 +107,27 @@ collect() {
 })'
 )"
 
+  local jellyfin_counts jellyfin_count_summary
+  jellyfin_counts="{}"
+
+  if [[ -n "${ATLAS_JELLYFIN_API_KEY:-}" ]]; then
+    jellyfin_counts="$(curl -s \
+      -H "X-Emby-Token: $ATLAS_JELLYFIN_API_KEY" \
+      "$ATLAS_JELLYFIN_URL/Items/Counts" || echo "{}")"
+  fi
+
+  jellyfin_count_summary="$(
+  echo "$jellyfin_counts" | jq '{
+  movies: (.MovieCount // 0),
+  series: (.SeriesCount // 0),
+  episodes: (.EpisodeCount // 0),
+  songs: (.SongCount // 0),
+  albums: (.AlbumCount // 0),
+  books: (.BookCount // 0),
+  total_items: (.ItemCount // 0)
+}'
+)"
+
   jellyfin_server_name="$(echo "$jellyfin_info" | jq -r '.ServerName // "unknown"')"
   jellyfin_version="$(echo "$jellyfin_info" | jq -r '.Version // "unknown"')"
   jellyfin_id="$(echo "$jellyfin_info" | jq -r '.Id // "unknown"')"
@@ -141,7 +162,8 @@ collect() {
   "version": "$jellyfin_version",
   "id": "$jellyfin_id",
   "libraries": $jellyfin_library_summary,
-  "users": $jellyfin_user_summary
+  "users": $jellyfin_user_summary,
+  "counts": $jellyfin_count_summary
   },
 
   "libraries": {
@@ -208,6 +230,16 @@ report() {
   "--------------",
   "User Count: \((.jellyfin.users // []) | length)",
   ((.jellyfin.users // [])[] | "  - \(.name) | admin=\(.administrator) disabled=\(.disabled) hidden=\(.hidden) last_activity=\(.last_activity // "never")"),
+  "",
+  "Jellyfin Counts",
+  "----------------",
+  "Movies:      \(.jellyfin.counts.movies // 0)",
+  "Series:      \(.jellyfin.counts.series // 0)",
+  "Episodes:    \(.jellyfin.counts.episodes // 0)",
+  "Songs:       \(.jellyfin.counts.songs // 0)",
+  "Albums:      \(.jellyfin.counts.albums // 0)",
+  "Books:       \(.jellyfin.counts.books // 0)",
+  "Total Items: \(.jellyfin.counts.total_items // 0)",
   "",
   "Libraries",
   "---------",
