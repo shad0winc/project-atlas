@@ -301,6 +301,7 @@ Project Atlas Backup
 Created: $(date)
 Version: $(cat VERSION)
 Branch: $(git branch --show-current)
+Commit: $(git rev-parse --short HEAD 2>/dev/null || echo unknown)
 
 Notes:
 ${notes:-None}
