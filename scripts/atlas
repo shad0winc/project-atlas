@@ -71,7 +71,65 @@ URLS
     ;;
 
   verify)
-    ./scripts/verify.sh
+    print_header
+    echo "Atlas Verification"
+    echo
+
+    pass=true
+
+    check() {
+      label="$1"
+      shift
+      if "$@" >/dev/null 2>&1; then
+        echo "OK   $label"
+      else
+        echo "FAIL $label"
+        pass=false
+      fi
+    }
+
+    echo "Infrastructure"
+    echo "--------------"
+    check "Docker Engine" docker info
+    check "Docker Compose" docker compose version
+    check "Project Directory" test -d /opt/project-atlas
+    check "Storage Mounted" test -d /mnt/storage
+    check "Intel GPU Available" test -e /dev/dri/renderD128
+
+    echo
+    echo "Core Services"
+    echo "-------------"
+    for service in jellyfin jellyseerr prowlarr sonarr sonarr-anime radarr radarr-anime gluetun qbittorrent homepage; do
+      check "$service running" sh -c "docker ps --format '{{.Names}}' | grep -qx '$service'"
+    done
+
+    echo
+    echo "Storage Paths"
+    echo "-------------"
+    for path in "/mnt/storage/media/Movies" "/mnt/storage/media/TV" "/mnt/storage/media/Anime Movies" "/mnt/storage/media/Anime TV" "/mnt/storage/downloads"; do
+      check "$path writable" sh -c "touch '$path/.atlas-test' && rm '$path/.atlas-test'"
+    done
+
+    echo
+    echo "Project Files"
+    echo "-------------"
+    for file in VERSION CHARTER.md ROADMAP.md CHANGELOG.md docs/BUILD_LOG.md docs/MATURITY.md docs/INDEXERS.md; do
+      check "$file present" test -e "$file"
+    done
+
+    echo
+    echo "VPN"
+    echo "---"
+    check "Gluetun running" sh -c "docker ps --format '{{.Names}}' | grep -qx gluetun"
+    check "qBittorrent reachable through VPN namespace" docker exec qbittorrent sh -c "curl -s ifconfig.io || wget -qO- ifconfig.io"
+
+    echo
+    if [ "$pass" = true ]; then
+      echo "Overall Status: PASS"
+    else
+      echo "Overall Status: FAIL"
+      exit 1
+    fi
     ;;
 
   doctor)
