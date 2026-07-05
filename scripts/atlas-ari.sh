@@ -251,7 +251,7 @@ report() {
 
 print_library_validation
 print_library_path_validation
-analyze_library_synchronization
+print_library_synchronization
 }
 
 print_library_validation() {
@@ -304,7 +304,7 @@ print_library_path_validation() {
   done
 }
 
-analyze_library_synchronization() {
+print_library_synchronization() {
   local filesystem_movies filesystem_tv
   local jellyfin_movies jellyfin_series
 
