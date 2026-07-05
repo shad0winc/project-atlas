@@ -154,6 +154,60 @@ ARI follows these principles:
 
 ---
 
+# ARI Reasoning Model
+
+ARI separates platform intelligence into four stages:
+
+## Observation
+
+An observation is a fact collected from Atlas or an external service.
+
+Examples:
+
+- Jellyfin reports a library named `Movies`.
+- The filesystem contains `/mnt/storage/media/Movies`.
+- Available storage is `1.7T`.
+
+Observations must be read-only and should not contain judgments.
+
+## Validation
+
+A validation compares observations against expected Atlas configuration.
+
+Examples:
+
+- Jellyfin has all expected libraries.
+- Jellyfin library paths match expected container paths.
+- Required storage paths are writable.
+
+Validations may produce `PASS`, `WARN`, or `FAIL`.
+
+## Recommendation
+
+A recommendation explains what the operator should consider doing.
+
+Examples:
+
+- Re-scan a Jellyfin library.
+- Correct a mismatched library path.
+- Review unused media.
+
+Recommendations do not modify the system.
+
+## Action
+
+An action changes system state.
+
+Examples:
+
+- Delete media.
+- Modify a Jellyfin library.
+- Apply a retention rule.
+
+Actions require explicit operator approval and are outside the scope of the initial ARI implementation.
+
+---
+
 # Future Work
 
 Planned enhancements include:
