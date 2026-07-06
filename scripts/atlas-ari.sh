@@ -220,6 +220,11 @@ print_storage_analysis() {
   echo "Storage Analysis"
   echo "----------------"
 
+  print_storage_snapshot_comparison
+  print_storage_history
+}
+
+print_storage_snapshot_comparison() {
   local previous_snapshot
   previous_snapshot="$(get_previous_snapshot)"
 
@@ -229,7 +234,6 @@ print_storage_analysis() {
   fi
 
   local current previous
-
   current="$(jq -r '.storage.used_bytes // 0' "$LATEST_FILE")"
   previous="$(jq -r '.storage.used_bytes // empty' "$previous_snapshot")"
 
@@ -256,6 +260,9 @@ print_storage_analysis() {
   echo
   echo "Growth       : $growth"
   echo "Direction    : $direction"
+}
+
+print_storage_history() {
   echo
   echo "History"
   echo "-------"
@@ -282,13 +289,16 @@ print_storage_analysis() {
   minimum_used_human="$(format_bytes "$minimum_used")"
   maximum_used_human="$(format_bytes "$maximum_used")"
 
+  local trend
+  trend="$(metric_trend "$net_growth")"
+
   echo "Snapshots     : $snapshot_count"
   echo "Net Growth    : $(metric_growth "$net_growth" "$net_growth_human")"
   echo
   echo "Average Used  : $average_used_human"
   echo "Minimum Used  : $minimum_used_human"
   echo "Maximum Used  : $maximum_used_human"
-
+  echo "Trend         : $trend"
 }
 
 print_library_analysis() {
@@ -671,6 +681,18 @@ metric_direction() {
     echo "Decreasing"
   else
     echo "Unchanged"
+  fi
+}
+
+metric_trend() {
+  local delta="$1"
+
+  if (( delta > 0 )); then
+    echo "Increasing"
+  elif (( delta < 0 )); then
+    echo "Decreasing"
+  else
+    echo "Stable"
   fi
 }
 
