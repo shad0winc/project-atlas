@@ -534,7 +534,32 @@ print_snapshot_comparison() {
 }
 
 ###############################################################################
-# Helper Functions
+# Snapshot Helpers
+###############################################################################
+
+get_recent_snapshots() {
+  local count="${1:-5}"
+
+  find "$ARI_SNAPSHOT_DIR" \
+    -maxdepth 1 \
+    -type f \
+    -name '*.json' \
+    | sort \
+    | tail -n "$count"
+}
+
+get_snapshot_count() {
+  get_recent_snapshots "$1" | wc -l
+}
+
+get_oldest_recent_snapshot() {
+  local count="${1:-5}"
+
+  get_recent_snapshots "$count" | head -n 1
+}
+
+###############################################################################
+# Jellyfin Helpers
 ###############################################################################
 
 get_jellyfin_library_path() {
@@ -547,12 +572,41 @@ get_jellyfin_library_path() {
   ' "$LATEST_FILE"
 }
 
+###############################################################################
+# Snapshot Helpers
+###############################################################################
+
 get_previous_snapshot() {
   ls -1 "$ARI_SNAPSHOT_DIR"/*.json 2>/dev/null \
     | sort \
     | tail -2 \
     | head -1
 }
+
+get_recent_snapshots() {
+  local count="${1:-5}"
+
+  find "$ARI_SNAPSHOT_DIR" \
+    -maxdepth 1 \
+    -type f \
+    -name '*.json' \
+    | sort \
+    | tail -n "$count"
+}
+
+get_snapshot_count() {
+  get_recent_snapshots "$1" | wc -l
+}
+
+get_oldest_recent_snapshot() {
+  local count="${1:-5}"
+
+  get_recent_snapshots "$count" | head -n 1
+}
+
+###############################################################################
+# Formatting Helpers
+###############################################################################
 
 format_bytes() {
   local bytes="$1"
@@ -563,6 +617,10 @@ format_bytes() {
     --format="%.1f" \
     "$bytes"
 }
+
+###############################################################################
+# Metric Helpers
+###############################################################################
 
 metric_delta() {
   local previous="$1"
