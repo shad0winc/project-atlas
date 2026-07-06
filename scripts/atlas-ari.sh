@@ -240,32 +240,16 @@ print_storage_analysis() {
   fi
 
   local delta
-  delta=$((current - previous))
+  delta="$(metric_delta "$previous" "$current")"
 
   local current_human previous_human delta_human
   current_human="$(format_bytes "$current")"
   previous_human="$(format_bytes "$previous")"
   delta_human="$(format_bytes "${delta#-}")"
 
-  local direction
-
-  if (( delta > 0 )); then
-      direction="Increasing"
-  elif (( delta < 0 )); then
-      direction="Decreasing"
-  else
-      direction="Unchanged"
-  fi
-
-  local growth
-
-  if (( delta > 0 )); then
-      growth="+$delta_human"
-  elif (( delta < 0 )); then
-      growth="-$delta_human"
-  else
-      growth="$delta_human"
-  fi
+  local direction growth
+  direction="$(metric_direction "$delta")"
+  growth="$(metric_growth "$delta" "$delta_human")"
 
   echo "Current Used : $current_human"
   echo "Previous Used: $previous_human"
@@ -592,6 +576,38 @@ format_bytes() {
     --suffix=B \
     --format="%.1f" \
     "$bytes"
+}
+
+metric_delta() {
+  local previous="$1"
+  local current="$2"
+
+  echo $((current - previous))
+}
+
+metric_direction() {
+  local delta="$1"
+
+  if (( delta > 0 )); then
+    echo "Increasing"
+  elif (( delta < 0 )); then
+    echo "Decreasing"
+  else
+    echo "Unchanged"
+  fi
+}
+
+metric_growth() {
+  local delta="$1"
+  local formatted="$2"
+
+  if (( delta > 0 )); then
+    echo "+$formatted"
+  elif (( delta < 0 )); then
+    echo "-$formatted"
+  else
+    echo "$formatted"
+  fi
 }
 
 ###############################################################################
