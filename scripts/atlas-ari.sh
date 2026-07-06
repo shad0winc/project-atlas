@@ -207,6 +207,72 @@ EOF
 }
 
 ###############################################################################
+# Analysis
+###############################################################################
+
+print_analysis() {
+  print_storage_analysis
+  print_library_analysis
+}
+
+print_storage_analysis() {
+  echo
+  echo "Storage Analysis"
+  echo "----------------"
+
+  local previous_snapshot
+  previous_snapshot="$(get_previous_snapshot)"
+
+  if [[ -z "$previous_snapshot" || ! -f "$previous_snapshot" ]]; then
+    echo "No previous snapshot available."
+    return
+  fi
+
+  local current previous
+
+  current="$(jq -r '.storage.used_bytes // 0' "$LATEST_FILE")"
+  previous="$(jq -r '.storage.used_bytes // empty' "$previous_snapshot")"
+
+  if [[ -z "$previous" ]]; then
+    echo "Previous snapshot does not contain byte-accurate storage data."
+    echo "Run another collection to enable storage growth analysis."
+    return
+  fi
+
+  local delta=$((current - previous))
+
+  echo "Current Bytes : $current"
+  echo "Previous Bytes: $previous"
+  echo "Difference    : $delta bytes"
+}
+
+print_library_analysis() {
+  echo
+  echo "Library Analysis"
+  echo "----------------"
+
+  local previous_snapshot
+  previous_snapshot="$(get_previous_snapshot)"
+
+  if [[ -z "$previous_snapshot" || ! -f "$previous_snapshot" ]]; then
+    echo "No previous snapshot available."
+    return
+  fi
+
+  local current_movies previous_movies
+  local current_tv previous_tv
+
+  current_movies="$(jq -r '.libraries.movies.count // 0' "$LATEST_FILE")"
+  previous_movies="$(jq -r '.libraries.movies.count // 0' "$previous_snapshot")"
+
+  current_tv="$(jq -r '.libraries.tv.count // 0' "$LATEST_FILE")"
+  previous_tv="$(jq -r '.libraries.tv.count // 0' "$previous_snapshot")"
+
+  echo "Movies: $previous_movies → $current_movies"
+  echo "TV:     $previous_tv → $current_tv"
+}
+
+###############################################################################
 # Reporting
 ###############################################################################
 
@@ -273,6 +339,7 @@ report() {
 print_library_validation
 print_library_path_validation
 print_library_synchronization
+print_analysis
 print_snapshot_comparison
 }
 
