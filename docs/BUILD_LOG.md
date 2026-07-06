@@ -98,3 +98,21 @@ Completed:
 Result:
 
 ARI now provides a unified operational view of the Atlas platform through immutable snapshots and validation-driven reporting.
+
+---
+
+## M-009 — Operational Intelligence
+
+Completed:
+
+- Added Jellyfin aggregate metrics
+- Added Jellyfin user inventory
+- Added library synchronization validation
+- Added historical snapshot comparison
+- Added operational summaries
+- Added byte-accurate storage metrics
+- Refactored ARI into functional sections
+
+Result:
+
+Atlas can now compare historical snapshots and detect operational changes across the media platform.

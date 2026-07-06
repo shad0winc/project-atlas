@@ -4,119 +4,97 @@
 
 ---
 
-# ✅ v1.0.0 – Platform Foundation
+# ✅ v0.9.0 — Operational Intelligence Foundation
 
-Established the core media platform.
+Atlas has evolved from a media stack into an operational platform.
 
-Completed:
+## Platform
 
-- Docker infrastructure
-- Storage architecture
-- VPN networking
-- GitHub repository
-- Documentation foundation
-- Intel Quick Sync
-- Jellyfin
-- Sonarr
-- Radarr
-- Anime ecosystem
-- Prowlarr
-- Recyclarr
-- Jellyseerr
-- Maintainerr
-- Homepage
-- Operational CLI
+- [x] Docker infrastructure
+- [x] Storage architecture
+- [x] VPN networking
+- [x] Intel Quick Sync
+- [x] Operational CLI
 
-Status:
+## Media Platform
 
-**Complete**
+- [x] Jellyfin
+- [x] Sonarr
+- [x] Radarr
+- [x] Anime ecosystem
+- [x] Jellyseerr
+- [x] Prowlarr
+- [x] Recyclarr
+- [x] Maintainerr
+- [x] Homepage
+- [x] Dozzle
 
----
+## Atlas Retention Intelligence (ARI)
 
-# ✅ v1.5.0 – Media Platform
+### Foundation
 
-Expanded Atlas into a complete media management platform.
+- [x] Shared configuration
+- [x] Immutable snapshots
+- [x] Historical snapshot storage
 
-Completed:
+### Adapters
 
-- Movie automation
-- TV automation
-- Anime automation
-- Request workflow
-- Quality profile synchronization
-- Metadata management
-- Automated cleanup
-- Operational backups
-- Verification tooling
+- [x] Filesystem
+- [x] Jellyfin server
+- [x] Jellyfin libraries
+- [x] Jellyfin users
 
-Status:
+### Validation
 
-**Complete**
-
----
-
-# ✅ v1.8.0 – Atlas Retention Intelligence (ARI)
-
-Atlas gained operational observability.
-
-## Foundation
-
-- [x] Shared configuration (`atlas.conf`)
-- [x] Runtime state separation
-- [x] Immutable snapshot architecture
-- [x] Historical snapshots
-
-## Adapters
-
-- [x] Filesystem adapter
-- [x] Jellyfin server adapter
-- [x] Jellyfin library adapter
-- [x] Jellyfin user adapter
-
-## Validation
-
-- [x] Library existence validation
+- [x] Library validation
 - [x] Library path validation
 
-## Reporting
+### Operational Intelligence
 
-- [x] Human-readable operational report
-- [x] Machine-readable snapshots
+- [x] Library synchronization
+- [x] Historical snapshot comparison
+- [x] Operational summaries
+- [x] Byte-accurate storage metrics
 
 Status:
 
-**Complete**
+**Current Release**
 
 ---
 
-# 🚧 v2.0.0 – Operational Intelligence
+# 🚧 v1.0.0 — Production Release
 
-Transform ARI from an observation platform into an operational intelligence platform.
+Complete Atlas as a production-ready platform.
 
-## v2.0.1 – Platform Synchronization
+## Operational Intelligence
 
-- Filesystem ↔ Jellyfin comparison
-- Library synchronization
-- Media indexing validation
+- [ ] Historical storage trends
+- [ ] Library growth analysis
+- [ ] User activity analytics
+- [ ] Capacity forecasting
+- [ ] Configuration drift detection
+- [ ] Health scoring
+- [ ] Operational recommendations
 
-## v2.0.2 – Snapshot Analytics
+## Automation
 
-- Historical comparisons
-- Storage growth analysis
-- Library growth trends
+- [ ] Scheduled ARI collection
+- [ ] Scheduled reporting
+- [ ] Automated health reports
 
-## v2.0.3 – User Analytics
+## Reliability
 
-- User activity
-- Administrator inventory
-- Account health
-- Usage summaries
+- [ ] Backup verification
+- [ ] Disaster recovery validation
+- [ ] Configuration validation
+- [ ] Restore testing
 
-## v2.0.4 – Retention Intelligence
+## Documentation
 
-- Media lifecycle scoring
-- Safe retention recommendations
-- Usage-aware analytics
+- [ ] Architecture Guide
+- [ ] Administrator Guide
+- [ ] User Guide
+- [ ] Developer Guide
 
 Status:
 
@@ -124,29 +102,32 @@ Status:
 
 ---
 
-# 🔮 v3.0.0 – Atlas Management Portal
+# 🔮 v2.0.0 — Atlas Management Platform
 
-Transition Atlas from a CLI-first platform into a full management experience.
+Expand Atlas beyond a CLI-first experience.
 
-Planned:
+## Planned
 
 - Atlas web interface
 - Dashboard
-- Health monitoring
 - Interactive reporting
+- Health monitoring
 - Administrative controls
 - User portal
 - Documentation website
+- REST API
 
 ---
 
-# 🌐 Future Vision
+# 🌐 Long-Term Vision
 
-Potential long-term capabilities include:
+Potential future capabilities:
 
 - Multi-server Atlas deployments
+- Distributed storage management
 - Gaming server management
 - Plugin architecture
 - Notification framework
+- Mobile companion
 - AI-assisted operational insights
 - High availability

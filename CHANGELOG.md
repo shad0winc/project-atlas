@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.0.0
+## [0.4.0]
 
 ### Added
 - Initial Docker media stack
@@ -31,3 +31,32 @@
 - Validation framework
 - Runtime state separation
 - Snapshot schema
+
+# Changelog
+
+## [0.9.0] — Operational Intelligence
+
+### Added
+
+- Atlas Retention Intelligence (ARI)
+- Immutable historical snapshots
+- Shared configuration architecture
+- Jellyfin server adapter
+- Jellyfin library adapter
+- Jellyfin user adapter
+- Jellyfin aggregate metrics
+- Human-readable operational reports
+- Machine-readable snapshot schema
+- Library validation
+- Library path validation
+- Filesystem ↔ Jellyfin synchronization analysis
+- Historical snapshot comparison
+- Operational change summaries
+- Byte-accurate storage metrics
+
+### Improved
+
+- ARI script organization
+- Snapshot schema
+- Report formatting
+- Documentation
