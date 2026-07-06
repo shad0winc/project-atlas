@@ -281,26 +281,12 @@ print_library_analysis() {
   previous_tv="$(jq -r '.libraries.tv.count // 0' "$previous_snapshot")"
 
   local movies_delta tv_delta
-  movies_delta=$((current_movies - previous_movies))
-  tv_delta=$((current_tv - previous_tv))
+  movies_delta="$(metric_delta "$previous_movies" "$current_movies")"
+  tv_delta="$(metric_delta "$previous_tv" "$current_tv")"
 
   local movies_status tv_status
-
-  if (( movies_delta > 0 )); then
-    movies_status="Increasing"
-  elif (( movies_delta < 0 )); then
-    movies_status="Decreasing"
-  else
-    movies_status="Unchanged"
-  fi
-
-  if (( tv_delta > 0 )); then
-    tv_status="Increasing"
-  elif (( tv_delta < 0 )); then
-    tv_status="Decreasing"
-  else
-    tv_status="Unchanged"
-  fi
+  movies_status="$(metric_direction "$movies_delta")"
+  tv_status="$(metric_direction "$tv_delta")"
 
   echo "Movies"
   echo "  Current : $current_movies"
