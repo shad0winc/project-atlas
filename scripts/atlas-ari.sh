@@ -669,6 +669,8 @@ format_bytes() {
 # Metric Helpers
 ###############################################################################
 
+# Basic Metrics
+
 metric_delta() {
   local previous="$1"
   local current="$2"
@@ -713,6 +715,8 @@ metric_growth() {
   fi
 }
 
+# Historical Metrics
+
 metric_history_delta() {
   local jq_path="$1"
   local count="${2:-5}"
@@ -751,6 +755,8 @@ metric_history_values() {
       fi
     done
 }
+
+# Statistical Metrics
 
 metric_average() {
   awk '
@@ -799,11 +805,27 @@ metric_count() {
   '
 }
 
+# Domain Metrics
+
 metric_storage_net_growth() {
   local count="${1:-5}"
 
   metric_history_delta '.storage.used_bytes' "$count"
 }
+
+metric_movie_net_growth() {
+  local count="${1:-5}"
+
+  metric_history_delta '.libraries.movies.count' "$count"
+}
+
+metric_tv_net_growth() {
+  local count="${1:-5}"
+
+  metric_history_delta '.libraries.tv.count' "$count"
+}
+
+
 
 ###############################################################################
 # Validation
