@@ -239,11 +239,39 @@ print_storage_analysis() {
     return
   fi
 
-  local delta=$((current - previous))
+  local delta
+  delta=$((current - previous))
 
-  echo "Current Bytes : $current"
-  echo "Previous Bytes: $previous"
-  echo "Difference    : $delta bytes"
+  local current_human previous_human delta_human
+  current_human="$(format_bytes "$current")"
+  previous_human="$(format_bytes "$previous")"
+  delta_human="$(format_bytes "${delta#-}")"
+
+  local direction
+
+  if (( delta > 0 )); then
+      direction="Increasing"
+  elif (( delta < 0 )); then
+      direction="Decreasing"
+  else
+      direction="Unchanged"
+  fi
+
+  local growth
+
+  if (( delta > 0 )); then
+      growth="+$delta_human"
+  elif (( delta < 0 )); then
+      growth="-$delta_human"
+  else
+      growth="$delta_human"
+  fi
+
+  echo "Current Used : $current_human"
+  echo "Previous Used: $previous_human"
+  echo
+  echo "Growth       : $growth"
+  echo "Direction    : $direction"
 }
 
 print_library_analysis() {
@@ -523,6 +551,16 @@ get_previous_snapshot() {
     | sort \
     | tail -2 \
     | head -1
+}
+
+format_bytes() {
+  local bytes="$1"
+
+  numfmt \
+    --to=iec \
+    --suffix=B \
+    --format="%.1f" \
+    "$bytes"
 }
 
 ###############################################################################
