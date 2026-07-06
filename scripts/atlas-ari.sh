@@ -669,14 +669,15 @@ metric_growth() {
   fi
 }
 
-metric_storage_net_growth() {
-  local count="${1:-5}"
+metric_history_delta() {
+  local jq_path="$1"
+  local count="${2:-5}"
 
   local oldest_snapshot
   oldest_snapshot="$(
     get_recent_snapshots "$count" |
       while read -r snapshot; do
-        if jq -e '.storage.used_bytes' "$snapshot" >/dev/null 2>&1; then
+        if jq -e "$jq_path" "$snapshot" >/dev/null 2>&1; then
           echo "$snapshot"
           break
         fi
@@ -689,11 +690,16 @@ metric_storage_net_growth() {
   fi
 
   local oldest current
-
-  oldest="$(jq -r '.storage.used_bytes // 0' "$oldest_snapshot")"
-  current="$(jq -r '.storage.used_bytes // 0' "$LATEST_FILE")"
+  oldest="$(jq -r "$jq_path // 0" "$oldest_snapshot")"
+  current="$(jq -r "$jq_path // 0" "$LATEST_FILE")"
 
   metric_delta "$oldest" "$current"
+}
+
+metric_storage_net_growth() {
+  local count="${1:-5}"
+
+  metric_history_delta '.storage.used_bytes' "$count"
 }
 
 ###############################################################################
