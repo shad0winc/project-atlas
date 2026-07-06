@@ -306,6 +306,10 @@ print_library_analysis() {
   echo "Library Analysis"
   echo "----------------"
 
+  print_library_snapshot_comparison
+}
+
+print_library_snapshot_comparison() {
   local previous_snapshot
   previous_snapshot="$(get_previous_snapshot)"
 
