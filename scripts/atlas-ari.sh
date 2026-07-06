@@ -271,6 +271,15 @@ print_storage_analysis() {
 
   echo "Snapshots    : $snapshot_count"
   echo "Net Growth   : $(metric_growth "$net_growth" "$net_growth_human")"
+
+  local average_used
+  average_used="$(metric_history_values '.storage.used_bytes' 5 | metric_average)"
+
+  local average_used_human
+  average_used_human="$(format_bytes "$average_used")"
+
+  echo "Average Used : $average_used_human"
+
 }
 
 print_library_analysis() {
@@ -694,6 +703,31 @@ metric_history_delta() {
   current="$(jq -r "$jq_path // 0" "$LATEST_FILE")"
 
   metric_delta "$oldest" "$current"
+}
+
+metric_history_values() {
+  local jq_path="$1"
+  local count="${2:-5}"
+
+  get_recent_snapshots "$count" |
+    while read -r snapshot; do
+      if jq -e "$jq_path" "$snapshot" >/dev/null 2>&1; then
+        jq -r "$jq_path" "$snapshot"
+      fi
+    done
+}
+
+metric_average() {
+  awk '
+    { sum += $1; count++ }
+    END {
+      if (count == 0) {
+        print 0
+      } else {
+        printf "%.0f\n", sum / count
+      }
+    }
+  '
 }
 
 metric_storage_net_growth() {
