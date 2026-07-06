@@ -256,6 +256,21 @@ print_storage_analysis() {
   echo
   echo "Growth       : $growth"
   echo "Direction    : $direction"
+  echo
+  echo "History"
+  echo "-------"
+
+  local snapshot_count
+  snapshot_count="$(get_snapshot_count 5)"
+
+  local net_growth
+  net_growth="$(metric_storage_net_growth 5)"
+
+  local net_growth_human
+  net_growth_human="$(format_bytes "${net_growth#-}")"
+
+  echo "Snapshots    : $snapshot_count"
+  echo "Net Growth   : $(metric_growth "$net_growth" "$net_growth_human")"
 }
 
 print_library_analysis() {
@@ -652,6 +667,33 @@ metric_growth() {
   else
     echo "$formatted"
   fi
+}
+
+metric_storage_net_growth() {
+  local count="${1:-5}"
+
+  local oldest_snapshot
+  oldest_snapshot="$(
+    get_recent_snapshots "$count" |
+      while read -r snapshot; do
+        if jq -e '.storage.used_bytes' "$snapshot" >/dev/null 2>&1; then
+          echo "$snapshot"
+          break
+        fi
+      done
+  )"
+
+  if [[ -z "$oldest_snapshot" || ! -f "$oldest_snapshot" ]]; then
+    echo 0
+    return
+  fi
+
+  local oldest current
+
+  oldest="$(jq -r '.storage.used_bytes // 0' "$oldest_snapshot")"
+  current="$(jq -r '.storage.used_bytes // 0' "$LATEST_FILE")"
+
+  metric_delta "$oldest" "$current"
 }
 
 ###############################################################################
