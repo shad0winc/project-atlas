@@ -61,10 +61,16 @@ collect() {
   snapshot_file="$ARI_SNAPSHOT_DIR/$safe_timestamp.json"
 
   local storage_capacity storage_used storage_available storage_use_percent
+  local storage_capacity_bytes storage_used_bytes storage_available_bytes
+
   storage_capacity="$(df -h "$MEDIA_ROOT" 2>/dev/null | awk 'NR==2 {print $2}')"
   storage_used="$(df -h "$MEDIA_ROOT" 2>/dev/null | awk 'NR==2 {print $3}')"
   storage_available="$(df -h "$MEDIA_ROOT" 2>/dev/null | awk 'NR==2 {print $4}')"
   storage_use_percent="$(df -h "$MEDIA_ROOT" 2>/dev/null | awk 'NR==2 {gsub("%","",$5); print $5}')"
+
+  storage_capacity_bytes="$(df -B1 "$MEDIA_ROOT" 2>/dev/null | awk 'NR==2 {print $2}')"
+  storage_used_bytes="$(df -B1 "$MEDIA_ROOT" 2>/dev/null | awk 'NR==2 {print $3}')"
+  storage_available_bytes="$(df -B1 "$MEDIA_ROOT" 2>/dev/null | awk 'NR==2 {print $4}')"
 
   local jellyfin_info jellyfin_server_name jellyfin_version jellyfin_id
   jellyfin_info="{}"
@@ -160,8 +166,11 @@ collect() {
   "storage": {
     "media_root": "$MEDIA_ROOT",
     "capacity": "$storage_capacity",
+    "capacity_bytes": $storage_capacity_bytes,
     "used": "$storage_used",
+    "used_bytes": $storage_used_bytes,
     "available": "$storage_available",
+    "available_bytes": $storage_available_bytes,
     "utilization_percent": $storage_use_percent
   },
 
