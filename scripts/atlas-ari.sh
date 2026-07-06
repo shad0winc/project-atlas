@@ -269,16 +269,25 @@ print_storage_analysis() {
   local net_growth_human
   net_growth_human="$(format_bytes "${net_growth#-}")"
 
-  echo "Snapshots    : $snapshot_count"
-  echo "Net Growth   : $(metric_growth "$net_growth" "$net_growth_human")"
+  local values
+  values="$(metric_history_values '.storage.used_bytes' 5)"
 
-  local average_used
-  average_used="$(metric_history_values '.storage.used_bytes' 5 | metric_average)"
+  local average_used minimum_used maximum_used
+  average_used="$(printf '%s\n' "$values" | metric_average)"
+  minimum_used="$(printf '%s\n' "$values" | metric_min)"
+  maximum_used="$(printf '%s\n' "$values" | metric_max)"
 
-  local average_used_human
+  local average_used_human minimum_used_human maximum_used_human
   average_used_human="$(format_bytes "$average_used")"
+  minimum_used_human="$(format_bytes "$minimum_used")"
+  maximum_used_human="$(format_bytes "$maximum_used")"
 
-  echo "Average Used : $average_used_human"
+  echo "Snapshots     : $snapshot_count"
+  echo "Net Growth    : $(metric_growth "$net_growth" "$net_growth_human")"
+  echo
+  echo "Average Used  : $average_used_human"
+  echo "Minimum Used  : $minimum_used_human"
+  echo "Maximum Used  : $maximum_used_human"
 
 }
 
@@ -726,6 +735,40 @@ metric_average() {
       } else {
         printf "%.0f\n", sum / count
       }
+    }
+  '
+}
+
+metric_min() {
+  awk '
+    NR == 1 { min = $1 }
+    $1 < min { min = $1 }
+    END {
+      if (NR == 0)
+        print 0
+      else
+        print min
+    }
+  '
+}
+
+metric_max() {
+  awk '
+    NR == 1 { max = $1 }
+    $1 > max { max = $1 }
+    END {
+      if (NR == 0)
+        print 0
+      else
+        print max
+    }
+  '
+}
+
+metric_count() {
+  awk '
+    END {
+      print NR
     }
   '
 }
