@@ -377,11 +377,17 @@ print_snapshot_comparison() {
   current_users="$(jq -r '(.jellyfin.users // []) | length' "$LATEST_FILE")"
   previous_users="$(jq -r '(.jellyfin.users // []) | length' "$previous_snapshot")"
 
+  local current_storage_used previous_storage_used
+
+  current_storage_used="$(jq -r '.storage.used // "unknown"' "$LATEST_FILE")"
+  previous_storage_used="$(jq -r '.storage.used // "unknown"' "$previous_snapshot")"
+
   local changes=0
 
   [[ "$current_movies" != "$previous_movies" ]] && ((changes++))
   [[ "$current_tv" != "$previous_tv" ]] && ((changes++))
   [[ "$current_users" != "$previous_users" ]] && ((changes++))
+  [[ "$current_storage_used" != "$previous_storage_used" ]] && ((changes++))
 
   echo
   echo "Snapshot Comparison"
@@ -401,6 +407,7 @@ print_snapshot_comparison() {
   echo
   echo "Details"
   echo "-------"
+  echo "Storage Used: $previous_storage_used → $current_storage_used"
   echo "Movies: $previous_movies → $current_movies"
   echo "TV:     $previous_tv → $current_tv"
   echo "Users:  $previous_users → $current_users"
