@@ -387,16 +387,31 @@ print_snapshot_comparison() {
   previous_users="$(jq -r '(.jellyfin.users // []) | length' "$previous_snapshot")"
 
   local current_storage_used previous_storage_used
+  local current_storage_used_bytes previous_storage_used_bytes
 
   current_storage_used="$(jq -r '.storage.used // "unknown"' "$LATEST_FILE")"
   previous_storage_used="$(jq -r '.storage.used // "unknown"' "$previous_snapshot")"
 
+  current_storage_used_bytes="$(jq -r '.storage.used_bytes // 0' "$LATEST_FILE")"
+  previous_storage_used_bytes="$(jq -r '.storage.used_bytes // 0' "$previous_snapshot")"
+
   local changes=0
 
-  [[ "$current_movies" != "$previous_movies" ]] && ((changes++))
-  [[ "$current_tv" != "$previous_tv" ]] && ((changes++))
-  [[ "$current_users" != "$previous_users" ]] && ((changes++))
-  [[ "$current_storage_used" != "$previous_storage_used" ]] && ((changes++))
+  if [[ "$current_movies" != "$previous_movies" ]]; then
+  changes=$((changes + 1))
+  fi
+
+  if [[ "$current_tv" != "$previous_tv" ]]; then
+  changes=$((changes + 1))
+  fi
+
+  if [[ "$current_users" != "$previous_users" ]]; then
+  changes=$((changes + 1))
+  fi
+
+  if [[ "$current_storage_used_bytes" != "$previous_storage_used_bytes" ]]; then
+  changes=$((changes + 1))
+  fi
 
   echo
   echo "Snapshot Comparison"
