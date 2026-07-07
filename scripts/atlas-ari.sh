@@ -240,6 +240,13 @@ print_health() {
     warnings+=("Library synchronization failed")
   fi
 
+  if health_check_storage >/dev/null 2>&1; then
+    checks+=("Storage utilization")
+  else
+    score=$((score - 20))
+    warnings+=("Storage utilization is critically high")
+  fi
+
   local status="Healthy"
 
   if (( score < 90 )); then
@@ -310,6 +317,18 @@ health_check_library_synchronization() {
   fi
 
   return "$failed"
+}
+
+health_check_storage() {
+  local used_percent
+
+  used_percent="$(jq -r '.storage.utilization_percent // 100' "$LATEST_FILE")"
+
+  if (( used_percent >= 95 )); then
+    return 1
+  fi
+
+  return 0
 }
 
 ###############################################################################
