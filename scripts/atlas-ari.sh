@@ -216,10 +216,86 @@ print_health() {
   echo "------------"
 
   local score=100
+  local warnings=()
+
+  if ! validate_jellyfin_libraries >/dev/null 2>&1; then
+    score=$((score - 20))
+    warnings+=("Jellyfin library validation failed")
+  fi
+
+  if ! health_check_library_paths >/dev/null 2>&1; then
+    score=$((score - 20))
+    warnings+=("Jellyfin library path validation failed")
+  fi
+
+  if ! health_check_library_synchronization >/dev/null 2>&1; then
+    score=$((score - 20))
+    warnings+=("Library synchronization failed")
+  fi
+
   local status="Healthy"
+
+  if (( score < 90 )); then
+    status="Warning"
+  fi
+
+  if (( score < 70 )); then
+    status="Degraded"
+  fi
 
   echo "Score : $score / 100"
   echo "Status: $status"
+
+  if (( ${#warnings[@]} > 0 )); then
+    echo
+    echo "Warnings"
+    echo "--------"
+    for warning in "${warnings[@]}"; do
+      echo "- $warning"
+    done
+  fi
+}
+
+health_check_library_paths() {
+  local expected_paths=(
+    "Movies:$ATLAS_JELLYFIN_MOVIES_PATH"
+    "TV:$ATLAS_JELLYFIN_TV_PATH"
+    "Anime Movies:$ATLAS_JELLYFIN_ANIME_MOVIES_PATH"
+    "Anime TV:$ATLAS_JELLYFIN_ANIME_TV_PATH"
+  )
+
+  local item library expected actual failed=0
+
+  for item in "${expected_paths[@]}"; do
+    library="${item%%:*}"
+    expected="${item#*:}"
+    actual="$(get_jellyfin_library_path "$library")"
+
+    if [[ "$actual" != "$expected" ]]; then
+      failed=1
+    fi
+  done
+
+  return "$failed"
+}
+
+health_check_library_synchronization() {
+  local movies_count tv_count jellyfin_movies jellyfin_series failed=0
+
+  movies_count="$(jq -r '.libraries.movies.count // 0' "$LATEST_FILE")"
+  tv_count="$(jq -r '.libraries.tv.count // 0' "$LATEST_FILE")"
+  jellyfin_movies="$(jq -r '.jellyfin.counts.movies // 0' "$LATEST_FILE")"
+  jellyfin_series="$(jq -r '.jellyfin.counts.series // 0' "$LATEST_FILE")"
+
+  if [[ "$movies_count" != "$jellyfin_movies" ]]; then
+    failed=1
+  fi
+
+  if [[ "$tv_count" != "$jellyfin_series" ]]; then
+    failed=1
+  fi
+
+  return "$failed"
 }
 
 ###############################################################################
