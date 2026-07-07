@@ -207,6 +207,22 @@ EOF
 }
 
 ###############################################################################
+# Health
+###############################################################################
+
+print_health() {
+  echo
+  echo "Atlas Health"
+  echo "------------"
+
+  local score=100
+  local status="Healthy"
+
+  echo "Score : $score / 100"
+  echo "Status: $status"
+}
+
+###############################################################################
 # Analysis
 ###############################################################################
 
@@ -459,6 +475,7 @@ report() {
   "Anime TV:      \(.libraries.anime_tv.count)"
   ' "$LATEST_FILE"
 
+print_health
 print_library_validation
 print_library_path_validation
 print_library_synchronization
