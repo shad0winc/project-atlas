@@ -307,6 +307,7 @@ print_library_analysis() {
   echo "----------------"
 
   print_library_snapshot_comparison
+  print_library_history
 }
 
 print_library_snapshot_comparison() {
@@ -346,6 +347,52 @@ print_library_snapshot_comparison() {
   echo "  Previous: $previous_tv"
   echo "  Growth  : $tv_delta"
   echo "  Status  : $tv_status"
+}
+
+print_library_history() {
+  echo
+  echo "History"
+  echo "-------"
+
+  local snapshot_count
+  snapshot_count="$(get_snapshot_count 5)"
+
+  local movie_values tv_values
+  movie_values="$(metric_movie_values 5)"
+  tv_values="$(metric_tv_values 5)"
+
+  local movie_growth tv_growth
+  movie_growth="$(metric_movie_net_growth 5)"
+  tv_growth="$(metric_tv_net_growth 5)"
+
+  local movie_average movie_min movie_max
+  movie_average="$(printf '%s\n' "$movie_values" | metric_average)"
+  movie_min="$(printf '%s\n' "$movie_values" | metric_min)"
+  movie_max="$(printf '%s\n' "$movie_values" | metric_max)"
+
+  local tv_average tv_min tv_max
+  tv_average="$(printf '%s\n' "$tv_values" | metric_average)"
+  tv_min="$(printf '%s\n' "$tv_values" | metric_min)"
+  tv_max="$(printf '%s\n' "$tv_values" | metric_max)"
+
+  echo "Snapshots     : $snapshot_count"
+  echo
+
+  echo "Movies"
+  echo "  Net Growth  : $movie_growth"
+  echo "  Average     : $movie_average"
+  echo "  Minimum     : $movie_min"
+  echo "  Maximum     : $movie_max"
+  echo "  Trend       : $(metric_movie_trend 5)"
+
+  echo
+
+  echo "TV"
+  echo "  Net Growth  : $tv_growth"
+  echo "  Average     : $tv_average"
+  echo "  Minimum     : $tv_min"
+  echo "  Maximum     : $tv_max"
+  echo "  Trend       : $(metric_tv_trend 5)"
 }
 
 ###############################################################################
@@ -825,7 +872,25 @@ metric_tv_net_growth() {
   metric_history_delta '.libraries.tv.count' "$count"
 }
 
+metric_movie_values() {
+  local count="${1:-5}"
 
+  metric_history_values '.libraries.movies.count' "$count"
+}
+
+metric_tv_values() {
+  local count="${1:-5}"
+
+  metric_history_values '.libraries.tv.count' "$count"
+}
+
+metric_movie_trend() {
+  metric_trend "$(metric_movie_net_growth "$1")"
+}
+
+metric_tv_trend() {
+  metric_trend "$(metric_tv_net_growth "$1")"
+}
 
 ###############################################################################
 # Validation
