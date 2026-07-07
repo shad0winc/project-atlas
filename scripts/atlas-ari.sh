@@ -247,6 +247,13 @@ print_health() {
     warnings+=("Storage utilization is critically high")
   fi
 
+  if health_check_snapshot_freshness >/dev/null 2>&1; then
+    checks+=("Snapshot freshness")
+  else
+    score=$((score - 10))
+    warnings+=("ARI snapshot is more than 24 hours old")
+  fi
+
   local status="Healthy"
 
   if (( score < 90 )); then
@@ -325,6 +332,25 @@ health_check_storage() {
   used_percent="$(jq -r '.storage.utilization_percent // 100' "$LATEST_FILE")"
 
   if (( used_percent >= 95 )); then
+    return 1
+  fi
+
+  return 0
+}
+
+health_check_snapshot_freshness() {
+  local latest_snapshot
+
+  latest_snapshot="$(stat -c %Y "$LATEST_FILE")"
+
+  local now
+  now="$(date +%s)"
+
+  local age
+  age=$((now - latest_snapshot))
+
+  # Snapshot older than 24 hours
+  if (( age > 86400 )); then
     return 1
   fi
 
