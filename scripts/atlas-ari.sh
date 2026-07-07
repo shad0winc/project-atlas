@@ -216,19 +216,26 @@ print_health() {
   echo "------------"
 
   local score=100
+  local checks=()
   local warnings=()
 
-  if ! validate_jellyfin_libraries >/dev/null 2>&1; then
+  if validate_jellyfin_libraries >/dev/null 2>&1; then
+    checks+=("Jellyfin libraries")
+  else
     score=$((score - 20))
     warnings+=("Jellyfin library validation failed")
   fi
 
-  if ! health_check_library_paths >/dev/null 2>&1; then
+  if health_check_library_paths >/dev/null 2>&1; then
+    checks+=("Jellyfin library paths")
+  else
     score=$((score - 20))
     warnings+=("Jellyfin library path validation failed")
   fi
 
-  if ! health_check_library_synchronization >/dev/null 2>&1; then
+  if health_check_library_synchronization >/dev/null 2>&1; then
+    checks+=("Library synchronization")
+  else
     score=$((score - 20))
     warnings+=("Library synchronization failed")
   fi
@@ -245,6 +252,13 @@ print_health() {
 
   echo "Score : $score / 100"
   echo "Status: $status"
+  echo
+  echo "Checks"
+  echo "------"
+
+  for check in "${checks[@]}"; do
+    echo "✓ $check"
+  done
 
   if (( ${#warnings[@]} > 0 )); then
     echo
