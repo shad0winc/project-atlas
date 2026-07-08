@@ -219,40 +219,11 @@ print_health() {
   local checks=()
   local warnings=()
 
-  if validate_jellyfin_libraries >/dev/null 2>&1; then
-    checks+=("Jellyfin libraries")
-  else
-    score=$((score - 20))
-    warnings+=("Jellyfin library validation failed")
-  fi
-
-  if health_check_library_paths >/dev/null 2>&1; then
-    checks+=("Jellyfin library paths")
-  else
-    score=$((score - 20))
-    warnings+=("Jellyfin library path validation failed")
-  fi
-
-  if health_check_library_synchronization >/dev/null 2>&1; then
-    checks+=("Library synchronization")
-  else
-    score=$((score - 20))
-    warnings+=("Library synchronization failed")
-  fi
-
-  if health_check_storage >/dev/null 2>&1; then
-    checks+=("Storage utilization")
-  else
-    score=$((score - 20))
-    warnings+=("Storage utilization is critically high")
-  fi
-
-  if health_check_snapshot_freshness >/dev/null 2>&1; then
-    checks+=("Snapshot freshness")
-  else
-    score=$((score - 10))
-    warnings+=("ARI snapshot is more than 24 hours old")
-  fi
+  health_register_check "Jellyfin libraries" "Jellyfin library validation failed" 20 validate_jellyfin_libraries
+  health_register_check "Jellyfin library paths" "Jellyfin library path validation failed" 20 health_check_library_paths
+  health_register_check "Library synchronization" "Library synchronization failed" 20 health_check_library_synchronization
+  health_register_check "Storage utilization" "Storage utilization is critically high" 20 health_check_storage
+  health_register_check "Snapshot freshness" "ARI snapshot is more than 24 hours old" 10 health_check_snapshot_freshness
 
   local status="Healthy"
 
@@ -281,6 +252,20 @@ print_health() {
     for warning in "${warnings[@]}"; do
       echo "- $warning"
     done
+  fi
+}
+
+health_register_check() {
+  local check_name="$1"
+  local warning_message="$2"
+  local penalty="$3"
+  local check_function="$4"
+
+  if "$check_function" >/dev/null 2>&1; then
+    checks+=("$check_name")
+  else
+    score=$((score - penalty))
+    warnings+=("$warning_message")
   fi
 }
 
