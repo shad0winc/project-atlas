@@ -219,14 +219,16 @@ print_health() {
   local checks=()
   local warnings=()
 
-  health_register_check "Jellyfin libraries" "Jellyfin library validation failed" 20 validate_jellyfin_libraries
-  health_register_check "Jellyfin library paths" "Jellyfin library path validation failed" 20 health_check_library_paths
-  health_register_check "Library synchronization" "Library synchronization failed" 20 health_check_library_synchronization
-  health_register_check "Storage utilization" "Storage utilization is critically high" 20 health_check_storage
-  health_register_check "Docker engine" "Docker Engine is not responding" 20 health_check_docker
-  health_register_check "Core services" "One or more required services are not running" 20 health_check_containers
-  health_register_check "VPN tunnel" "Gluetun VPN is not healthy" 20 health_check_vpn
-  health_register_check "Snapshot freshness" "ARI snapshot is more than 24 hours old" 10 health_check_snapshot_freshness
+  health_register_check "Platform:Storage utilization" "Storage utilization is critically high" 20 health_check_storage
+  health_register_check "Platform:Docker engine" "Docker Engine is not responding" 20 health_check_docker
+  health_register_check "Platform:Core services" "One or more required services are not running" 20 health_check_containers
+  health_register_check "Platform:VPN tunnel" "Gluetun VPN is not healthy" 20 health_check_vpn
+
+  health_register_check "Media:Jellyfin libraries" "Jellyfin library validation failed" 20 validate_jellyfin_libraries
+  health_register_check "Media:Jellyfin library paths" "Jellyfin library path validation failed" 20 health_check_library_paths
+  health_register_check "Media:Library synchronization" "Library synchronization failed" 20 health_check_library_synchronization
+
+  health_register_check "Intelligence:Snapshot freshness" "ARI snapshot is more than 24 hours old" 10 health_check_snapshot_freshness
 
   local status="Healthy"
 
@@ -241,12 +243,9 @@ print_health() {
   echo "Score : $score / 100"
   echo "Status: $status"
   echo
-  echo "Checks"
-  echo "------"
-
-  for check in "${checks[@]}"; do
-    echo "✓ $check"
-  done
+  print_health_group "Platform"
+  print_health_group "Media"
+  print_health_group "Intelligence"
 
   if (( ${#warnings[@]} > 0 )); then
     echo
@@ -270,6 +269,27 @@ health_register_check() {
     score=$((score - penalty))
     warnings+=("$warning_message")
   fi
+}
+
+print_health_group() {
+  local group="$1"
+  local check item label printed=0
+
+  for check in "${checks[@]}"; do
+    item="${check%%:*}"
+    label="${check#*:}"
+
+    if [[ "$item" == "$group" ]]; then
+      if (( printed == 0 )); then
+        echo
+        echo "$group"
+        printf '%*s\n' "${#group}" '' | tr ' ' '-'
+        printed=1
+      fi
+
+      echo "✓ $label"
+    fi
+  done
 }
 
 health_check_library_paths() {
