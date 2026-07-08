@@ -237,6 +237,17 @@ print_forecast() {
   snapshots="$(get_snapshot_count 5)"
 
   echo "Snapshots Used    : $snapshots"
+
+    local intervals
+  intervals="$(metric_growth_intervals '.storage.used_bytes' 5)"
+
+  local average_interval
+  average_interval="$(printf '%s\n' "$intervals" | metric_average)"
+
+  local average_interval_human
+  average_interval_human="$(format_bytes "${average_interval#-}")"
+
+  echo "Average Growth    : $(metric_growth "$average_interval" "$average_interval_human") / snapshot"
 }
 
 ###############################################################################
@@ -1030,6 +1041,23 @@ metric_history_values() {
       if jq -e "$jq_path" "$snapshot" >/dev/null 2>&1; then
         jq -r "$jq_path" "$snapshot"
       fi
+    done
+}
+
+metric_growth_intervals() {
+  local jq_path="$1"
+  local count="${2:-5}"
+
+  local previous=""
+  local current=""
+
+  metric_history_values "$jq_path" "$count" |
+    while read -r current; do
+      if [[ -n "$previous" ]]; then
+        metric_delta "$previous" "$current"
+      fi
+
+      previous="$current"
     done
 }
 
