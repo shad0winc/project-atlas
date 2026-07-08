@@ -223,6 +223,7 @@ print_health() {
   health_register_check "Jellyfin library paths" "Jellyfin library path validation failed" 20 health_check_library_paths
   health_register_check "Library synchronization" "Library synchronization failed" 20 health_check_library_synchronization
   health_register_check "Storage utilization" "Storage utilization is critically high" 20 health_check_storage
+  health_register_check "Core services" "One or more required services are not running" 20 health_check_containers
   health_register_check "Snapshot freshness" "ARI snapshot is more than 24 hours old" 10 health_check_snapshot_freshness
 
   local status="Healthy"
@@ -323,6 +324,33 @@ health_check_storage() {
   return 0
 }
 
+health_check_containers() {
+  local required=(
+    jellyfin
+    jellyseerr
+    prowlarr
+    sonarr
+    sonarr-anime
+    radarr
+    radarr-anime
+    qbittorrent
+    gluetun
+    homepage
+  )
+
+  local container
+
+  for container in "${required[@]}"; do
+    if ! docker inspect \
+        --format '{{.State.Running}}' \
+        "$container" 2>/dev/null | grep -q true; then
+      return 1
+    fi
+  done
+
+  return 0
+}
+
 health_check_snapshot_freshness() {
   local latest_snapshot
 
@@ -334,7 +362,6 @@ health_check_snapshot_freshness() {
   local age
   age=$((now - latest_snapshot))
 
-  # Snapshot older than 24 hours
   if (( age > 86400 )); then
     return 1
   fi
