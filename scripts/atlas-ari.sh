@@ -275,7 +275,27 @@ print_forecast() {
   local projected_30_human
   projected_30_human="$(format_bytes "${projected_30#-}")"
 
-  echo "Projected 30 Days: $(metric_growth "$projected_30" "$projected_30_human")"
+  echo "Projected 30 Days : $(metric_growth "$projected_30" "$projected_30_human")"
+
+  local days_remaining
+
+  if (( daily_growth > 0 )); then
+    days_remaining=$(( available_bytes / daily_growth ))
+    echo "Days Remaining   : $days_remaining"
+  else
+    days_remaining=0
+    echo "Days Remaining   : Unknown"
+  fi
+
+  if (( daily_growth > 0 )); then
+  local estimated_full
+
+  estimated_full="$(date -d "+${days_remaining} days" +"%Y-%m-%d")"
+
+    echo "Estimated Full   : $estimated_full"
+  else
+    echo "Estimated Full   : Unknown"
+  fi
 
 }
 
