@@ -281,21 +281,47 @@ print_forecast() {
 
   if (( daily_growth > 0 )); then
     days_remaining=$(( available_bytes / daily_growth ))
-    echo "Days Remaining   : $days_remaining"
+
+    local estimated_full
+    estimated_full="$(date -d "+${days_remaining} days" +"%Y-%m-%d")"
+
+    echo "Days Remaining    : $days_remaining"
+    echo "Estimated Full    : $estimated_full"
   else
     days_remaining=0
-    echo "Days Remaining   : Unknown"
+    echo "Days Remaining    : Unknown"
+    echo "Estimated Full    : Unknown"
   fi
 
-  if (( daily_growth > 0 )); then
-  local estimated_full
+  local interval_array=()
 
-  estimated_full="$(date -d "+${days_remaining} days" +"%Y-%m-%d")"
+  while read -r value; do
+    interval_array+=("$value")
+  done < <(metric_growth_intervals '.storage.used_bytes' 5)
 
-    echo "Estimated Full   : $estimated_full"
-  else
-    echo "Estimated Full   : Unknown"
-  fi
+  local variability
+  variability="$(metric_variability "${interval_array[@]}")"
+
+  local confidence
+
+  case "$variability" in
+    Low)
+      confidence="High"
+      ;;
+    Moderate)
+      confidence="Medium"
+      ;;
+    *)
+      confidence="Low"
+      ;;
+  esac
+
+  echo
+  echo "Confidence"
+  echo "----------"
+  echo "Snapshots Used : $snapshots"
+  echo "Variability    : $variability"
+  echo "Confidence     : $confidence"
 
 }
 
@@ -1108,6 +1134,37 @@ metric_growth_intervals() {
 
       previous="$current"
     done
+}
+
+metric_variability() {
+  local values=("$@")
+
+  local count="${#values[@]}"
+
+  if (( count <= 1 )); then
+    echo "Low"
+    return
+  fi
+
+  local min="${values[0]}"
+  local max="${values[0]}"
+
+  local value
+
+  for value in "${values[@]}"; do
+    (( value < min )) && min="$value"
+    (( value > max )) && max="$value"
+  done
+
+  local spread=$(( max - min ))
+
+  if (( spread < 10485760 )); then       # <10 MB
+    echo "Low"
+  elif (( spread < 104857600 )); then    # <100 MB
+    echo "Moderate"
+  else
+    echo "High"
+  fi
 }
 
 metric_snapshot_time_intervals() {
