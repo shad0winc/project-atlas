@@ -248,6 +248,15 @@ print_forecast() {
   average_interval_human="$(format_bytes "${average_interval#-}")"
 
   echo "Average Growth    : $(metric_growth "$average_interval" "$average_interval_human") / snapshot"
+
+  local time_intervals
+  time_intervals="$(metric_snapshot_time_intervals 5)"
+
+  local average_seconds
+  average_seconds="$(printf '%s\n' "$time_intervals" | metric_average)"
+
+  echo "Average Interval  : $average_seconds seconds"
+
 }
 
 ###############################################################################
@@ -1055,6 +1064,28 @@ metric_growth_intervals() {
     while read -r current; do
       if [[ -n "$previous" ]]; then
         metric_delta "$previous" "$current"
+      fi
+
+      previous="$current"
+    done
+}
+
+metric_snapshot_time_intervals() {
+  local count="${1:-5}"
+
+  local previous=""
+  local current=""
+
+  get_recent_snapshots "$count" |
+    while read -r snapshot; do
+      current="$(jq -r '.timestamp // empty' "$snapshot")"
+
+      if [[ -n "$previous" && -n "$current" ]]; then
+        local previous_epoch current_epoch
+        previous_epoch="$(date -d "$previous" +%s)"
+        current_epoch="$(date -d "$current" +%s)"
+
+        metric_delta "$previous_epoch" "$current_epoch"
       fi
 
       previous="$current"
