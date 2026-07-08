@@ -269,6 +269,14 @@ print_forecast() {
 
   echo "Average Daily     : $(metric_growth "$daily_growth" "$daily_growth_human") / day"
 
+  local projected_30
+  projected_30=$(( daily_growth * 30 ))
+
+  local projected_30_human
+  projected_30_human="$(format_bytes "${projected_30#-}")"
+
+  echo "Projected 30 Days: $(metric_growth "$projected_30" "$projected_30_human")"
+
 }
 
 ###############################################################################
