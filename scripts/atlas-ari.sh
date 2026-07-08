@@ -257,6 +257,18 @@ print_forecast() {
 
   echo "Average Interval  : $average_seconds seconds"
 
+  local daily_growth
+  if (( average_seconds > 0 )); then
+    daily_growth=$(( average_interval * 86400 / average_seconds ))
+  else
+    daily_growth=0
+  fi
+
+  local daily_growth_human
+  daily_growth_human="$(format_bytes "${daily_growth#-}")"
+
+  echo "Average Daily     : $(metric_growth "$daily_growth" "$daily_growth_human") / day"
+
 }
 
 ###############################################################################
