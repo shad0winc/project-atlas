@@ -207,6 +207,39 @@ EOF
 }
 
 ###############################################################################
+# Forecast
+###############################################################################
+
+print_forecast() {
+  echo
+  echo "Forecast"
+  echo "--------"
+
+  local available_bytes
+  available_bytes="$(jq -r '.storage.available_bytes // 0' "$LATEST_FILE")"
+
+  local net_growth
+  net_growth="$(metric_storage_net_growth 5)"
+
+  local available_human net_growth_human
+  available_human="$(format_bytes "$available_bytes")"
+  net_growth_human="$(format_bytes "${net_growth#-}")"
+
+  echo "Storage Available : $available_human"
+  echo "Recent Net Growth : $(metric_growth "$net_growth" "$net_growth_human")"
+
+  if (( net_growth <= 0 )); then
+    echo "Forecast          : Stable or insufficient growth data"
+    return
+  fi
+
+  local snapshots
+  snapshots="$(get_snapshot_count 5)"
+
+  echo "Snapshots Used    : $snapshots"
+}
+
+###############################################################################
 # Health
 ###############################################################################
 
@@ -655,6 +688,7 @@ report() {
   ' "$LATEST_FILE"
 
 print_health
+print_forecast
 print_library_validation
 print_library_path_validation
 print_library_synchronization
