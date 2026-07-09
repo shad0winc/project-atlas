@@ -36,6 +36,15 @@ EOF
 }
 
 ###############################################################################
+# Runtime State
+###############################################################################
+
+ARI_HEALTH_SCORE=100
+ARI_FORECAST_CONFIDENCE=""
+ARI_DAILY_GROWTH=0
+ARI_DAYS_REMAINING=0
+
+###############################################################################
 # Collection
 ###############################################################################
 
@@ -323,6 +332,41 @@ print_forecast() {
   echo "Variability    : $variability"
   echo "Confidence     : $confidence"
 
+  ARI_DAILY_GROWTH="$daily_growth"
+  ARI_DAYS_REMAINING="$days_remaining"
+  ARI_FORECAST_CONFIDENCE="$confidence"
+
+}
+
+print_recommendations() {
+  echo
+  echo "Recommendations"
+  echo "---------------"
+
+  local recommendation_count=0
+
+  if (( ARI_DAYS_REMAINING > 0 )) && (( ARI_DAYS_REMAINING < 90 )); then
+    echo "⚠ Storage projected to fill within 90 days."
+    echo "  Recommendation: Add additional storage."
+    recommendation_count=$((recommendation_count + 1))
+  fi
+
+  if [[ "$ARI_FORECAST_CONFIDENCE" == "Low" ]]; then
+    echo "⚠ Forecast confidence is low."
+    echo "  Recommendation: Collect additional snapshots."
+    recommendation_count=$((recommendation_count + 1))
+  fi
+
+  if (( ARI_HEALTH_SCORE < 100 )); then
+    echo "⚠ Atlas health is degraded."
+    echo "  Recommendation: Review health warnings."
+    recommendation_count=$((recommendation_count + 1))
+  fi
+
+  if (( recommendation_count == 0 )); then
+    echo "✓ No action required."
+    echo "✓ Atlas is operating normally."
+  fi
 }
 
 ###############################################################################
@@ -348,6 +392,8 @@ print_health() {
   health_register_check "Media:Library synchronization" "Library synchronization failed" 20 health_check_library_synchronization
 
   health_register_check "Intelligence:Snapshot freshness" "ARI snapshot is more than 24 hours old" 10 health_check_snapshot_freshness
+
+  ARI_HEALTH_SCORE="$score"
 
   local status="Healthy"
 
@@ -775,6 +821,7 @@ report() {
 
 print_health
 print_forecast
+print_recommendations
 print_library_validation
 print_library_path_validation
 print_library_synchronization
