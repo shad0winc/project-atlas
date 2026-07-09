@@ -112,16 +112,34 @@ Planned:
 
 ## M-016 — Atlas Web Portal
 
+Build a modern web interface for both administrators and users.
+
+### Administrator Dashboard
+
 - [ ] System dashboard
 - [ ] Health dashboard
 - [ ] Forecast dashboard
 - [ ] Media statistics
-- [ ] Administrative interface
+- [ ] Container status
+- [ ] Storage analytics
+- [ ] ARI recommendations
+
+### User Portal
+
+- [ ] User dashboard
+- [ ] Current requests
+- [ ] Recently added media
+- [ ] Favorites
+- [ ] Continue Watching
 - [ ] Documentation portal
 
 ---
 
-## M-017 — User Intelligence
+## M-017 — User Intelligence & Media Policies
+
+Introduce user-aware automation and personalized media management.
+
+### User Preferences
 
 - [ ] Favorites management
 - [ ] Protected media
@@ -129,37 +147,182 @@ Planned:
 - [ ] Watch history
 - [ ] Personalized recommendations
 
----
+### Smart Series
 
-## M-018 — Smart Media Automation
-
-- [ ] Auto-follow TV series
+- [ ] Auto-follow currently airing TV series
+- [ ] Auto-follow currently airing Anime
 - [ ] Automatic episode acquisition
 - [ ] User subscription preferences
-- [ ] Notification framework
+- [ ] "Next Episode" action
+- [ ] Stop following series
+
+### Media Retention Policies
+
+- [ ] 30-day retention after request
+- [ ] 72-hour retention after 98% watched
+- [ ] Favorite protection from deletion
+- [ ] Thumbs-down scheduled deletion (24 hours)
+- [ ] Request expiration notifications
+- [ ] User retention overrides
+- [ ] Policy auditing
+
+### Policy Engine
+
+- [ ] User policy database
+- [ ] Request tracking
+- [ ] Favorite tracking
+- [ ] Retention tracking
+- [ ] ARI policy reporting
 
 ---
 
-## M-019 — Sports Platform
+## M-018 — Sports Platform
 
-- [ ] Dedicated sports container
-- [ ] Live event requests
+Integrate live sports into Project Atlas as an optional platform module.
+
+### Sports Services
+
+- [ ] Dedicated Sportyfin container
+- [ ] Sports request management
+- [ ] Live sporting event requests
 - [ ] Sports streaming integration
 - [ ] Schedule synchronization
+- [ ] Team favorites
+- [ ] League favorites
+- [ ] Auto-follow favorite teams
+- [ ] Sports dashboard
+
+---
+
+## M-019 — Atlas Platform Expansion
+
+Expand Atlas beyond a self-hosted media server.
+
+### Platform
+
+- [ ] REST API
+- [ ] Plugin framework
+- [ ] Notification framework
+- [ ] Multi-server Atlas
+- [ ] Distributed storage management
+- [ ] Mobile companion app
+- [ ] AI-assisted operational insights
+
+---
+
+## M-020 — Family Experience
+
+### Accounts
+
+- [ ] User onboarding
+- [ ] Welcome page
+- [ ] User profiles
+- [ ] Avatar support
+
+### Media Experience
+
+- [ ] Favorite collections
+- [ ] Shared collections
+- [ ] Family recommendations
+- [ ] Continue Watching improvements
+
+### Requests
+
+- [ ] Request history
+- [ ] Request status
+- [ ] Request notifications
+- [ ] Request limits
+
+### Personalization
+
+- [ ] Preferred quality
+- [ ] Preferred language
+- [ ] Subtitle preferences
+- [ ] Auto-follow defaults
+
+---
+
+## M-021 — Game Server Platform
+
+Expand Atlas into a unified media and gaming platform.
+
+### Game Server Infrastructure
+
+- [ ] Dedicated game server node(s)
+- [ ] Game server management service
+- [ ] Automatic server deployment
+- [ ] Backup and restore
+- [ ] Resource monitoring
+- [ ] Automatic updates
+
+### User Experience
+
+- [ ] Game server request system
+- [ ] One-click server creation
+- [ ] Server ownership
+- [ ] Invite friends
+- [ ] Temporary server requests
+- [ ] Permanent server requests
+
+### Administration
+
+- [ ] CPU and RAM allocation
+- [ ] Storage quotas
+- [ ] Port management
+- [ ] Scheduled shutdown/startup
+- [ ] Activity monitoring
+
+### Supported Games (Initial)
+
+- [ ] Minecraft
+- [ ] Terraria
+- [ ] Valheim
+- [ ] Palworld
+- [ ] Satisfactory
+- [ ] ARK
+- [ ] Factorio
+- [ ] Rust
+
+### Future
+
+- [ ] SteamCMD integration
+- [ ] Mod management
+- [ ] Save management
+- [ ] Automatic world backups
+- [ ] Community templates
 
 ---
 
 # 🌐 Long-Term Vision
 
-Project Atlas aims to become a complete self-hosted media and operations platform.
+## M-020 — Family Experience
 
-Future capabilities include:
+### Accounts
 
-- Multi-server Atlas deployments
-- Distributed storage management
-- Plugin architecture
-- REST API
-- Mobile companion
-- AI-assisted operational insights
-- Gaming server management
-- High availability
+- [ ] User onboarding
+- [ ] Welcome page
+- [ ] User profiles
+- [ ] Avatar support
+
+### Media Experience
+
+- [ ] Favorite collections
+- [ ] Shared collections
+- [ ] Family recommendations
+- [ ] Continue watching improvements
+
+### Requests
+
+- [ ] Request history
+- [ ] Request status
+- [ ] Request notifications
+- [ ] Request limits
+
+### Personalization
+
+- [ ] Preferred quality
+- [ ] Preferred language
+- [ ] Subtitle preferences
+- [ ] Auto-follow defaults
+
+
