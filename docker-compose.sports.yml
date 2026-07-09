@@ -1,0 +1,8 @@
+# Project Atlas Sports Module
+#
+# Optional module compose file.
+# This file is intentionally safe by default.
+#
+# Sports services will be added here when the module is enabled.
+
+services: {}

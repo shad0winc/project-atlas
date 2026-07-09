@@ -3,6 +3,7 @@ set -euo pipefail
 
 PROJECT_DIR="/opt/project-atlas"
 ATLAS_CONFIG_FILE="$PROJECT_DIR/config/atlas.conf"
+ATLAS_MODULE_CONFIG_FILE="$PROJECT_DIR/config/modules/modules.conf"
 
 if [[ ! -f "$ATLAS_CONFIG_FILE" ]]; then
   echo "Missing Atlas config: $ATLAS_CONFIG_FILE"
@@ -10,6 +11,10 @@ if [[ ! -f "$ATLAS_CONFIG_FILE" ]]; then
 fi
 
 source "$ATLAS_CONFIG_FILE"
+
+if [[ -f "$ATLAS_MODULE_CONFIG_FILE" ]]; then
+  source "$ATLAS_MODULE_CONFIG_FILE"
+fi
 
 cd "$ATLAS_PROJECT_DIR"
 
@@ -36,6 +41,14 @@ Core Commands
   atlas services
   atlas urls
   atlas git
+
+Modules
+-------
+  atlas modules
+  atlas module list
+  atlas module status <module>
+  atlas module verify <module>
+  atlas module doctor <module>
 
 Maintenance
 -----------
@@ -89,6 +102,139 @@ URLS
 
   git)
     git status
+    ;;
+
+  modules)
+    print_header
+    echo "Atlas Modules"
+    echo
+    echo "Sports:"
+    echo "  Name:    ${ATLAS_MODULE_SPORTS_NAME:-Sports Platform}"
+    echo "  Enabled: ${ATLAS_MODULE_SPORTS_ENABLED:-false}"
+    echo "  Compose: ${ATLAS_MODULE_SPORTS_COMPOSE_FILE:-docker-compose.sports.yml}"
+    echo "  Docs:    ${ATLAS_MODULE_SPORTS_DOC:-docs/SPORTS.md}"
+    ;;
+
+  module)
+    subcommand="${2:-list}"
+    module_name="${3:-sports}"
+
+    case "$subcommand" in
+      list)
+        print_header
+        echo "Atlas Module List"
+        echo
+        echo "sports  ${ATLAS_MODULE_SPORTS_ENABLED:-false}  ${ATLAS_MODULE_SPORTS_NAME:-Sports Platform}"
+        ;;
+
+      status)
+        case "$module_name" in
+          sports)
+            print_header
+            echo "Sports Module"
+            echo
+            echo "Name:         ${ATLAS_MODULE_SPORTS_NAME:-Sports Platform}"
+            echo "Enabled:      ${ATLAS_MODULE_SPORTS_ENABLED:-false}"
+            echo "Compose File: ${ATLAS_MODULE_SPORTS_COMPOSE_FILE:-docker-compose.sports.yml}"
+            echo "Docs:         ${ATLAS_MODULE_SPORTS_DOC:-docs/SPORTS.md}"
+
+            if [[ -f "$ATLAS_PROJECT_DIR/${ATLAS_MODULE_SPORTS_COMPOSE_FILE:-docker-compose.sports.yml}" ]]; then
+              echo "Compose:      present"
+            else
+              echo "Compose:      missing"
+            fi
+
+            if [[ -f "$ATLAS_PROJECT_DIR/${ATLAS_MODULE_SPORTS_DOC:-docs/SPORTS.md}" ]]; then
+              echo "Docs:         present"
+            else
+              echo "Docs:         missing"
+            fi
+            ;;
+          *)
+            echo "Unknown module: $module_name"
+            exit 1
+            ;;
+        esac
+        ;;
+
+      verify)
+        if [[ "$module_name" != "sports" ]]; then
+          echo "Usage: atlas module verify sports"
+          exit 1
+        fi
+
+        print_header
+        echo "Sports Module Verification"
+        echo
+
+        pass=true
+
+        check_module() {
+          label="$1"
+          shift
+          if "$@" >/dev/null 2>&1; then
+            echo "OK   $label"
+          else
+            echo "FAIL $label"
+            pass=false
+          fi
+        }
+
+        check_module "Module registry present" test -f "$ATLAS_MODULE_CONFIG_FILE"
+        check_module "Sports compose present" test -f "$ATLAS_PROJECT_DIR/${ATLAS_MODULE_SPORTS_COMPOSE_FILE:-docker-compose.sports.yml}"
+        check_module "Sports documentation present" test -f "$ATLAS_PROJECT_DIR/${ATLAS_MODULE_SPORTS_DOC:-docs/SPORTS.md}"
+        check_module "Sports config directory present" test -d "$ATLAS_CONFIG_ROOT/sportyfin"
+        check_module "Sports media directory present" test -d "$ATLAS_MEDIA_ROOT/Sports"
+        check_module "Sports compose valid" docker compose -f docker-compose.yml -f "${ATLAS_MODULE_SPORTS_COMPOSE_FILE:-docker-compose.sports.yml}" config
+
+        echo
+        if [ "$pass" = true ]; then
+          echo "Sports Module Status: PASS"
+        else
+          echo "Sports Module Status: FAIL"
+          exit 1
+        fi
+        ;;
+
+      doctor)
+        if [[ "$module_name" != "sports" ]]; then
+          echo "Usage: atlas module doctor sports"
+          exit 1
+        fi
+
+        print_header
+        echo "Sports Module Doctor"
+        echo
+        echo "Enabled: ${ATLAS_MODULE_SPORTS_ENABLED:-false}"
+        echo
+
+        echo "Files:"
+        [[ -f "$ATLAS_PROJECT_DIR/${ATLAS_MODULE_SPORTS_COMPOSE_FILE:-docker-compose.sports.yml}" ]] && echo "  OK docker-compose.sports.yml" || echo "  FAIL docker-compose.sports.yml"
+        [[ -f "$ATLAS_PROJECT_DIR/${ATLAS_MODULE_SPORTS_DOC:-docs/SPORTS.md}" ]] && echo "  OK docs/SPORTS.md" || echo "  FAIL docs/SPORTS.md"
+
+        echo
+        echo "Directories:"
+        [[ -d "$ATLAS_CONFIG_ROOT/sportyfin" ]] && echo "  OK $ATLAS_CONFIG_ROOT/sportyfin" || echo "  FAIL $ATLAS_CONFIG_ROOT/sportyfin"
+        [[ -d "$ATLAS_MEDIA_ROOT/Sports" ]] && echo "  OK $ATLAS_MEDIA_ROOT/Sports" || echo "  FAIL $ATLAS_MEDIA_ROOT/Sports"
+
+        echo
+        echo "Compose:"
+        if docker compose -f docker-compose.yml -f "${ATLAS_MODULE_SPORTS_COMPOSE_FILE:-docker-compose.sports.yml}" config >/dev/null 2>&1; then
+          echo "  OK Sports compose valid"
+        else
+          echo "  FAIL Sports compose invalid"
+        fi
+        ;;
+
+      *)
+        echo "Usage:"
+        echo "  atlas module list"
+        echo "  atlas module status <module>"
+        echo "  atlas module verify <module>"
+        echo "  atlas module doctor <module>"
+        exit 1
+        ;;
+    esac
     ;;
 
   verify)
@@ -192,34 +338,21 @@ URLS
 
     echo
     echo "Project Files:"
+    for file in VERSION CHARTER.md ROADMAP.md CHANGELOG.md docs/BUILD_LOG.md docs/MATURITY.md; do
+      if [ -e "$file" ]; then
+        echo "  OK $file"
+      else
+        echo "  FAIL $file"
+      fi
+    done
 
-    check_file() {
-        if [ -e "$1" ]; then
-            echo "  OK $1"
-        else
-            echo "  FAIL $1"
-        fi
-    }
-
-    check_dir() {
-        if [ -d "$1" ]; then
-            echo "  OK $1"
-        else
-            echo "  FAIL $1"
-        fi
-    }
-
-    check_file VERSION
-    check_file CHARTER.md
-    check_file ROADMAP.md
-    check_file CHANGELOG.md
-
-    check_dir docs
-    check_dir docs/ADR
-    check_dir docs/EDR
-
-    check_file docs/BUILD_LOG.md
-    check_file docs/MATURITY.md
+    for dir in docs docs/ADR docs/EDR; do
+      if [ -d "$dir" ]; then
+        echo "  OK $dir"
+      else
+        echo "  FAIL $dir"
+      fi
+    done
 
     echo
     echo "Container status:"
@@ -314,13 +447,15 @@ EOF
       --transform="s|.*$(basename "$manifest")|BACKUP_INFO.txt|" \
       -czf "$backup_file" \
       docker-compose.yml \
+      docker-compose.sports.yml \
       .env.example \
       VERSION \
       CHARTER.md \
       ROADMAP.md \
       CHANGELOG.md \
-      configs \
+      config \
       docs \
+      modules \
       scripts \
       "$manifest"
 
