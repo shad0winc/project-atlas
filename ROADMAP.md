@@ -1,133 +1,165 @@
 # Project Atlas Roadmap
 
-> **Mission:** Build a self-managing media platform that is reliable, observable, intelligent, and simple to operate.
+> **Mission:** Build an intelligent, self-managing media platform that is reliable, observable, secure, and simple to operate.
 
 ---
 
-# ✅ v0.9.0 — Operational Intelligence Foundation
+# ✅ Current Release — v1.0.0
 
-Atlas has evolved from a media stack into an operational platform.
+Project Atlas is now a production-ready self-hosted media platform with built-in operational intelligence.
 
-## Platform
+---
+
+# Completed Milestones
+
+## Core Platform
 
 - [x] Docker infrastructure
+- [x] Proxmox LXC deployment
 - [x] Storage architecture
-- [x] VPN networking
-- [x] Intel Quick Sync
-- [x] Operational CLI
+- [x] VPN networking (Gluetun)
+- [x] Intel Quick Sync acceleration
+- [x] Atlas operational CLI
+- [x] Backup management
+- [x] Git integration
+
+---
 
 ## Media Platform
 
 - [x] Jellyfin
-- [x] Sonarr
-- [x] Radarr
-- [x] Anime ecosystem
 - [x] Jellyseerr
+- [x] Sonarr
+- [x] Sonarr Anime
+- [x] Radarr
+- [x] Radarr Anime
 - [x] Prowlarr
 - [x] Recyclarr
+- [x] Bazarr
 - [x] Maintainerr
+- [x] qBittorrent
 - [x] Homepage
 - [x] Dozzle
 
+---
+
 ## Atlas Retention Intelligence (ARI)
 
-### Foundation
+### Health Engine
 
-- [x] Shared configuration
+- [x] Platform health
+- [x] Docker validation
+- [x] VPN validation
+- [x] Storage validation
+- [x] Media validation
+- [x] Health scoring
+
+### Analytics Engine
+
 - [x] Immutable snapshots
-- [x] Historical snapshot storage
-
-### Adapters
-
-- [x] Filesystem
-- [x] Jellyfin server
-- [x] Jellyfin libraries
-- [x] Jellyfin users
-
-### Validation
-
-- [x] Library validation
-- [x] Library path validation
-
-### Operational Intelligence
-
-- [x] Library synchronization
-- [x] Historical snapshot comparison
+- [x] Historical storage analysis
+- [x] Library growth analysis
+- [x] Historical comparisons
+- [x] Trend analysis
 - [x] Operational summaries
-- [x] Byte-accurate storage metrics
 
-Status:
+### Forecast Engine
 
-**Current Release**
+- [x] Storage growth forecasting
+- [x] Average daily growth
+- [x] Capacity forecasting
+- [x] Estimated full date
+- [x] Forecast confidence
+
+### Recommendation Engine
+
+- [x] Health recommendations
+- [x] Storage recommendations
+- [x] Forecast recommendations
 
 ---
 
-# 🚧 v1.0.0 — Production Release
+# 🚧 Active Development
 
-Complete Atlas as a production-ready platform.
+## M-014 — Documentation & Release Preparation
 
-## Operational Intelligence
-
-- [ ] Historical storage trends
-- [ ] Library growth analysis
-- [ ] User activity analytics
-- [ ] Capacity forecasting
-- [ ] Configuration drift detection
-- [ ] Health scoring
-- [ ] Operational recommendations
-
-## Automation
-
-- [ ] Scheduled ARI collection
-- [ ] Scheduled reporting
-- [ ] Automated health reports
-
-## Reliability
-
-- [ ] Backup verification
-- [ ] Disaster recovery validation
-- [ ] Configuration validation
-- [ ] Restore testing
-
-## Documentation
-
+- [ ] Release Notes
 - [ ] Architecture Guide
 - [ ] Administrator Guide
-- [ ] User Guide
 - [ ] Developer Guide
-
-Status:
-
-**In Progress**
+- [ ] User Guide
+- [ ] v1.0 Documentation Refresh
 
 ---
 
-# 🔮 v2.0.0 — Atlas Management Platform
+## M-015 — Atlas CLI Framework
 
-Expand Atlas beyond a CLI-first experience.
+Goal:
 
-## Planned
+Expand Atlas into a modular command platform.
 
-- Atlas web interface
-- Dashboard
-- Interactive reporting
-- Health monitoring
-- Administrative controls
-- User portal
-- Documentation website
-- REST API
+Planned:
+
+- [ ] Modular command namespaces
+- [ ] Media commands
+- [ ] User commands
+- [ ] ARI command improvements
+- [ ] Configuration management
+
+---
+
+# 🔮 Planned Milestones
+
+## M-016 — Atlas Web Portal
+
+- [ ] System dashboard
+- [ ] Health dashboard
+- [ ] Forecast dashboard
+- [ ] Media statistics
+- [ ] Administrative interface
+- [ ] Documentation portal
+
+---
+
+## M-017 — User Intelligence
+
+- [ ] Favorites management
+- [ ] Protected media
+- [ ] User activity
+- [ ] Watch history
+- [ ] Personalized recommendations
+
+---
+
+## M-018 — Smart Media Automation
+
+- [ ] Auto-follow TV series
+- [ ] Automatic episode acquisition
+- [ ] User subscription preferences
+- [ ] Notification framework
+
+---
+
+## M-019 — Sports Platform
+
+- [ ] Dedicated sports container
+- [ ] Live event requests
+- [ ] Sports streaming integration
+- [ ] Schedule synchronization
 
 ---
 
 # 🌐 Long-Term Vision
 
-Potential future capabilities:
+Project Atlas aims to become a complete self-hosted media and operations platform.
+
+Future capabilities include:
 
 - Multi-server Atlas deployments
 - Distributed storage management
-- Gaming server management
 - Plugin architecture
-- Notification framework
+- REST API
 - Mobile companion
 - AI-assisted operational insights
+- Gaming server management
 - High availability

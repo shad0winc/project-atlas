@@ -6,71 +6,54 @@
 
 # Purpose
 
-Project Atlas is a modular, Docker-based media platform designed to automate media acquisition, organization, delivery, validation, and operational intelligence while remaining simple to operate.
+Project Atlas is an intelligent self-hosted media platform designed to automate media acquisition, organization, delivery, monitoring, and operational decision-making.
 
-Atlas intentionally favors a small number of well-integrated services over a large collection of loosely maintained containers. Every subsystem has a clearly defined responsibility and contributes to a reliable, maintainable, and recoverable platform.
+Rather than being a collection of Docker containers, Atlas is a modular platform composed of independent subsystems that work together to provide a reliable, observable, and maintainable media environment.
 
 ---
 
-# Design Principles
+# Core Design Principles
 
-Atlas is built around several core engineering principles.
+Atlas is built around seven engineering principles.
 
 1. Simplicity
 2. Reliability
-3. Operational Intelligence
-4. Recoverability
-5. Documentation First
-6. Version Controlled Infrastructure
-7. Immutable Operational History
+3. Observability
+4. Automation
+5. Operational Intelligence
+6. Recoverability
+7. Documentation First
 
 ---
 
-# High-Level Architecture
+# Platform Architecture
 
 ```
-                        Users
-                           │
-                           ▼
-                     Jellyseerr
-                           │
-          ┌────────────────┴────────────────┐
-          ▼                                 ▼
-      Sonarr                          Radarr
-          │                                 │
-          ▼                                 ▼
-  Sonarr Anime                    Radarr Anime
-          │                                 │
-          └──────────────┬──────────────────┘
-                         ▼
-                     Prowlarr
-                         │
-                         ▼
-                    qBittorrent
-                         │
-                         ▼
-                   Media Storage
-                         │
-              ┌──────────┴──────────┐
-              ▼                     ▼
-          Jellyfin            Maintainerr
-              │
-              ▼
- Atlas Retention Intelligence (ARI)
-              │
-              ▼
- Validation • Analysis • Reporting
+                          Project Atlas
+                                 │
+        ┌────────────────────────┼────────────────────────┐
+        │                        │                        │
+        ▼                        ▼                        ▼
+ Media Platform             Atlas CLI          Documentation
+        │                        │                        │
+        └──────────────┬─────────┘                        │
+                       ▼                                  │
+          Atlas Retention Intelligence (ARI)             │
+                       │                                  │
+      ┌────────────┬────────────┬────────────┬────────────┐
+      ▼            ▼            ▼            ▼
+   Health      Analytics     Forecast   Recommendations
 ```
 
 ---
 
-# System Components
+# Major Subsystems
 
-## Media Platform
+## 1. Media Platform
 
-Responsible for acquiring, organizing, managing, and serving media.
+Responsible for acquiring, organizing, and serving media.
 
-Core components:
+### Services
 
 - Jellyfin
 - Jellyseerr
@@ -82,112 +65,159 @@ Core components:
 - qBittorrent
 - Gluetun
 - Bazarr
-- Tautulli
 - Maintainerr
 - Homepage
 - Dozzle
-
-Supporting components:
-
+- Tautulli
 - Recyclarr
-
-Future components:
-
-- Readarr
-- Audiobookshelf
-- Komga
-- Kavita
-- FlareSolverr
 
 ---
 
-## Operational CLI
+## 2. Atlas CLI
 
-Atlas includes an operational command-line interface that standardizes platform administration.
+Provides a unified operational interface.
 
 Core commands include:
 
-- `atlas doctor`
-- `atlas verify`
-- `atlas backup`
-- `atlas restore`
-- `atlas update`
-- `atlas git`
-- `atlas ari collect`
-- `atlas ari report`
+```
+atlas doctor
+atlas verify
+atlas status
+atlas backup
+atlas update
 
-The CLI provides a consistent operational experience for routine maintenance and system validation.
+atlas ari collect
+atlas ari report
+```
+
+Future versions will expand the CLI into additional namespaces.
 
 ---
 
-## Atlas Retention Intelligence (ARI)
+## 3. Atlas Retention Intelligence (ARI)
 
-Atlas Retention Intelligence (ARI) is the operational intelligence subsystem of Project Atlas.
+ARI is the operational intelligence layer of Project Atlas.
 
-ARI continuously captures, validates, compares, and summarizes the operational state of the platform.
+Instead of merely reporting system state, ARI evaluates platform health, analyzes historical behavior, predicts future resource requirements, and provides operational recommendations.
 
-Current responsibilities include:
+### Health Engine
 
-- Collect platform metadata
-- Collect filesystem state
-- Collect Jellyfin metadata
-- Preserve immutable historical snapshots
-- Validate media libraries
-- Validate library paths
-- Compare historical snapshots
-- Detect operational changes
-- Generate operational reports
+Responsible for:
 
-Future responsibilities include:
-
-- Growth analysis
-- Capacity forecasting
+- Docker validation
+- VPN validation
+- Storage validation
+- Library validation
 - Health scoring
-- Configuration drift detection
-- Automated recommendations
 
 ---
 
-# Media Platform
+### Analytics Engine
 
-## Core Services
+Responsible for:
 
-Always running.
-
-- Jellyfin
-- Jellyseerr
-- Prowlarr
-- Sonarr
-- Sonarr Anime
-- Radarr
-- Radarr Anime
-- qBittorrent
-- Gluetun
-- Homepage
-- Bazarr
-- Tautulli
-- Maintainerr
-- Dozzle
+- Immutable snapshots
+- Historical analysis
+- Trend detection
+- Operational summaries
 
 ---
 
-## Manual Services
+### Forecast Engine
 
-Executed only when needed.
+Responsible for:
 
-- Recyclarr
+- Storage forecasting
+- Daily growth analysis
+- Capacity planning
+- Forecast confidence
 
 ---
 
-## Future Services
+### Recommendation Engine
 
-Optional functionality.
+Responsible for:
 
-- Readarr
-- Audiobookshelf
-- Komga
-- Kavita
-- FlareSolverr
+- Health recommendations
+- Capacity recommendations
+- Forecast recommendations
+
+---
+
+## 4. Documentation
+
+Atlas documentation is version controlled alongside the platform.
+
+Documentation includes:
+
+- Architecture
+- Charter
+- Roadmap
+- Build Log
+- Changelog
+- ADRs
+- EDRs
+- Maturity Model
+
+Documentation is considered a core subsystem of Atlas.
+
+---
+
+# Media Flow
+
+```
+Users
+   │
+   ▼
+Jellyseerr
+   │
+   ▼
+Sonarr / Radarr
+   │
+   ▼
+Prowlarr
+   │
+   ▼
+qBittorrent
+   │
+   ▼
+Media Storage
+   │
+   ▼
+Jellyfin
+```
+
+---
+
+# Operational Intelligence Flow
+
+```
+Filesystem
+Docker
+Jellyfin
+Configuration
+        │
+        ▼
+ARI Collect
+        │
+        ▼
+Immutable Snapshot
+        │
+        ▼
+Health Engine
+        │
+        ▼
+Analytics Engine
+        │
+        ▼
+Forecast Engine
+        │
+        ▼
+Recommendation Engine
+        │
+        ▼
+Operational Report
+```
 
 ---
 
@@ -195,34 +225,24 @@ Optional functionality.
 
 ```
 Internet
-        │
-        ▼
-+----------------------+
-|     Gluetun VPN      |
-+----------------------+
-           │
-           ▼
-+----------------------+
-|    qBittorrent       |
-+----------------------+
-           │
-           ▼
-+----------------------+
-|      Prowlarr        |
-+----------------------+
-      │           │
-      ▼           ▼
- Sonarr       Radarr
-      │           │
-      ▼           ▼
- Anime       Anime
-      │           │
-      └──────┬────┘
-             ▼
-       Jellyseerr
-             │
-             ▼
-        Jellyfin
+     │
+     ▼
+Gluetun VPN
+     │
+     ▼
+qBittorrent
+     │
+     ▼
+Prowlarr
+     │
+     ▼
+Sonarr / Radarr
+     │
+     ▼
+Jellyseerr
+     │
+     ▼
+Jellyfin
 ```
 
 ---
@@ -232,170 +252,80 @@ Internet
 ```
 /mnt/storage
 ├── media
-│   ├── Movies
-│   ├── TV
-│   ├── Anime Movies
-│   └── Anime TV
-│
 ├── downloads
-│
 ├── configs
-│
 ├── backups
-│
 └── atlas
     └── ari
         ├── latest.json
         └── snapshots/
 ```
 
----
+Snapshots are immutable.
 
-# Snapshot Lifecycle
-
-```
-atlas ari collect
-        │
-        ▼
-Collect platform state
-        │
-        ▼
-Normalize collected data
-        │
-        ▼
-Generate immutable snapshot
-        │
-        ▼
-Update latest.json
-        │
-        ▼
-Archive historical snapshot
-```
-
-Historical snapshots are never modified.
-
-Every execution creates a new immutable record of platform state.
+Every collection creates a permanent operational record.
 
 ---
 
-# Data Flow
+# Operational Workflow
 
-```
-Filesystem
-        │
-Docker
-        │
-Jellyfin
-        │
-Configuration
-───────────────
-        │
-        ▼
-ARI Collectors
-        │
-        ▼
-Snapshot
-        │
-        ▼
-Validation
-        │
-        ▼
-Analysis
-        │
-        ▼
-Operational Report
-```
-
----
-
-# Operational Lifecycle
-
-Routine operational workflow:
+Routine platform maintenance:
 
 ```
 atlas doctor
-        │
-        ▼
+      │
+      ▼
 atlas verify
-        │
-        ▼
+      │
+      ▼
 atlas ari collect
-        │
-        ▼
+      │
+      ▼
 atlas ari report
-        │
-        ▼
+      │
+      ▼
 atlas backup
-        │
-        ▼
+      │
+      ▼
 atlas update
 ```
 
-This workflow ensures the platform remains validated before administrative changes are performed.
-
 ---
 
-# Recovery Strategy
+# Recovery Workflow
 
-Before every significant change:
+Before making significant changes:
 
 1. Run `atlas doctor`
 2. Run `atlas verify`
-3. Create a backup (`atlas backup`)
+3. Create a backup
 4. Verify the backup
-5. Perform the change
-6. Run `atlas verify` again
+5. Apply the change
+6. Verify the platform again
 
-Operational safety always takes precedence over convenience.
-
----
-
-# Release Strategy
-
-```
-Development
-      │
-      ▼
-Feature Implementation
-      │
-      ▼
-Validation
-      │
-      ▼
-Documentation
-      │
-      ▼
-Git Commit
-      │
-      ▼
-GitHub Push
-      │
-      ▼
-Release Tag
-```
-
-Every feature is expected to include:
-
-- Documentation
-- Validation
-- Operational testing
-- Version control
+Operational safety always takes priority over convenience.
 
 ---
 
 # Architecture Philosophy
 
-Project Atlas follows several architectural principles.
+Project Atlas follows several architectural rules.
 
 ## Single Responsibility
 
-Each component performs one primary function.
+Every subsystem owns one responsibility.
+
+---
+
+## Modular Design
+
+Subsystems communicate through well-defined interfaces.
 
 ---
 
 ## Shared Configuration
 
-Configuration exists in one location.
+Configuration is centralized.
 
 ```
 config/atlas.conf
@@ -403,36 +333,19 @@ config/atlas.conf
 
 ---
 
-## Immutable History
+## Immutable Operational History
 
 Historical operational data is never modified.
 
-Every operational change produces a new snapshot.
+Every snapshot becomes a permanent record.
 
 ---
 
-## Raw Data First
+## Runtime State
 
-Machine-readable values are stored alongside formatted values.
+Shared operational values are published once and consumed by dependent subsystems.
 
-Example:
-
-```
-used
-used_bytes
-```
-
-Human-readable reports never replace machine-readable data.
-
----
-
-## Human-Friendly Operations
-
-Humans read reports.
-
-Machines read JSON.
-
-Both are treated as first-class outputs.
+This eliminates duplicate calculations while keeping subsystem responsibilities separate.
 
 ---
 
@@ -440,26 +353,19 @@ Both are treated as first-class outputs.
 
 Documentation evolves alongside implementation.
 
-Architectural decisions, engineering decisions, and operational procedures are version controlled with the project.
+No significant engineering change is considered complete until the documentation has been updated.
 
 ---
 
-# Future Expansion
+# Future Platform Evolution
 
-Planned platform evolution includes:
+Planned capabilities include:
 
-- Historical trend analysis
-- Storage growth forecasting
-- Capacity planning
-- Configuration drift detection
-- Health scoring
-- Automated reporting
-- Scheduled ARI collection
-- Recommendation engine
-- Atlas Management Portal
+- Atlas Web Portal
+- User Intelligence
+- Smart TV Automation
+- Sports Integration
 - REST API
-- Multi-server Atlas deployments
-- Gaming server management
-- Plugin architecture
+- Multi-server Atlas
+- Plugin Framework
 - AI-assisted operational insights
-- High availability

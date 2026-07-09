@@ -60,3 +60,41 @@
 - Snapshot schema
 - Report formatting
 - Documentation
+
+# v1.0.0
+
+## 🚀 Major Features
+
+### Atlas Retention Intelligence (ARI)
+
+- Added Health Engine
+- Added Analytics Engine
+- Added Forecast Engine
+- Added Recommendation Engine
+
+### Health
+
+- Health scoring
+- Platform checks
+- Media checks
+- Intelligence checks
+
+### Forecasting
+
+- Daily storage growth
+- Time-normalized forecasting
+- 30-day projection
+- Estimated storage exhaustion
+- Forecast confidence
+
+### Recommendations
+
+- Storage recommendations
+- Health recommendations
+- Forecast recommendations
+
+### Infrastructure
+
+- Improved CLI
+- Enhanced validation
+- Runtime state management

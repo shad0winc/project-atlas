@@ -1,0 +1,145 @@
+ADR-0001 — Atlas Platform Architecture
+
+Title
+
+Atlas Platform Architecture
+Context
+
+Atlas is intended to become an intelligent self-hosted media platform rather than a collection of independent containers.
+
+Decision
+
+Project Atlas shall be organized into modular subsystems:
+
+Media Platform
+Operational CLI
+Atlas Retention Intelligence (ARI)
+Documentation
+Automation
+
+Each subsystem owns a single responsibility.
+
+Consequences
+
+Benefits:
+
+Easier maintenance
+Easier testing
+Easier expansion
+
+Tradeoffs:
+
+Slightly more documentation
+More modular code
+
+Status:
+
+Accepted
+
+
+
+ADR-0002 — Atlas Retention Intelligence Architecture
+Context
+
+Operational reporting grew beyond simple snapshot collection.
+
+Decision
+
+ARI is divided into four independent engines:
+
+Health
+Analytics
+Forecast
+Recommendations
+
+Each engine performs one responsibility.
+
+Consequences
+
+Benefits
+
+Smaller functions
+Easier debugging
+Easier future expansion
+
+Status
+
+Accepted
+
+
+ADR-0003 — Immutable Snapshot Architecture
+Context
+
+Operational history should never be modified.
+
+Decision
+
+Snapshots are immutable.
+
+Each collection creates a new snapshot.
+
+Reports always compare snapshots.
+
+Consequences
+
+Benefits
+
+Historical accuracy
+Auditing
+Trend analysis
+Forecasting
+
+Status
+
+Accepted
+
+
+ADR-0004 — Runtime State Architecture
+Context
+
+ARI engines needed to share calculated values.
+
+Decision
+
+Forecast and Health publish runtime state.
+
+Recommendation Engine consumes runtime state.
+
+Consequences
+
+Benefits
+
+No duplicate calculations
+Cleaner architecture
+Easier dashboard integration
+
+Status
+
+Accepted
+
+
+ADR-0005 — Docker Networking
+Context
+
+Download traffic must remain inside the VPN.
+
+Decision
+
+qBittorrent shares the Gluetun network namespace.
+
+All download traffic exits through VPN.
+
+Consequences
+
+Benefits
+
+Privacy
+Simpler networking
+Automatic kill switch
+
+Status
+
+Accepted
+
+
+

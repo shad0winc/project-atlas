@@ -1,113 +1,221 @@
 # Project Atlas Maturity Model
 
-## Levels
+Project Atlas measures maturity by **operational capability**, **reliability**, **automation**, **maintainability**, and **engineering quality** rather than by the number of deployed services.
 
-| Level | Meaning |
-|---|---|
-| Level 1 | Basic functionality |
-| Level 2 | Configured and operational |
-| Level 3 | Integrated across the platform |
-| Level 4 | Documented, monitored, and recoverable |
-| Level 5 | Automated, validated, and production-ready |
+---
+
+# Maturity Levels
+
+| Level | Description |
+|--------|-------------|
+| **Level 1** | Functional — Core functionality exists. |
+| **Level 2** | Operational — Configured, stable, and usable. |
+| **Level 3** | Integrated — Services operate as a unified platform. |
+| **Level 4** | Observable — Health, monitoring, validation, and recovery are implemented. |
+| **Level 5** | Intelligent — Automated, predictive, self-validating, and production ready. |
 
 ---
 
 # Domain Maturity
 
 | Domain | Current | Goal |
-|---|---:|---:|
-| Infrastructure | 4 | 5 |
-| Storage | 4 | 5 |
-| Networking | 4 | 5 |
-| Security | 4 | 5 |
-| Media Management | 4 | 5 |
-| Discovery | 3 | 5 |
-| Presentation | 3 | 5 |
-| Requests | 3 | 5 |
-| Lifecycle | 3 | 5 |
-| Observability | 5 | 5 |
-| Operational Intelligence | 3 | 5 |
-| Engineering Handbook | 4 | 5 |
+|---------|:------:|:----:|
+| Infrastructure | **5** | 5 |
+| Storage | **5** | 5 |
+| Networking | **5** | 5 |
+| Security | **4** | 5 |
+| Media Management | **5** | 5 |
+| Discovery | **5** | 5 |
+| Presentation | **4** | 5 |
+| Requests | **4** | 5 |
+| Lifecycle Management | **5** | 5 |
+| Observability | **5** | 5 |
+| Operational Intelligence | **5** | 5 |
+| Documentation | **5** | 5 |
 
 ---
 
 # Atlas Retention Intelligence (ARI)
 
-## Current Stage
+## Status
 
-**Operational Intelligence**
+**Production Ready**
 
-Atlas now observes, validates, compares, and summarizes the operational state of the media platform using immutable historical snapshots.
+ARI is the operational intelligence subsystem of Project Atlas.
 
----
-
-## Current Capabilities
-
-### Platform
-
-- Atlas version
-- Hostname
-- Snapshot schema version
-
-### Storage
-
-- Capacity
-- Capacity (bytes)
-- Used space
-- Used space (bytes)
-- Available space
-- Available space (bytes)
-- Utilization percentage
-
-### Filesystem
-
-- Media library inventory
-- Library counts
-
-### Jellyfin
-
-- Server metadata
-- Library inventory
-- Library path discovery
-- User inventory
-- Aggregate media counts
-
-### Validation
-
-- Library existence validation
-- Library path validation
-
-### Analysis
-
-- Filesystem ↔ Jellyfin synchronization
-- Historical snapshot comparison
-- Operational change summaries
+It continuously evaluates platform health, analyzes historical operational data, forecasts future capacity requirements, and provides actionable recommendations.
 
 ---
 
-## Next Stage
+# Engine Architecture
 
-### Trend Analysis
+ARI consists of four independent engines.
 
-- Historical storage growth
-- Library growth over time
-- User activity trends
+## Health Engine
 
-### Operational Intelligence
+### Capabilities
 
-- Configuration drift detection
-- Health scoring
+- Platform health scoring
+- Docker validation
+- Storage validation
+- VPN validation
+- Jellyfin validation
+- Snapshot freshness monitoring
+
+Result:
+
+ARI continuously evaluates the operational health of Atlas.
+
+---
+
+## Analytics Engine
+
+### Capabilities
+
+- Immutable snapshots
+- Historical storage analysis
+- Historical library analysis
+- Trend detection
+- Historical comparisons
+- Operational summaries
+
+Result:
+
+ARI understands historical platform behavior.
+
+---
+
+## Forecast Engine
+
+### Capabilities
+
+- Time-normalized growth analysis
+- Average storage growth
+- Average daily growth
 - Capacity forecasting
-- Automated recommendations
+- Days remaining estimation
+- Estimated storage exhaustion date
+- Forecast confidence analysis
 
-### Automation
+Result:
 
-- Scheduled snapshot collection
-- Scheduled reporting
-- Automated health reports
+ARI predicts future storage requirements using historical operational data.
 
 ---
 
-## Notes
+## Recommendation Engine
 
-Project Atlas measures maturity by operational capability, maintainability, recoverability, automation, and engineering quality—not by the number of containers or services deployed.
+### Capabilities
+
+- Health recommendations
+- Capacity recommendations
+- Forecast recommendations
+
+Result:
+
+ARI provides actionable operational guidance.
+
+---
+
+# Current Platform Capabilities
+
+## Infrastructure
+
+- Docker orchestration
+- Proxmox LXC deployment
+- Intel Quick Sync
+- VPN networking
+- Operational CLI
+- Backup framework
+
+## Media Platform
+
+- Jellyfin
+- Jellyseerr
+- Sonarr
+- Sonarr Anime
+- Radarr
+- Radarr Anime
+- Prowlarr
+- Recyclarr
+- Bazarr
+- Maintainerr
+- qBittorrent
+- Homepage
+- Dozzle
+
+## Operational Intelligence
+
+- Health monitoring
+- Historical analytics
+- Capacity forecasting
+- Recommendation engine
+
+---
+
+# Current Maturity Assessment
+
+Project Atlas has achieved:
+
+- Production-ready infrastructure
+- Production-ready media platform
+- Production-ready operational intelligence
+- Comprehensive documentation
+- Version-controlled configuration
+- Automated validation
+- Operational forecasting
+
+Overall Project Maturity:
+
+# **Level 5 — Intelligent**
+
+Atlas has evolved from a self-hosted media server into an intelligent operational platform capable of monitoring, validating, forecasting, and recommending actions based on real operational data.
+
+---
+
+# Next Evolution
+
+The next stage of Project Atlas focuses on expanding platform capabilities rather than increasing maturity.
+
+## Planned
+
+### Atlas Platform
+
+- Web dashboard
+- Administrative portal
+- User portal
+- REST API
+
+### User Intelligence
+
+- Favorites
+- Protected media
+- Watch history
+- Personalized recommendations
+
+### Smart Automation
+
+- Automatic TV episode subscriptions
+- Live sports integration
+- Notification framework
+
+### Long-Term
+
+- Multi-server deployments
+- Distributed storage
+- Plugin architecture
+- Mobile companion
+- AI-assisted operational insights
+
+---
+
+# Engineering Philosophy
+
+Project Atlas prioritizes:
+
+- Simplicity over complexity
+- Reliability over novelty
+- Observability before automation
+- Automation before manual intervention
+- Intelligence through operational data
+- Documentation as a first-class feature
