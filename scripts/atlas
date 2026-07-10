@@ -138,17 +138,8 @@ URLS
             echo "Compose File: ${ATLAS_MODULE_SPORTS_COMPOSE_FILE:-docker-compose.sports.yml}"
             echo "Docs:         ${ATLAS_MODULE_SPORTS_DOC:-docs/SPORTS.md}"
 
-            if [[ -f "$ATLAS_PROJECT_DIR/${ATLAS_MODULE_SPORTS_COMPOSE_FILE:-docker-compose.sports.yml}" ]]; then
-              echo "Compose:      present"
-            else
-              echo "Compose:      missing"
-            fi
-
-            if [[ -f "$ATLAS_PROJECT_DIR/${ATLAS_MODULE_SPORTS_DOC:-docs/SPORTS.md}" ]]; then
-              echo "Docs:         present"
-            else
-              echo "Docs:         missing"
-            fi
+            [[ -f "$ATLAS_PROJECT_DIR/${ATLAS_MODULE_SPORTS_COMPOSE_FILE:-docker-compose.sports.yml}" ]] && echo "Compose:      present" || echo "Compose:      missing"
+            [[ -f "$ATLAS_PROJECT_DIR/${ATLAS_MODULE_SPORTS_DOC:-docs/SPORTS.md}" ]] && echo "Docs:         present" || echo "Docs:         missing"
             ;;
           *)
             echo "Unknown module: $module_name"
@@ -158,72 +149,33 @@ URLS
         ;;
 
       verify)
-        if [[ "$module_name" != "sports" ]]; then
-          echo "Usage: atlas module verify sports"
-          exit 1
-        fi
-
-        print_header
-        echo "Sports Module Verification"
-        echo
-
-        pass=true
-
-        check_module() {
-          label="$1"
-          shift
-          if "$@" >/dev/null 2>&1; then
-            echo "OK   $label"
-          else
-            echo "FAIL $label"
-            pass=false
-          fi
-        }
-
-        check_module "Module registry present" test -f "$ATLAS_MODULE_CONFIG_FILE"
-        check_module "Sports compose present" test -f "$ATLAS_PROJECT_DIR/${ATLAS_MODULE_SPORTS_COMPOSE_FILE:-docker-compose.sports.yml}"
-        check_module "Sports documentation present" test -f "$ATLAS_PROJECT_DIR/${ATLAS_MODULE_SPORTS_DOC:-docs/SPORTS.md}"
-        check_module "Sports config directory present" test -d "$ATLAS_CONFIG_ROOT/sportyfin"
-        check_module "Sports media directory present" test -d "$ATLAS_MEDIA_ROOT/Sports"
-        check_module "Sports compose valid" docker compose -f docker-compose.yml -f "${ATLAS_MODULE_SPORTS_COMPOSE_FILE:-docker-compose.sports.yml}" config
-
-        echo
-        if [ "$pass" = true ]; then
-          echo "Sports Module Status: PASS"
-        else
-          echo "Sports Module Status: FAIL"
-          exit 1
-        fi
+        case "$module_name" in
+          sports)
+            print_header
+            "$ATLAS_PROJECT_DIR/modules/sports/verify.sh"
+            ;;
+          *)
+            echo "Unknown module: $module_name"
+            exit 1
+            ;;
+        esac
         ;;
 
       doctor)
-        if [[ "$module_name" != "sports" ]]; then
-          echo "Usage: atlas module doctor sports"
-          exit 1
-        fi
-
-        print_header
-        echo "Sports Module Doctor"
-        echo
-        echo "Enabled: ${ATLAS_MODULE_SPORTS_ENABLED:-false}"
-        echo
-
-        echo "Files:"
-        [[ -f "$ATLAS_PROJECT_DIR/${ATLAS_MODULE_SPORTS_COMPOSE_FILE:-docker-compose.sports.yml}" ]] && echo "  OK docker-compose.sports.yml" || echo "  FAIL docker-compose.sports.yml"
-        [[ -f "$ATLAS_PROJECT_DIR/${ATLAS_MODULE_SPORTS_DOC:-docs/SPORTS.md}" ]] && echo "  OK docs/SPORTS.md" || echo "  FAIL docs/SPORTS.md"
-
-        echo
-        echo "Directories:"
-        [[ -d "$ATLAS_CONFIG_ROOT/sportyfin" ]] && echo "  OK $ATLAS_CONFIG_ROOT/sportyfin" || echo "  FAIL $ATLAS_CONFIG_ROOT/sportyfin"
-        [[ -d "$ATLAS_MEDIA_ROOT/Sports" ]] && echo "  OK $ATLAS_MEDIA_ROOT/Sports" || echo "  FAIL $ATLAS_MEDIA_ROOT/Sports"
-
-        echo
-        echo "Compose:"
-        if docker compose -f docker-compose.yml -f "${ATLAS_MODULE_SPORTS_COMPOSE_FILE:-docker-compose.sports.yml}" config >/dev/null 2>&1; then
-          echo "  OK Sports compose valid"
-        else
-          echo "  FAIL Sports compose invalid"
-        fi
+        case "$module_name" in
+          sports)
+            print_header
+            echo "Sports Module Doctor"
+            echo
+            echo "Enabled: ${ATLAS_MODULE_SPORTS_ENABLED:-false}"
+            echo
+            "$ATLAS_PROJECT_DIR/modules/sports/verify.sh"
+            ;;
+          *)
+            echo "Unknown module: $module_name"
+            exit 1
+            ;;
+        esac
         ;;
 
       *)
@@ -315,11 +267,7 @@ URLS
 
     echo
     echo "VPN:"
-    if docker ps --format '{{.Names}}' | grep -qx gluetun; then
-      echo "  OK Gluetun container running"
-    else
-      echo "  FAIL Gluetun container not running"
-    fi
+    docker ps --format '{{.Names}}' | grep -qx gluetun && echo "  OK Gluetun container running" || echo "  FAIL Gluetun container not running"
 
     echo
     echo "qBittorrent VPN IP:"
@@ -339,19 +287,11 @@ URLS
     echo
     echo "Project Files:"
     for file in VERSION CHARTER.md ROADMAP.md CHANGELOG.md docs/BUILD_LOG.md docs/MATURITY.md; do
-      if [ -e "$file" ]; then
-        echo "  OK $file"
-      else
-        echo "  FAIL $file"
-      fi
+      [ -e "$file" ] && echo "  OK $file" || echo "  FAIL $file"
     done
 
     for dir in docs docs/ADR docs/EDR; do
-      if [ -d "$dir" ]; then
-        echo "  OK $dir"
-      else
-        echo "  FAIL $dir"
-      fi
+      [ -d "$dir" ] && echo "  OK $dir" || echo "  FAIL $dir"
     done
 
     echo
@@ -361,7 +301,6 @@ URLS
 
   update)
     print_header
-
     echo "Starting Atlas update..."
     echo
 
@@ -472,9 +411,7 @@ EOF
     echo "Retention:"
     echo "  Keeping newest 10 backups"
 
-    ls -1t "$backup_dir"/atlas-*.tar.gz 2>/dev/null \
-      | tail -n +11 \
-      | xargs -r rm -f
+    ls -1t "$backup_dir"/atlas-*.tar.gz 2>/dev/null | tail -n +11 | xargs -r rm -f
 
     echo
     echo "Status:"
