@@ -27,7 +27,9 @@ check "Module directory present" test -d "$ATLAS_PROJECT_DIR/modules/sports"
 check "Module README present" test -f "$ATLAS_PROJECT_DIR/modules/sports/README.md"
 check "Module compose present" test -f "$ATLAS_PROJECT_DIR/modules/sports/docker-compose.yml"
 check "Runtime config directory present" test -d "$ATLAS_CONFIG_ROOT/sportyfin"
-check "Sportyfin output directory present" test -d "$ATLAS_CONFIG_ROOT/sportyfin/output"
+check "Sports input directory present" test -d "$ATLAS_CONFIG_ROOT/sportyfin/input"
+check "Sports output directory present" test -d "$ATLAS_CONFIG_ROOT/sportyfin/output"
+check "Sports logs directory present" test -d "$ATLAS_CONFIG_ROOT/sportyfin/logs"
 check "Sports media directory present" test -d "$ATLAS_MEDIA_ROOT/Sports"
 check "Module compose valid" docker compose -f "$ATLAS_PROJECT_DIR/modules/sports/docker-compose.yml" config
 
