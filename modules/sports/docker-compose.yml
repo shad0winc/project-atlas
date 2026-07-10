@@ -1,0 +1,6 @@
+# Atlas Sports Module Compose
+#
+# This file is intentionally safe by default.
+# Sportyfin service definitions will be added here later.
+
+services: {}

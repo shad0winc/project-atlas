@@ -1,8 +1,7 @@
 # Project Atlas Sports Module
 #
-# Optional module compose file.
-# This file is intentionally safe by default.
-#
-# Sports services will be added here when the module is enabled.
+# Root compose override for the optional Sports module.
+# The module currently contains no running services.
 
-services: {}
+include:
+  - modules/sports/docker-compose.yml
