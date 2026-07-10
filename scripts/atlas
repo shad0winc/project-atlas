@@ -51,6 +51,8 @@ Modules
   atlas module doctor <module>
   atlas module install <module>
   atlas module uninstall <module>
+  atlas module enable <module>
+  atlas module disable <module>
 
 Maintenance
 -----------
@@ -206,6 +208,58 @@ URLS
         esac
         ;;
 
+      enable)
+        case "$module_name" in
+          sports)
+            print_header
+
+            if [[ ! -f "$ATLAS_MODULE_CONFIG_FILE" ]]; then
+              echo "Missing module registry: $ATLAS_MODULE_CONFIG_FILE"
+              exit 1
+            fi
+
+            sed -i \
+              's/^ATLAS_MODULE_SPORTS_ENABLED=.*/ATLAS_MODULE_SPORTS_ENABLED=true/' \
+              "$ATLAS_MODULE_CONFIG_FILE"
+
+            echo "Sports module enabled."
+            echo
+            echo "No containers were started."
+            echo "Run: atlas module status sports"
+            ;;
+          *)
+            echo "Unknown module: $module_name"
+            exit 1
+            ;;
+        esac
+        ;;
+
+      disable)
+        case "$module_name" in
+          sports)
+            print_header
+
+            if [[ ! -f "$ATLAS_MODULE_CONFIG_FILE" ]]; then
+              echo "Missing module registry: $ATLAS_MODULE_CONFIG_FILE"
+              exit 1
+            fi
+
+            sed -i \
+              's/^ATLAS_MODULE_SPORTS_ENABLED=.*/ATLAS_MODULE_SPORTS_ENABLED=false/' \
+              "$ATLAS_MODULE_CONFIG_FILE"
+
+            echo "Sports module disabled."
+            echo
+            echo "No containers were stopped."
+            echo "Run: atlas module status sports"
+            ;;
+          *)
+            echo "Unknown module: $module_name"
+            exit 1
+            ;;
+        esac
+        ;;
+
       *)
         echo "Usage:"
         echo "  atlas module list"
@@ -214,6 +268,8 @@ URLS
         echo "  atlas module doctor <module>"
         echo "  atlas module install <module>"
         echo "  atlas module uninstall <module>"
+        echo "  atlas module enable <module>"
+        echo "  atlas module disable <module>"
         exit 1
         ;;
     esac
