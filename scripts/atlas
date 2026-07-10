@@ -49,6 +49,8 @@ Modules
   atlas module status <module>
   atlas module verify <module>
   atlas module doctor <module>
+  atlas module install <module>
+  atlas module uninstall <module>
 
 Maintenance
 -----------
@@ -178,12 +180,40 @@ URLS
         esac
         ;;
 
+      install)
+        case "$module_name" in
+          sports)
+            print_header
+            "$ATLAS_PROJECT_DIR/modules/sports/install.sh"
+            ;;
+          *)
+            echo "Unknown module: $module_name"
+            exit 1
+            ;;
+        esac
+        ;;
+
+      uninstall)
+        case "$module_name" in
+          sports)
+            print_header
+            "$ATLAS_PROJECT_DIR/modules/sports/uninstall.sh"
+            ;;
+          *)
+            echo "Unknown module: $module_name"
+            exit 1
+            ;;
+        esac
+        ;;
+
       *)
         echo "Usage:"
         echo "  atlas module list"
         echo "  atlas module status <module>"
         echo "  atlas module verify <module>"
         echo "  atlas module doctor <module>"
+        echo "  atlas module install <module>"
+        echo "  atlas module uninstall <module>"
         exit 1
         ;;
     esac
