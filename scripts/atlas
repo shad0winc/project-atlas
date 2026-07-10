@@ -54,6 +54,7 @@ Modules
   atlas module enable <module>
   atlas module disable <module>
   atlas module update <module>
+  atlas module create <name>
 
 Maintenance
 -----------
@@ -274,6 +275,19 @@ URLS
         esac
         ;;
 
+      create)
+        new_module_id="${3:-}"
+        new_module_name="${4:-}"
+        new_module_description="${5:-}"
+
+        print_header
+
+        "$ATLAS_PROJECT_DIR/scripts/atlas-module-create.sh" \
+          "$new_module_id" \
+          "$new_module_name" \
+          "$new_module_description"
+        ;;
+
       *)
         echo "Usage:"
         echo "  atlas module list"
@@ -285,6 +299,7 @@ URLS
         echo "  atlas module enable <module>"
         echo "  atlas module disable <module>"
         echo "  atlas module update <module>"
+        echo "  atlas module create <name>"
         exit 1
         ;;
     esac
