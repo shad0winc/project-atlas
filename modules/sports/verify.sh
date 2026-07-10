@@ -32,6 +32,23 @@ check "Sports output directory present" test -d "$ATLAS_CONFIG_ROOT/sportyfin/ou
 check "Sports logs directory present" test -d "$ATLAS_CONFIG_ROOT/sportyfin/logs"
 check "Sports media directory present" test -d "$ATLAS_MEDIA_ROOT/Sports"
 check "Module compose valid" docker compose -f "$ATLAS_PROJECT_DIR/modules/sports/docker-compose.yml" config
+check "Sports feed container running" \
+  docker inspect --format '{{.State.Running}}' atlas-sports-feed
+
+check "Sports feed container healthy" \
+  sh -c "[ \"$(docker inspect --format '{{.State.Health.Status}}' atlas-sports-feed 2>/dev/null)\" = healthy ]"
+
+check "Sports health endpoint reachable" \
+  curl -fsS http://127.0.0.1:8097/health
+
+check "Sports M3U feed reachable" \
+  curl -fsS http://127.0.0.1:8097/sports.m3u
+
+check "Sports XMLTV feed reachable" \
+  curl -fsS http://127.0.0.1:8097/sports.xml
+
+check "Jellyfin can reach Sports feed" \
+  docker exec jellyfin curl -fsS http://atlas-sports-feed:8080/health
 
 echo
 
