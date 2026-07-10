@@ -32,6 +32,9 @@ check "Sports output directory present" test -d "$ATLAS_CONFIG_ROOT/sportyfin/ou
 check "Sports logs directory present" test -d "$ATLAS_CONFIG_ROOT/sportyfin/logs"
 check "Sports media directory present" test -d "$ATLAS_MEDIA_ROOT/Sports"
 check "Module compose valid" docker compose -f "$ATLAS_PROJECT_DIR/modules/sports/docker-compose.yml" config
+check "Module metadata present" test -f "$ATLAS_PROJECT_DIR/modules/sports/module.conf"
+check "Module environment example present" test -f "$ATLAS_PROJECT_DIR/modules/sports/.env.example"
+check "Module update script present" test -x "$ATLAS_PROJECT_DIR/modules/sports/scripts/update.sh"
 check "Sports feed container running" \
   docker inspect --format '{{.State.Running}}' atlas-sports-feed
 

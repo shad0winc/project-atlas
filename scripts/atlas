@@ -53,6 +53,7 @@ Modules
   atlas module uninstall <module>
   atlas module enable <module>
   atlas module disable <module>
+  atlas module update <module>
 
 Maintenance
 -----------
@@ -156,7 +157,7 @@ URLS
         case "$module_name" in
           sports)
             print_header
-            "$ATLAS_PROJECT_DIR/modules/sports/verify.sh"
+            "$ATLAS_PROJECT_DIR/modules/sports/scripts/verify.sh"
             ;;
           *)
             echo "Unknown module: $module_name"
@@ -173,7 +174,7 @@ URLS
             echo
             echo "Enabled: ${ATLAS_MODULE_SPORTS_ENABLED:-false}"
             echo
-            "$ATLAS_PROJECT_DIR/modules/sports/verify.sh"
+            "$ATLAS_PROJECT_DIR/modules/sports/scripts/verify.sh"
             ;;
           *)
             echo "Unknown module: $module_name"
@@ -186,7 +187,7 @@ URLS
         case "$module_name" in
           sports)
             print_header
-            "$ATLAS_PROJECT_DIR/modules/sports/install.sh"
+            "$ATLAS_PROJECT_DIR/modules/sports/scripts/install.sh"
             ;;
           *)
             echo "Unknown module: $module_name"
@@ -199,7 +200,7 @@ URLS
         case "$module_name" in
           sports)
             print_header
-            "$ATLAS_PROJECT_DIR/modules/sports/uninstall.sh"
+            "$ATLAS_PROJECT_DIR/modules/sports/scripts/uninstall.sh"
             ;;
           *)
             echo "Unknown module: $module_name"
@@ -260,6 +261,19 @@ URLS
         esac
         ;;
 
+      update)
+        case "$module_name" in
+          sports)
+            print_header
+            "$ATLAS_PROJECT_DIR/modules/sports/scripts/update.sh"
+            ;;
+          *)
+            echo "Unknown module: $module_name"
+            exit 1
+            ;;
+        esac
+        ;;
+
       *)
         echo "Usage:"
         echo "  atlas module list"
@@ -270,6 +284,7 @@ URLS
         echo "  atlas module uninstall <module>"
         echo "  atlas module enable <module>"
         echo "  atlas module disable <module>"
+        echo "  atlas module update <module>"
         exit 1
         ;;
     esac
