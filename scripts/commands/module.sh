@@ -289,6 +289,28 @@ atlas_command_module_info() {
 
 }
 
+atlas_command_module_usage() {
+  echo "Usage:"
+  echo "  atlas module list"
+  echo "  atlas module status <module>"
+  echo "  atlas module verify <module>"
+  echo "  atlas module doctor <module>"
+  echo "  atlas module install <module>"
+  echo "  atlas module uninstall <module>"
+  echo "  atlas module enable <module>"
+  echo "  atlas module disable <module>"
+  echo "  atlas module update <module>"
+  echo "  atlas module create <name>"
+  echo "  atlas module dependencies <module>"
+  echo "  atlas module services <module>"
+  echo "  atlas module health <module>"
+  echo "  atlas module validate <module>"
+  echo "  atlas module permissions <module>"
+  echo "  atlas module events <module>"
+  echo "  atlas module publish <module> <event> [payload]"
+  echo "  atlas module reconcile <module>"
+}
+
 atlas_command_module() {
   local subcommand="${1:-list}"
   local module_name="${2:-}"
@@ -474,30 +496,13 @@ atlas_command_module() {
         "$event_payload"
       ;;
 
-    *)
-      atlas_command_module_usage
-      return 1
+    reconcile)
+      atlas_print_header
+      atlas_module_reconcile_event_subscriber "$module_name"
       ;;
 
     *)
-      echo "Usage:"
-      echo "  atlas module list"
-      echo "  atlas module status <module>"
-      echo "  atlas module verify <module>"
-      echo "  atlas module doctor <module>"
-      echo "  atlas module install <module>"
-      echo "  atlas module uninstall <module>"
-      echo "  atlas module enable <module>"
-      echo "  atlas module disable <module>"
-      echo "  atlas module update <module>"
-      echo "  atlas module create <name>"
-      echo "  atlas module dependencies <module>"
-      echo "  atlas module services <module>"
-      echo "  atlas module health <module>"
-      echo "  atlas module validate <module>"
-      echo "  atlas module permissions <module>"
-      echo "  atlas module events <module>"
-      echo "  atlas module publish <module> <event> [payload]"
+      atlas_command_module_usage
       return 1
       ;;
   esac

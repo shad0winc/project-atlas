@@ -496,3 +496,50 @@ atlas_module_publish_event() {
 
     atlas_event_publish "$event" "$payload" "$module"
 }
+
+atlas_module_event_subscriber_name() {
+    local module="${1:-}"
+
+    printf 'module-%s\n' "$module"
+}
+
+atlas_module_reconcile_event_subscriber() {
+    local module="${1:-}"
+
+    if ! atlas_module_exists "$module"; then
+        atlas_fail "Unknown module: $module"
+        return 1
+    fi
+
+    atlas_module_load "$module"
+
+    local subscribes="${ATLAS_MODULE_EVENTS_SUBSCRIBES:-}"
+    local subscriber=""
+
+    subscriber="$(atlas_module_event_subscriber_name "$module")"
+
+    atlas_section "Module Event Subscriber"
+
+    if [[ -z "$subscribes" ]]; then
+        echo "Module declares no event subscriptions."
+
+        if atlas_event_subscriber_exists "$subscriber"; then
+            atlas_event_subscriber_unregister "$subscriber"
+        fi
+
+        return 0
+    fi
+
+    if ! atlas_event_subscriber_exists "$subscriber"; then
+        atlas_event_subscriber_register "$subscriber"
+    fi
+
+    atlas_event_subscriber_filter \
+        "$subscriber" \
+        "$subscribes"
+
+    echo
+    atlas_ok "Module subscriber reconciled: $module"
+    echo "Subscriber: $subscriber"
+    echo "Filter:     $subscribes"
+}
