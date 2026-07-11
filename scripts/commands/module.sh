@@ -391,11 +391,15 @@ atlas_command_module() {
 
       echo
 
-      atlas_command_module_run_script "$module_name" "install"
+      atlas_command_module_run_script "$module_name" "install" || return 1
 
       echo
 
-      atlas_module_validate_configuration "$module_name"
+      atlas_module_validate_configuration "$module_name" || return 1
+
+      echo
+
+      atlas_module_reconcile_event_subscriber "$module_name"
       ;;
 
     uninstall)
@@ -404,7 +408,12 @@ atlas_command_module() {
 
     enable)
       atlas_print_header
+
       atlas_command_module_enable "$module_name"
+
+      echo
+
+      atlas_module_reconcile_event_subscriber "$module_name"
       ;;
 
     disable)
@@ -426,6 +435,10 @@ atlas_command_module() {
       if [[ "$failed" -ne 0 ]]; then
         return 1
       fi
+
+      echo
+
+      atlas_module_reconcile_event_subscriber "$module_name" || return 1
 
       echo
 
