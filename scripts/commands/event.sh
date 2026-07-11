@@ -8,13 +8,14 @@ atlas_command_event() {
     publish)
       local event="${1:-}"
       local payload="${2:-}"
+      local source="${3:-atlas}"
 
       if [[ -z "$payload" ]]; then
         payload='{}'
       fi
 
       atlas_print_header
-      atlas_event_publish "$event" "$payload"
+      atlas_event_publish "$event" "$payload" "$source"
       ;;
 
     list)
@@ -30,7 +31,7 @@ atlas_command_event() {
       ;;
 
     *)
-      echo "Usage:"
+      echo "  atlas event publish <event> [payload] [source]"
       echo "  atlas event publish <event> [payload]"
       echo "  atlas event list"
       echo "  atlas event tail"

@@ -11,14 +11,15 @@ atlas_event_initialize() {
 atlas_event_publish() {
   local event="${1:-}"
   local payload="${2:-}"
-
-  if [[ -z "$payload" ]]; then
-    payload='{}'
-  fi
+  local source="${3:-atlas}"
 
   if [[ -z "$event" ]]; then
     echo "Event name required"
     return 1
+  fi
+
+  if [[ -z "$payload" ]]; then
+    payload='{}'
   fi
 
   atlas_event_initialize
@@ -26,13 +27,27 @@ atlas_event_publish() {
   local timestamp
   timestamp="$(date --utc --iso-8601=seconds)"
 
-  python3 - "$timestamp" "$event" "$payload" >> "$ATLAS_EVENT_LOG" <<'PY'
+  local event_id
+  event_id="evt-$(python3 - <<'PY'
+import uuid
+print(uuid.uuid4())
+PY
+)"
+
+  python3 - \
+    "$event_id" \
+    "$timestamp" \
+    "$source" \
+    "$event" \
+    "$payload" >> "$ATLAS_EVENT_LOG" <<'PY'
 import json
 import sys
 
-timestamp = sys.argv[1]
-event = sys.argv[2]
-payload_raw = sys.argv[3]
+event_id = sys.argv[1]
+timestamp = sys.argv[2]
+source = sys.argv[3]
+event = sys.argv[4]
+payload_raw = sys.argv[5]
 
 try:
     payload = json.loads(payload_raw)
@@ -40,7 +55,10 @@ except json.JSONDecodeError:
     payload = payload_raw
 
 record = {
+    "schema": 2,
+    "id": event_id,
     "timestamp": timestamp,
+    "source": source,
     "event": event,
     "payload": payload,
 }
@@ -49,6 +67,8 @@ print(json.dumps(record, separators=(",", ":")))
 PY
 
   atlas_ok "Event published: $event"
+  echo "ID:   $event_id"
+  echo "Source: $source"
 }
 
 atlas_event_list() {

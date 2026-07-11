@@ -52,7 +52,7 @@ Intelligence
 
 Runtime
 -------
-  atlas event publish <event> [payload]
+  atlas event publish <event> [payload] [source]
   atlas event list
   atlas event tail
 
