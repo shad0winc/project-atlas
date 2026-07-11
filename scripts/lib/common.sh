@@ -8,6 +8,7 @@ source "$ATLAS_CLI_ROOT/lib/config.sh"
 
 # shellcheck disable=SC1091
 source "$ATLAS_CLI_ROOT/lib/output.sh"
+source "$ATLAS_CLI_ROOT/lib/modules.sh"
 
 atlas_initialize() {
   atlas_load_config
