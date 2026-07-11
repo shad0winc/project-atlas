@@ -55,6 +55,10 @@ Runtime
   atlas event publish <event> [payload] [source]
   atlas event list
   atlas event tail
+  atlas event subscriber register <name>
+  atlas event subscriber list
+  atlas event subscriber pending <name>
+  atlas event subscriber consume <name>
 
 HELP
 }
