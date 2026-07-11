@@ -51,6 +51,7 @@ atlas_command_module_list() {
 
 atlas_command_module_status() {
   local module="${1:-}"
+  local show_header="${2:-true}"
 
   if [[ -z "$module" ]]; then
     echo "Usage: atlas module status <module>"
@@ -72,7 +73,10 @@ atlas_command_module_status() {
     enabled="true"
   fi
 
-  atlas_print_header
+  if [[ "$show_header" == "true" ]]; then
+    atlas_print_header
+  fi
+
   echo "${ATLAS_MODULE_NAME:-$module}"
   echo
   echo "ID:           $module"
@@ -152,6 +156,7 @@ atlas_command_module_disable() {
 
 atlas_command_module_services() {
   local module="${1:-}"
+  local show_header="${2:-true}"
 
   if ! atlas_module_exists "$module"; then
     echo "Unknown module: $module"
@@ -160,7 +165,10 @@ atlas_command_module_services() {
 
   atlas_module_load "$module"
 
-  atlas_print_header
+  if [[ "$show_header" == "true" ]]; then
+    atlas_print_header
+  fi
+
   atlas_section "Module Services"
 
   local services="${ATLAS_MODULE_SERVICES:-}"
@@ -196,6 +204,7 @@ atlas_command_module_services() {
 
 atlas_command_module_health() {
   local module="${1:-}"
+  local show_header="${2:-true}"
 
   if ! atlas_module_exists "$module"; then
     echo "Unknown module: $module"
@@ -204,7 +213,9 @@ atlas_command_module_health() {
 
   atlas_module_load "$module"
 
-  atlas_print_header
+  if [[ "$show_header" == "true" ]]; then
+    atlas_print_header
+  fi
   atlas_section "Module Health"
 
   local failed=0
@@ -247,6 +258,31 @@ atlas_command_module_health() {
     atlas_fail "Module health check failed"
     return 1
   fi
+}
+
+atlas_command_module_info() {
+  local module="${1:-}"
+
+  if ! atlas_module_exists "$module"; then
+    echo "Unknown module: $module"
+    return 1
+  fi
+
+  atlas_module_load "$module"
+
+  atlas_print_header
+  atlas_section "Module Information"
+
+  atlas_command_module_status "$module" false
+
+  echo
+  atlas_module_check_dependencies "$module"
+
+  echo
+  atlas_command_module_services "$module" false
+
+  echo
+  atlas_command_module_health "$module" false
 }
 
 atlas_command_module() {
@@ -359,6 +395,10 @@ atlas_command_module() {
     health)
       atlas_command_module_health "$module_name"
       ;;
+
+    info)
+        atlas_command_module_info "$module_name"
+        ;;
 
     *)
       echo "Usage:"

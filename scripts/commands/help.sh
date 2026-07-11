@@ -32,6 +32,7 @@ Modules
   atlas module dependencies <module>
   atlas module services <module>
   atlas module health <module>
+  atlas module info <module>
 
 Maintenance
 -----------
