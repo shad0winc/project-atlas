@@ -441,6 +441,18 @@ atlas_command_module() {
       atlas_module_validate_configuration "$module_name"
       ;;
 
+    permissions)
+      if ! atlas_module_exists "$module_name"; then
+        echo "Unknown module: $module_name"
+        return 1
+      fi
+
+      atlas_module_load "$module_name"
+
+      atlas_print_header
+      atlas_module_validate_permissions
+      ;;
+
     *)
       echo "Usage:"
       echo "  atlas module list"
@@ -457,6 +469,7 @@ atlas_command_module() {
       echo "  atlas module services <module>"
       echo "  atlas module health <module>"
       echo "  atlas module validate <module>"
+      echo "  atlas module permissions <module>"
       return 1
       ;;
   esac

@@ -258,6 +258,10 @@ atlas_module_validate_configuration() {
     atlas_module_validate_files "$module" || failed=1
     atlas_module_validate_directories || failed=1
     atlas_module_validate_writable_directories || failed=1
+
+    echo
+
+    atlas_module_validate_permissions || failed=1
     atlas_module_validate_environment || failed=1
 
     echo
@@ -320,5 +324,77 @@ atlas_module_validate_install_configuration() {
     fi
 
     atlas_fail "Install configuration invalid"
+    return 1
+}
+
+atlas_module_validate_permissions() {
+    local directories="${ATLAS_MODULE_WRITABLE_DIRECTORIES:-}"
+    local expected_mode="${ATLAS_MODULE_DIRECTORY_MODE:-}"
+    local expected_uid="${ATLAS_MODULE_EXPECTED_UID:-}"
+    local expected_gid="${ATLAS_MODULE_EXPECTED_GID:-}"
+
+    local directory
+    local failed=0
+
+    [[ -n "$directories" ]] || return 0
+
+    atlas_section "Module Permissions"
+
+    while IFS= read -r directory; do
+        [[ -n "$directory" ]] || continue
+
+        if [[ ! -d "$directory" ]]; then
+            atlas_fail "Directory missing: $directory"
+            failed=1
+            continue
+        fi
+
+        local actual_mode
+        local actual_uid
+        local actual_gid
+
+        actual_mode="$(stat -c '%a' "$directory")"
+        actual_uid="$(stat -c '%u' "$directory")"
+        actual_gid="$(stat -c '%g' "$directory")"
+
+        if [[ -n "$expected_mode" ]]; then
+            if [[ "$actual_mode" == "$expected_mode" ]]; then
+                atlas_ok "Directory mode: $directory ($actual_mode)"
+            else
+                atlas_fail \
+                    "Directory mode: $directory ($actual_mode, expected $expected_mode)"
+                failed=1
+            fi
+        fi
+
+        if [[ -n "$expected_uid" ]]; then
+            if [[ "$actual_uid" == "$expected_uid" ]]; then
+                atlas_ok "Directory UID: $directory ($actual_uid)"
+            else
+                atlas_fail \
+                    "Directory UID: $directory ($actual_uid, expected $expected_uid)"
+                failed=1
+            fi
+        fi
+
+        if [[ -n "$expected_gid" ]]; then
+            if [[ "$actual_gid" == "$expected_gid" ]]; then
+                atlas_ok "Directory GID: $directory ($actual_gid)"
+            else
+                atlas_fail \
+                    "Directory GID: $directory ($actual_gid, expected $expected_gid)"
+                failed=1
+            fi
+        fi
+    done < <(printf '%s\n' "$directories" | tr '|' '\n')
+
+    echo
+
+    if [[ "$failed" -eq 0 ]]; then
+        atlas_ok "Module permission contract satisfied"
+        return 0
+    fi
+
+    atlas_fail "Module permission contract violated"
     return 1
 }
