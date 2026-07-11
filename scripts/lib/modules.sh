@@ -398,3 +398,46 @@ atlas_module_validate_permissions() {
     atlas_fail "Module permission contract violated"
     return 1
 }
+
+atlas_module_event_contract() {
+    local module="${1:-}"
+
+    if ! atlas_module_exists "$module"; then
+        atlas_fail "Unknown module: $module"
+        return 1
+    fi
+
+    atlas_module_load "$module"
+
+    local publishes="${ATLAS_MODULE_EVENTS_PUBLISHES:-}"
+    local subscribes="${ATLAS_MODULE_EVENTS_SUBSCRIBES:-}"
+
+    atlas_section "Module Event Contract"
+
+    echo "Publishes:"
+
+    if [[ -z "$publishes" ]]; then
+        echo "  none"
+    else
+        local event=""
+
+        while IFS= read -r event; do
+            [[ -n "$event" ]] || continue
+            echo "  $event"
+        done < <(printf '%s\n' "$publishes" | tr '|' '\n')
+    fi
+
+    echo
+    echo "Subscribes:"
+
+    if [[ -z "$subscribes" ]]; then
+        echo "  none"
+    else
+        local pattern=""
+
+        while IFS= read -r pattern; do
+            [[ -n "$pattern" ]] || continue
+            echo "  $pattern"
+        done < <(printf '%s\n' "$subscribes" | tr '|' '\n')
+    fi
+}

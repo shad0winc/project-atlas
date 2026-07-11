@@ -283,6 +283,10 @@ atlas_command_module_info() {
 
   echo
   atlas_command_module_health "$module" false
+
+  echo
+  atlas_module_event_contract "$module"
+
 }
 
 atlas_command_module() {
@@ -453,6 +457,11 @@ atlas_command_module() {
       atlas_module_validate_permissions
       ;;
 
+    events)
+      atlas_print_header
+      atlas_module_event_contract "$module_name"
+      ;;
+
     *)
       echo "Usage:"
       echo "  atlas module list"
@@ -470,6 +479,7 @@ atlas_command_module() {
       echo "  atlas module health <module>"
       echo "  atlas module validate <module>"
       echo "  atlas module permissions <module>"
+      echo "  atlas module events <module>"
       return 1
       ;;
   esac

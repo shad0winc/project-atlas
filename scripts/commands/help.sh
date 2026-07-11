@@ -35,6 +35,7 @@ Modules
   atlas module info <module>
   atlas module validate <module>
   atlas module permissions <module>
+  atlas module events <module>
 
 Maintenance
 -----------
