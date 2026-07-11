@@ -462,6 +462,23 @@ atlas_command_module() {
       atlas_module_event_contract "$module_name"
       ;;
 
+    publish)
+      local event_name="${3:-}"
+      local event_payload="${4:-}"
+
+      atlas_print_header
+
+      atlas_module_publish_event \
+        "$module_name" \
+        "$event_name" \
+        "$event_payload"
+      ;;
+
+    *)
+      atlas_command_module_usage
+      return 1
+      ;;
+
     *)
       echo "Usage:"
       echo "  atlas module list"
@@ -480,6 +497,7 @@ atlas_command_module() {
       echo "  atlas module validate <module>"
       echo "  atlas module permissions <module>"
       echo "  atlas module events <module>"
+      echo "  atlas module publish <module> <event> [payload]"
       return 1
       ;;
   esac

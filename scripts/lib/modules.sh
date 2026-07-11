@@ -441,3 +441,58 @@ atlas_module_event_contract() {
         done < <(printf '%s\n' "$subscribes" | tr '|' '\n')
     fi
 }
+
+atlas_module_event_is_declared() {
+    local module="${1:-}"
+    local event="${2:-}"
+
+    if ! atlas_module_exists "$module"; then
+        atlas_fail "Unknown module: $module"
+        return 1
+    fi
+
+    atlas_module_load "$module"
+
+    local publishes="${ATLAS_MODULE_EVENTS_PUBLISHES:-}"
+    local pattern=""
+
+    [[ -n "$event" ]] || return 1
+    [[ -n "$publishes" ]] || return 1
+
+    while IFS= read -r pattern; do
+        [[ -n "$pattern" ]] || continue
+
+        if [[ "$event" == $pattern ]]; then
+            return 0
+        fi
+    done < <(printf '%s\n' "$publishes" | tr '|' '\n')
+
+    return 1
+}
+
+atlas_module_publish_event() {
+    local module="${1:-}"
+    local event="${2:-}"
+    local payload="${3:-}"
+
+    if ! atlas_module_exists "$module"; then
+        atlas_fail "Unknown module: $module"
+        return 1
+    fi
+
+    if [[ -z "$event" ]]; then
+        atlas_fail "Event name required"
+        return 1
+    fi
+
+    if ! atlas_module_event_is_declared "$module" "$event"; then
+        atlas_fail "Event not declared by module: $event"
+        return 1
+    fi
+
+    if [[ -z "$payload" ]]; then
+        payload='{}'
+    fi
+
+    atlas_event_publish "$event" "$payload" "$module"
+}
