@@ -65,6 +65,29 @@ atlas_command_event() {
             "${3:-*}"
           ;;
 
+        info)
+          atlas_print_header
+          atlas_section "Subscriber Information"
+          atlas_event_subscriber_info "$subscriber_name"
+          ;;
+
+        reset)
+          atlas_print_header
+          atlas_event_subscriber_reset "$subscriber_name"
+          ;;
+
+        seek)
+          atlas_print_header
+          atlas_event_subscriber_seek \
+            "$subscriber_name" \
+            "${3:-}"
+          ;;
+
+        unregister)
+          atlas_print_header
+          atlas_event_subscriber_unregister "$subscriber_name"
+          ;;
+
         *)
           echo "Usage:"
           echo "  atlas event subscriber register <name>"
@@ -76,6 +99,10 @@ atlas_command_event() {
           echo "  atlas event subscriber pending <name>"
           echo "  atlas event subscriber consume <name>"
           echo "  atlas event subscriber filter <name> <pattern>"
+          echo "  atlas event subscriber info <name>"
+          echo "  atlas event subscriber reset <name>"
+          echo "  atlas event subscriber seek <name> <cursor>"
+          echo "  atlas event subscriber unregister <name>"
           return 1
           ;;
       esac

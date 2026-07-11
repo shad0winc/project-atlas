@@ -60,6 +60,10 @@ Runtime
   atlas event subscriber pending <name>
   atlas event subscriber consume <name>
   atlas event subscriber filter <name> <pattern>
+  atlas event subscriber info <name>
+  atlas event subscriber reset <name>
+  atlas event subscriber seek <name> <cursor>
+  atlas event subscriber unregister <name>
 
 HELP
 }

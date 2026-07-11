@@ -292,3 +292,108 @@ for line in sys.stdin:
         print(line)
 ' "$filter"
 }
+
+atlas_event_subscriber_info() {
+  local subscriber="${1:-}"
+
+  if ! atlas_event_subscriber_exists "$subscriber"; then
+    atlas_fail "Unknown subscriber: $subscriber"
+    return 1
+  fi
+
+  local cursor=""
+  local position=""
+  local event_count=""
+  local pending_count=""
+  local filter=""
+
+  cursor="$(atlas_event_subscriber_cursor "$subscriber")"
+  position="$(cat "$cursor")"
+  event_count="$(wc -l < "$ATLAS_EVENT_LOG")"
+  filter="$(atlas_event_subscriber_get_filter "$subscriber")"
+
+  if (( position >= event_count )); then
+    pending_count=0
+  else
+    pending_count="$(
+      tail -n "+$((position + 1))" "$ATLAS_EVENT_LOG" \
+        | atlas_event_filter_stream "$filter" \
+        | wc -l
+    )"
+  fi
+
+  echo "Subscriber: $subscriber"
+  echo "Cursor:     $position"
+  echo "Journal:    $event_count"
+  echo "Pending:    $pending_count"
+  echo "Filter:     $filter"
+}
+
+atlas_event_subscriber_reset() {
+  local subscriber="${1:-}"
+
+  if ! atlas_event_subscriber_exists "$subscriber"; then
+    atlas_fail "Unknown subscriber: $subscriber"
+    return 1
+  fi
+
+  local cursor=""
+
+  cursor="$(atlas_event_subscriber_cursor "$subscriber")"
+
+  printf '0\n' > "$cursor"
+
+  atlas_ok "Subscriber reset: $subscriber"
+  echo "Cursor: 0"
+}
+
+atlas_event_subscriber_seek() {
+  local subscriber="${1:-}"
+  local position="${2:-}"
+
+  if ! atlas_event_subscriber_exists "$subscriber"; then
+    atlas_fail "Unknown subscriber: $subscriber"
+    return 1
+  fi
+
+  if [[ ! "$position" =~ ^[0-9]+$ ]]; then
+    atlas_fail "Invalid cursor: $position"
+    return 1
+  fi
+
+  local event_count=""
+  local cursor=""
+
+  event_count="$(wc -l < "$ATLAS_EVENT_LOG")"
+
+  if (( position > event_count )); then
+    atlas_fail "Cursor exceeds journal size: $position > $event_count"
+    return 1
+  fi
+
+  cursor="$(atlas_event_subscriber_cursor "$subscriber")"
+
+  printf '%s\n' "$position" > "$cursor"
+
+  atlas_ok "Subscriber cursor updated: $subscriber"
+  echo "Cursor: $position"
+}
+
+atlas_event_subscriber_unregister() {
+  local subscriber="${1:-}"
+
+  if ! atlas_event_subscriber_exists "$subscriber"; then
+    atlas_fail "Unknown subscriber: $subscriber"
+    return 1
+  fi
+
+  local cursor=""
+  local filter_file=""
+
+  cursor="$(atlas_event_subscriber_cursor "$subscriber")"
+  filter_file="$(atlas_event_subscriber_filter_file "$subscriber")"
+
+  rm -f "$cursor" "$filter_file"
+
+  atlas_ok "Subscriber unregistered: $subscriber"
+}
