@@ -59,6 +59,7 @@ Runtime
   atlas event subscriber list
   atlas event subscriber pending <name>
   atlas event subscriber consume <name>
+  atlas event subscriber filter <name> <pattern>
 
 HELP
 }

@@ -130,6 +130,7 @@ atlas_event_subscriber_register() {
   fi
 
   printf '0\n' > "$cursor"
+  printf '*\n' > "$(atlas_event_subscriber_filter_file "$subscriber")"
 
   atlas_ok "Subscriber registered: $subscriber"
 }
@@ -138,14 +139,15 @@ atlas_event_subscriber_list() {
   atlas_event_initialize
 
   local subscriber_dir
+  local found=0
+  local cursor=""
+  local subscriber=""
+  local position=""
+  local filter=""
+
   subscriber_dir="$(atlas_event_subscriber_dir)"
 
   mkdir -p "$subscriber_dir"
-
-  local found=0
-  local cursor
-  local subscriber
-  local position
 
   for cursor in "$subscriber_dir"/*.cursor; do
     [[ -f "$cursor" ]] || continue
@@ -153,8 +155,12 @@ atlas_event_subscriber_list() {
     found=1
     subscriber="$(basename "$cursor" .cursor)"
     position="$(cat "$cursor")"
+    filter="$(atlas_event_subscriber_get_filter "$subscriber")"
 
-    printf '%-20s cursor=%s\n' "$subscriber" "$position"
+    printf '%-20s cursor=%-8s filter=%s\n' \
+      "$subscriber" \
+      "$position" \
+      "$filter"
   done
 
   if [[ "$found" -eq 0 ]]; then
@@ -173,6 +179,9 @@ atlas_event_subscriber_pending() {
   local cursor
   local position
   local event_count
+  local filter
+
+  filter="$(atlas_event_subscriber_get_filter "$subscriber")"
 
   cursor="$(atlas_event_subscriber_cursor "$subscriber")"
   position="$(cat "$cursor")"
@@ -183,7 +192,8 @@ atlas_event_subscriber_pending() {
     return 0
   fi
 
-  tail -n "+$((position + 1))" "$ATLAS_EVENT_LOG"
+  tail -n "+$((position + 1))" "$ATLAS_EVENT_LOG" \
+    | atlas_event_filter_stream "$filter"
 }
 
 atlas_event_subscriber_consume() {
@@ -194,20 +204,91 @@ atlas_event_subscriber_consume() {
     return 1
   fi
 
-  local cursor
-  local current_position
-  local event_count
+  local cursor=""
+  local current_position=""
+  local event_count=""
+  local filter=""
 
   cursor="$(atlas_event_subscriber_cursor "$subscriber")"
   current_position="$(cat "$cursor")"
   event_count="$(wc -l < "$ATLAS_EVENT_LOG")"
+  filter="$(atlas_event_subscriber_get_filter "$subscriber")"
 
   if (( current_position >= event_count )); then
     echo "No pending events."
     return 0
   fi
 
-  tail -n "+$((current_position + 1))" "$ATLAS_EVENT_LOG"
+  tail -n "+$((current_position + 1))" "$ATLAS_EVENT_LOG" \
+    | atlas_event_filter_stream "$filter"
 
   printf '%s\n' "$event_count" > "$cursor"
+}
+
+atlas_event_subscriber_filter_file() {
+  local subscriber="$1"
+  printf '%s/%s.filter\n' "$(atlas_event_subscriber_dir)" "$subscriber"
+}
+
+atlas_event_subscriber_filter() {
+  local subscriber="${1:-}"
+  local filter="${2:-}"
+
+  if ! atlas_event_subscriber_exists "$subscriber"; then
+    atlas_fail "Unknown subscriber: $subscriber"
+    return 1
+  fi
+
+  local filter_file
+  filter_file="$(atlas_event_subscriber_filter_file "$subscriber")"
+
+  if [[ -z "$filter" ]]; then
+    filter='*'
+  fi
+
+  printf '%s\n' "$filter" > "$filter_file"
+
+  atlas_ok "Subscriber filter updated: $subscriber"
+  echo "Filter: $filter"
+}
+
+atlas_event_subscriber_get_filter() {
+  local subscriber="$1"
+  local filter_file
+
+  filter_file="$(atlas_event_subscriber_filter_file "$subscriber")"
+
+  if [[ -f "$filter_file" ]]; then
+    cat "$filter_file"
+  else
+    printf '*\n'
+  fi
+}
+
+atlas_event_filter_stream() {
+  local filter="${1:-*}"
+
+  python3 -c '
+import fnmatch
+import json
+import sys
+
+patterns = sys.argv[1].split("|")
+
+for line in sys.stdin:
+    line = line.rstrip("\n")
+
+    if not line:
+        continue
+
+    try:
+        record = json.loads(line)
+    except json.JSONDecodeError:
+        continue
+
+    event = record.get("event", "")
+
+    if any(fnmatch.fnmatchcase(event, pattern) for pattern in patterns):
+        print(line)
+' "$filter"
 }

@@ -58,6 +58,13 @@ atlas_command_event() {
           atlas_event_subscriber_consume "$subscriber_name"
           ;;
 
+        filter)
+          atlas_print_header
+          atlas_event_subscriber_filter \
+            "$subscriber_name" \
+            "${3:-*}"
+          ;;
+
         *)
           echo "Usage:"
           echo "  atlas event subscriber register <name>"
@@ -68,6 +75,7 @@ atlas_command_event() {
           echo "  atlas event subscriber list"
           echo "  atlas event subscriber pending <name>"
           echo "  atlas event subscriber consume <name>"
+          echo "  atlas event subscriber filter <name> <pattern>"
           return 1
           ;;
       esac
