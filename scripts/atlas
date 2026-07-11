@@ -29,6 +29,10 @@ source "$ATLAS_CLI_ROOT/commands/restart.sh"
 source "$ATLAS_CLI_ROOT/commands/logs.sh"
 source "$ATLAS_CLI_ROOT/commands/ari.sh"
 source "$ATLAS_CLI_ROOT/commands/module.sh"
+source "$ATLAS_CLI_ROOT/commands/verify.sh"
+source "$ATLAS_CLI_ROOT/commands/doctor.sh"
+source "$ATLAS_CLI_ROOT/commands/update.sh"
+source "$ATLAS_CLI_ROOT/commands/backup.sh"
 
 atlas_initialize
 
@@ -76,232 +80,19 @@ case "$command" in
     ;;
 
   verify)
-    print_header
-    echo "Atlas Verification"
-    echo
-
-    pass=true
-
-    check() {
-      label="$1"
-      shift
-      if "$@" >/dev/null 2>&1; then
-        echo "OK   $label"
-      else
-        echo "FAIL $label"
-        pass=false
-      fi
-    }
-
-    echo "Infrastructure"
-    echo "--------------"
-    check "Docker Engine" docker info
-    check "Docker Compose" docker compose version
-    check "Project Directory" test -d "$ATLAS_PROJECT_DIR"
-    check "Storage Mounted" test -d "$ATLAS_STORAGE_ROOT"
-    check "Intel GPU Available" test -e /dev/dri/renderD128
-
-    echo
-    echo "Core Services"
-    echo "-------------"
-    for service in jellyfin jellyseerr prowlarr sonarr sonarr-anime radarr radarr-anime gluetun qbittorrent homepage; do
-      check "$service running" sh -c "docker ps --format '{{.Names}}' | grep -qx '$service'"
-    done
-
-    echo
-    echo "Storage Paths"
-    echo "-------------"
-    for path in "$ATLAS_MEDIA_ROOT/Movies" "$ATLAS_MEDIA_ROOT/TV" "$ATLAS_MEDIA_ROOT/Anime Movies" "$ATLAS_MEDIA_ROOT/Anime TV" "$ATLAS_DOWNLOADS_ROOT"; do
-      check "$path writable" sh -c "touch '$path/.atlas-test' && rm '$path/.atlas-test'"
-    done
-
-    echo
-    echo "Project Files"
-    echo "-------------"
-    for file in VERSION CHARTER.md ROADMAP.md CHANGELOG.md docs/BUILD_LOG.md docs/MATURITY.md docs/INDEXERS.md; do
-      check "$file present" test -e "$file"
-    done
-
-    echo
-    echo "VPN"
-    echo "---"
-    check "Gluetun running" sh -c "docker ps --format '{{.Names}}' | grep -qx gluetun"
-    check "qBittorrent reachable through VPN namespace" docker exec qbittorrent sh -c "curl -s ifconfig.io || wget -qO- ifconfig.io"
-
-    echo
-    if [ "$pass" = true ]; then
-      echo "Overall Status: PASS"
-    else
-      echo "Overall Status: FAIL"
-      exit 1
-    fi
+    atlas_command_verify
     ;;
 
   doctor)
-    print_header
-
-    echo "Docker:"
-    docker info >/dev/null 2>&1 && echo "  OK Docker is running" || echo "  FAIL Docker is not running"
-
-    echo
-    echo "Git:"
-    if git diff --quiet && git diff --cached --quiet; then
-      echo "  OK Working tree clean"
-    else
-      echo "  WARN Working tree has changes"
-    fi
-
-    echo
-    echo "VPN:"
-    docker ps --format '{{.Names}}' | grep -qx gluetun && echo "  OK Gluetun container running" || echo "  FAIL Gluetun container not running"
-
-    echo
-    echo "qBittorrent VPN IP:"
-    docker exec qbittorrent sh -c "curl -s ifconfig.io || wget -qO- ifconfig.io" 2>/dev/null || echo "  WARN Could not check qBittorrent public IP"
-
-    echo
-    echo "Storage writable:"
-    for path in "$ATLAS_MEDIA_ROOT/Movies" "$ATLAS_MEDIA_ROOT/TV" "$ATLAS_MEDIA_ROOT/Anime Movies" "$ATLAS_MEDIA_ROOT/Anime TV" "$ATLAS_DOWNLOADS_ROOT"; do
-      if touch "$path/.atlas-write-test" 2>/dev/null; then
-        rm -f "$path/.atlas-write-test"
-        echo "  OK $path"
-      else
-        echo "  FAIL $path"
-      fi
-    done
-
-    echo
-    echo "Project Files:"
-    for file in VERSION CHARTER.md ROADMAP.md CHANGELOG.md docs/BUILD_LOG.md docs/MATURITY.md; do
-      [ -e "$file" ] && echo "  OK $file" || echo "  FAIL $file"
-    done
-
-    for dir in docs docs/ADR docs/EDR; do
-      [ -d "$dir" ] && echo "  OK $dir" || echo "  FAIL $dir"
-    done
-
-    echo
-    echo "Container status:"
-    docker ps --format "  {{.Names}} - {{.Status}}"
+    atlas_command_doctor
     ;;
 
   update)
-    print_header
-    echo "Starting Atlas update..."
-    echo
-
-    echo "Pre-update doctor:"
-    "$0" doctor
-
-    echo
-    echo "Pulling latest container images..."
-    docker compose pull
-
-    echo
-    echo "Recreating containers..."
-    docker compose up -d
-
-    echo
-    echo "Cleaning unused images..."
-    docker image prune -f
-
-    echo
-    echo "Post-update doctor:"
-    "$0" doctor
-
-    echo
-    echo "Post-update verify:"
-    "$0" verify
-
-    echo
-    echo "Atlas update complete."
+    atlas_command_update
     ;;
 
   backup)
-    print_header
-
-    backup_dir="$ATLAS_BACKUP_DIR"
-    mkdir -p "$backup_dir"
-
-    if [ "${2:-}" = "--list" ]; then
-      echo "Atlas Backups"
-      echo
-
-      if ! ls "$backup_dir"/atlas-*.tar.gz >/dev/null 2>&1; then
-        echo "No backups found."
-        exit 0
-      fi
-
-      ls -1t "$backup_dir"/atlas-*.tar.gz | while read -r file; do
-        echo "$(basename "$file")"
-        tar -xOzf "$file" BACKUP_INFO.txt 2>/dev/null | sed 's/^/  /' || echo "  No manifest found"
-        echo
-      done
-
-      exit 0
-    fi
-
-    timestamp="$(date +%Y%m%d-%H%M%S-%3N)"
-    backup_file="${backup_dir}/atlas-${timestamp}.tar.gz"
-    manifest="$(mktemp)"
-    notes=""
-
-    if [ "${2:-}" = "--notes" ]; then
-      notes="${3:-}"
-    fi
-
-    echo "Creating Atlas backup..."
-    echo
-
-    cat > "$manifest" <<EOF
-Project Atlas Backup
-
-Created: $(date)
-Version: $(cat VERSION)
-Branch: $(git branch --show-current)
-Commit: $(git rev-parse --short HEAD 2>/dev/null || echo unknown)
-
-Notes:
-${notes:-None}
-
-EOF
-
-    tar \
-      --exclude='.git' \
-      --exclude='backups' \
-      --transform="s|.*$(basename "$manifest")|BACKUP_INFO.txt|" \
-      -czf "$backup_file" \
-      docker-compose.yml \
-      docker-compose.sports.yml \
-      .env.example \
-      VERSION \
-      CHARTER.md \
-      ROADMAP.md \
-      CHANGELOG.md \
-      config \
-      docs \
-      modules \
-      scripts \
-      "$manifest"
-
-    rm -f "$manifest"
-
-    echo "Backup complete"
-    echo
-    echo "File:"
-    echo "  $backup_file"
-    echo
-    echo "Size:"
-    echo "  $(du -h "$backup_file" | awk '{print $1}')"
-    echo
-    echo "Retention:"
-    echo "  Keeping newest 10 backups"
-
-    ls -1t "$backup_dir"/atlas-*.tar.gz 2>/dev/null | tail -n +11 | xargs -r rm -f
-
-    echo
-    echo "Status:"
-    echo "  SUCCESS"
+    atlas_command_backup "${2:-}" "${3:-}"
     ;;
 
   restart)
