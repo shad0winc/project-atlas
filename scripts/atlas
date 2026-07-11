@@ -29,6 +29,10 @@ source "$ATLAS_CLI_ROOT/commands/restart.sh"
 source "$ATLAS_CLI_ROOT/commands/logs.sh"
 source "$ATLAS_CLI_ROOT/commands/ari.sh"
 source "$ATLAS_CLI_ROOT/commands/module.sh"
+
+# shellcheck disable=SC1091
+source "$ATLAS_CLI_ROOT/commands/event.sh"
+
 source "$ATLAS_CLI_ROOT/commands/verify.sh"
 source "$ATLAS_CLI_ROOT/commands/doctor.sh"
 source "$ATLAS_CLI_ROOT/commands/update.sh"
@@ -105,6 +109,10 @@ case "$command" in
 
   ari)
     atlas_command_ari "${@:2}"
+    ;;
+
+  event)
+    atlas_command_event "${@:2}"
     ;;
 
   *)

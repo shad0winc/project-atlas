@@ -49,5 +49,12 @@ Intelligence
 ------------
   atlas ari collect
   atlas ari report
+
+Runtime
+-------
+  atlas event publish <event> [payload]
+  atlas event list
+  atlas event tail
+
 HELP
 }
