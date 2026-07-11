@@ -80,6 +80,11 @@ atlas_command_module_status() {
   echo "Description:  ${ATLAS_MODULE_DESCRIPTION:-Not provided}"
   echo "Enabled:      $enabled"
   echo "Compose File: $compose_file"
+  echo "Commands:     ${ATLAS_MODULE_DEPENDS_COMMANDS:-none}"
+  echo "Services:     ${ATLAS_MODULE_DEPENDS_SERVICES:-none}"
+  echo "Modules:      ${ATLAS_MODULE_DEPENDS_MODULES:-none}"
+  echo "Owns:         ${ATLAS_MODULE_SERVICES:-none}"
+  echo "Health URL:   ${ATLAS_MODULE_HEALTHCHECK_URL:-none}"
 
   if [[ -f "$module_dir/$compose_file" ]]; then
     echo "Compose:      present"
@@ -122,8 +127,7 @@ atlas_command_module_run_script() {
     return 1
   fi
 
-  atlas_print_header
-  "$script_path"
+"$script_path"
 }
 
 atlas_command_module_enable() {
@@ -160,7 +164,19 @@ atlas_command_module() {
       ;;
 
     verify)
-      atlas_command_module_run_script "$module_name" "verify"
+      atlas_print_header
+
+      local failed=0
+
+      atlas_module_check_dependencies "$module_name" || failed=1
+
+      echo
+
+      atlas_command_module_run_script "$module_name" "verify" || failed=1
+
+      if [[ "$failed" -ne 0 ]]; then
+        return 1
+      fi
       ;;
 
     doctor)
@@ -176,10 +192,24 @@ atlas_command_module() {
       echo "Enabled: $(atlas_module_enabled "$module_name" && echo true || echo false)"
       echo
 
-      "$ATLAS_PROJECT_DIR/modules/$module_name/scripts/verify.sh"
+      local failed=0
+
+      atlas_module_check_dependencies "$module_name" || failed=1
+
+      echo
+
+      "$ATLAS_PROJECT_DIR/modules/$module_name/scripts/verify.sh" || failed=1
+
+      if [[ "$failed" -ne 0 ]]; then
+        return 1
+      fi
       ;;
 
     install)
+      atlas_print_header
+
+      atlas_module_check_dependencies "$module_name"
+      echo
       atlas_command_module_run_script "$module_name" "install"
       ;;
 
@@ -198,6 +228,10 @@ atlas_command_module() {
       ;;
 
     update)
+      atlas_print_header
+
+      atlas_module_check_dependencies "$module_name"
+      echo
       atlas_command_module_run_script "$module_name" "update"
       ;;
 
@@ -214,6 +248,11 @@ atlas_command_module() {
         "$new_module_description"
       ;;
 
+    dependencies)
+      atlas_print_header
+      atlas_module_check_dependencies "$module_name"
+      ;;
+
     *)
       echo "Usage:"
       echo "  atlas module list"
@@ -226,6 +265,7 @@ atlas_command_module() {
       echo "  atlas module disable <module>"
       echo "  atlas module update <module>"
       echo "  atlas module create <name>"
+      echo "  atlas module dependencies <module>"
       return 1
       ;;
   esac

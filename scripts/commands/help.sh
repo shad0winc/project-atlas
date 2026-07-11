@@ -29,6 +29,7 @@ Modules
   atlas module disable <module>
   atlas module update <module>
   atlas module create <name>
+  atlas module dependencies <module>
 
 Maintenance
 -----------
