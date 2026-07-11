@@ -1,328 +1,289 @@
 # Project Atlas Roadmap
 
-> **Mission:** Build an intelligent, self-managing media platform that is reliable, observable, secure, and simple to operate.
+Project Atlas is an intelligent, modular, self-hosted entertainment platform built for friends and family.
 
 ---
 
-# ✅ Current Release — v1.0.0
+# Guiding Principles
 
-Project Atlas is now a production-ready self-hosted media platform with built-in operational intelligence.
+- Simplicity over complexity
+- Reliability over novelty
+- Observability before automation
+- Automation before manual intervention
+- Documentation as a first-class feature
+- Modular architecture
+- User-first experience
 
 ---
 
 # Completed Milestones
 
-## Core Platform
+## M-001 — Platform Foundation ✅
 
-- [x] Docker infrastructure
-- [x] Proxmox LXC deployment
-- [x] Storage architecture
-- [x] VPN networking (Gluetun)
-- [x] Intel Quick Sync acceleration
-- [x] Atlas operational CLI
-- [x] Backup management
-- [x] Git integration
+Completed:
 
----
-
-## Media Platform
-
-- [x] Jellyfin
-- [x] Jellyseerr
-- [x] Sonarr
-- [x] Sonarr Anime
-- [x] Radarr
-- [x] Radarr Anime
-- [x] Prowlarr
-- [x] Recyclarr
-- [x] Bazarr
-- [x] Maintainerr
-- [x] qBittorrent
-- [x] Homepage
-- [x] Dozzle
+- Proxmox LXC deployment
+- Docker platform
+- Intel Quick Sync
+- Storage architecture
+- Network configuration
+- VPN integration
+- Backup system
+- Git integration
 
 ---
 
-## Atlas Retention Intelligence (ARI)
+## M-002 — Media Platform ✅
+
+Completed:
+
+- Jellyfin
+- Jellyseerr
+- Sonarr
+- Sonarr Anime
+- Radarr
+- Radarr Anime
+- Prowlarr
+- Recyclarr
+- Bazarr
+- Maintainerr
+- Homepage
+- Dozzle
+- Tautulli
+- qBittorrent
+
+---
+
+## M-003 — Atlas CLI ✅
+
+Completed:
+
+- atlas doctor
+- atlas verify
+- atlas backup
+- atlas update
+- atlas status
+- atlas services
+- atlas urls
+- atlas git
+
+---
+
+## M-004 — Atlas Retention Intelligence (ARI) ✅
+
+Completed:
 
 ### Health Engine
 
-- [x] Platform health
-- [x] Docker validation
-- [x] VPN validation
-- [x] Storage validation
-- [x] Media validation
-- [x] Health scoring
+- Docker validation
+- VPN validation
+- Storage validation
+- Library validation
+- Snapshot freshness
 
 ### Analytics Engine
 
-- [x] Immutable snapshots
-- [x] Historical storage analysis
-- [x] Library growth analysis
-- [x] Historical comparisons
-- [x] Trend analysis
-- [x] Operational summaries
+- Historical snapshots
+- Growth analysis
+- Trend analysis
+- Historical comparisons
 
 ### Forecast Engine
 
-- [x] Storage growth forecasting
-- [x] Average daily growth
-- [x] Capacity forecasting
-- [x] Estimated full date
-- [x] Forecast confidence
+- Average growth
+- Capacity forecasting
+- Estimated full date
+- Confidence calculations
 
 ### Recommendation Engine
 
-- [x] Health recommendations
-- [x] Storage recommendations
-- [x] Forecast recommendations
+- Health recommendations
+- Capacity recommendations
+- Forecast recommendations
 
 ---
 
-# 🚧 Active Development
+## M-005 — Documentation Platform ✅
 
-## M-014 — Documentation & Release Preparation
+Completed:
 
-- [ ] Release Notes
-- [ ] Architecture Guide
-- [ ] Administrator Guide
-- [ ] Developer Guide
-- [ ] User Guide
-- [ ] v1.0 Documentation Refresh
+- README
+- CHARTER
+- ROADMAP
+- BUILD_LOG
+- MATURITY
+- ARCHITECTURE
+- OPERATIONS
+- CHANGELOG
+- ADR documentation
+- EDR documentation
+- Release Notes
 
 ---
 
-## M-015 — Atlas CLI Framework
+## M-006 — Atlas Module SDK ✅
+
+Completed:
+
+### Module Framework
+
+- Module registry
+- Module lifecycle
+- Module enable / disable
+- Module install / uninstall
+- Module update
+- Module verification
+- Module health
+
+### Module SDK
+
+- Standard module layout
+- Module template
+- Module scaffolding
+- atlas module create
+- Self-contained module architecture
+
+### First Module
+
+- Sports module
+- Separate Docker container
+- Jellyfin integration
+- Runtime verification
+
+---
+
+# Active Development
+
+## M-007 — Sports Platform
 
 Goal:
 
-Expand Atlas into a modular command platform.
+Create an optional sports ecosystem that integrates with Jellyfin while remaining completely modular.
 
 Planned:
 
-- [ ] Modular command namespaces
-- [ ] Media commands
-- [ ] User commands
-- [ ] ARI command improvements
-- [ ] Configuration management
+- Sports feed management
+- Authorized provider integration
+- Team favorites
+- League favorites
+- Sports requests
+- Homepage integration
+- ARI awareness
+- Sports dashboard
 
 ---
 
-# 🔮 Planned Milestones
+## M-008 — Atlas Web Portal
 
-## M-016 — Atlas Web Portal
+Planned:
 
-Build a modern web interface for both administrators and users.
-
-### Administrator Dashboard
-
-- [ ] System dashboard
-- [ ] Health dashboard
-- [ ] Forecast dashboard
-- [ ] Media statistics
-- [ ] Container status
-- [ ] Storage analytics
-- [ ] ARI recommendations
-
-### User Portal
-
-- [ ] User dashboard
-- [ ] Current requests
-- [ ] Recently added media
-- [ ] Favorites
-- [ ] Continue Watching
-- [ ] Documentation portal
+- Administrator Dashboard
+- User Dashboard
+- Module Dashboard
+- ARI Dashboard
+- Forecast Dashboard
+- Documentation Portal
 
 ---
 
-## M-017 — User Intelligence & Media Policies
+## M-009 — User Intelligence
 
-Introduce user-aware automation and personalized media management.
+Planned:
 
-### User Preferences
+### Favorites
 
-- [ ] Favorites management
-- [ ] Protected media
-- [ ] User activity
-- [ ] Watch history
-- [ ] Personalized recommendations
+- Movies
+- TV
+- Anime
+- Sports
 
-### Smart Series
+### Retention Policies
 
-- [ ] Auto-follow currently airing TV series
-- [ ] Auto-follow currently airing Anime
-- [ ] Automatic episode acquisition
-- [ ] User subscription preferences
-- [ ] "Next Episode" action
-- [ ] Stop following series
+- Smart retention
+- Protected media
+- Auto follow
+- Next episode
+- Request expiration
 
-### Media Retention Policies
+### User Policies
 
-- [ ] 30-day retention after request
-- [ ] 72-hour retention after 98% watched
-- [ ] Favorite protection from deletion
-- [ ] Thumbs-down scheduled deletion (24 hours)
-- [ ] Request expiration notifications
-- [ ] User retention overrides
-- [ ] Policy auditing
-
-### Policy Engine
-
-- [ ] User policy database
-- [ ] Request tracking
-- [ ] Favorite tracking
-- [ ] Retention tracking
-- [ ] ARI policy reporting
+- Per-user preferences
+- Notifications
+- Favorites protection
 
 ---
 
-## M-018 — Sports Platform
+## M-010 — Atlas Platform Expansion
 
-Integrate live sports into Project Atlas as an optional platform module.
+Planned:
 
-### Sports Services
-
-- [ ] Dedicated Sportyfin container
-- [ ] Sports request management
-- [ ] Live sporting event requests
-- [ ] Sports streaming integration
-- [ ] Schedule synchronization
-- [ ] Team favorites
-- [ ] League favorites
-- [ ] Auto-follow favorite teams
-- [ ] Sports dashboard
+- REST API
+- Plugin framework
+- Notification framework
+- Mobile integration
+- AI services
 
 ---
 
-## M-019 — Atlas Platform Expansion
+## M-011 — Family Experience
 
-Expand Atlas beyond a self-hosted media server.
+Planned:
 
-### Platform
-
-- [ ] REST API
-- [ ] Plugin framework
-- [ ] Notification framework
-- [ ] Multi-server Atlas
-- [ ] Distributed storage management
-- [ ] Mobile companion app
-- [ ] AI-assisted operational insights
+- Profiles
+- Personalization
+- Request history
+- Recommendations
+- Shared experience
 
 ---
 
-## M-020 — Family Experience
+## M-012 — Game Server Platform
 
-### Accounts
+Planned:
 
-- [ ] User onboarding
-- [ ] Welcome page
-- [ ] User profiles
-- [ ] Avatar support
+Dedicated game server infrastructure.
 
-### Media Experience
+Initial targets:
 
-- [ ] Favorite collections
-- [ ] Shared collections
-- [ ] Family recommendations
-- [ ] Continue Watching improvements
+- Minecraft
+- Terraria
+- Valheim
+- Factorio
+- Palworld
+- ARK
+- Rust
 
-### Requests
+Features:
 
-- [ ] Request history
-- [ ] Request status
-- [ ] Request notifications
-- [ ] Request limits
-
-### Personalization
-
-- [ ] Preferred quality
-- [ ] Preferred language
-- [ ] Subtitle preferences
-- [ ] Auto-follow defaults
+- Server requests
+- One-click deployment
+- Resource allocation
+- Backups
+- Updates
+- Mod support
+- SteamCMD
 
 ---
 
-## M-021 — Game Server Platform
+# Long-Term Vision
 
-Expand Atlas into a unified media and gaming platform.
+Project Atlas is no longer simply a media server.
 
-### Game Server Infrastructure
+It is a modular, self-hosted entertainment platform built around reusable modules.
 
-- [ ] Dedicated game server node(s)
-- [ ] Game server management service
-- [ ] Automatic server deployment
-- [ ] Backup and restore
-- [ ] Resource monitoring
-- [ ] Automatic updates
+Current modules:
 
-### User Experience
+- Core Platform
+- Sports
 
-- [ ] Game server request system
-- [ ] One-click server creation
-- [ ] Server ownership
-- [ ] Invite friends
-- [ ] Temporary server requests
-- [ ] Permanent server requests
+Future modules:
 
-### Administration
+- Games
+- AI
+- Notifications
+- Home Automation
+- Books
+- Music
+- Photos
 
-- [ ] CPU and RAM allocation
-- [ ] Storage quotas
-- [ ] Port management
-- [ ] Scheduled shutdown/startup
-- [ ] Activity monitoring
-
-### Supported Games (Initial)
-
-- [ ] Minecraft
-- [ ] Terraria
-- [ ] Valheim
-- [ ] Palworld
-- [ ] Satisfactory
-- [ ] ARK
-- [ ] Factorio
-- [ ] Rust
-
-### Future
-
-- [ ] SteamCMD integration
-- [ ] Mod management
-- [ ] Save management
-- [ ] Automatic world backups
-- [ ] Community templates
-
----
-
-# 🌐 Long-Term Vision
-
-## M-020 — Family Experience
-
-### Accounts
-
-- [ ] User onboarding
-- [ ] Welcome page
-- [ ] User profiles
-- [ ] Avatar support
-
-### Media Experience
-
-- [ ] Favorite collections
-- [ ] Shared collections
-- [ ] Family recommendations
-- [ ] Continue watching improvements
-
-### Requests
-
-- [ ] Request history
-- [ ] Request status
-- [ ] Request notifications
-- [ ] Request limits
-
-### Personalization
-
-- [ ] Preferred quality
-- [ ] Preferred language
-- [ ] Subtitle preferences
-- [ ] Auto-follow defaults
-
-
+Every module follows the Atlas Module SDK and can be installed, enabled, updated, verified, or removed independently.

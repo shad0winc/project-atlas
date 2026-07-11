@@ -4,6 +4,7 @@ set -euo pipefail
 PROJECT_DIR="/opt/project-atlas"
 ATLAS_CONFIG_FILE="$PROJECT_DIR/config/atlas.conf"
 ATLAS_MODULE_CONFIG_FILE="$PROJECT_DIR/config/modules/modules.conf"
+ATLAS_CLI_ROOT="$PROJECT_DIR/scripts"
 
 if [[ ! -f "$ATLAS_CONFIG_FILE" ]]; then
   echo "Missing Atlas config: $ATLAS_CONFIG_FILE"
@@ -15,6 +16,20 @@ source "$ATLAS_CONFIG_FILE"
 if [[ -f "$ATLAS_MODULE_CONFIG_FILE" ]]; then
   source "$ATLAS_MODULE_CONFIG_FILE"
 fi
+
+source "$ATLAS_CLI_ROOT/lib/common.sh"
+
+source "$ATLAS_CLI_ROOT/commands/help.sh"
+source "$ATLAS_CLI_ROOT/commands/version.sh"
+source "$ATLAS_CLI_ROOT/commands/status.sh"
+source "$ATLAS_CLI_ROOT/commands/services.sh"
+source "$ATLAS_CLI_ROOT/commands/urls.sh"
+source "$ATLAS_CLI_ROOT/commands/git.sh"
+source "$ATLAS_CLI_ROOT/commands/restart.sh"
+source "$ATLAS_CLI_ROOT/commands/logs.sh"
+source "$ATLAS_CLI_ROOT/commands/ari.sh"
+
+atlas_initialize
 
 cd "$ATLAS_PROJECT_DIR"
 
@@ -28,86 +43,27 @@ print_header() {
 
 case "$command" in
   help)
-    print_header
-    cat <<'HELP'
-Usage:
-  atlas <command> [options]
-
-Core Commands
--------------
-  atlas help
-  atlas version
-  atlas status
-  atlas services
-  atlas urls
-  atlas git
-
-Modules
--------
-  atlas modules
-  atlas module list
-  atlas module status <module>
-  atlas module verify <module>
-  atlas module doctor <module>
-  atlas module install <module>
-  atlas module uninstall <module>
-  atlas module enable <module>
-  atlas module disable <module>
-  atlas module update <module>
-  atlas module create <name>
-
-Maintenance
------------
-  atlas verify
-  atlas doctor
-  atlas update
-  atlas backup
-  atlas restart
-  atlas logs <container>
-
-Intelligence
-------------
-  atlas ari collect
-  atlas ari report
-HELP
+    atlas_command_help
     ;;
 
   version)
-    print_header
-    echo -n "Version: "
-    cat VERSION 2>/dev/null || echo "unknown"
-    echo "Branch:  $(git branch --show-current 2>/dev/null || echo unknown)"
+    atlas_command_version
     ;;
 
   status)
-    docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+    atlas_command_status
     ;;
 
   services)
-    docker compose ps
+    atlas_command_services
     ;;
 
   urls)
-    source .env
-    cat <<URLS
-Homepage:      http://${LXC_IP}:3000
-Jellyfin:      http://${LXC_IP}:8096
-Jellyseerr:    http://${LXC_IP}:5055
-Sonarr:        http://${LXC_IP}:8989
-Sonarr Anime:  http://${LXC_IP}:8990
-Radarr:        http://${LXC_IP}:7878
-Radarr Anime:  http://${LXC_IP}:7879
-Prowlarr:      http://${LXC_IP}:9696
-qBittorrent:   http://${LXC_IP}:8080
-Bazarr:        http://${LXC_IP}:6767
-Maintainerr:   http://${LXC_IP}:6246
-Tautulli:      http://${LXC_IP}:8181
-Dozzle:        http://${LXC_IP}:9999
-URLS
+    atlas_command_urls
     ;;
 
   git)
-    git status
+    atlas_command_git
     ;;
 
   modules)
@@ -535,19 +491,15 @@ EOF
     ;;
 
   restart)
-    docker compose restart
+    atlas_command_restart
     ;;
 
   logs)
-    if [ -z "${2:-}" ]; then
-      echo "Usage: atlas logs <container>"
-      exit 1
-    fi
-    docker logs "$2" --tail=100 -f
+    atlas_command_logs "${2:-}"
     ;;
 
   ari)
-    "$PROJECT_DIR/scripts/atlas-ari.sh" "${@:2}"
+    atlas_command_ari "${@:2}"
     ;;
 
   *)
