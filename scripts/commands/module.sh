@@ -150,6 +150,105 @@ atlas_command_module_disable() {
   echo "No containers were stopped."
 }
 
+atlas_command_module_services() {
+  local module="${1:-}"
+
+  if ! atlas_module_exists "$module"; then
+    echo "Unknown module: $module"
+    return 1
+  fi
+
+  atlas_module_load "$module"
+
+  atlas_print_header
+  atlas_section "Module Services"
+
+  local services="${ATLAS_MODULE_SERVICES:-}"
+
+  if [[ -z "$services" ]]; then
+    echo "No services declared."
+    return 0
+  fi
+
+  local service
+  for service in $services; do
+    local running="false"
+    local health="n/a"
+
+    if docker inspect \
+      --format '{{.State.Running}}' \
+      "$service" 2>/dev/null | grep -qx true; then
+      running="true"
+    fi
+
+    health="$(
+      docker inspect \
+        --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}n/a{{end}}' \
+        "$service" 2>/dev/null || echo "missing"
+    )"
+
+    echo "$service"
+    echo "  Running: $running"
+    echo "  Health:  $health"
+    echo
+  done
+}
+
+atlas_command_module_health() {
+  local module="${1:-}"
+
+  if ! atlas_module_exists "$module"; then
+    echo "Unknown module: $module"
+    return 1
+  fi
+
+  atlas_module_load "$module"
+
+  atlas_print_header
+  atlas_section "Module Health"
+
+  local failed=0
+  local services="${ATLAS_MODULE_SERVICES:-}"
+  local health_url="${ATLAS_MODULE_HEALTHCHECK_URL:-}"
+
+  if [[ -n "$services" ]]; then
+    local service
+
+    for service in $services; do
+      if docker inspect \
+        --format '{{.State.Running}}' \
+        "$service" 2>/dev/null | grep -qx true; then
+        atlas_ok "Service running: $service"
+      else
+        atlas_fail "Service unavailable: $service"
+        failed=1
+      fi
+    done
+  fi
+
+  if [[ -n "$health_url" ]]; then
+    if curl -fsS "$health_url" >/dev/null 2>&1; then
+      atlas_ok "Health endpoint reachable: $health_url"
+    else
+      atlas_fail "Health endpoint unavailable: $health_url"
+      failed=1
+    fi
+  fi
+
+  if [[ -z "$services" && -z "$health_url" ]]; then
+    atlas_warn "No runtime health checks declared"
+  fi
+
+  echo
+
+  if [[ "$failed" -eq 0 ]]; then
+    atlas_ok "Module health check passed"
+  else
+    atlas_fail "Module health check failed"
+    return 1
+  fi
+}
+
 atlas_command_module() {
   local subcommand="${1:-list}"
   local module_name="${2:-}"
@@ -253,6 +352,14 @@ atlas_command_module() {
       atlas_module_check_dependencies "$module_name"
       ;;
 
+    services)
+      atlas_command_module_services "$module_name"
+      ;;
+
+    health)
+      atlas_command_module_health "$module_name"
+      ;;
+
     *)
       echo "Usage:"
       echo "  atlas module list"
@@ -266,6 +373,8 @@ atlas_command_module() {
       echo "  atlas module update <module>"
       echo "  atlas module create <name>"
       echo "  atlas module dependencies <module>"
+      echo "  atlas module services <module>"
+      echo "  atlas module health <module>"
       return 1
       ;;
   esac

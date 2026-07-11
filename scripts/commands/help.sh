@@ -30,6 +30,8 @@ Modules
   atlas module update <module>
   atlas module create <name>
   atlas module dependencies <module>
+  atlas module services <module>
+  atlas module health <module>
 
 Maintenance
 -----------
