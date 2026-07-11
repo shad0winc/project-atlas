@@ -33,6 +33,7 @@ Modules
   atlas module services <module>
   atlas module health <module>
   atlas module info <module>
+  atlas module validate <module>
 
 Maintenance
 -----------

@@ -303,6 +303,10 @@ atlas_command_module() {
 
       local failed=0
 
+      atlas_module_validate_configuration "$module_name" || failed=1
+
+      echo
+
       atlas_module_check_dependencies "$module_name" || failed=1
 
       echo
@@ -329,6 +333,10 @@ atlas_command_module() {
 
       local failed=0
 
+      atlas_module_validate_configuration "$module_name" || failed=1
+
+      echo
+
       atlas_module_check_dependencies "$module_name" || failed=1
 
       echo
@@ -343,9 +351,25 @@ atlas_command_module() {
     install)
       atlas_print_header
 
-      atlas_module_check_dependencies "$module_name"
+      local failed=0
+
+      atlas_module_validate_install_configuration "$module_name" || failed=1
+
       echo
+
+      atlas_module_check_dependencies "$module_name" || failed=1
+
+      if [[ "$failed" -ne 0 ]]; then
+        return 1
+      fi
+
+      echo
+
       atlas_command_module_run_script "$module_name" "install"
+
+      echo
+
+      atlas_module_validate_configuration "$module_name"
       ;;
 
     uninstall)
@@ -365,8 +389,20 @@ atlas_command_module() {
     update)
       atlas_print_header
 
-      atlas_module_check_dependencies "$module_name"
+      local failed=0
+
+      atlas_module_validate_configuration "$module_name" || failed=1
+
       echo
+
+      atlas_module_check_dependencies "$module_name" || failed=1
+
+      if [[ "$failed" -ne 0 ]]; then
+        return 1
+      fi
+
+      echo
+
       atlas_command_module_run_script "$module_name" "update"
       ;;
 
@@ -400,6 +436,11 @@ atlas_command_module() {
         atlas_command_module_info "$module_name"
         ;;
 
+    validate)
+      atlas_print_header
+      atlas_module_validate_configuration "$module_name"
+      ;;
+
     *)
       echo "Usage:"
       echo "  atlas module list"
@@ -415,6 +456,7 @@ atlas_command_module() {
       echo "  atlas module dependencies <module>"
       echo "  atlas module services <module>"
       echo "  atlas module health <module>"
+      echo "  atlas module validate <module>"
       return 1
       ;;
   esac

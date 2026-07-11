@@ -175,3 +175,150 @@ atlas_module_check_dependencies() {
     atlas_fail "One or more dependencies are unavailable"
     return 1
 }
+
+atlas_module_validate_files() {
+    local module="$1"
+    local module_dir="$ATLAS_PROJECT_DIR/modules/$module"
+    local files="${ATLAS_MODULE_REQUIRED_FILES:-}"
+    local file
+    local failed=0
+
+    [[ -n "$files" ]] || return 0
+
+    while IFS= read -r file; do
+        [[ -n "$file" ]] || continue
+
+        if [[ -f "$module_dir/$file" ]]; then
+            atlas_ok "Required file: $file"
+        else
+            atlas_fail "Required file missing: $file"
+            failed=1
+        fi
+    done < <(printf '%s\n' "$files" | tr '|' '\n')
+
+    return "$failed"
+}
+
+atlas_module_validate_directories() {
+    local directories="${ATLAS_MODULE_REQUIRED_DIRECTORIES:-}"
+    local directory
+    local failed=0
+
+    [[ -n "$directories" ]] || return 0
+
+    while IFS= read -r directory; do
+        [[ -n "$directory" ]] || continue
+
+        if [[ -d "$directory" ]]; then
+            atlas_ok "Required directory: $directory"
+        else
+            atlas_fail "Required directory missing: $directory"
+            failed=1
+        fi
+    done < <(printf '%s\n' "$directories" | tr '|' '\n')
+
+    return "$failed"
+}
+
+atlas_module_validate_environment() {
+    local variables="${ATLAS_MODULE_REQUIRED_ENV:-}"
+    local variable
+    local failed=0
+
+    [[ -n "$variables" ]] || return 0
+
+    while IFS= read -r variable; do
+        [[ -n "$variable" ]] || continue
+
+        if [[ -n "${!variable:-}" ]]; then
+            atlas_ok "Required environment variable: $variable"
+        else
+            atlas_fail "Required environment variable missing: $variable"
+            failed=1
+        fi
+    done < <(printf '%s\n' "$variables" | tr '|' '\n')
+
+    return "$failed"
+}
+
+atlas_module_validate_configuration() {
+    local module="${1:-}"
+
+    if ! atlas_module_exists "$module"; then
+        echo "Unknown module: $module"
+        return 1
+    fi
+
+    atlas_module_load "$module"
+
+    atlas_section "Module Configuration"
+
+    local failed=0
+
+    atlas_module_validate_files "$module" || failed=1
+    atlas_module_validate_directories || failed=1
+    atlas_module_validate_writable_directories || failed=1
+    atlas_module_validate_environment || failed=1
+
+    echo
+
+    if [[ "$failed" -eq 0 ]]; then
+        atlas_ok "Module configuration valid"
+        return 0
+    fi
+
+    atlas_fail "Module configuration invalid"
+    return 1
+}
+
+atlas_module_validate_writable_directories() {
+    local directories="${ATLAS_MODULE_WRITABLE_DIRECTORIES:-}"
+    local directory
+    local failed=0
+
+    [[ -n "$directories" ]] || return 0
+
+    while IFS= read -r directory; do
+        [[ -n "$directory" ]] || continue
+
+        local test_file="$directory/.atlas-write-test"
+
+        if touch "$test_file" >/dev/null 2>&1; then
+            rm -f "$test_file"
+            atlas_ok "Writable directory: $directory"
+        else
+            atlas_fail "Directory not writable: $directory"
+            failed=1
+        fi
+    done < <(printf '%s\n' "$directories" | tr '|' '\n')
+
+    return "$failed"
+}
+
+atlas_module_validate_install_configuration() {
+    local module="${1:-}"
+
+    if ! atlas_module_exists "$module"; then
+        echo "Unknown module: $module"
+        return 1
+    fi
+
+    atlas_module_load "$module"
+
+    atlas_section "Install Configuration"
+
+    local failed=0
+
+    atlas_module_validate_files "$module" || failed=1
+    atlas_module_validate_environment || failed=1
+
+    echo
+
+    if [[ "$failed" -eq 0 ]]; then
+        atlas_ok "Install configuration valid"
+        return 0
+    fi
+
+    atlas_fail "Install configuration invalid"
+    return 1
+}
