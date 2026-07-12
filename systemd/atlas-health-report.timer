@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Project Atlas Daily Health Report
+
+[Timer]
+OnCalendar=*-*-* 08:00:00 America/New_York
+Persistent=true
+Unit=atlas-health-report.service
+
+[Install]
+WantedBy=timers.target

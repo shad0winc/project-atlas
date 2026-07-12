@@ -27,6 +27,7 @@ def notification_title(notification: dict[str, Any]) -> str:
 
     titles = {
         "atlas.health-changed": "Atlas Health Changed",
+        "atlas.health-report": "Atlas Daily Health Report",
         "sports.game-started": "Sports Event Started",
         "sports.game-finished": "Sports Event Finished",
         "storage.threshold-crossed": "Atlas Storage Threshold Reached",
@@ -48,6 +49,11 @@ def notification_description(notification: dict[str, Any]) -> str:
         current = payload.get("current", "Unknown")
 
         return f"{previous} → {current}"
+
+    if event_name == "atlas.health-report":
+        status = payload.get("status", "Unknown")
+
+        return f"Daily platform health summary: {status}"
 
     if event_name == "storage.threshold-crossed":
         threshold = payload.get("threshold", "Unknown")
@@ -93,6 +99,64 @@ def notification_fields(
             {
                 "name": "Health Score",
                 "value": f"{payload.get('score', 'Unknown')} / 100",
+                "inline": True,
+            },
+        ]
+
+    if event_name == "atlas.health-report":
+        storage = payload.get("storage", {})
+        forecast = payload.get("forecast", {})
+
+        days_remaining = forecast.get("days_remaining", 0)
+
+        if days_remaining:
+            forecast_value = f"{days_remaining} days remaining"
+        else:
+            forecast_value = str(
+                forecast.get("status", "Unknown")
+            )
+
+        return [
+            {
+                "name": "Status",
+                "value": str(payload.get("status", "Unknown")),
+                "inline": True,
+            },
+            {
+                "name": "Health Score",
+                "value": f"{payload.get('score', 'Unknown')} / 100",
+                "inline": True,
+            },
+            {
+                "name": "Storage Usage",
+                "value": f"{storage.get('usage_percent', 'Unknown')}%",
+                "inline": True,
+            },
+            {
+                "name": "Used",
+                "value": str(storage.get("used", "Unknown")),
+                "inline": True,
+            },
+            {
+                "name": "Available",
+                "value": str(storage.get("available", "Unknown")),
+                "inline": True,
+            },
+            {
+                "name": "Capacity",
+                "value": str(storage.get("capacity", "Unknown")),
+                "inline": True,
+            },
+            {
+                "name": "Forecast",
+                "value": forecast_value,
+                "inline": True,
+            },
+            {
+                "name": "Forecast Confidence",
+                "value": str(
+                    forecast.get("confidence", "Unknown")
+                ),
                 "inline": True,
             },
         ]

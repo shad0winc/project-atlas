@@ -47,6 +47,7 @@ Atlas Retention Intelligence
 Usage:
   atlas-ari.sh collect
   atlas-ari.sh report
+  atlas-ari.sh health-report
 EOF
 }
 
@@ -55,7 +56,19 @@ EOF
 ###############################################################################
 
 ARI_HEALTH_SCORE=100
-ARI_FORECAST_CONFIDENCE=""
+
+ARI_FORECAST_STATUS="Unknown"
+ARI_FORECAST_CONFIDENCE="Unknown"
+ARI_FORECAST_VARIABILITY="Unknown"
+ARI_FORECAST_NET_GROWTH=0
+ARI_FORECAST_DAILY_GROWTH=0
+ARI_FORECAST_PROJECTED_30=0
+ARI_FORECAST_DAYS_REMAINING=0
+ARI_FORECAST_ESTIMATED_FULL="Unknown"
+ARI_FORECAST_SNAPSHOTS=0
+ARI_FORECAST_AVERAGE_INTERVAL=0
+
+# Compatibility globals
 ARI_DAILY_GROWTH=0
 ARI_DAYS_REMAINING=0
 
@@ -262,44 +275,40 @@ EOF
 # Forecast
 ###############################################################################
 
-print_forecast() {
-  echo
-  echo "Forecast"
-  echo "--------"
-
+ari_calculate_forecast() {
   local available_bytes
   available_bytes="$(jq -r '.storage.available_bytes // 0' "$LATEST_FILE")"
 
   local net_growth
   net_growth="$(metric_storage_net_growth 5)"
 
-  local available_human net_growth_human
-  available_human="$(format_bytes "$available_bytes")"
-  net_growth_human="$(format_bytes "${net_growth#-}")"
-
-  echo "Storage Available : $available_human"
-  echo "Recent Net Growth : $(metric_growth "$net_growth" "$net_growth_human")"
-
-  if (( net_growth <= 0 )); then
-    echo "Forecast          : Stable or insufficient growth data"
-    return
-  fi
-
   local snapshots
   snapshots="$(get_snapshot_count 5)"
 
-  echo "Snapshots Used    : $snapshots"
+  ARI_FORECAST_NET_GROWTH="$net_growth"
+  ARI_FORECAST_SNAPSHOTS="$snapshots"
 
-    local intervals
+  if (( net_growth <= 0 )); then
+    ARI_FORECAST_STATUS="Stable"
+    ARI_FORECAST_CONFIDENCE="Insufficient Data"
+    ARI_FORECAST_VARIABILITY="Unknown"
+    ARI_FORECAST_DAILY_GROWTH=0
+    ARI_FORECAST_PROJECTED_30=0
+    ARI_FORECAST_DAYS_REMAINING=0
+    ARI_FORECAST_ESTIMATED_FULL="Unknown"
+    ARI_FORECAST_AVERAGE_INTERVAL=0
+
+    ARI_DAILY_GROWTH=0
+    ARI_DAYS_REMAINING=0
+
+    return 0
+  fi
+
+  local intervals
   intervals="$(metric_growth_intervals '.storage.used_bytes' 5)"
 
   local average_interval
   average_interval="$(printf '%s\n' "$intervals" | metric_average)"
-
-  local average_interval_human
-  average_interval_human="$(format_bytes "${average_interval#-}")"
-
-  echo "Average Growth    : $(metric_growth "$average_interval" "$average_interval_human") / snapshot"
 
   local time_intervals
   time_intervals="$(metric_snapshot_time_intervals 5)"
@@ -307,42 +316,21 @@ print_forecast() {
   local average_seconds
   average_seconds="$(printf '%s\n' "$time_intervals" | metric_average)"
 
-  echo "Average Interval  : $average_seconds seconds"
+  local daily_growth=0
 
-  local daily_growth
   if (( average_seconds > 0 )); then
     daily_growth=$(( average_interval * 86400 / average_seconds ))
-  else
-    daily_growth=0
   fi
-
-  local daily_growth_human
-  daily_growth_human="$(format_bytes "${daily_growth#-}")"
-
-  echo "Average Daily     : $(metric_growth "$daily_growth" "$daily_growth_human") / day"
 
   local projected_30
   projected_30=$(( daily_growth * 30 ))
 
-  local projected_30_human
-  projected_30_human="$(format_bytes "${projected_30#-}")"
-
-  echo "Projected 30 Days : $(metric_growth "$projected_30" "$projected_30_human")"
-
-  local days_remaining
+  local days_remaining=0
+  local estimated_full="Unknown"
 
   if (( daily_growth > 0 )); then
     days_remaining=$(( available_bytes / daily_growth ))
-
-    local estimated_full
     estimated_full="$(date -d "+${days_remaining} days" +"%Y-%m-%d")"
-
-    echo "Days Remaining    : $days_remaining"
-    echo "Estimated Full    : $estimated_full"
-  else
-    days_remaining=0
-    echo "Days Remaining    : Unknown"
-    echo "Estimated Full    : Unknown"
   fi
 
   local interval_array=()
@@ -368,17 +356,87 @@ print_forecast() {
       ;;
   esac
 
-  echo
-  echo "Confidence"
-  echo "----------"
-  echo "Snapshots Used : $snapshots"
-  echo "Variability    : $variability"
-  echo "Confidence     : $confidence"
+  ARI_FORECAST_STATUS="Growing"
+  ARI_FORECAST_CONFIDENCE="$confidence"
+  ARI_FORECAST_VARIABILITY="$variability"
+  ARI_FORECAST_DAILY_GROWTH="$daily_growth"
+  ARI_FORECAST_PROJECTED_30="$projected_30"
+  ARI_FORECAST_DAYS_REMAINING="$days_remaining"
+  ARI_FORECAST_ESTIMATED_FULL="$estimated_full"
+  ARI_FORECAST_AVERAGE_INTERVAL="$average_seconds"
 
   ARI_DAILY_GROWTH="$daily_growth"
   ARI_DAYS_REMAINING="$days_remaining"
-  ARI_FORECAST_CONFIDENCE="$confidence"
+}
 
+print_forecast() {
+  echo
+  echo "Forecast"
+  echo "--------"
+
+  ari_calculate_forecast
+
+  local available_bytes
+  available_bytes="$(jq -r '.storage.available_bytes // 0' "$LATEST_FILE")"
+
+  local available_human
+  available_human="$(format_bytes "$available_bytes")"
+
+  local net_growth_human
+  net_growth_human="$(
+    format_bytes "${ARI_FORECAST_NET_GROWTH#-}"
+  )"
+
+  echo "Storage Available : $available_human"
+  echo "Recent Net Growth : $(metric_growth "$ARI_FORECAST_NET_GROWTH" "$net_growth_human")"
+
+  if [[ "$ARI_FORECAST_STATUS" == "Stable" ]]; then
+    echo "Forecast          : Stable or insufficient growth data"
+    return
+  fi
+
+  local average_growth
+  average_growth="$(
+    printf '%s\n' \
+      "$(metric_growth_intervals '.storage.used_bytes' 5)" \
+      | metric_average
+  )"
+
+  local average_growth_human
+  average_growth_human="$(
+    format_bytes "${average_growth#-}"
+  )"
+
+  local daily_growth_human
+  daily_growth_human="$(
+    format_bytes "${ARI_FORECAST_DAILY_GROWTH#-}"
+  )"
+
+  local projected_30_human
+  projected_30_human="$(
+    format_bytes "${ARI_FORECAST_PROJECTED_30#-}"
+  )"
+
+  echo "Snapshots Used    : $ARI_FORECAST_SNAPSHOTS"
+  echo "Average Growth    : $(metric_growth "$average_growth" "$average_growth_human") / snapshot"
+  echo "Average Interval  : $ARI_FORECAST_AVERAGE_INTERVAL seconds"
+  echo "Average Daily     : $(metric_growth "$ARI_FORECAST_DAILY_GROWTH" "$daily_growth_human") / day"
+  echo "Projected 30 Days : $(metric_growth "$ARI_FORECAST_PROJECTED_30" "$projected_30_human")"
+
+  if (( ARI_FORECAST_DAYS_REMAINING > 0 )); then
+    echo "Days Remaining    : $ARI_FORECAST_DAYS_REMAINING"
+    echo "Estimated Full    : $ARI_FORECAST_ESTIMATED_FULL"
+  else
+    echo "Days Remaining    : Unknown"
+    echo "Estimated Full    : Unknown"
+  fi
+
+  echo
+  echo "Confidence"
+  echo "----------"
+  echo "Snapshots Used : $ARI_FORECAST_SNAPSHOTS"
+  echo "Variability    : $ARI_FORECAST_VARIABILITY"
+  echo "Confidence     : $ARI_FORECAST_CONFIDENCE"
 }
 
 print_recommendations() {
@@ -1442,6 +1500,64 @@ ari_publish_health_transition() {
     "{\"previous\":\"$previous_status\",\"current\":\"$status\",\"score\":$score,\"timestamp\":\"$timestamp\"}"
 }
 
+ari_publish_health_report() {
+  if [[ ! -f "$LATEST_FILE" ]]; then
+    echo "No ARI snapshot found."
+    echo "Run: atlas ari collect"
+    return 1
+  fi
+
+  local score
+  local status
+  local timestamp
+
+  score="$(ari_calculate_health_score)"
+  status="$(ari_health_status "$score")"
+  timestamp="$(date -Iseconds)"
+
+  ari_calculate_forecast
+
+  local payload
+  payload="$(
+    jq -nc \
+      --arg status "$status" \
+      --arg timestamp "$timestamp" \
+      --arg forecast_status "$ARI_FORECAST_STATUS" \
+      --arg forecast_confidence "$ARI_FORECAST_CONFIDENCE" \
+      --arg forecast_estimated_full "$ARI_FORECAST_ESTIMATED_FULL" \
+      --argjson score "$score" \
+      --argjson forecast_net_growth "$ARI_FORECAST_NET_GROWTH" \
+      --argjson forecast_daily_growth "$ARI_FORECAST_DAILY_GROWTH" \
+      --argjson forecast_days_remaining "$ARI_FORECAST_DAYS_REMAINING" \
+      --slurpfile snapshot "$LATEST_FILE" \
+      '{
+        status: $status,
+        score: $score,
+        storage: {
+          capacity: ($snapshot[0].storage.capacity // "unknown"),
+          used: ($snapshot[0].storage.used // "unknown"),
+          available: ($snapshot[0].storage.available // "unknown"),
+          usage_percent: ($snapshot[0].storage.utilization_percent // 0)
+        },
+        forecast: {
+          status: $forecast_status,
+          confidence: $forecast_confidence,
+          net_growth_bytes: $forecast_net_growth,
+          daily_growth_bytes: $forecast_daily_growth,
+          days_remaining: $forecast_days_remaining,
+          estimated_full: $forecast_estimated_full
+        },
+        timestamp: $timestamp
+      }'
+  )"
+
+  ari_publish_event \
+    "atlas.health-report" \
+    "$payload"
+
+  echo "Atlas health report published."
+}
+
 ari_storage_active_threshold() {
   local usage_percent="${1:-0}"
 
@@ -1536,10 +1652,13 @@ case "${1:-}" in
   report)
     report
     ;;
+  health-report)
+    ari_publish_health_report
+    ;;
   ""|-h|--help|help)
     usage
     ;;
-  *)
+ *)
     echo "Unknown ARI command: $1"
     usage
     exit 1

@@ -27,6 +27,20 @@ def classify_severity(event_name: str, payload: dict) -> str:
 
         return "warning"
 
+    if event_name == "atlas.health-report":
+        status = payload.get("status", "Unknown")
+
+        if status == "Degraded":
+            return "critical"
+
+        if status == "Warning":
+            return "warning"
+
+        if status == "Healthy":
+            return "success"
+
+        return "info"
+
     if event_name == "storage.threshold-crossed":
         threshold = int(payload.get("threshold", 0))
 

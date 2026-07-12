@@ -1,0 +1,10 @@
+[Unit]
+Description=Project Atlas Daily Health Report
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/project-atlas
+ExecStart=/bin/atlas ari collect
+ExecStart=/bin/atlas ari health-report
