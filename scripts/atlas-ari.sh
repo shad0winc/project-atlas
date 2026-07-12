@@ -15,6 +15,19 @@ fi
 
 source "$ATLAS_CONFIG_FILE"
 
+ATLAS_OUTPUT_LIB="$ATLAS_PROJECT_DIR/scripts/lib/output.sh"
+ATLAS_EVENTS_LIB="$ATLAS_PROJECT_DIR/scripts/lib/events.sh"
+
+if [[ -f "$ATLAS_OUTPUT_LIB" ]]; then
+  # shellcheck disable=SC1090
+  source "$ATLAS_OUTPUT_LIB"
+fi
+
+if [[ -f "$ATLAS_EVENTS_LIB" ]]; then
+  # shellcheck disable=SC1090
+  source "$ATLAS_EVENTS_LIB"
+fi
+
 ATLAS_ENV_FILE="$ATLAS_ROOT/.env"
 if [[ -f "$ATLAS_ENV_FILE" ]]; then
   source "$ATLAS_ENV_FILE"
@@ -210,7 +223,17 @@ collect() {
 EOF
 
   echo "ARI collection complete."
+
   cp "$snapshot_file" "$LATEST_FILE"
+
+  ari_publish_event \
+    "ari.snapshot-created" \
+    "{\"snapshot\":\"$snapshot_file\",\"timestamp\":\"$timestamp\"}"
+
+  ari_publish_event \
+    "storage.snapshot" \
+    "{\"available\":\"$storage_available\",\"available_bytes\":$storage_available_bytes,\"used\":\"$storage_used\",\"used_bytes\":$storage_used_bytes,\"usage_percent\":$storage_use_percent}"
+
   echo "Snapshot written to: $snapshot_file"
   echo "Latest snapshot updated: $LATEST_FILE"
 }
@@ -1323,6 +1346,32 @@ metric_movie_trend() {
 
 metric_tv_trend() {
   metric_trend "$(metric_tv_net_growth "$1")"
+}
+
+###############################################################################
+# Runtime Bus Helpers
+###############################################################################
+
+ari_publish_event() {
+  local event="${1:-}"
+  local payload="${2:-}"
+
+  if [[ -z "$event" ]]; then
+    return 0
+  fi
+
+  if ! declare -F atlas_event_publish >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if ! atlas_event_publish \
+      "$event" \
+      "$payload" \
+      "ari" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  return 0
 }
 
 ###############################################################################
