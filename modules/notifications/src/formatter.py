@@ -27,9 +27,10 @@ def notification_title(notification: dict[str, Any]) -> str:
 
     titles = {
         "atlas.health-changed": "Atlas Health Changed",
-        "storage.low": "Atlas Storage Warning",
         "sports.game-started": "Sports Event Started",
         "sports.game-finished": "Sports Event Finished",
+        "storage.threshold-crossed": "Atlas Storage Threshold Reached",
+        "storage.threshold-recovered": "Atlas Storage Threshold Recovered",
     }
 
     return titles.get(
@@ -48,8 +49,19 @@ def notification_description(notification: dict[str, Any]) -> str:
 
         return f"{previous} → {current}"
 
-    if event_name == "storage.low":
-        return "Available storage has reached a warning threshold."
+    if event_name == "storage.threshold-crossed":
+        threshold = payload.get("threshold", "Unknown")
+
+        return (
+            f"Storage usage has crossed the {threshold}% threshold."
+        )
+
+    if event_name == "storage.threshold-recovered":
+        threshold = payload.get("threshold", "Unknown")
+
+        return (
+            f"Storage usage has recovered below the {threshold}% threshold."
+        )
 
     if event_name == "sports.game-started":
         return "A monitored sports event has started."
@@ -85,11 +97,34 @@ def notification_fields(
             },
         ]
 
-    if event_name == "storage.low":
+    if event_name in {
+        "storage.threshold-crossed",
+        "storage.threshold-recovered",
+    }:
         return [
             {
-                "name": "Available Storage",
+                "name": "Usage",
+                "value": f"{payload.get('usage_percent', 'Unknown')}%",
+                "inline": True,
+            },
+            {
+                "name": "Used",
+                "value": str(payload.get("used", "Unknown")),
+                "inline": True,
+            },
+            {
+                "name": "Available",
                 "value": str(payload.get("available", "Unknown")),
+                "inline": True,
+            },
+            {
+                "name": "Capacity",
+                "value": str(payload.get("capacity", "Unknown")),
+                "inline": True,
+            },
+            {
+                "name": "Threshold",
+                "value": f"{payload.get('threshold', 'Unknown')}%",
                 "inline": True,
             },
         ]

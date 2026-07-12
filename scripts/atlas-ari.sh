@@ -37,6 +37,7 @@ ARI_DATA_DIR="$ATLAS_ARI_DIR"
 ARI_SNAPSHOT_DIR="$ATLAS_ARI_SNAPSHOT_DIR"
 LATEST_FILE="$ATLAS_ARI_LATEST_FILE"
 ARI_HEALTH_STATE_FILE="$ATLAS_ARI_DIR/health-state.json"
+ARI_STORAGE_STATE_FILE="$ATLAS_ARI_DIR/storage-state.json"
 MEDIA_ROOT="$ATLAS_MEDIA_ROOT"
 
 usage() {
@@ -234,6 +235,13 @@ EOF
   ari_publish_event \
     "storage.snapshot" \
     "{\"available\":\"$storage_available\",\"available_bytes\":$storage_available_bytes,\"used\":\"$storage_used\",\"used_bytes\":$storage_used_bytes,\"usage_percent\":$storage_use_percent}"
+
+  ari_publish_storage_transition \
+    "$storage_use_percent" \
+    "$storage_used" \
+    "$storage_available" \
+    "$storage_capacity" \
+    "$timestamp"
 
   local health_score
   local health_status
@@ -1432,6 +1440,83 @@ ari_publish_health_transition() {
   ari_publish_event \
     "atlas.health-changed" \
     "{\"previous\":\"$previous_status\",\"current\":\"$status\",\"score\":$score,\"timestamp\":\"$timestamp\"}"
+}
+
+ari_storage_active_threshold() {
+  local usage_percent="${1:-0}"
+
+  if (( usage_percent >= 90 )); then
+    echo 90
+  elif (( usage_percent >= 75 )); then
+    echo 75
+  elif (( usage_percent >= 50 )); then
+    echo 50
+  else
+    echo 0
+  fi
+}
+
+ari_read_previous_storage_threshold() {
+  if [[ ! -f "$ARI_STORAGE_STATE_FILE" ]]; then
+    echo 0
+    return 0
+  fi
+
+  jq -r \
+    '.active_threshold // 0' \
+    "$ARI_STORAGE_STATE_FILE" \
+    2>/dev/null
+}
+
+ari_write_storage_state() {
+  local usage_percent="${1:-0}"
+  local active_threshold="${2:-0}"
+  local timestamp="${3:-}"
+
+  jq -n \
+    --arg timestamp "$timestamp" \
+    --argjson usage_percent "$usage_percent" \
+    --argjson active_threshold "$active_threshold" \
+    '{
+      timestamp: $timestamp,
+      usage_percent: $usage_percent,
+      active_threshold: $active_threshold
+    }' > "$ARI_STORAGE_STATE_FILE"
+}
+
+ari_publish_storage_transition() {
+  local usage_percent="${1:-0}"
+  local used="${2:-unknown}"
+  local available="${3:-unknown}"
+  local capacity="${4:-unknown}"
+  local timestamp="${5:-}"
+
+  local previous_threshold=0
+  local active_threshold=0
+
+  previous_threshold="$(ari_read_previous_storage_threshold)"
+  active_threshold="$(ari_storage_active_threshold "$usage_percent")"
+
+  ari_write_storage_state \
+    "$usage_percent" \
+    "$active_threshold" \
+    "$timestamp"
+
+  if [[ "$previous_threshold" == "$active_threshold" ]]; then
+    return 0
+  fi
+
+  if (( active_threshold > previous_threshold )); then
+    ari_publish_event \
+      "storage.threshold-crossed" \
+      "{\"threshold\":$active_threshold,\"previous_threshold\":$previous_threshold,\"usage_percent\":$usage_percent,\"used\":\"$used\",\"available\":\"$available\",\"capacity\":\"$capacity\",\"timestamp\":\"$timestamp\"}"
+
+    return 0
+  fi
+
+  ari_publish_event \
+    "storage.threshold-recovered" \
+    "{\"threshold\":$previous_threshold,\"active_threshold\":$active_threshold,\"usage_percent\":$usage_percent,\"used\":\"$used\",\"available\":\"$available\",\"capacity\":\"$capacity\",\"timestamp\":\"$timestamp\"}"
 }
 
 ###############################################################################

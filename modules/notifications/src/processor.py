@@ -27,8 +27,19 @@ def classify_severity(event_name: str, payload: dict) -> str:
 
         return "warning"
 
-    if event_name == "storage.low":
-        return "critical"
+    if event_name == "storage.threshold-crossed":
+        threshold = int(payload.get("threshold", 0))
+
+        if threshold >= 90:
+            return "critical"
+
+        if threshold >= 75:
+            return "warning"
+
+        return "info"
+
+    if event_name == "storage.threshold-recovered":
+        return "success"
 
     if event_name in {
         "sports.game-started",
