@@ -1049,31 +1049,6 @@ print_snapshot_comparison() {
 }
 
 ###############################################################################
-# Snapshot Helpers
-###############################################################################
-
-get_recent_snapshots() {
-  local count="${1:-5}"
-
-  find "$ARI_SNAPSHOT_DIR" \
-    -maxdepth 1 \
-    -type f \
-    -name '*.json' \
-    | sort \
-    | tail -n "$count"
-}
-
-get_snapshot_count() {
-  get_recent_snapshots "$1" | wc -l
-}
-
-get_oldest_recent_snapshot() {
-  local count="${1:-5}"
-
-  get_recent_snapshots "$count" | head -n 1
-}
-
-###############################################################################
 # Jellyfin Helpers
 ###############################################################################
 
