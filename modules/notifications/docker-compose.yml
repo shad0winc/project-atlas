@@ -1,5 +1,43 @@
-# Project Atlas Module Template
-#
-# Replace notifications and other placeholders when creating a module.
+services:
+  atlas-notifications-worker:
+    build:
+      context: ../..
+      dockerfile: modules/notifications/Dockerfile
 
-services: {}
+    container_name: atlas-notifications-worker
+    restart: unless-stopped
+
+    environment:
+      ATLAS_NOTIFICATIONS_INTERVAL: "5"
+
+    volumes:
+      - /opt/project-atlas:/opt/project-atlas:ro
+      - /mnt/storage/configs/atlas/runtime:/mnt/storage/configs/atlas/runtime
+      - /mnt/storage/configs/atlas/notifications:/mnt/storage/configs/atlas/notifications
+
+    mem_limit: 128m
+    cpus: 0.50
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          test -f /mnt/storage/configs/atlas/notifications/worker-heartbeat
+          && test
+          $(( $(date +%s) - $(stat -c %Y /mnt/storage/configs/atlas/notifications/worker-heartbeat) ))
+          -lt 30
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+    labels:
+      project-atlas.module: notifications
+      project-atlas.service: notifications-worker
+
+    networks:
+      - atlas
+
+networks:
+  atlas:
+    external: true
