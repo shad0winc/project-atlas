@@ -12,17 +12,44 @@ LOG_FILE = Path(
     "/mnt/storage/configs/atlas/notifications/logs/notifications.log"
 )
 
+def classify_severity(event_name: str, payload: dict) -> str:
+    if event_name == "atlas.health-changed":
+        current = payload.get("current", "Unknown")
+
+        if current == "Degraded":
+            return "critical"
+
+        if current == "Warning":
+            return "warning"
+
+        if current == "Healthy":
+            return "success"
+
+        return "warning"
+
+    if event_name == "storage.low":
+        return "critical"
+
+    if event_name in {
+        "sports.game-started",
+        "sports.game-finished",
+    }:
+        return "info"
+
+    return "info"
 
 def build_notification(event: dict) -> dict:
     event_name = event.get("event", "unknown")
     source = event.get("source", "unknown")
     payload = event.get("payload", {})
+    severity = classify_severity(event_name, payload)
 
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "event_id": event.get("id"),
         "event": event_name,
         "source": source,
+        "severity": severity,
         "payload": payload,
     }
 

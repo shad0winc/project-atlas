@@ -7,18 +7,26 @@ import urllib.request
 from typing import Any
 
 from adapters.base import NotificationAdapter
-from formatter import format_notification
+from formatter import (
+    notification_description,
+    notification_fields,
+    notification_route,
+    notification_title,
+)
+
+
+SEVERITY_COLORS = {
+    "info": 3447003,
+    "success": 5763719,
+    "warning": 16776960,
+    "critical": 15548997,
+}
 
 
 class DiscordAdapter(NotificationAdapter):
     name = "discord"
 
     def __init__(self) -> None:
-        self.webhook_url = os.getenv(
-            "ATLAS_NOTIFICATIONS_DISCORD_WEBHOOK",
-            "",
-        ).strip()
-
         self.timeout = int(
             os.getenv(
                 "ATLAS_NOTIFICATIONS_DISCORD_TIMEOUT",
@@ -26,22 +34,76 @@ class DiscordAdapter(NotificationAdapter):
             )
         )
 
+        self.webhooks = {
+            "system": os.getenv(
+                "ATLAS_NOTIFICATIONS_DISCORD_SYSTEM_WEBHOOK",
+                "",
+            ).strip(),
+            "movies": os.getenv(
+                "ATLAS_NOTIFICATIONS_DISCORD_MOVIES_WEBHOOK",
+                "",
+            ).strip(),
+            "tv": os.getenv(
+                "ATLAS_NOTIFICATIONS_DISCORD_TV_WEBHOOK",
+                "",
+            ).strip(),
+            "anime_movies": os.getenv(
+                "ATLAS_NOTIFICATIONS_DISCORD_ANIME_MOVIES_WEBHOOK",
+                "",
+            ).strip(),
+            "anime_tv": os.getenv(
+                "ATLAS_NOTIFICATIONS_DISCORD_ANIME_TV_WEBHOOK",
+                "",
+            ).strip(),
+            "sports": os.getenv(
+                "ATLAS_NOTIFICATIONS_DISCORD_SPORTS_WEBHOOK",
+                "",
+            ).strip(),
+        }
+
     def enabled(self) -> bool:
-        return bool(self.webhook_url)
+        return any(self.webhooks.values())
 
     def deliver(self, notification: dict[str, Any]) -> bool:
         if not self.enabled():
             return True
 
+        route = notification_route(notification)
+        webhook_url = self.webhooks.get(route, "")
+
+        if not webhook_url:
+            return True
+
+        severity = notification.get("severity", "info")
+        color = SEVERITY_COLORS.get(
+            severity,
+            SEVERITY_COLORS["info"],
+        )
+
+        embed = {
+            "title": notification_title(notification),
+            "description": notification_description(notification),
+            "color": color,
+            "fields": notification_fields(notification),
+            "timestamp": notification.get("timestamp"),
+            "footer": {
+                "text": (
+                    f"Project Atlas • "
+                    f"{notification.get('source', 'unknown')} • "
+                    f"{route}"
+                )
+            },
+        }
+
         payload = {
-            "content": format_notification(notification),
             "username": "Project Atlas",
+            "embeds": [embed],
         }
 
         body = json.dumps(payload).encode("utf-8")
 
         request = urllib.request.Request(
-            self.webhook_url,
+            webhook_url,
             data=body,
             headers={
                 "Content-Type": "application/json",
