@@ -5,6 +5,9 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from router import NotificationRouter
+
+
 LOG_FILE = Path(
     "/mnt/storage/configs/atlas/notifications/logs/notifications.log"
 )
@@ -27,6 +30,8 @@ def build_notification(event: dict) -> dict:
 def main() -> int:
     LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
 
+    router = NotificationRouter()
+
     for raw_line in sys.stdin:
         raw_line = raw_line.strip()
 
@@ -44,6 +49,14 @@ def main() -> int:
             log_file.write(
                 json.dumps(notification, separators=(",", ":")) + "\n"
             )
+
+        if not router.deliver(notification):
+            print(
+                f"Notification delivery failed: "
+                f"{notification['event']}",
+                file=sys.stderr,
+            )
+            return 1
 
         print(
             f"Processed notification event: "
