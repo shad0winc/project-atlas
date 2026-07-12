@@ -397,3 +397,45 @@ atlas_event_subscriber_unregister() {
 
   atlas_ok "Subscriber unregistered: $subscriber"
 }
+
+atlas_event_subscriber_process() {
+  local subscriber="${1:-}"
+  shift || true
+
+  if ! atlas_event_subscriber_exists "$subscriber"; then
+    atlas_fail "Unknown subscriber: $subscriber"
+    return 1
+  fi
+
+  if [[ "$#" -eq 0 ]]; then
+    atlas_fail "Subscriber handler required"
+    return 1
+  fi
+
+  local cursor=""
+  local current_position=""
+  local event_count=""
+  local filter=""
+
+  cursor="$(atlas_event_subscriber_cursor "$subscriber")"
+  current_position="$(cat "$cursor")"
+  event_count="$(wc -l < "$ATLAS_EVENT_LOG")"
+  filter="$(atlas_event_subscriber_get_filter "$subscriber")"
+
+  if (( current_position >= event_count )); then
+    echo "No pending events."
+    return 0
+  fi
+
+  if ! tail -n "+$((current_position + 1))" "$ATLAS_EVENT_LOG" \
+      | atlas_event_filter_stream "$filter" \
+      | "$@"; then
+    atlas_fail "Subscriber handler failed: $subscriber"
+    return 1
+  fi
+
+  printf '%s\n' "$event_count" > "$cursor"
+
+  atlas_ok "Subscriber processing complete: $subscriber"
+  echo "Cursor: $event_count"
+}
