@@ -7,11 +7,11 @@ services:
     container_name: atlas-notifications-worker
     restart: unless-stopped
 
+    env_file:
+      - .env
+
     environment:
       ATLAS_NOTIFICATIONS_INTERVAL: "5"
-      ATLAS_NOTIFICATIONS_WEBHOOK_URL: "${ATLAS_NOTIFICATIONS_WEBHOOK_URL:-}"
-      ATLAS_NOTIFICATIONS_WEBHOOK_TIMEOUT: "${ATLAS_NOTIFICATIONS_WEBHOOK_TIMEOUT:-10}"
-      ATLAS_NOTIFICATIONS_DISCORD_WEBHOOK: "${ATLAS_NOTIFICATIONS_DISCORD_WEBHOOK:-}"
 
     volumes:
       - /opt/project-atlas:/opt/project-atlas:ro
