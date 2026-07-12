@@ -10,3 +10,6 @@ backups/
 
 # Runtime data
 data/
+
+__pycache__/
+*.pyc
