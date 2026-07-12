@@ -36,6 +36,7 @@ fi
 ARI_DATA_DIR="$ATLAS_ARI_DIR"
 ARI_SNAPSHOT_DIR="$ATLAS_ARI_SNAPSHOT_DIR"
 LATEST_FILE="$ATLAS_ARI_LATEST_FILE"
+ARI_HEALTH_STATE_FILE="$ATLAS_ARI_DIR/health-state.json"
 MEDIA_ROOT="$ATLAS_MEDIA_ROOT"
 
 usage() {
@@ -234,6 +235,17 @@ EOF
     "storage.snapshot" \
     "{\"available\":\"$storage_available\",\"available_bytes\":$storage_available_bytes,\"used\":\"$storage_used\",\"used_bytes\":$storage_used_bytes,\"usage_percent\":$storage_use_percent}"
 
+  local health_score
+  local health_status
+
+  health_score="$(ari_calculate_health_score)"
+  health_status="$(ari_health_status "$health_score")"
+
+  ari_publish_health_transition \
+    "$health_score" \
+    "$health_status" \
+    "$timestamp"
+
   echo "Snapshot written to: $snapshot_file"
   echo "Latest snapshot updated: $LATEST_FILE"
 }
@@ -396,12 +408,43 @@ print_recommendations() {
 # Health
 ###############################################################################
 
+ari_calculate_health_score() {
+  local score=100
+
+  health_check_storage >/dev/null 2>&1 || score=$((score - 20))
+  health_check_docker >/dev/null 2>&1 || score=$((score - 20))
+  health_check_containers >/dev/null 2>&1 || score=$((score - 20))
+  health_check_vpn >/dev/null 2>&1 || score=$((score - 20))
+
+  validate_jellyfin_libraries >/dev/null 2>&1 || score=$((score - 20))
+  health_check_library_paths >/dev/null 2>&1 || score=$((score - 20))
+  health_check_library_synchronization >/dev/null 2>&1 || score=$((score - 20))
+
+  health_check_snapshot_freshness >/dev/null 2>&1 || score=$((score - 10))
+
+  echo "$score"
+}
+
+ari_health_status() {
+  local score="${1:-100}"
+
+  if (( score < 70 )); then
+    echo "Degraded"
+  elif (( score < 90 )); then
+    echo "Warning"
+  else
+    echo "Healthy"
+  fi
+}
+
 print_health() {
   echo
   echo "Atlas Health"
   echo "------------"
 
-  local score=100
+  local score
+  score="$(ari_calculate_health_score)"
+
   local checks=()
   local warnings=()
 
@@ -418,15 +461,8 @@ print_health() {
 
   ARI_HEALTH_SCORE="$score"
 
-  local status="Healthy"
-
-  if (( score < 90 )); then
-    status="Warning"
-  fi
-
-  if (( score < 70 )); then
-    status="Degraded"
-  fi
+  local status
+  status="$(ari_health_status "$score")"
 
   echo "Score : $score / 100"
   echo "Status: $status"
@@ -454,7 +490,6 @@ health_register_check() {
   if "$check_function" >/dev/null 2>&1; then
     checks+=("$check_name")
   else
-    score=$((score - penalty))
     warnings+=("$warning_message")
   fi
 }
@@ -1372,6 +1407,56 @@ ari_publish_event() {
   fi
 
   return 0
+}
+
+ari_read_previous_health_state() {
+  if [[ ! -f "$ARI_HEALTH_STATE_FILE" ]]; then
+    return 0
+  fi
+
+  jq -r '.status // empty' "$ARI_HEALTH_STATE_FILE" 2>/dev/null
+}
+
+ari_write_health_state() {
+  local score="${1:-100}"
+  local status="${2:-Healthy}"
+  local timestamp="${3:-}"
+
+  jq -n \
+    --arg timestamp "$timestamp" \
+    --arg status "$status" \
+    --argjson score "$score" \
+    '{
+      timestamp: $timestamp,
+      score: $score,
+      status: $status
+    }' > "$ARI_HEALTH_STATE_FILE"
+}
+
+ari_publish_health_transition() {
+  local score="${1:-100}"
+  local status="${2:-Healthy}"
+  local timestamp="${3:-}"
+
+  local previous_status=""
+  previous_status="$(ari_read_previous_health_state)"
+
+  ari_write_health_state \
+    "$score" \
+    "$status" \
+    "$timestamp"
+
+  if [[ -z "$previous_status" ]]; then
+    return 0
+  fi
+
+  if [[ "$previous_status" == "$status" ]]; then
+    return 0
+  fi
+
+  ari_publish_event \
+    "atlas.health-changed" \
+    "{\"previous\":\"$previous_status\",\"current\":\"$status\",\"score\":$score,\"timestamp\":\"$timestamp\"}"
 }
 
 ###############################################################################
