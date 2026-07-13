@@ -55,6 +55,12 @@ def classify_severity(event_name: str, payload: dict) -> str:
     if event_name == "storage.threshold-recovered":
         return "success"
 
+    if event_name == "sports.provider-degraded":
+        return "critical"
+
+    if event_name == "sports.provider-recovered":
+        return "success"
+
     if event_name in {
         "sports.game-started",
         "sports.game-finished",

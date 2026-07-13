@@ -10,14 +10,17 @@ echo "Updating Sports module..."
 echo
 
 docker compose \
-  -f docker-compose.yml \
-  -f docker-compose.sports.yml \
-  pull atlas-sports-feed
+  -f "$MODULE_DIR/docker-compose.yml" \
+  pull
 
 docker compose \
-  -f docker-compose.yml \
-  -f docker-compose.sports.yml \
-  up -d atlas-sports-feed
+  -f "$MODULE_DIR/docker-compose.yml" \
+  build
+
+docker compose \
+  -f "$MODULE_DIR/docker-compose.yml" \
+  up -d \
+  --remove-orphans
 
 echo
 echo "Sports module update complete."

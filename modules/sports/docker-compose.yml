@@ -34,6 +34,47 @@ services:
       project-atlas.module: sports
       project-atlas.service: sports-feed
 
+  atlas-sports-controller:
+    build:
+      context: /opt/project-atlas
+      dockerfile: modules/sports/Dockerfile
+
+    container_name: atlas-sports-controller
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      PYTHONUNBUFFERED: "1"
+      SPORTS_CONTROLLER_INTERVAL_SECONDS: "${SPORTS_CONTROLLER_INTERVAL_SECONDS:-30}"
+      SPORTS_CONTROLLER_HEARTBEAT_FILE: "${SPORTS_CONTROLLER_HEARTBEAT_FILE:-/mnt/storage/configs/sportyfin/state/controller-heartbeat}"
+      SPORTS_PROVIDER_HEALTH_FILE: "${SPORTS_PROVIDER_HEALTH_FILE:-/mnt/storage/configs/sportyfin/state/provider-health.json}"
+
+    volumes:
+      - /opt/project-atlas:/opt/project-atlas:ro
+      - /mnt/storage/configs/sportyfin:/mnt/storage/configs/sportyfin
+      - /mnt/storage/configs/atlas/runtime:/mnt/storage/configs/atlas/runtime
+
+    mem_limit: 128m
+    cpus: 0.50
+
+    networks:
+      - atlas
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - test -f /mnt/storage/configs/sportyfin/state/controller-heartbeat && test $$(( $$(date +%s) - $$(stat -c %Y /mnt/storage/configs/sportyfin/state/controller-heartbeat) )) -lt 90
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
+
+    labels:
+      project-atlas.module: sports
+      project-atlas.service: sports-controller
+
 networks:
   atlas:
     external: true

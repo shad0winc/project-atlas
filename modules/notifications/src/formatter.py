@@ -32,6 +32,8 @@ def notification_title(notification: dict[str, Any]) -> str:
         "sports.game-finished": "Sports Event Finished",
         "storage.threshold-crossed": "Atlas Storage Threshold Reached",
         "storage.threshold-recovered": "Atlas Storage Threshold Recovered",
+        "sports.provider-degraded": "Sports Provider Degraded",
+        "sports.provider-recovered": "Sports Provider Recovered",
     }
 
     return titles.get(
@@ -67,6 +69,28 @@ def notification_description(notification: dict[str, Any]) -> str:
 
         return (
             f"Storage usage has recovered below the {threshold}% threshold."
+        )
+
+    if event_name == "sports.provider-degraded":
+        provider = payload.get(
+            "provider",
+            "Unknown",
+        )
+
+        return (
+            f"The {provider} sports provider "
+            "is currently degraded."
+        )
+
+    if event_name == "sports.provider-recovered":
+        provider = payload.get(
+            "provider",
+            "Unknown",
+        )
+
+        return (
+            f"The {provider} sports provider "
+            "has recovered."
         )
 
     if event_name == "sports.game-started":
@@ -189,6 +213,74 @@ def notification_fields(
             {
                 "name": "Threshold",
                 "value": f"{payload.get('threshold', 'Unknown')}%",
+                "inline": True,
+            },
+        ]
+
+    if event_name == "sports.provider-degraded":
+        return [
+            {
+                "name": "Provider",
+                "value": str(
+                    payload.get(
+                        "provider",
+                        "Unknown",
+                    )
+                ),
+                "inline": True,
+            },
+            {
+                "name": "Status",
+                "value": "Degraded",
+                "inline": True,
+            },
+            {
+                "name": "Failures",
+                "value": str(
+                    payload.get(
+                        "consecutive_failures",
+                        "Unknown",
+                    )
+                ),
+                "inline": True,
+            },
+            {
+                "name": "Error",
+                "value": str(
+                    payload.get(
+                        "error",
+                        "Unknown",
+                    )
+                ),
+                "inline": False,
+            },
+        ]
+
+    if event_name == "sports.provider-recovered":
+        return [
+            {
+                "name": "Provider",
+                "value": str(
+                    payload.get(
+                        "provider",
+                        "Unknown",
+                    )
+                ),
+                "inline": True,
+            },
+            {
+                "name": "Status",
+                "value": "Healthy",
+                "inline": True,
+            },
+            {
+                "name": "Games",
+                "value": str(
+                    payload.get(
+                        "game_count",
+                        0,
+                    )
+                ),
                 "inline": True,
             },
         ]
