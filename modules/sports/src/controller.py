@@ -202,6 +202,25 @@ def process_games(
 
         next_games[game_id] = game
 
+    for game_id, previous in previous_games.items():
+        if game_id in next_games:
+            continue
+
+        previous_state = str(
+            previous.get(
+                "lifecycle_state",
+                "scheduled",
+            )
+        )
+
+        if previous_state == "finished":
+            continue
+
+        preserved = deepcopy(previous)
+        preserved["updated_at"] = format_timestamp(now)
+
+        next_games[game_id] = preserved
+
     save_state(next_games)
 
     feed_result = generate_feed()
