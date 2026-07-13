@@ -96,3 +96,38 @@ def should_include_in_feed(state: str) -> bool:
         "final",
         "grace",
     }
+
+def should_surface_game(
+    game: dict[str, Any],
+    now: datetime,
+    pregame_minutes: int,
+) -> bool:
+    state = str(
+        game.get(
+            "lifecycle_state",
+            "scheduled",
+        )
+    ).lower()
+
+    if state in {
+        "live",
+        "final",
+        "grace",
+    }:
+        return True
+
+    if state == "finished":
+        return False
+
+    start_at = parse_timestamp(
+        game.get("start_at")
+    )
+
+    if start_at is None:
+        return False
+
+    visible_at = start_at - timedelta(
+        minutes=pregame_minutes
+    )
+
+    return now >= visible_at

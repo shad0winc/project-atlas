@@ -10,8 +10,14 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from lifecycle import should_include_in_feed
+from lifecycle import should_surface_game
 
+PREGAME_WINDOW_MINUTES = int(
+    os.getenv(
+        "SPORTS_PREGAME_WINDOW_MINUTES",
+        "60",
+    )
+)
 
 STATE_FILE = Path(
     os.getenv(
@@ -50,12 +56,18 @@ def load_games() -> dict[str, dict[str, Any]]:
 
 def active_games(
     games: dict[str, dict[str, Any]],
+    now: datetime | None = None,
 ) -> list[dict[str, Any]]:
+    if now is None:
+        now = datetime.now(timezone.utc)
+
     return [
         game
         for game in games.values()
-        if should_include_in_feed(
-            str(game.get("lifecycle_state", "scheduled"))
+        if should_surface_game(
+            game,
+            now,
+            PREGAME_WINDOW_MINUTES,
         )
     ]
 

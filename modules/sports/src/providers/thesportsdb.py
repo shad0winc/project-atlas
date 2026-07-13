@@ -7,7 +7,7 @@ import os
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from providers.base import SportsProvider
@@ -21,6 +21,13 @@ class TheSportsDBProvider(SportsProvider):
             "SPORTS_THESPORTSDB_API_KEY",
             "",
         ).strip()
+
+        self.discovery_days_ahead = int(
+            os.getenv(
+                "SPORTS_DISCOVERY_DAYS_AHEAD",
+                "1",
+            )
+        )
 
         self.league_ids = [
             value.strip()
@@ -123,23 +130,35 @@ class TheSportsDBProvider(SportsProvider):
         date_value: str | None = None,
     ) -> list[dict[str, Any]]:
         if date_value is None:
-            date_value = datetime.now(
+            start_date = datetime.now(
                 timezone.utc
-            ).date().isoformat()
+            ).date()
+        else:
+            start_date = datetime.fromisoformat(
+                date_value
+            ).date()
 
         events_by_id: dict[str, dict[str, Any]] = {}
 
-        for league_id in self.league_ids:
-            for event in self.fetch_day_events(
-                date_value,
-                league_id,
-            ):
-                event_id = str(
-                    event.get("idEvent", "")
-                ).strip()
+        for day_offset in range(
+            self.discovery_days_ahead + 1
+        ):
+            discovery_date = (
+                start_date
+                + timedelta(days=day_offset)
+            ).isoformat()
 
-                if event_id:
-                    events_by_id[event_id] = event
+            for league_id in self.league_ids:
+                for event in self.fetch_day_events(
+                    discovery_date,
+                    league_id,
+                ):
+                    event_id = str(
+                        event.get("idEvent", "")
+                    ).strip()
+
+                    if event_id:
+                        events_by_id[event_id] = event
 
         for event_id in tracked_event_ids or []:
             event = self.fetch_event(event_id)

@@ -69,6 +69,71 @@ check "Sports provider healthy" \
     " /mnt/storage/configs/sportyfin/state/provider-health.json
   '
 
+check "Sports visibility policy valid" \
+  sh -c '
+    cd /opt/project-atlas
+
+    PYTHONPATH=modules/sports/src python3 - <<'"'"'PY'"'"'
+from datetime import datetime, timezone
+
+from lifecycle import should_surface_game
+
+
+now = datetime(
+    2026,
+    7,
+    13,
+    18,
+    0,
+    tzinfo=timezone.utc,
+)
+
+checks = [
+    not should_surface_game(
+        {
+            "lifecycle_state": "scheduled",
+            "start_at": "2026-07-13T20:00:00+00:00",
+        },
+        now,
+        pregame_minutes=60,
+    ),
+    should_surface_game(
+        {
+            "lifecycle_state": "scheduled",
+            "start_at": "2026-07-13T18:45:00+00:00",
+        },
+        now,
+        pregame_minutes=60,
+    ),
+    should_surface_game(
+        {
+            "lifecycle_state": "live",
+        },
+        now,
+        pregame_minutes=60,
+    ),
+    should_surface_game(
+        {
+            "lifecycle_state": "grace",
+        },
+        now,
+        pregame_minutes=60,
+    ),
+    not should_surface_game(
+        {
+            "lifecycle_state": "finished",
+        },
+        now,
+        pregame_minutes=60,
+    ),
+]
+
+raise SystemExit(
+    0 if all(checks) else 1
+)
+PY
+  '
+
 check "Sports health endpoint reachable" \
   curl -fsS http://127.0.0.1:8097/health
 
