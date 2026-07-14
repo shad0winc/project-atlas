@@ -106,6 +106,19 @@ class TheSportsDBProvider(SportsProvider):
 
         return response.get("events") or []
 
+    def fetch_team_events(
+        self,
+        team_id: str,
+    ) -> list[dict[str, Any]]:
+        response = self.request_json(
+            "eventsnext.php",
+            {
+                "id": team_id,
+            },
+        )
+
+        return response.get("events") or []
+
     def fetch_event(
         self,
         event_id: str,
@@ -127,6 +140,9 @@ class TheSportsDBProvider(SportsProvider):
     def fetch_games(
         self,
         tracked_event_ids: list[str] | None = None,
+        event_ids: list[str] | None = None,
+        team_ids: list[str] | None = None,
+        league_ids: list[str] | None = None,
         date_value: str | None = None,
     ) -> list[dict[str, Any]]:
         if date_value is None:
@@ -138,7 +154,24 @@ class TheSportsDBProvider(SportsProvider):
                 date_value
             ).date()
 
-        events_by_id: dict[str, dict[str, Any]] = {}
+        events_by_id: dict[
+            str,
+            dict[str, Any],
+        ] = {}
+
+        for team_id in team_ids or []:
+            for event in self.fetch_team_events(
+                team_id
+            ):
+                event_id = str(
+                    event.get(
+                        "idEvent",
+                        "",
+                    )
+                ).strip()
+
+                if event_id:
+                    events_by_id[event_id] = event
 
         for day_offset in range(
             self.discovery_days_ahead + 1
@@ -148,20 +181,33 @@ class TheSportsDBProvider(SportsProvider):
                 + timedelta(days=day_offset)
             ).isoformat()
 
-            for league_id in self.league_ids:
+            for league_id in league_ids or []:
                 for event in self.fetch_day_events(
                     discovery_date,
                     league_id,
                 ):
                     event_id = str(
-                        event.get("idEvent", "")
+                        event.get(
+                            "idEvent",
+                            "",
+                        )
                     ).strip()
 
                     if event_id:
                         events_by_id[event_id] = event
 
-        for event_id in tracked_event_ids or []:
-            event = self.fetch_event(event_id)
+        refresh_event_ids = set(
+            tracked_event_ids or []
+        )
+
+        refresh_event_ids.update(
+            event_ids or []
+        )
+
+        for event_id in refresh_event_ids:
+            event = self.fetch_event(
+                event_id
+            )
 
             if event is not None:
                 events_by_id[event_id] = event
@@ -198,11 +244,29 @@ class TheSportsDBProvider(SportsProvider):
             "id": f"thesportsdb-{event_id}",
             "provider": self.name,
             "provider_event_id": event_id,
+            "provider_league_id": str(
+                event.get(
+                    "idLeague",
+                    "",
+                )
+            ),
             "name": str(name),
             "sport": event.get("strSport"),
             "league": event.get("strLeague"),
             "home_team": event.get("strHomeTeam"),
             "away_team": event.get("strAwayTeam"),
+            "home_team_id": str(
+                event.get(
+                    "idHomeTeam",
+                    "",
+                )
+            ),
+            "away_team_id": str(
+                event.get(
+                    "idAwayTeam",
+                    "",
+                )
+            ),
             "start_at": start_at,
             "status": self.normalize_status(event),
             "duration_minutes": 240,

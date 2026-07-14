@@ -514,6 +514,15 @@ atlas_command_module() {
       atlas_module_reconcile_event_subscriber "$module_name"
       ;;
 
+    sports)
+      local sports_subcommand="${2:-subscriptions}"
+
+      python3 \
+        "$ATLAS_PROJECT_DIR/modules/sports/src/sports_cli.py" \
+        "$sports_subcommand" \
+        "${@:3}"
+      ;;
+
     *)
       atlas_command_module_usage
       return 1

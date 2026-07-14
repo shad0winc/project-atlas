@@ -50,6 +50,7 @@ services:
       SPORTS_CONTROLLER_INTERVAL_SECONDS: "${SPORTS_CONTROLLER_INTERVAL_SECONDS:-30}"
       SPORTS_CONTROLLER_HEARTBEAT_FILE: "${SPORTS_CONTROLLER_HEARTBEAT_FILE:-/mnt/storage/configs/sportyfin/state/controller-heartbeat}"
       SPORTS_PROVIDER_HEALTH_FILE: "${SPORTS_PROVIDER_HEALTH_FILE:-/mnt/storage/configs/sportyfin/state/provider-health.json}"
+      SPORTS_SUBSCRIPTIONS_FILE: "${SPORTS_SUBSCRIPTIONS_FILE:-/mnt/storage/configs/sportyfin/state/subscriptions.json}"
 
     volumes:
       - /opt/project-atlas:/opt/project-atlas:ro

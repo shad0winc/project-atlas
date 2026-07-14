@@ -13,7 +13,11 @@ from typing import Any
 
 from controller import load_state, process_games
 from providers.registry import enabled_providers
-
+from subscriptions import (
+    active_subscriptions,
+    filter_subscribed_games,
+    provider_discovery_targets,
+)
 
 CONTROLLER_INTERVAL_SECONDS = int(
     os.getenv(
@@ -262,18 +266,44 @@ def run_cycle() -> int:
     previous_games = load_state()
     provider_games: list[dict[str, Any]] = []
     provider_health = load_provider_health()
+    subscriptions = active_subscriptions()
+
+    subscribed_previous_games = {
+        game_id: game
+        for game_id, game in previous_games.items()
+        if filter_subscribed_games(
+            [game],
+            subscriptions,
+        )
+    }
 
     degraded_count = 0
 
     for provider in providers:
-        event_ids = tracked_event_ids(
-            previous_games,
+        tracked_ids = tracked_event_ids(
+            subscribed_previous_games,
             provider.name,
+        )
+
+        discovery_targets = (
+            provider_discovery_targets(
+                subscriptions,
+                provider.name,
+            )
         )
 
         try:
             games = provider.fetch_games(
-                tracked_event_ids=event_ids,
+                tracked_event_ids=tracked_ids,
+                event_ids=discovery_targets[
+                    "events"
+                ],
+                team_ids=discovery_targets[
+                    "teams"
+                ],
+                league_ids=discovery_targets[
+                    "leagues"
+                ],
             )
 
         except Exception as exc:
@@ -304,11 +334,44 @@ def run_cycle() -> int:
         print(
             f"Provider {provider.name}: "
             f"{len(games)} game(s), "
-            f"{len(event_ids)} tracked"
+            f"{len(tracked_ids)} tracked, "
+            f"{len(discovery_targets['events'])} event subscription(s), "
+            f"{len(discovery_targets['teams'])} team subscription(s), "
+            f"{len(discovery_targets['leagues'])} league subscription(s)"
+        )
+
+    subscribed_games = filter_subscribed_games(
+        provider_games,
+        subscriptions,
+    )
+
+    stale_game_ids = [
+        game_id
+        for game_id in previous_games
+        if game_id not in subscribed_previous_games
+    ]
+
+    for game_id in stale_game_ids:
+        previous_games.pop(
+            game_id,
+            None,
+        )
+
+    if stale_game_ids:
+        from controller import save_state
+
+        save_state(
+            previous_games
+        )
+
+        print(
+            f"Sports state pruned: "
+            f"{len(stale_game_ids)} unsubscribed "
+            "or unmanaged game(s)"
         )
 
     next_games = process_games(
-        provider_games
+        subscribed_games
     )
 
     write_provider_health(
@@ -319,7 +382,9 @@ def run_cycle() -> int:
 
     print(
         f"Sports controller cycle complete: "
-        f"{len(next_games)} game(s), "
+        f"{len(provider_games)} discovered, "
+        f"{len(subscribed_games)} subscribed, "
+        f"{len(next_games)} monitored, "
         f"{degraded_count} degraded provider(s)"
     )
 
