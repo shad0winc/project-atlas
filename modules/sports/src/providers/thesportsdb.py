@@ -48,7 +48,6 @@ class TheSportsDBProvider(SportsProvider):
     def enabled(self) -> bool:
         return bool(
             self.api_key
-            and self.league_ids
         )
 
     def request_json(
@@ -106,6 +105,122 @@ class TheSportsDBProvider(SportsProvider):
 
         return response.get("events") or []
 
+    def search_teams(
+        self,
+        query: str,
+    ) -> list[dict[str, Any]]:
+        response = self.request_json(
+            "searchteams.php",
+            {
+                "t": query,
+            },
+        )
+
+        teams = response.get("teams") or []
+
+        results: list[dict[str, Any]] = []
+
+        for team in teams:
+            team_id = str(
+                team.get(
+                    "idTeam",
+                    "",
+                )
+            ).strip()
+
+            if not team_id:
+                continue
+
+            results.append(
+                {
+                    "provider": self.name,
+                    "id": team_id,
+                    "name": str(
+                        team.get(
+                            "strTeam",
+                            team_id,
+                        )
+                    ),
+                    "sport": team.get(
+                        "strSport"
+                    ),
+                    "league": team.get(
+                        "strLeague"
+                    ),
+                    "country": team.get(
+                        "strCountry"
+                    ),
+                }
+            )
+
+        return results
+
+    def search_leagues(
+        self,
+        query: str,
+    ) -> list[dict[str, Any]]:
+        normalized_query = query.strip().lower()
+
+        if not normalized_query:
+            return []
+
+        results: list[dict[str, Any]] = []
+
+        for league_id in self.league_ids:
+            response = self.request_json(
+                "lookupleague.php",
+                {
+                    "id": league_id,
+                },
+            )
+
+            leagues = response.get(
+                "leagues"
+            ) or []
+
+            for league in leagues:
+                name = str(
+                    league.get(
+                        "strLeague",
+                        "",
+                    )
+                ).strip()
+
+                if normalized_query not in name.lower():
+                    continue
+
+                results.append(
+                    {
+                        "provider": self.name,
+                        "id": str(
+                            league.get(
+                                "idLeague",
+                                league_id,
+                            )
+                        ),
+                        "name": name,
+                        "sport": league.get(
+                            "strSport"
+                        ),
+                        "country": league.get(
+                            "strCountry"
+                        ),
+                    }
+                )
+
+        return results
+
+    def upcoming_team_games(
+        self,
+        team_id: str,
+    ) -> list[dict[str, Any]]:
+        return [
+            self.normalize_event(event)
+            for event in self.fetch_team_events(
+                team_id
+            )
+        ]
+
     def fetch_team_events(
         self,
         team_id: str,
@@ -136,6 +251,42 @@ class TheSportsDBProvider(SportsProvider):
             return None
 
         return events[0]
+
+    def fetch_team(
+        self,
+        team_id: str,
+    ) -> dict[str, Any] | None:
+        response = self.request_json(
+            "lookupteam.php",
+            {
+                "id": team_id,
+            },
+        )
+
+        teams = response.get("teams") or []
+
+        if not teams:
+            return None
+
+        return teams[0]
+
+    def fetch_league(
+        self,
+        league_id: str,
+    ) -> dict[str, Any] | None:
+        response = self.request_json(
+            "lookupleague.php",
+            {
+                "id": league_id,
+            },
+        )
+
+        leagues = response.get("leagues") or []
+
+        if not leagues:
+            return None
+
+        return leagues[0]
 
     def fetch_games(
         self,

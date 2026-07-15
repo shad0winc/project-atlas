@@ -93,7 +93,7 @@ def create_subscription(
     subscription_id: str,
     name: str,
     user: str,
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], bool]:
     subscription = normalize_subscription(
         {
             "type": subscription_type,
@@ -115,13 +115,34 @@ def create_subscription(
 
     subscriptions = load_subscriptions()
 
+    for existing in subscriptions:
+        if (
+            str(existing.get("type", "")).lower()
+            == subscription["type"]
+            and str(existing.get("provider", ""))
+            == subscription["provider"]
+            and str(existing.get("id", ""))
+            == subscription["id"]
+            and str(existing.get("user", ""))
+            == subscription["user"]
+        ):
+            return (
+                normalize_subscription(
+                    existing
+                ),
+                False,
+            )
+
     subscriptions.append(subscription)
 
     write_subscriptions(
         subscriptions
     )
 
-    return subscription
+    return (
+        subscription,
+        True,
+    )
 
 
 def remove_subscription(
