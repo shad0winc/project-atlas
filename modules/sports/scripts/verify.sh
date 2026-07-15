@@ -134,6 +134,74 @@ raise SystemExit(
 PY
   '
 
+check "Sports subscription resolver valid" \
+  sh -c '
+    cd /opt/project-atlas
+
+    PYTHONPATH=modules/sports/src python3 - <<'"'"'PY'"'"'
+from resolver import resolve_subscribed_games
+
+
+game = {
+    "id": "resolver-verification-game",
+    "provider": "thesportsdb",
+    "provider_event_id": "resolver-event",
+    "provider_league_id": "resolver-league",
+    "home_team_id": "resolver-team",
+    "away_team_id": "resolver-opponent",
+    "name": "Atlas Resolver Verification",
+}
+
+subscriptions = [
+    {
+        "subscription_id": "sub-team",
+        "type": "team",
+        "provider": "thesportsdb",
+        "id": "resolver-team",
+        "user": "michael",
+    },
+    {
+        "subscription_id": "sub-league",
+        "type": "league",
+        "provider": "thesportsdb",
+        "id": "resolver-league",
+        "user": "test-user",
+    },
+    {
+        "subscription_id": "sub-event",
+        "type": "event",
+        "provider": "thesportsdb",
+        "id": "resolver-event",
+        "user": "michael",
+    },
+]
+
+resolved = resolve_subscribed_games(
+    [game],
+    subscriptions,
+)
+
+if len(resolved) != 1:
+    raise SystemExit(1)
+
+resolved_game = resolved[0]
+
+checks = [
+    resolved_game.get("subscription_count") == 3,
+    resolved_game.get("subscription_types")
+    == ["event", "league", "team"],
+    resolved_game.get("subscribed_users")
+    == ["michael", "test-user"],
+    resolved_game.get("subscription_ids")
+    == ["sub-event", "sub-league", "sub-team"],
+]
+
+raise SystemExit(
+    0 if all(checks) else 1
+)
+PY
+  '
+
 check "Sports health endpoint reachable" \
   curl -fsS http://127.0.0.1:8097/health
 

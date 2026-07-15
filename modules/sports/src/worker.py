@@ -19,6 +19,8 @@ from subscriptions import (
     provider_discovery_targets,
 )
 
+from resolver import resolve_subscribed_games
+
 CONTROLLER_INTERVAL_SECONDS = int(
     os.getenv(
         "SPORTS_CONTROLLER_INTERVAL_SECONDS",
@@ -340,7 +342,7 @@ def run_cycle() -> int:
             f"{len(discovery_targets['leagues'])} league subscription(s)"
         )
 
-    subscribed_games = filter_subscribed_games(
+    subscribed_games = resolve_subscribed_games(
         provider_games,
         subscriptions,
     )
