@@ -54,6 +54,8 @@ services:
       SPORTS_RECORDINGS_FILE: "${SPORTS_RECORDINGS_FILE:-/mnt/storage/configs/sportyfin/recordings/recordings.json}"
       SPORTS_RECORDING_PREROLL_MINUTES: "${SPORTS_RECORDING_PREROLL_MINUTES:-5}"
       SPORTS_RECORDING_POSTROLL_MINUTES: "${SPORTS_RECORDING_POSTROLL_MINUTES:-15}"
+      SPORTS_RECORDING_LOG_DIR: "${SPORTS_RECORDING_LOG_DIR:-/mnt/storage/configs/sportyfin/logs/recordings}"
+      SPORTS_FAKE_RECORDER_SECONDS: "${SPORTS_FAKE_RECORDER_SECONDS:-300}"
 
     volumes:
       - /opt/project-atlas:/opt/project-atlas:ro

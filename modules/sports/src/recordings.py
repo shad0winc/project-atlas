@@ -9,6 +9,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from recorder import (
+    launch_recording,
+    process_is_running,
+    stop_recording,
+)
 
 RECORDINGS_FILE = Path(
     os.getenv(
@@ -296,6 +301,17 @@ def recording_status(
         )
     )
 
+    if current_status == "recording":
+        pid = recording.get("pid")
+
+        if now >= scheduled_end:
+            return "completed"
+
+        if not process_is_running(pid):
+            return "failed"
+
+        return "recording"
+
     if now >= scheduled_end:
         return "completed"
 
@@ -303,7 +319,6 @@ def recording_status(
         return "recording"
 
     return "pending"
-
 
 def update_recording_statuses(
     now: datetime | None = None,
@@ -328,28 +343,106 @@ def update_recording_statuses(
             now,
         )
 
-        if current_status == previous_status:
-            continue
+        if (
+            previous_status == "pending"
+            and current_status == "recording"
+        ):
+            try:
+                launch_result = launch_recording(
+                    recording
+                )
 
-        recording["status"] = current_status
-        recording["updated_at"] = format_timestamp(
-            now
-        )
+                recording["pid"] = int(
+                    launch_result["pid"]
+                )
+                recording["log_file"] = str(
+                    launch_result["log_file"]
+                )
+                recording["started_at"] = (
+                    recording.get(
+                        "started_at"
+                    )
+                    or format_timestamp(now)
+                )
+                recording["launch_error"] = None
 
-        if current_status == "recording":
-            recording["started_at"] = (
+            except Exception as exc:
+                current_status = "failed"
+
+                recording["failed_at"] = (
+                    format_timestamp(now)
+                )
+                recording["failure_reason"] = (
+                    "recorder_launch_failed"
+                )
+                recording["launch_error"] = str(
+                    exc
+                )
+
+        if (
+            previous_status == "recording"
+            and current_status == "completed"
+        ):
+            pid = recording.get("pid")
+
+            stopped = stop_recording(
+                pid
+            )
+
+            if not stopped:
+                current_status = "failed"
+
+                recording["failed_at"] = (
+                    format_timestamp(now)
+                )
+                recording["failure_reason"] = (
+                    "recorder_stop_failed"
+                )
+            else:
+                recording["completed_at"] = (
+                    recording.get(
+                        "completed_at"
+                    )
+                    or format_timestamp(now)
+                )
+                recording["stopped_at"] = (
+                    format_timestamp(now)
+                )
+
+        if (
+            previous_status == "recording"
+            and current_status == "failed"
+        ):
+            recording["failed_at"] = (
                 recording.get(
-                    "started_at"
+                    "failed_at"
                 )
                 or format_timestamp(now)
             )
+            recording["failure_reason"] = (
+                recording.get(
+                    "failure_reason"
+                )
+                or "recorder_exited_early"
+            )
 
-        if current_status == "completed":
+        if (
+            previous_status == "pending"
+            and current_status == "completed"
+        ):
             recording["completed_at"] = (
                 recording.get(
                     "completed_at"
                 )
                 or format_timestamp(now)
+            )
+
+        if current_status != previous_status:
+            recording["status"] = (
+                current_status
+            )
+            recording["updated_at"] = (
+                format_timestamp(now)
             )
 
         recordings[recording_id] = recording
