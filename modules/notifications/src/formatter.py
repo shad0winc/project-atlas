@@ -286,25 +286,124 @@ def notification_fields(
         ]
 
     if event_name == "sports.game-started":
+        subscribed_users = payload.get(
+            "subscribed_users",
+            [],
+        )
+
+        subscription_types = payload.get(
+            "subscription_types",
+            [],
+        )
+
+        followers = (
+            ", ".join(subscribed_users)
+            if subscribed_users
+            else "None"
+        )
+
+        matched_by = (
+            ", ".join(subscription_types)
+            if subscription_types
+            else "Unknown"
+        )
+
         return [
             {
                 "name": "Game",
-                "value": str(payload.get("game", "Unknown")),
+                "value": str(
+                    payload.get(
+                        "game",
+                        "Unknown",
+                    )
+                ),
+                "inline": False,
+            },
+            {
+                "name": "Followers",
+                "value": followers,
+                "inline": True,
+            },
+            {
+                "name": "Subscription Matches",
+                "value": str(
+                    payload.get(
+                        "subscription_count",
+                        0,
+                    )
+                ),
+                "inline": True,
+            },
+            {
+                "name": "Matched By",
+                "value": matched_by,
                 "inline": False,
             },
         ]
 
     if event_name == "sports.game-finished":
+        subscribed_users = payload.get(
+            "subscribed_users",
+            [],
+        )
+
+        subscription_types = payload.get(
+            "subscription_types",
+            [],
+        )
+
+        followers = (
+            ", ".join(subscribed_users)
+            if subscribed_users
+            else "None"
+        )
+
+        matched_by = (
+            ", ".join(subscription_types)
+            if subscription_types
+            else "Unknown"
+        )
+
         return [
             {
                 "name": "Game",
-                "value": str(payload.get("game", "Unknown")),
+                "value": str(
+                    payload.get(
+                        "game",
+                        "Unknown",
+                    )
+                ),
                 "inline": False,
             },
             {
                 "name": "Status",
-                "value": str(payload.get("status", "Complete")),
+                "value": str(
+                    payload.get(
+                        "status",
+                        "Complete",
+                    )
+                ),
                 "inline": True,
+            },
+            {
+                "name": "Followers",
+                "value": followers,
+                "inline": True,
+            },
+            {
+                "name": "Subscription Matches",
+                "value": str(
+                    payload.get(
+                        "subscription_count",
+                        0,
+                    )
+                ),
+                "inline": True,
+            },
+            {
+                "name": "Matched By",
+                "value": matched_by,
+                "inline": False,
             },
         ]
 

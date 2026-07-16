@@ -181,6 +181,22 @@ def process_games(
                         game_id,
                     ),
                     "status": "started",
+                    "subscription_count": game.get(
+                        "subscription_count",
+                        0,
+                    ),
+                    "subscription_types": game.get(
+                        "subscription_types",
+                        [],
+                    ),
+                    "subscribed_users": game.get(
+                        "subscribed_users",
+                        [],
+                    ),
+                    "subscription_ids": game.get(
+                        "subscription_ids",
+                        [],
+                    ),
                 },
             )
 
@@ -197,6 +213,22 @@ def process_games(
                         game_id,
                     ),
                     "status": "finished",
+                    "subscription_count": game.get(
+                        "subscription_count",
+                        0,
+                    ),
+                    "subscription_types": game.get(
+                        "subscription_types",
+                        [],
+                    ),
+                    "subscribed_users": game.get(
+                        "subscribed_users",
+                        [],
+                    ),
+                    "subscription_ids": game.get(
+                        "subscription_ids",
+                        [],
+                    ),
                 },
             )
 

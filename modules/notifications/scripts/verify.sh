@@ -42,6 +42,65 @@ check "Module uninstall script present" test -x "$MODULE_DIR/scripts/uninstall.s
 check "Module update script present" test -x "$MODULE_DIR/scripts/update.sh"
 check "Module compose valid" docker compose -f "$MODULE_DIR/docker-compose.yml" config
 
+check "Sports audience notification formatting valid" \
+  sh -c '
+    cd /opt/project-atlas
+
+    PYTHONPATH=modules/notifications/src python3 - <<'"'"'PY'"'"'
+from formatter import notification_fields
+from processor import build_notification
+
+
+event = {
+    "id": "evt-audience-verification",
+    "event": "sports.game-started",
+    "source": "sports",
+    "payload": {
+        "game_id": "audience-verification-game",
+        "game": "Atlas Audience Verification",
+        "status": "started",
+        "subscription_count": 3,
+        "subscription_types": [
+            "event",
+            "league",
+            "team",
+        ],
+        "subscribed_users": [
+            "michael",
+            "test-user",
+        ],
+        "subscription_ids": [
+            "sub-event",
+            "sub-league",
+            "sub-team",
+        ],
+    },
+}
+
+notification = build_notification(event)
+
+fields = {
+    field["name"]: field["value"]
+    for field in notification_fields(notification)
+}
+
+checks = [
+    fields.get("Game")
+    == "Atlas Audience Verification",
+    fields.get("Followers")
+    == "michael, test-user",
+    fields.get("Subscription Matches")
+    == "3",
+    fields.get("Matched By")
+    == "event, league, team",
+]
+
+raise SystemExit(
+    0 if all(checks) else 1
+)
+PY
+  '
+
 echo
 
 if [[ "$pass" == true ]]; then
