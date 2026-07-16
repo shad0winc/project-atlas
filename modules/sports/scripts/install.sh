@@ -12,6 +12,7 @@ mkdir -p \
   "$ATLAS_CONFIG_ROOT/sportyfin/output" \
   "$ATLAS_CONFIG_ROOT/sportyfin/logs" \
   "$ATLAS_CONFIG_ROOT/sportyfin/state" \
+  "$ATLAS_CONFIG_ROOT/sportyfin/recordings" \
   "$ATLAS_MEDIA_ROOT/Sports"
 
 chmod 755 \

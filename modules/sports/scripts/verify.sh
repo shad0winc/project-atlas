@@ -202,6 +202,123 @@ raise SystemExit(
 PY
   '
 
+check "Sports recording scheduler valid" \
+  sh -c '
+    cd /opt/project-atlas
+
+    test_file="/tmp/atlas-sports-recording-verify.json"
+
+    rm -f "$test_file"
+
+    SPORTS_RECORDINGS_FILE="$test_file" \
+    PYTHONPATH=modules/sports/src \
+    python3 - <<'"'"'PY'"'"'
+from datetime import datetime, timezone
+
+from recordings import (
+    plan_recordings,
+    update_recording_statuses,
+)
+
+
+game = {
+    "id": "recording-verification",
+    "provider": "thesportsdb",
+    "provider_event_id": "recording-verification-event",
+    "name": "Atlas Recording Verification",
+    "league": "NFL",
+    "home_team": "Kansas City Chiefs",
+    "away_team": "Los Angeles Rams",
+    "start_at": "2026-08-15T20:00:00+00:00",
+    "duration_minutes": 240,
+    "stream_url": "http://example.invalid/recording-verification.m3u8",
+    "subscription_count": 3,
+    "subscription_ids": [
+        "sub-event",
+        "sub-league",
+        "sub-team",
+    ],
+    "subscribed_users": [
+        "michael",
+    ],
+}
+
+plan_recordings([game])
+
+tests = [
+    (
+        datetime(
+            2026,
+            8,
+            15,
+            19,
+            50,
+            tzinfo=timezone.utc,
+        ),
+        "pending",
+    ),
+    (
+        datetime(
+            2026,
+            8,
+            15,
+            19,
+            55,
+            tzinfo=timezone.utc,
+        ),
+        "recording",
+    ),
+    (
+        datetime(
+            2026,
+            8,
+            16,
+            0,
+            15,
+            tzinfo=timezone.utc,
+        ),
+        "completed",
+    ),
+]
+
+for now, expected_status in tests:
+    recordings = update_recording_statuses(
+        now
+    )
+
+    recording = recordings[
+        "recording-recording-verification"
+    ]
+
+    if recording.get("status") != expected_status:
+        raise SystemExit(1)
+
+recording = recordings[
+    "recording-recording-verification"
+]
+
+checks = [
+    recording.get("started_at")
+    == "2026-08-15T19:55:00+00:00",
+    recording.get("completed_at")
+    == "2026-08-16T00:15:00+00:00",
+    recording.get("subscription_count") == 3,
+    recording.get("subscribed_users")
+    == ["michael"],
+]
+
+raise SystemExit(
+    0 if all(checks) else 1
+)
+PY
+
+    result=$?
+
+    rm -f "$test_file"
+
+    exit "$result"
+  '
+
 check "Sports health endpoint reachable" \
   curl -fsS http://127.0.0.1:8097/health
 

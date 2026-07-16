@@ -21,6 +21,11 @@ from subscriptions import (
 
 from resolver import resolve_subscribed_games
 
+from recordings import (
+    plan_recordings,
+    update_recording_statuses,
+)
+
 CONTROLLER_INTERVAL_SECONDS = int(
     os.getenv(
         "SPORTS_CONTROLLER_INTERVAL_SECONDS",
@@ -347,6 +352,12 @@ def run_cycle() -> int:
         subscriptions,
     )
 
+    recordings = plan_recordings(
+        subscribed_games
+    )
+
+    recordings = update_recording_statuses()
+
     stale_game_ids = [
         game_id
         for game_id in previous_games
@@ -382,11 +393,32 @@ def run_cycle() -> int:
 
     write_heartbeat()
 
+    pending_recordings = sum(
+        1
+        for recording in recordings.values()
+        if recording.get("status") == "pending"
+    )
+
+    active_recordings = sum(
+        1
+        for recording in recordings.values()
+        if recording.get("status") == "recording"
+    )
+
+    completed_recordings = sum(
+        1
+        for recording in recordings.values()
+        if recording.get("status") == "completed"
+    )
+
     print(
         f"Sports controller cycle complete: "
         f"{len(provider_games)} discovered, "
         f"{len(subscribed_games)} subscribed, "
         f"{len(next_games)} monitored, "
+        f"{pending_recordings} pending recording(s), "
+        f"{active_recordings} active recording(s), "
+        f"{completed_recordings} completed recording(s), "
         f"{degraded_count} degraded provider(s)"
     )
 
