@@ -341,7 +341,8 @@ atlas_command_module_test() {
 
       for sports_test in \
         integration_recording.py \
-        integration_scheduler.py
+        integration_scheduler.py \
+        integration_provider.py
       do
         test_script="$ATLAS_PROJECT_DIR/modules/sports/tests/$sports_test"
 
