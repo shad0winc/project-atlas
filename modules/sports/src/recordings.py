@@ -13,6 +13,7 @@ from recorder import (
     finalize_recording,
     launch_recording,
     process_is_running,
+    recording_exit_code,
     stop_recording,
 )
 
@@ -374,6 +375,11 @@ def update_recording_statuses(
                         "partial_file"
                     ]
                 )
+                recording["exit_file"] = str(
+                    launch_result[
+                        "exit_file"
+                    ]
+                )
                 recording["recorder_command"] = list(
                     launch_result.get(
                         "command",
@@ -421,31 +427,110 @@ def update_recording_statuses(
                     "recorder_stop_failed"
                 )
             else:
-                recording["completed_at"] = (
-                    recording.get(
-                        "completed_at"
-                    )
-                    or format_timestamp(now)
+                exit_code = recording_exit_code(
+                    recording
+                )
+
+                recording["exit_code"] = (
+                    exit_code
                 )
                 recording["stopped_at"] = (
                     format_timestamp(now)
                 )
 
+                if exit_code not in (
+                    None,
+                    0,
+                ):
+                    current_status = "failed"
+
+                    recording["failed_at"] = (
+                        format_timestamp(now)
+                    )
+                    recording["failure_reason"] = (
+                        f"recorder_exit_code_"
+                        f"{exit_code}"
+                    )
+                    recording["finalized"] = False
+                    recording["output_size"] = None
+                else:
+                    finalize_result = (
+                        finalize_recording(
+                            recording
+                        )
+                    )
+
+                    recording["finalized"] = bool(
+                        finalize_result.get(
+                            "finalized",
+                            False,
+                        )
+                    )
+                    recording["output_size"] = (
+                        finalize_result.get(
+                            "output_size"
+                        )
+                    )
+
+                    if not recording["finalized"]:
+                        current_status = "failed"
+
+                        recording["failed_at"] = (
+                            format_timestamp(now)
+                        )
+                        recording["failure_reason"] = (
+                            finalize_result.get(
+                                "failure_reason"
+                            )
+                            or "recording_finalize_failed"
+                        )
+                    else:
+                        current_status = "completed"
+
+                        recording["completed_at"] = (
+                            recording.get(
+                                "completed_at"
+                            )
+                            or format_timestamp(now)
+                        )
+                        recording["finalized_at"] = (
+                            format_timestamp(now)
+                        )
+                        recording["failure_reason"] = None
+
         if (
             previous_status == "recording"
             and current_status == "failed"
         ):
+            exit_code = recording_exit_code(
+                recording
+            )
+
+            recording["exit_code"] = (
+                exit_code
+            )
             recording["failed_at"] = (
                 recording.get(
                     "failed_at"
                 )
                 or format_timestamp(now)
             )
+
+            if exit_code is None:
+                default_failure_reason = (
+                    "recorder_exited_early"
+                )
+            else:
+                default_failure_reason = (
+                    f"recorder_exit_code_"
+                    f"{exit_code}"
+                )
+
             recording["failure_reason"] = (
                 recording.get(
                     "failure_reason"
                 )
-                or "recorder_exited_early"
+                or default_failure_reason
             )
 
         if (
