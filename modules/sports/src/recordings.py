@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from recorder import (
+    finalize_recording,
     launch_recording,
     process_is_running,
     stop_recording,
@@ -366,6 +367,11 @@ def update_recording_statuses(
                 recording["recorder_mode"] = str(
                     launch_result[
                         "recorder_mode"
+                    ]
+                )
+                recording["partial_file"] = str(
+                    launch_result[
+                        "partial_file"
                     ]
                 )
                 recording["recorder_command"] = list(

@@ -125,6 +125,76 @@ def recording_output_file(
 
     return SPORTS_MEDIA_DIR / filename
 
+def recording_partial_file(
+    recording: dict[str, Any],
+) -> Path:
+    existing_partial = recording.get(
+        "partial_file"
+    )
+
+    if existing_partial:
+        return Path(
+            str(existing_partial)
+        )
+
+    output_file = recording_output_file(
+        recording
+    )
+
+    return output_file.with_name(
+        f"{output_file.name}.part"
+    )
+
+
+def finalize_recording(
+    recording: dict[str, Any],
+) -> dict[str, Any]:
+    output_file = recording_output_file(
+        recording
+    )
+
+    partial_file = recording_partial_file(
+        recording
+    )
+
+    if RECORDER_MODE != "ffmpeg":
+        return {
+            "finalized": True,
+            "output_file": str(output_file),
+            "partial_file": str(partial_file),
+            "output_size": None,
+        }
+
+    if not partial_file.exists():
+        return {
+            "finalized": False,
+            "output_file": str(output_file),
+            "partial_file": str(partial_file),
+            "output_size": 0,
+            "error": "partial_file_missing",
+        }
+
+    partial_size = partial_file.stat().st_size
+
+    if partial_size <= 0:
+        return {
+            "finalized": False,
+            "output_file": str(output_file),
+            "partial_file": str(partial_file),
+            "output_size": partial_size,
+            "error": "partial_file_empty",
+        }
+
+    partial_file.replace(
+        output_file
+    )
+
+    return {
+        "finalized": True,
+        "output_file": str(output_file),
+        "partial_file": str(partial_file),
+        "output_size": output_file.stat().st_size,
+    }
 
 def fake_recorder_command() -> list[str]:
     return [
@@ -148,7 +218,7 @@ def ffmpeg_recorder_command(
             "Recording has no stream_url"
         )
 
-    output_file = recording_output_file(
+    partial_file = recording_partial_file(
         recording
     )
 
@@ -165,7 +235,9 @@ def ffmpeg_recorder_command(
         "0",
         "-c",
         "copy",
-        str(output_file),
+        "-f",
+        "matroska",
+        str(partial_file),
     ]
 
 
@@ -271,6 +343,12 @@ def launch_recording(
                     recording_output_file(recording),
                 )
             ),
+            "partial_file": str(
+                recording.get(
+                    "partial_file",
+                    recording_partial_file(recording),
+                )
+            ),
             "recorder_mode": str(
                 recording.get(
                     "recorder_mode",
@@ -298,6 +376,16 @@ def launch_recording(
         recording
     )
 
+    partial_file = recording_partial_file(
+        recording
+    )
+
+    if (
+        RECORDER_MODE == "ffmpeg"
+        and partial_file.exists()
+    ):
+        partial_file.unlink()
+
     command = recorder_command(
         recording
     )
@@ -321,6 +409,7 @@ def launch_recording(
         "pid": process.pid,
         "log_file": str(log_file),
         "output_file": str(output_file),
+        "partial_file": str(partial_file),
         "recorder_mode": RECORDER_MODE,
         "command": command,
         "started": True,
