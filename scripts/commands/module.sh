@@ -289,11 +289,75 @@ atlas_command_module_info() {
 
 }
 
+atlas_command_module_test() {
+  local module="${1:-}"
+
+  if [[ -z "$module" ]]; then
+    echo "Usage: atlas module test <module>"
+    return 1
+  fi
+
+  if ! atlas_module_exists "$module"; then
+    echo "Unknown module: $module"
+    return 1
+  fi
+
+  local test_script="$ATLAS_PROJECT_DIR/modules/$module/tests/integration_recording.py"
+
+  if [[ ! -f "$test_script" ]]; then
+    echo "Module test not available: $module"
+    echo "Missing test script: $test_script"
+    return 1
+  fi
+
+  atlas_module_load "$module"
+
+  atlas_print_header
+  atlas_section "Module Integration Tests"
+
+  echo "Module: $module"
+  echo
+
+  case "$module" in
+    sports)
+      if ! docker inspect atlas-sports-controller \
+        >/dev/null 2>&1; then
+        echo "FAIL Sports controller container does not exist"
+        return 1
+      fi
+
+      if [[ "$(docker inspect \
+        --format '{{.State.Running}}' \
+        atlas-sports-controller \
+        2>/dev/null)" != "true" ]]; then
+        echo "FAIL Sports controller container is not running"
+        return 1
+      fi
+
+      echo "OK   Sports controller container running"
+      echo
+
+      docker exec \
+        -e SPORTS_RECORDER_MODE=ffmpeg \
+        -e PYTHONPATH=/opt/project-atlas/modules/sports/src \
+        atlas-sports-controller \
+        python3 \
+        "$test_script"
+      ;;
+
+    *)
+      echo "Module test runner is not configured for: $module"
+      return 1
+      ;;
+  esac
+}
+
 atlas_command_module_usage() {
   echo "Usage:"
   echo "  atlas module list"
   echo "  atlas module status <module>"
   echo "  atlas module verify <module>"
+  echo "  atlas module test <module>"
   echo "  atlas module doctor <module>"
   echo "  atlas module install <module>"
   echo "  atlas module uninstall <module>"
@@ -342,6 +406,10 @@ atlas_command_module() {
       if [[ "$failed" -ne 0 ]]; then
         return 1
       fi
+      ;;
+
+    test)
+      atlas_command_module_test "$module_name"
       ;;
 
     doctor)
