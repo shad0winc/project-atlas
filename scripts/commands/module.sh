@@ -337,12 +337,31 @@ atlas_command_module_test() {
       echo "OK   Sports controller container running"
       echo
 
-      docker exec \
-        -e SPORTS_RECORDER_MODE=ffmpeg \
-        -e PYTHONPATH=/opt/project-atlas/modules/sports/src \
-        atlas-sports-controller \
-        python3 \
-        "$test_script"
+      local sports_test
+
+      for sports_test in \
+        integration_recording.py \
+        integration_scheduler.py
+      do
+        test_script="$ATLAS_PROJECT_DIR/modules/sports/tests/$sports_test"
+
+        if [[ ! -f "$test_script" ]]; then
+          echo "FAIL Missing Sports integration test: $test_script"
+          return 1
+        fi
+
+        echo "Running: $sports_test"
+        echo
+
+        docker exec \
+          -e SPORTS_RECORDER_MODE=ffmpeg \
+          -e PYTHONPATH=/opt/project-atlas/modules/sports/src \
+          atlas-sports-controller \
+          python3 \
+          "$test_script" || return 1
+
+        echo
+      done
       ;;
 
     *)
