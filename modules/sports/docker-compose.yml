@@ -56,6 +56,9 @@ services:
       SPORTS_RECORDING_POSTROLL_MINUTES: "${SPORTS_RECORDING_POSTROLL_MINUTES:-15}"
       SPORTS_RECORDING_LOG_DIR: "${SPORTS_RECORDING_LOG_DIR:-/mnt/storage/configs/sportyfin/logs/recordings}"
       SPORTS_FAKE_RECORDER_SECONDS: "${SPORTS_FAKE_RECORDER_SECONDS:-300}"
+      SPORTS_RECORDER_MODE: "${SPORTS_RECORDER_MODE:-fake}"
+      SPORTS_FFMPEG_BINARY: "${SPORTS_FFMPEG_BINARY:-ffmpeg}"
+      SPORTS_FFMPEG_LOG_LEVEL: "${SPORTS_FFMPEG_LOG_LEVEL:-warning}"
 
     volumes:
       - /opt/project-atlas:/opt/project-atlas:ro

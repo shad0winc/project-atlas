@@ -358,6 +358,22 @@ def update_recording_statuses(
                 recording["log_file"] = str(
                     launch_result["log_file"]
                 )
+                recording["output_file"] = str(
+                    launch_result[
+                        "output_file"
+                    ]
+                )
+                recording["recorder_mode"] = str(
+                    launch_result[
+                        "recorder_mode"
+                    ]
+                )
+                recording["recorder_command"] = list(
+                    launch_result.get(
+                        "command",
+                        [],
+                    )
+                )
                 recording["started_at"] = (
                     recording.get(
                         "started_at"

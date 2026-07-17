@@ -3,16 +3,29 @@
 from __future__ import annotations
 
 import os
+import re
 import signal
 import subprocess
 from pathlib import Path
 from typing import Any
 
 
+RECORDER_MODE = os.getenv(
+    "SPORTS_RECORDER_MODE",
+    "fake",
+).strip().lower()
+
 RECORDING_LOG_DIR = Path(
     os.getenv(
         "SPORTS_RECORDING_LOG_DIR",
         "/mnt/storage/configs/sportyfin/logs/recordings",
+    )
+)
+
+SPORTS_MEDIA_DIR = Path(
+    os.getenv(
+        "SPORTS_MEDIA_DIR",
+        "/mnt/storage/media/Sports",
     )
 )
 
@@ -23,14 +36,49 @@ FAKE_RECORDER_SECONDS = int(
     )
 )
 
+FFMPEG_BINARY = os.getenv(
+    "SPORTS_FFMPEG_BINARY",
+    "ffmpeg",
+)
+
+FFMPEG_LOG_LEVEL = os.getenv(
+    "SPORTS_FFMPEG_LOG_LEVEL",
+    "warning",
+)
+
+
+def sanitize_filename(
+    value: str,
+) -> str:
+    sanitized = re.sub(
+        r"[^A-Za-z0-9._ -]+",
+        "",
+        value,
+    )
+
+    sanitized = re.sub(
+        r"\s+",
+        " ",
+        sanitized,
+    ).strip()
+
+    sanitized = sanitized.replace(
+        " ",
+        "-",
+    )
+
+    return sanitized or "sports-recording"
+
 
 def recording_log_file(
     recording: dict[str, Any],
 ) -> Path:
-    recording_id = str(
-        recording.get(
-            "id",
-            "unknown-recording",
+    recording_id = sanitize_filename(
+        str(
+            recording.get(
+                "id",
+                "unknown-recording",
+            )
         )
     )
 
@@ -38,6 +86,105 @@ def recording_log_file(
         RECORDING_LOG_DIR
         / f"{recording_id}.log"
     )
+
+
+def recording_output_file(
+    recording: dict[str, Any],
+) -> Path:
+    existing_output = recording.get(
+        "output_file"
+    )
+
+    if existing_output:
+        return Path(
+            str(existing_output)
+        )
+
+    game_name = str(
+        recording.get(
+            "game",
+            recording.get(
+                "id",
+                "sports-recording",
+            ),
+        )
+    )
+
+    recording_id = str(
+        recording.get(
+            "id",
+            "unknown-recording",
+        )
+    )
+
+    filename = (
+        f"{sanitize_filename(game_name)}"
+        f"-{sanitize_filename(recording_id)}"
+        ".mkv"
+    )
+
+    return SPORTS_MEDIA_DIR / filename
+
+
+def fake_recorder_command() -> list[str]:
+    return [
+        "sleep",
+        str(FAKE_RECORDER_SECONDS),
+    ]
+
+
+def ffmpeg_recorder_command(
+    recording: dict[str, Any],
+) -> list[str]:
+    stream_url = str(
+        recording.get(
+            "stream_url",
+            "",
+        )
+    ).strip()
+
+    if not stream_url:
+        raise ValueError(
+            "Recording has no stream_url"
+        )
+
+    output_file = recording_output_file(
+        recording
+    )
+
+    return [
+        FFMPEG_BINARY,
+        "-hide_banner",
+        "-nostdin",
+        "-loglevel",
+        FFMPEG_LOG_LEVEL,
+        "-y",
+        "-i",
+        stream_url,
+        "-map",
+        "0",
+        "-c",
+        "copy",
+        str(output_file),
+    ]
+
+
+def recorder_command(
+    recording: dict[str, Any],
+) -> list[str]:
+    if RECORDER_MODE == "fake":
+        return fake_recorder_command()
+
+    if RECORDER_MODE == "ffmpeg":
+        return ffmpeg_recorder_command(
+            recording
+        )
+
+    raise ValueError(
+        f"Unsupported recorder mode: "
+        f"{RECORDER_MODE}"
+    )
+
 
 def process_is_running(
     pid: int | None,
@@ -103,6 +250,7 @@ def process_is_running(
 
     return True
 
+
 def launch_recording(
     recording: dict[str, Any],
 ) -> dict[str, Any]:
@@ -117,6 +265,18 @@ def launch_recording(
                     recording_log_file(recording),
                 )
             ),
+            "output_file": str(
+                recording.get(
+                    "output_file",
+                    recording_output_file(recording),
+                )
+            ),
+            "recorder_mode": str(
+                recording.get(
+                    "recorder_mode",
+                    RECORDER_MODE,
+                )
+            ),
             "started": False,
         }
 
@@ -125,7 +285,20 @@ def launch_recording(
         exist_ok=True,
     )
 
+    SPORTS_MEDIA_DIR.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
     log_file = recording_log_file(
+        recording
+    )
+
+    output_file = recording_output_file(
+        recording
+    )
+
+    command = recorder_command(
         recording
     )
 
@@ -135,10 +308,7 @@ def launch_recording(
 
     try:
         process = subprocess.Popen(
-            [
-                "sleep",
-                str(FAKE_RECORDER_SECONDS),
-            ],
+            command,
             stdin=subprocess.DEVNULL,
             stdout=log_handle,
             stderr=subprocess.STDOUT,
@@ -150,6 +320,9 @@ def launch_recording(
     return {
         "pid": process.pid,
         "log_file": str(log_file),
+        "output_file": str(output_file),
+        "recorder_mode": RECORDER_MODE,
+        "command": command,
         "started": True,
     }
 

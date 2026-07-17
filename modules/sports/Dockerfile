@@ -4,6 +4,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         bash \
         coreutils \
+        ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/project-atlas
