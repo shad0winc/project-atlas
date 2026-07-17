@@ -202,6 +202,17 @@ def fake_recorder_command() -> list[str]:
         str(FAKE_RECORDER_SECONDS),
     ]
 
+def stream_supports_reconnect(
+    stream_url: str,
+) -> bool:
+    normalized_url = stream_url.lower()
+
+    return normalized_url.startswith(
+        (
+            "http://",
+            "https://",
+        )
+    )
 
 def ffmpeg_recorder_command(
     recording: dict[str, Any],
@@ -222,23 +233,48 @@ def ffmpeg_recorder_command(
         recording
     )
 
-    return [
+    command = [
         FFMPEG_BINARY,
         "-hide_banner",
         "-nostdin",
         "-loglevel",
         FFMPEG_LOG_LEVEL,
         "-y",
-        "-i",
-        stream_url,
-        "-map",
-        "0",
-        "-c",
-        "copy",
-        "-f",
-        "matroska",
-        str(partial_file),
     ]
+
+    if stream_supports_reconnect(
+        stream_url
+    ):
+        command.extend(
+            [
+                "-reconnect",
+                "1",
+                "-reconnect_streamed",
+                "1",
+                "-reconnect_on_network_error",
+                "1",
+                "-reconnect_on_http_error",
+                "4xx,5xx",
+                "-reconnect_delay_max",
+                "5",
+            ]
+        )
+
+    command.extend(
+        [
+            "-i",
+            stream_url,
+            "-map",
+            "0",
+            "-c",
+            "copy",
+            "-f",
+            "matroska",
+            str(partial_file),
+        ]
+    )
+
+    return command
 
 
 def recorder_command(
