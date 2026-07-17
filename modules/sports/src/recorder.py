@@ -87,6 +87,46 @@ def recording_log_file(
         / f"{recording_id}.log"
     )
 
+def recording_exit_file(
+    recording: dict[str, Any],
+) -> Path:
+    recording_id = sanitize_filename(
+        str(
+            recording.get(
+                "id",
+                "unknown-recording",
+            )
+        )
+    )
+
+    return (
+        RECORDING_LOG_DIR
+        / f"{recording_id}.exit"
+    )
+
+
+def recording_exit_code(
+    recording: dict[str, Any],
+) -> int | None:
+    exit_file = recording_exit_file(
+        recording
+    )
+
+    try:
+        raw_exit_code = exit_file.read_text(
+            encoding="utf-8"
+        ).strip()
+    except (
+        FileNotFoundError,
+        PermissionError,
+        OSError,
+    ):
+        return None
+
+    try:
+        return int(raw_exit_code)
+    except ValueError:
+        return None
 
 def recording_output_file(
     recording: dict[str, Any],
@@ -385,6 +425,12 @@ def launch_recording(
                     recording_partial_file(recording),
                 )
             ),
+            "exit_file": str(
+                recording.get(
+                    "exit_file",
+                    recording_exit_file(recording),
+                )
+            ),
             "recorder_mode": str(
                 recording.get(
                     "recorder_mode",
@@ -426,17 +472,46 @@ def launch_recording(
         recording
     )
 
+    exit_file = recording_exit_file(
+        recording
+    )
+
+    try:
+        exit_file.unlink()
+    except FileNotFoundError:
+        pass
+
+    wrapped_command = [
+        "/bin/sh",
+        "-c",
+        (
+            '"$@"; '
+            "exit_code=$?; "
+            'printf "%s\\n" "$exit_code" '
+            '> "$ATLAS_EXIT_FILE"; '
+            'exit "$exit_code"'
+        ),
+        "atlas-recorder",
+        *command,
+    ]
+
+    process_environment = os.environ.copy()
+    process_environment[
+        "ATLAS_EXIT_FILE"
+    ] = str(exit_file)
+
     log_handle = log_file.open(
         "ab",
     )
 
     try:
         process = subprocess.Popen(
-            command,
+            wrapped_command,
             stdin=subprocess.DEVNULL,
             stdout=log_handle,
             stderr=subprocess.STDOUT,
             start_new_session=True,
+            env=process_environment,
         )
     finally:
         log_handle.close()
@@ -446,6 +521,7 @@ def launch_recording(
         "log_file": str(log_file),
         "output_file": str(output_file),
         "partial_file": str(partial_file),
+        "exit_file": str(exit_file),
         "recorder_mode": RECORDER_MODE,
         "command": command,
         "started": True,
