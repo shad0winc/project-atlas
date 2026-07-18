@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Validation
+
+- Added `atlas test [all|core|sports]` as the authoritative repository-wide validation command.
+- Unified Python compilation, Atlas Core unit tests, and Sports integration tests behind one CLI entry point.
+
 ### Added
 
 - Shared Atlas Core Python event publisher in `atlas/events.py`

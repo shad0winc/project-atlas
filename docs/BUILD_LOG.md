@@ -284,3 +284,11 @@ python3 -m unittest discover -s tests -p 'test_*.py' -v
 
 Result: eight Core tests passed.
 
+
+
+## Unified Atlas Test Command
+
+- Added `atlas test` with `all`, `core`, and `sports` scopes.
+- Core validation runs compilation and discoverable unit tests.
+- Sports validation runs the complete module integration suite.
+- Verified eight Core tests and five Sports integration suites pass.

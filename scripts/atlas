@@ -37,6 +37,7 @@ source "$ATLAS_CLI_ROOT/commands/verify.sh"
 source "$ATLAS_CLI_ROOT/commands/doctor.sh"
 source "$ATLAS_CLI_ROOT/commands/update.sh"
 source "$ATLAS_CLI_ROOT/commands/backup.sh"
+source "$ATLAS_CLI_ROOT/commands/test.sh"
 
 atlas_initialize
 
@@ -113,6 +114,10 @@ case "$command" in
 
   event)
     atlas_command_event "${@:2}"
+    ;;
+
+  test)
+    atlas_command_test "${2:-all}"
     ;;
 
   *)

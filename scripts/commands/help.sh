@@ -15,6 +15,7 @@ Core Commands
   atlas services
   atlas urls
   atlas git
+  atlas test [all|core|sports]
 
 Modules
 -------
