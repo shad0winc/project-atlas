@@ -23,6 +23,10 @@ def run_test(test: Path) -> bool:
 
     env = os.environ.copy()
 
+    # Integration recording and scheduler tests require the
+    # deterministic FFmpeg recorder rather than fake sleep mode.
+    env["SPORTS_RECORDER_MODE"] = "ffmpeg"
+
     existing = env.get("PYTHONPATH", "")
 
     paths = [str(SPORTS_SRC_DIR)]
