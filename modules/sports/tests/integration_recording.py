@@ -231,6 +231,45 @@ def test_successful_recording(
             launch_result
         )
 
+        print()
+        print(
+            f"Recorder PID: "
+            f"{recording.get('pid')}"
+        )
+        print(
+            f"Recorder mode: "
+            f"{recording.get('recorder_mode')}"
+        )
+        print(
+            f"Recorder command: "
+            f"{recording.get('command')}"
+        )
+        print(
+            f"Recorder log: "
+            f"{recording.get('log_file')}"
+        )
+        print(
+            f"Recorder output: "
+            f"{recording.get('output_file')}"
+        )
+        print(
+            f"Recorder partial: "
+            f"{recording.get('partial_file')}"
+        )
+        print(
+            f"Recorder exit file: "
+            f"{recording.get('exit_file')}"
+        )
+
+        assert_test(
+            bool(
+                launch_result.get(
+                    "started"
+                )
+            ),
+            "Recorder did not report a new launch.",
+        )
+
         assert_test(
             bool(
                 launch_result.get(
