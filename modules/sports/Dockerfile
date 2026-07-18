@@ -9,4 +9,6 @@ RUN apt-get update \
 
 WORKDIR /opt/project-atlas
 
+ENV PYTHONPATH="/opt/project-atlas:/opt/project-atlas/modules/sports/src"
+
 CMD ["python3", "/opt/project-atlas/modules/sports/src/worker.py"]
