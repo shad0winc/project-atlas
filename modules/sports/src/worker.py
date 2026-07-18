@@ -259,7 +259,8 @@ def mark_provider_degraded(
         )
 
 
-def run_cycle() -> int:
+def run_provider_pipeline() -> dict[str, Any] | None:
+    """Fetch provider data and resolve subscribed games."""
     providers = enabled_providers()
 
     if not providers:
@@ -270,7 +271,7 @@ def run_cycle() -> int:
 
         write_heartbeat()
 
-        return 1
+        return None
 
     previous_games = load_state()
     provider_games: list[dict[str, Any]] = []
@@ -354,12 +355,37 @@ def run_cycle() -> int:
         subscriptions,
     )
 
-    recordings = plan_recordings(
+    return {
+        "previous_games": previous_games,
+        "subscribed_previous_games": (
+            subscribed_previous_games
+        ),
+        "provider_games": provider_games,
+        "provider_health": provider_health,
+        "subscribed_games": subscribed_games,
+        "degraded_count": degraded_count,
+    }
+
+
+def run_recording_pipeline(
+    subscribed_games: list[dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Plan recordings and reconcile recorder state."""
+    plan_recordings(
         subscribed_games
     )
 
-    recordings = update_recording_statuses()
+    return update_recording_statuses()
 
+
+def prune_unmanaged_games(
+    previous_games: dict[str, dict[str, Any]],
+    subscribed_previous_games: dict[
+        str,
+        dict[str, Any],
+    ],
+) -> int:
+    """Remove games no longer controlled by a subscription."""
     stale_game_ids = [
         game_id
         for game_id in previous_games
@@ -385,6 +411,61 @@ def run_cycle() -> int:
             "or unmanaged game(s)"
         )
 
+    return len(stale_game_ids)
+
+
+def recording_counts(
+    recordings: dict[str, dict[str, Any]],
+) -> dict[str, int]:
+    """Summarize recording states for operational output."""
+    return {
+        "pending": sum(
+            1
+            for recording in recordings.values()
+            if recording.get("status") == "pending"
+        ),
+        "active": sum(
+            1
+            for recording in recordings.values()
+            if recording.get("status") == "recording"
+        ),
+        "completed": sum(
+            1
+            for recording in recordings.values()
+            if recording.get("status") == "completed"
+        ),
+    }
+
+
+def run_operations_pipeline(
+    provider_result: dict[str, Any],
+    recordings: dict[str, dict[str, Any]],
+) -> int:
+    """Finalize state, lifecycle, health, and cycle reporting."""
+    previous_games = provider_result[
+        "previous_games"
+    ]
+    subscribed_previous_games = provider_result[
+        "subscribed_previous_games"
+    ]
+    provider_games = provider_result[
+        "provider_games"
+    ]
+    provider_health = provider_result[
+        "provider_health"
+    ]
+    subscribed_games = provider_result[
+        "subscribed_games"
+    ]
+    degraded_count = provider_result[
+        "degraded_count"
+    ]
+
+    prune_unmanaged_games(
+        previous_games,
+        subscribed_previous_games,
+    )
+
     next_games = process_games(
         subscribed_games
     )
@@ -396,38 +477,38 @@ def run_cycle() -> int:
     write_heartbeat()
 
     health_report = write_health_report()
-
-    pending_recordings = sum(
-        1
-        for recording in recordings.values()
-        if recording.get("status") == "pending"
-    )
-
-    active_recordings = sum(
-        1
-        for recording in recordings.values()
-        if recording.get("status") == "recording"
-    )
-
-    completed_recordings = sum(
-        1
-        for recording in recordings.values()
-        if recording.get("status") == "completed"
-    )
+    counts = recording_counts(recordings)
 
     print(
         f"Sports controller cycle complete: "
         f"{len(provider_games)} discovered, "
         f"{len(subscribed_games)} subscribed, "
         f"{len(next_games)} monitored, "
-        f"{pending_recordings} pending recording(s), "
-        f"{active_recordings} active recording(s), "
-        f"{completed_recordings} completed recording(s), "
+        f"{counts['pending']} pending recording(s), "
+        f"{counts['active']} active recording(s), "
+        f"{counts['completed']} completed recording(s), "
         f"{degraded_count} degraded provider(s), "
         f"health={health_report['status']}"
     )
 
     return 0
+
+
+def run_cycle() -> int:
+    """Run one complete Sports worker cycle."""
+    provider_result = run_provider_pipeline()
+
+    if provider_result is None:
+        return 1
+
+    recordings = run_recording_pipeline(
+        provider_result["subscribed_games"]
+    )
+
+    return run_operations_pipeline(
+        provider_result,
+        recordings,
+    )
 
 
 def main() -> int:

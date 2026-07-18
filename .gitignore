@@ -11,5 +11,10 @@ backups/
 # Runtime data
 data/
 
+# Python
 __pycache__/
+*.py[cod]
 *.pyc
+*.pyo
+*.pyd
+.pytest_cache/
