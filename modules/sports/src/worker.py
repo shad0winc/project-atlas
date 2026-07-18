@@ -9,6 +9,8 @@ import time
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
+
+from health import write_health_report
 from typing import Any
 
 from controller import load_state, process_games
@@ -393,6 +395,8 @@ def run_cycle() -> int:
 
     write_heartbeat()
 
+    health_report = write_health_report()
+
     pending_recordings = sum(
         1
         for recording in recordings.values()
@@ -419,7 +423,8 @@ def run_cycle() -> int:
         f"{pending_recordings} pending recording(s), "
         f"{active_recordings} active recording(s), "
         f"{completed_recordings} completed recording(s), "
-        f"{degraded_count} degraded provider(s)"
+        f"{degraded_count} degraded provider(s), "
+        f"health={health_report['status']}"
     )
 
     return 0
@@ -439,6 +444,15 @@ def main() -> int:
             )
 
             write_heartbeat()
+
+            try:
+                write_health_report()
+            except Exception as health_exc:
+                print(
+                    "Unable to write Sports "
+                    f"health report: {health_exc}",
+                    file=sys.stderr,
+                )
 
             result = 1
 

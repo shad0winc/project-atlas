@@ -322,6 +322,26 @@ PY
 check "Sports health endpoint reachable" \
   curl -fsS http://127.0.0.1:8097/health
 
+check "Sports structured health endpoint valid" \
+  sh -c '
+    curl -fsS http://127.0.0.1:8097/health.json \
+      | jq -e "
+          .status == \"healthy\"
+          and .controller.status == \"healthy\"
+          and .providers.status == \"healthy\"
+          and .recorder.status == \"healthy\"
+          and .recordings.status == \"healthy\"
+          and .storage.status == \"healthy\"
+        "
+  '
+
+check "Jellyfin can reach Sports health report" \
+  sh -c '
+    docker exec jellyfin \
+      curl -fsS http://atlas-sports-feed:8080/health.json \
+      | jq -e ".status == \"healthy\""
+  '
+
 check "Sports M3U feed reachable" \
   curl -fsS http://127.0.0.1:8097/sports.m3u
 
