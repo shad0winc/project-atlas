@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from atlas.events import publish_event
 from atlas.scheduler import TaskScheduler
 
 import maintenance
@@ -220,24 +220,6 @@ def write_provider_health(
         PROVIDER_HEALTH_FILE
     )
 
-def publish_event(
-    event_name: str,
-    payload: dict[str, Any],
-) -> None:
-    subprocess.run(
-        [
-            "/bin/atlas",
-            "module",
-            "publish",
-            "sports",
-            event_name,
-            json.dumps(
-                payload,
-                separators=(",", ":"),
-            ),
-        ],
-        check=True,
-    )
 
 def mark_provider_healthy(
     health: dict[str, dict[str, Any]],
@@ -269,6 +251,7 @@ def mark_provider_healthy(
 
     if previous_status == "degraded":
         publish_event(
+            "sports",
             "sports.provider-recovered",
             {
                 "provider": provider_name,
@@ -319,6 +302,7 @@ def mark_provider_degraded(
 
     if previous_status != "degraded":
         publish_event(
+            "sports",
             "sports.provider-degraded",
             {
                 "provider": provider_name,

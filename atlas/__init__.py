@@ -1,5 +1,6 @@
 """Project Atlas shared Python runtime."""
 
+from atlas.events import publish_event
 from atlas.scheduler import TaskScheduler
 from atlas.state import (
     load_json,
@@ -20,6 +21,7 @@ __all__ = [
     "load_json",
     "load_json_object",
     "parse_timestamp",
+    "publish_event",
     "save_json",
     "utc_now",
 ]

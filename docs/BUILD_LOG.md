@@ -262,3 +262,25 @@ Atlas now provides actionable operational guidance instead of reporting alone.
 ## Next Milestone
 
 **M-014 — Documentation & Release Preparation**
+---
+
+## Atlas Core Event Publisher Consolidation
+
+### Completed
+
+- Added `atlas/events.py` as the shared Python interface for module event publishing.
+- Preserved the Atlas CLI as the authority for event declaration validation, durable event storage, and subscriber delivery.
+- Removed duplicate Sports event publisher implementations from the worker and controller.
+- Converted Core scheduler checks into discoverable `unittest` tests.
+- Added Core event publisher tests covering command construction, payload serialization, input validation, and CLI failure propagation.
+- Updated `.gitignore` to exclude nested module `.env` files.
+
+### Validation
+
+```bash
+python3 -m compileall -q atlas modules/sports/src tests
+python3 -m unittest discover -s tests -p 'test_*.py' -v
+```
+
+Result: eight Core tests passed.
+

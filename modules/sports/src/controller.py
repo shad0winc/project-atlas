@@ -80,27 +80,6 @@ def save_state(
     temporary_file.replace(STATE_FILE)
 
 
-def publish_event(
-    event_name: str,
-    payload: dict[str, Any],
-) -> None:
-    command = [
-        "/bin/atlas",
-        "module",
-        "publish",
-        "sports",
-        event_name,
-        json.dumps(
-            payload,
-            separators=(",", ":"),
-        ),
-    ]
-
-    subprocess.run(
-        command,
-        check=True,
-    )
-
 
 def normalize_game(
     game: dict[str, Any],

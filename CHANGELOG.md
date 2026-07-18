@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Shared Atlas Core Python event publisher in `atlas/events.py`
+- Discoverable unit tests for Core event publishing
+
+### Improved
+
+- Sports worker and controller now use the shared Core event publisher
+- Core scheduler validation now runs through standard `unittest` discovery
+- Nested module `.env` files are explicitly ignored
+
 ## [0.4.0]
 
 ### Added
