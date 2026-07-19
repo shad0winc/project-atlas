@@ -40,6 +40,7 @@ source "$ATLAS_CLI_ROOT/commands/backup.sh"
 source "$ATLAS_CLI_ROOT/commands/test.sh"
 source "$ATLAS_CLI_ROOT/commands/health.sh"
 source "$ATLAS_CLI_ROOT/commands/scheduler.sh"
+source "$ATLAS_CLI_ROOT/commands/user.sh"
 
 atlas_initialize
 
@@ -80,6 +81,14 @@ case "$command" in
 
   modules)
     atlas_command_modules
+    ;;
+
+  users)
+    atlas_command_users "${@:2}"
+    ;;
+
+  user)
+    atlas_command_user "${@:2}"
     ;;
 
   module)

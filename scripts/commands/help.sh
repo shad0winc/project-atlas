@@ -25,6 +25,15 @@ Core Commands
   atlas scheduler dry-run
   atlas scheduler history [--limit N]
   atlas scheduler sync [module]
+  atlas users
+  atlas user list [--json]
+  atlas user show <username-or-id>
+  atlas user create <username> [options]
+  atlas user update <username-or-id> [options]
+  atlas user enable <username-or-id>
+  atlas user disable <username-or-id>
+  atlas user link-jellyfin <username-or-id> <jellyfin-user-id>
+  atlas user verify [username-or-id]
 
 Modules
 -------

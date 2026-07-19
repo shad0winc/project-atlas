@@ -287,3 +287,27 @@ Future modules:
 - Photos
 
 Every module follows the Atlas Module SDK and can be installed, enabled, updated, verified, or removed independently.
+
+
+---
+
+## M-020 — Family Experience
+
+### M-020.1 — User Identity and Profile Framework
+
+- [x] Jellyfin-linked Atlas profile schema
+- [x] Durable user registry and per-user profile storage
+- [x] Optional first name, last name, email, and birthday fields
+- [x] User role and account status
+- [x] User management and verification CLI
+- [x] Core profile tests
+
+### M-020.2 — Invitation and Registration
+
+- [ ] Email invitations
+- [ ] Shareable invitation links
+- [ ] Expiring single-use tokens
+- [ ] Registration form
+- [ ] Jellyfin account provisioning
+- [ ] Invitation revocation and resend
+- [ ] Registration audit events

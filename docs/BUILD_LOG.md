@@ -356,3 +356,12 @@ invoked and is deferred to M-019.2.
 - Added a scheduler callback that delegates through the Atlas Module Command Interface.
 - Removed the private Sports `TaskScheduler` and maintenance timing state from `worker.py`.
 - Added tests confirming the Sports scheduler contract and removal of duplicate scheduling logic.
+
+## M-020.1 — User Identity and Profile Framework
+
+- Added durable Atlas user profiles under the shared runtime configuration root.
+- Added normalized usernames, optional personal profile fields, roles, account status, and Jellyfin user linkage.
+- Added atomic registry and profile writes with schema validation and duplicate username/email protection.
+- Added `atlas users` and `atlas user` commands for creation, inspection, updates, enable/disable, Jellyfin linking, and verification.
+- Added focused Core tests for profile storage, validation, registry consistency, and CLI lifecycle operations.
+- Passwords remain owned by Jellyfin and are not stored by Atlas.
