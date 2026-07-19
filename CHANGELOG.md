@@ -129,3 +129,9 @@
 - Added a normalized JSON health-provider contract for Atlas modules.
 - Added Sports runtime health reporting for containers, heartbeat, providers, and endpoint reachability.
 - Added Core tests for enabled, disabled, and malformed module health providers.
+
+### M-019.1 — Scheduler Core Management
+
+- Expanded persistent scheduler records with task definitions, execution counters, descriptions, callbacks, module ownership, enablement, and timing metadata.
+- Added scheduler task registration, inspection, listing, and removal through the Atlas CLI.
+- Preserved compatibility with existing interval and lifecycle callers while adding stored-interval scheduling.

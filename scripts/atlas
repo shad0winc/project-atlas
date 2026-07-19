@@ -39,6 +39,7 @@ source "$ATLAS_CLI_ROOT/commands/update.sh"
 source "$ATLAS_CLI_ROOT/commands/backup.sh"
 source "$ATLAS_CLI_ROOT/commands/test.sh"
 source "$ATLAS_CLI_ROOT/commands/health.sh"
+source "$ATLAS_CLI_ROOT/commands/scheduler.sh"
 
 atlas_initialize
 
@@ -123,6 +124,10 @@ case "$command" in
 
   health)
     atlas_command_health "${2:-json}"
+    ;;
+
+  scheduler)
+    atlas_command_scheduler "${@:2}"
     ;;
 
   *)

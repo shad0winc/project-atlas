@@ -320,3 +320,11 @@ or `health.sh` for enabled modules. Provider output is normalized into Core `Hea
 objects and appears automatically in both `atlas health` and `atlas doctor`. Sports is the
 first module implementation and reports container state, controller heartbeat freshness,
 provider health, and endpoint availability without introducing Sports-specific logic into Core.
+
+## M-019.1 — Scheduler Core Management
+
+Atlas now exposes its existing persistent interval scheduler as a first-class Core subsystem.
+Tasks carry durable definitions and runtime metadata, including callback, interval, module,
+enablement, run counts, failure counts, last duration, due state, and next-run time. The CLI
+supports registering, listing, inspecting, and removing tasks. Execution remains manually
+invoked and is deferred to M-019.2.

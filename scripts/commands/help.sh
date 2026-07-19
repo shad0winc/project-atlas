@@ -17,6 +17,10 @@ Core Commands
   atlas git
   atlas test [all|core|sports]
   atlas health [json|--compact]
+  atlas scheduler list
+  atlas scheduler inspect <task>
+  atlas scheduler register <task> <interval-seconds> <callback> [options]
+  atlas scheduler remove <task>
 
 Modules
 -------
