@@ -38,6 +38,7 @@ source "$ATLAS_CLI_ROOT/commands/doctor.sh"
 source "$ATLAS_CLI_ROOT/commands/update.sh"
 source "$ATLAS_CLI_ROOT/commands/backup.sh"
 source "$ATLAS_CLI_ROOT/commands/test.sh"
+source "$ATLAS_CLI_ROOT/commands/health.sh"
 
 atlas_initialize
 
@@ -118,6 +119,10 @@ case "$command" in
 
   test)
     atlas_command_test "${2:-all}"
+    ;;
+
+  health)
+    atlas_command_health "${2:-json}"
     ;;
 
   *)

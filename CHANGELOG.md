@@ -9,6 +9,9 @@
 
 ### Added
 
+- Foundational Atlas Health Engine with a normalized Python data model and JSON report output
+- `atlas health` command for machine-readable foundational health reporting
+- Shared shell health-result helpers and Core health-engine unit tests
 - Shared Atlas Core Python event publisher in `atlas/events.py`
 - Discoverable unit tests for Core event publishing
 

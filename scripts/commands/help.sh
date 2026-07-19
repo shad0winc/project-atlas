@@ -16,6 +16,7 @@ Core Commands
   atlas urls
   atlas git
   atlas test [all|core|sports]
+  atlas health [json|--compact]
 
 Modules
 -------

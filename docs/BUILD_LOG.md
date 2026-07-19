@@ -292,3 +292,17 @@ Result: eight Core tests passed.
 - Core validation runs compilation and discoverable unit tests.
 - Sports validation runs the complete module integration suite.
 - Verified eight Core tests and five Sports integration suites pass.
+
+## M-018.1 — Health Engine Foundation
+
+### Completed
+
+- Added `atlas/health.py` with normalized health statuses, checks, reports, scoring, and JSON serialization.
+- Added foundational Core checks for the Python runtime, Atlas project directory, and Atlas configuration.
+- Added `atlas health` with formatted and compact JSON output.
+- Added shared shell helpers for emitting normalized health-check results.
+- Added Core unit tests for health validation, aggregation, scoring, serialization, and foundational collection.
+
+### Scope
+
+Existing `status`, `services`, `verify`, and `doctor` behavior remains unchanged. Migration to the shared engine is deferred to later M-018 sections.
