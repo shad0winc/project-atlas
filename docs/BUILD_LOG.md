@@ -341,3 +341,10 @@ invoked and is deferred to M-019.2.
 - Added enabled-module discovery and scheduler task reconciliation.
 - Added callback containment validation and stale module task cleanup.
 - Added `atlas scheduler sync [module]` and focused module scheduler tests.
+
+## M-019.4 — Module Command Interface
+
+- Added declarative `commands.json` manifests for module-owned commands.
+- Added safe command discovery and execution through `atlas module commands` and `atlas module exec`.
+- Enforced enabled-module checks, callback containment, command allowlisting, and exit-code propagation.
+- Added the Sports module as the reference command-manifest implementation while preserving its existing CLI shortcut.

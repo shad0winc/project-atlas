@@ -46,6 +46,8 @@ Modules
   atlas module validate <module>
   atlas module permissions <module>
   atlas module events <module>
+  atlas module commands <module>
+  atlas module exec <module> <command> [arguments...]
 
 Maintenance
 -----------

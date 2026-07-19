@@ -393,6 +393,8 @@ atlas_command_module_usage() {
   echo "  atlas module events <module>"
   echo "  atlas module publish <module> <event> [payload]"
   echo "  atlas module reconcile <module>"
+  echo "  atlas module commands <module>"
+  echo "  atlas module exec <module> <command> [arguments...]"
 }
 
 atlas_command_module() {
@@ -600,6 +602,25 @@ atlas_command_module() {
     reconcile)
       atlas_print_header
       atlas_module_reconcile_event_subscriber "$module_name"
+      ;;
+
+    commands)
+      python3 -m atlas.module_commands \
+        --project-directory "$ATLAS_PROJECT_DIR" \
+        commands "$module_name"
+      ;;
+
+    exec)
+      local module_command="${3:-}"
+
+      if [[ -z "$module_name" || -z "$module_command" ]]; then
+        echo "Usage: atlas module exec <module> <command> [arguments...]"
+        return 1
+      fi
+
+      python3 -m atlas.module_commands \
+        --project-directory "$ATLAS_PROJECT_DIR" \
+        exec "$module_name" "$module_command" "${@:4}"
       ;;
 
     sports)
