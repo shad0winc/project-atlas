@@ -399,3 +399,11 @@ invoked and is deferred to M-019.2.
 - Added no-store caching, content-type, frame, referrer, and content-security response headers.
 - Added a `/health` endpoint and focused portal tests.
 - Kept framework selection, production serving, reverse-proxy configuration, and concrete Jellyfin provisioning outside the presentation layer.
+
+## M-020.3.1 — Favorites Infrastructure
+
+- Added metadata-only favorites storage under the shared Atlas identity runtime.
+- Added durable user/provider/media relationships without copying media or creating filesystem links.
+- Added atomic record and registry persistence, duplicate prevention, filtering, removal, path containment, schema validation, and storage verification.
+- Added focused tests for lifecycle operations, validation, duplicate handling, filtering, and corruption detection.
+- Deferred CLI, Jellyfin synchronization, retention protection, events, and web controls to later M-020.3 patches.

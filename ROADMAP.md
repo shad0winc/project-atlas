@@ -192,6 +192,10 @@ Planned:
 
 ### Favorites
 
+- [x] Metadata storage foundation
+- [ ] CLI lifecycle commands
+- [ ] Jellyfin and retention-policy integration
+- [ ] Web favorites controls and personalized view
 - Movies
 - TV
 - Anime
