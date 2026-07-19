@@ -12,6 +12,8 @@
 
 ### Added
 
+- Dependency-free WSGI registration portal with invitation validation, secure form handling, friendly success/error pages, and no-store security headers
+
 - Transactional invitation redemption and registration service with external user provisioning, Atlas/Jellyfin identity linkage, compensating rollback, and best-effort audit event delivery
 - Rollback-safe Atlas profile deletion for failed multi-system registration transactions
 

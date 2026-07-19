@@ -390,3 +390,12 @@ invoked and is deferred to M-019.2.
 - Added rollback-safe profile deletion with staged filesystem removal and atomic registry updates.
 - Added best-effort registration audit events that report delivery failures without undoing successful registrations.
 - Added focused tests for success, invalid tokens, invitation email enforcement, provisioning failures, profile failures, completion failures, rollback, password handling, and event isolation.
+
+## M-020.2.4 — Web Registration Portal
+
+- Added a dependency-free WSGI registration application at `/register`.
+- Added invitation-link validation, server-side form validation, password confirmation, and delegation to the transactional registration engine.
+- Added friendly invalid, expired, failed, and successful registration pages.
+- Added no-store caching, content-type, frame, referrer, and content-security response headers.
+- Added a `/health` endpoint and focused portal tests.
+- Kept framework selection, production serving, reverse-proxy configuration, and concrete Jellyfin provisioning outside the presentation layer.

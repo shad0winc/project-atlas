@@ -307,9 +307,9 @@ Every module follows the Atlas Module SDK and can be installed, enabled, updated
 - [x] Identity runtime layout and invitation persistence
 - [x] Secure hashed invitation tokens and lifecycle validation
 - [ ] Email invitations
-- [ ] Shareable invitation links
+- [x] Shareable invitation links
 - [x] Expiring single-use tokens
-- [ ] Registration form
+- [x] Registration form
 - [x] Registration provisioning interface and linked account orchestration
 - [x] Invitation lifecycle CLI
 - [ ] Invitation revocation and resend
