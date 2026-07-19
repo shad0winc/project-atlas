@@ -24,6 +24,7 @@ Core Commands
   atlas scheduler run [task] [--due-only]
   atlas scheduler dry-run
   atlas scheduler history [--limit N]
+  atlas scheduler sync [module]
 
 Modules
 -------

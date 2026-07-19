@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Sequence
 
 from atlas.events import publish_event
+from atlas.module_scheduler import sync_module_jobs
 from atlas.scheduler import SchedulerLockedError, TaskScheduler
 
 
@@ -57,6 +58,9 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("dry-run", help="Show tasks that are currently due")
     history_parser = subparsers.add_parser("history", help="Show recent task executions")
     history_parser.add_argument("--limit", type=int, default=25)
+
+    sync_parser = subparsers.add_parser("sync", help="Synchronize module scheduler manifests")
+    sync_parser.add_argument("module_name", nargs="?")
     return parser
 
 
@@ -111,6 +115,23 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         if args.command == "history":
             _print_json(scheduler.history(args.limit))
+            return 0
+
+        if args.command == "sync":
+            registry_file = Path(
+                os.environ.get(
+                    "ATLAS_MODULES_CONFIG_FILE",
+                    str(project_directory / "config" / "modules" / "modules.conf"),
+                )
+            )
+            _print_json(
+                sync_module_jobs(
+                    scheduler,
+                    project_directory,
+                    registry_file,
+                    args.module_name,
+                )
+            )
             return 0
 
         if args.command == "run":

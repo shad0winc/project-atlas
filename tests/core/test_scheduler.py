@@ -234,3 +234,167 @@ class SchedulerCliTests(unittest.TestCase):
     def test_cli_failed_task_returns_one(self) -> None:
         self.assertEqual(main(["register", "failure", "0", "/bin/false"]), 0)
         self.assertEqual(main(["run", "failure"]), 1)
+
+
+class ModuleSchedulerTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary_directory.cleanup)
+        self.project_directory = Path(self.temporary_directory.name)
+        self.modules_directory = self.project_directory / "modules"
+        self.registry_file = self.project_directory / "config" / "modules" / "modules.conf"
+        self.registry_file.parent.mkdir(parents=True)
+        self.state_file = self.project_directory / "scheduler.json"
+        self.scheduler = TaskScheduler(self.state_file)
+
+    def _write_module(self, name: str, manifest: dict[str, object]) -> None:
+        module_directory = self.modules_directory / name
+        (module_directory / "scripts").mkdir(parents=True, exist_ok=True)
+        callback = module_directory / "scripts" / "job.py"
+        callback.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+        (module_directory / "scheduler.json").write_text(
+            json.dumps(manifest), encoding="utf-8"
+        )
+
+    def _sync(self, module_name: str | None = None) -> dict[str, object]:
+        from atlas.module_scheduler import sync_module_jobs
+
+        return sync_module_jobs(
+            self.scheduler,
+            self.project_directory,
+            self.registry_file,
+            module_name,
+        )
+
+    def test_sync_registers_enabled_module_jobs(self) -> None:
+        self.registry_file.write_text("ATLAS_MODULE_SPORTS_ENABLED=true\n", encoding="utf-8")
+        self._write_module(
+            "sports",
+            {
+                "schema_version": 1,
+                "jobs": [{
+                    "name": "provider-sync",
+                    "callback": "scripts/job.py",
+                    "interval_seconds": 300,
+                    "description": "Refresh providers",
+                    "enabled": True,
+                }],
+            },
+        )
+
+        result = self._sync()
+        task = self.scheduler.task_state("sports.provider-sync")
+
+        self.assertEqual(result["registered"], ["sports.provider-sync"])
+        self.assertEqual(task["module"], "sports")
+        self.assertEqual(task["callback"], "modules/sports/scripts/job.py")
+
+    def test_sync_updates_definition_and_preserves_runtime_state(self) -> None:
+        self.registry_file.write_text("ATLAS_MODULE_SPORTS_ENABLED=true\n", encoding="utf-8")
+        manifest = {
+            "schema_version": 1,
+            "jobs": [{
+                "name": "provider-sync",
+                "callback": "scripts/job.py",
+                "interval_seconds": 300,
+            }],
+        }
+        self._write_module("sports", manifest)
+        self._sync()
+        self.scheduler.succeeded("sports.provider-sync", now=datetime.now(timezone.utc))
+        manifest["jobs"][0]["interval_seconds"] = 600
+        self._write_module("sports", manifest)
+
+        self._sync("sports")
+        task = self.scheduler.task_state("sports.provider-sync")
+
+        self.assertEqual(task["interval_seconds"], 600)
+        self.assertEqual(task["run_count"], 1)
+
+    def test_sync_removes_stale_module_jobs(self) -> None:
+        self.registry_file.write_text("ATLAS_MODULE_SPORTS_ENABLED=true\n", encoding="utf-8")
+        self._write_module(
+            "sports",
+            {"schema_version": 1, "jobs": [{
+                "name": "old", "callback": "scripts/job.py", "interval_seconds": 60
+            }]},
+        )
+        self._sync()
+        self._write_module("sports", {"schema_version": 1, "jobs": []})
+
+        result = self._sync()
+
+        self.assertEqual(result["removed"], ["sports.old"])
+        self.assertEqual(self.scheduler.task_state("sports.old"), {})
+
+    def test_disabled_module_jobs_are_removed(self) -> None:
+        self.registry_file.write_text("ATLAS_MODULE_SPORTS_ENABLED=true\n", encoding="utf-8")
+        self._write_module(
+            "sports",
+            {"schema_version": 1, "jobs": [{
+                "name": "sync", "callback": "scripts/job.py", "interval_seconds": 60
+            }]},
+        )
+        self._sync()
+        self.registry_file.write_text("ATLAS_MODULE_SPORTS_ENABLED=false\n", encoding="utf-8")
+
+        result = self._sync()
+
+        self.assertEqual(result["removed"], ["sports.sync"])
+        self.assertIn("sports", result["skipped"])
+
+    def test_sync_rejects_callback_escape(self) -> None:
+        self.registry_file.write_text("ATLAS_MODULE_SPORTS_ENABLED=true\n", encoding="utf-8")
+        self._write_module(
+            "sports",
+            {"schema_version": 1, "jobs": [{
+                "name": "unsafe", "callback": "../../outside.py", "interval_seconds": 60
+            }]},
+        )
+
+        with self.assertRaisesRegex(ValueError, "escapes module directory"):
+            self._sync()
+
+    def test_sync_rejects_malformed_manifest(self) -> None:
+        self.registry_file.write_text("ATLAS_MODULE_SPORTS_ENABLED=true\n", encoding="utf-8")
+        module_directory = self.modules_directory / "sports"
+        module_directory.mkdir(parents=True)
+        (module_directory / "scheduler.json").write_text("not json", encoding="utf-8")
+
+        with self.assertRaisesRegex(ValueError, "invalid scheduler manifest"):
+            self._sync()
+
+    def test_sync_specific_unknown_module_is_rejected(self) -> None:
+        self.registry_file.write_text("ATLAS_MODULE_SPORTS_ENABLED=true\n", encoding="utf-8")
+
+        with self.assertRaisesRegex(ValueError, "module not found"):
+            self._sync("unknown")
+
+
+class ModuleSchedulerCliTests(unittest.TestCase):
+    def test_cli_sync_registers_module_job(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory)
+            module = project / "modules" / "sports"
+            (module / "scripts").mkdir(parents=True)
+            (module / "scripts" / "job.py").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+            (module / "scheduler.json").write_text(
+                json.dumps({"schema_version": 1, "jobs": [{
+                    "name": "sync",
+                    "callback": "scripts/job.py",
+                    "interval_seconds": 60,
+                }]}),
+                encoding="utf-8",
+            )
+            registry = project / "config" / "modules" / "modules.conf"
+            registry.parent.mkdir(parents=True)
+            registry.write_text("ATLAS_MODULE_SPORTS_ENABLED=true\n", encoding="utf-8")
+            state = project / "tasks.json"
+            with patch.dict("os.environ", {
+                "ATLAS_PROJECT_DIR": str(project),
+                "ATLAS_MODULES_CONFIG_FILE": str(registry),
+                "ATLAS_SCHEDULER_STATE_FILE": str(state),
+            }):
+                self.assertEqual(main(["sync", "sports"]), 0)
+            stored = json.loads(state.read_text(encoding="utf-8"))
+            self.assertIn("sports.sync", stored["tasks"])

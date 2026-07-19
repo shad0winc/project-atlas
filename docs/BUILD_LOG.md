@@ -334,3 +334,10 @@ invoked and is deferred to M-019.2.
 - Added shell-free callback parsing, execution timing, success/failure counters, bounded history, runtime locking, stale-lock recovery, and best-effort module event publication.
 - Added CLI commands for run, dry-run, and execution history.
 - Added scheduler runtime tests for success, failure, due selection, dry runs, history limits, event isolation, and overlap protection.
+
+## M-019.3 — Module Scheduler API
+
+- Added optional `modules/<module>/scheduler.json` manifests.
+- Added enabled-module discovery and scheduler task reconciliation.
+- Added callback containment validation and stale module task cleanup.
+- Added `atlas scheduler sync [module]` and focused module scheduler tests.
