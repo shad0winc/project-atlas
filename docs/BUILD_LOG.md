@@ -381,3 +381,12 @@ invoked and is deferred to M-019.2.
 - Added `atlas invite` lifecycle commands backed by the shared identity invitation store.
 - Added one-time registration URL output without persisting plaintext invitation tokens.
 - Added focused CLI tests for creation, listing, inspection, revocation, verification, and cleanup.
+
+## M-020.2.3 — Registration Engine
+
+- Added a transactional registration service that redeems pending invitations, provisions an external account, creates a linked Atlas profile, and completes the invitation.
+- Added a provider interface so Jellyfin and future Atlas services can be integrated without coupling their APIs to registration business logic.
+- Added compensating rollback for external accounts and Atlas profiles when any pre-completion step fails.
+- Added rollback-safe profile deletion with staged filesystem removal and atomic registry updates.
+- Added best-effort registration audit events that report delivery failures without undoing successful registrations.
+- Added focused tests for success, invalid tokens, invitation email enforcement, provisioning failures, profile failures, completion failures, rollback, password handling, and event isolation.

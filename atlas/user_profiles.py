@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import tempfile
 import uuid
 from dataclasses import dataclass
@@ -176,6 +177,33 @@ class UserProfileStore:
         )
         _atomic_write_json(self.registry_file, registry)
         return updated
+
+    def delete_user(self, identifier: str) -> dict[str, Any]:
+        """Delete a profile and registry entry with rollback-safe staging.
+
+        This operation exists primarily for compensating failed multi-system
+        registration transactions. Authentication secrets remain external to
+        Atlas and are therefore not involved.
+        """
+        self.initialize()
+        registry = self._load_registry()
+        user_id = self._resolve_user_id(registry, identifier)
+        profile = self.get_user(user_id)
+        profile_directory = self._profile_file(user_id).parent
+        staged_directory = self.profiles_directory / f".{user_id}.deleting-{uuid.uuid4().hex}"
+
+        profile_directory.rename(staged_directory)
+        updated_registry = dict(registry)
+        updated_registry["users"] = dict(registry["users"])
+        del updated_registry["users"][user_id]
+        try:
+            _atomic_write_json(self.registry_file, updated_registry)
+        except Exception:
+            staged_directory.rename(profile_directory)
+            raise
+
+        shutil.rmtree(staged_directory)
+        return profile
 
     def verify(self, identifier: str | None = None) -> list[str]:
         self.initialize()

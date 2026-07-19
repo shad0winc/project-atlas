@@ -12,6 +12,9 @@
 
 ### Added
 
+- Transactional invitation redemption and registration service with external user provisioning, Atlas/Jellyfin identity linkage, compensating rollback, and best-effort audit event delivery
+- Rollback-safe Atlas profile deletion for failed multi-system registration transactions
+
 - Invitation lifecycle CLI for issuing, listing, inspecting, revoking, verifying, and cleaning up invitations
 
 - Atlas identity infrastructure with secure hashed invitation tokens, durable lifecycle storage, expiration handling, and consistency verification

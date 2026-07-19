@@ -308,9 +308,9 @@ Every module follows the Atlas Module SDK and can be installed, enabled, updated
 - [x] Secure hashed invitation tokens and lifecycle validation
 - [ ] Email invitations
 - [ ] Shareable invitation links
-- [ ] Expiring single-use tokens
+- [x] Expiring single-use tokens
 - [ ] Registration form
-- [ ] Jellyfin account provisioning
+- [x] Registration provisioning interface and linked account orchestration
 - [x] Invitation lifecycle CLI
 - [ ] Invitation revocation and resend
-- [ ] Registration audit events
+- [x] Registration audit events
