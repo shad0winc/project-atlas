@@ -149,3 +149,9 @@
 - Expanded persistent scheduler records with task definitions, execution counters, descriptions, callbacks, module ownership, enablement, and timing metadata.
 - Added scheduler task registration, inspection, listing, and removal through the Atlas CLI.
 - Preserved compatibility with existing interval and lifecycle callers while adding stored-interval scheduling.
+
+### M-020.3 — Favorites CLI
+
+- Added Atlas CLI commands to add, remove, list, show, and verify favorite relationships.
+- Added username-or-user-ID resolution through the Atlas user profile store.
+- Added JSON output, relationship-based removal, filters, metadata input, and stable exit codes.

@@ -42,6 +42,7 @@ source "$ATLAS_CLI_ROOT/commands/health.sh"
 source "$ATLAS_CLI_ROOT/commands/scheduler.sh"
 source "$ATLAS_CLI_ROOT/commands/user.sh"
 source "$ATLAS_CLI_ROOT/commands/invite.sh"
+source "$ATLAS_CLI_ROOT/commands/favorite.sh"
 
 atlas_initialize
 
@@ -94,6 +95,10 @@ case "$command" in
 
   invite)
     atlas_command_invite "${@:2}"
+    ;;
+
+  favorite)
+    atlas_command_favorite "${@:2}"
     ;;
 
   module)

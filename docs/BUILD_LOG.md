@@ -407,3 +407,10 @@ invoked and is deferred to M-019.2.
 - Added atomic record and registry persistence, duplicate prevention, filtering, removal, path containment, schema validation, and storage verification.
 - Added focused tests for lifecycle operations, validation, duplicate handling, filtering, and corruption detection.
 - Deferred CLI, Jellyfin synchronization, retention protection, events, and web controls to later M-020.3 patches.
+
+## M-020.3 — Favorites CLI
+
+- Added `atlas favorite add`, `remove`, `list`, `show`, and `verify`.
+- Kept all persistence and validation in `FavoriteStore`; the CLI is an adapter only.
+- Added username resolution through `UserProfileStore` and machine-readable JSON output.
+- Added focused CLI lifecycle, filtering, verification, and error tests.

@@ -318,3 +318,5 @@ Every module follows the Atlas Module SDK and can be installed, enabled, updated
 - [x] Invitation lifecycle CLI
 - [ ] Invitation revocation and resend
 - [x] Registration audit events
+
+- [x] M-020.3 Patch 2 — Favorites CLI

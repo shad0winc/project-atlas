@@ -40,6 +40,11 @@ Core Commands
   atlas invite revoke <invite-id> [--revoked-by USER]
   atlas invite verify [--token TOKEN]
   atlas invite cleanup
+  atlas favorite add --user USER --provider PROVIDER --item-id ID --type TYPE [options]
+  atlas favorite remove (--favorite-id ID | --item-id ID --user USER --provider PROVIDER)
+  atlas favorite list [--user USER] [--provider PROVIDER] [--type TYPE] [--json]
+  atlas favorite show <favorite-id>
+  atlas favorite verify
 
 Modules
 -------
