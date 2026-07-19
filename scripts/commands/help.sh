@@ -34,6 +34,12 @@ Core Commands
   atlas user disable <username-or-id>
   atlas user link-jellyfin <username-or-id> <jellyfin-user-id>
   atlas user verify [username-or-id]
+  atlas invite create [--email EMAIL] [--role ROLE] [--days N]
+  atlas invite list [--status STATUS] [--json]
+  atlas invite show <invite-id>
+  atlas invite revoke <invite-id> [--revoked-by USER]
+  atlas invite verify [--token TOKEN]
+  atlas invite cleanup
 
 Modules
 -------

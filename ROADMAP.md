@@ -311,5 +311,6 @@ Every module follows the Atlas Module SDK and can be installed, enabled, updated
 - [ ] Expiring single-use tokens
 - [ ] Registration form
 - [ ] Jellyfin account provisioning
+- [x] Invitation lifecycle CLI
 - [ ] Invitation revocation and resend
 - [ ] Registration audit events

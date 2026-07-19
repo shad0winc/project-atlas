@@ -12,6 +12,8 @@
 
 ### Added
 
+- Invitation lifecycle CLI for issuing, listing, inspecting, revoking, verifying, and cleaning up invitations
+
 - Atlas identity infrastructure with secure hashed invitation tokens, durable lifecycle storage, expiration handling, and consistency verification
 - Atlas user identity and profile framework with Jellyfin linkage, optional personal fields, atomic storage, validation, and user-management CLI commands
 - Foundational Atlas Health Engine with a normalized Python data model and JSON report output

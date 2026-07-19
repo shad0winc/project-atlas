@@ -374,3 +374,10 @@ invoked and is deferred to M-019.2.
 - Added atomic invitation registry and record persistence with path-containment and schema validation.
 - Added expiration cleanup, storage verification, and focused Core unit tests.
 - Deferred CLI commands, registration, Jellyfin provisioning, email delivery, and portal integration to later M-020.2 patches.
+
+
+## M-020.2.2 — Invitation CLI
+
+- Added `atlas invite` lifecycle commands backed by the shared identity invitation store.
+- Added one-time registration URL output without persisting plaintext invitation tokens.
+- Added focused CLI tests for creation, listing, inspection, revocation, verification, and cleanup.
