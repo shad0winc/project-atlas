@@ -1,0 +1,742 @@
+=== Scheduler source ===
+"""Persistent interval scheduling for Project Atlas workers."""
+
+from __future__ import annotations
+
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any
+
+from atlas.state import load_json_object, save_json
+from atlas.time import (
+    age_seconds,
+    format_timestamp,
+    parse_timestamp,
+    utc_now,
+)
+
+
+class TaskScheduler:
+    """Track persistent interval-based worker tasks and metadata."""
+
+    SCHEMA_VERSION = 1
+
+    def __init__(
+        self,
+        state_file: Path,
+    ) -> None:
+        self.state_file = state_file
+
+    def _load(self) -> dict[str, Any]:
+        state = load_json_object(self.state_file)
+
+        tasks = state.get("tasks")
+        if not isinstance(tasks, dict):
+            state["tasks"] = {}
+
+        state.setdefault("schema_version", self.SCHEMA_VERSION)
+        return state
+
+    def _save(
+        self,
+        state: dict[str, Any],
+    ) -> None:
+        state["schema_version"] = self.SCHEMA_VERSION
+        state["updated_at"] = format_timestamp(utc_now())
+        save_json(self.state_file, state)
+
+    @staticmethod
+    def _validate_task_name(task_name: str) -> str:
+        normalized = task_name.strip()
+        if not normalized:
+            raise ValueError("task_name cannot be empty")
+        return normalized
+
+    @staticmethod
+    def _validate_interval(interval_seconds: int) -> int:
+        if interval_seconds < 0:
+            raise ValueError("interval_seconds cannot be negative")
+        return interval_seconds
+
+    def register(
+        self,
+        task_name: str,
+        interval_seconds: int,
+        callback: str,
+        *,
+        description: str = "",
+        enabled: bool = True,
+        module: str | None = None,
+    ) -> dict[str, Any]:
+        """Register or update a persistent task definition."""
+        name = self._validate_task_name(task_name)
+        interval = self._validate_interval(interval_seconds)
+        normalized_callback = callback.strip()
+
+        if not normalized_callback:
+            raise ValueError("callback cannot be empty")
+
+        state = self._load()
+        tasks = state["tasks"]
+        task = tasks.get(name, {})
+        if not isinstance(task, dict):
+            task = {}
+
+        now = format_timestamp(utc_now())
+        task.setdefault("created_at", now)
+        task.update(
+            {
+                "name": name,
+                "enabled": enabled,
+                "interval_seconds": interval,
+                "callback": normalized_callback,
+                "description": description.strip(),
+                "module": module.strip() if module else None,
+                "updated_at": now,
+            }
+        )
+        task.setdefault("status", "never_run")
+        task.setdefault("run_count", 0)
+        task.setdefault("failure_count", 0)
+        task.setdefault("consecutive_failures", 0)
+
+        tasks[name] = task
+        self._save(state)
+        return dict(task)
+
+    def remove(self, task_name: str) -> bool:
+        """Remove a task definition and its persisted runtime state."""
+        name = self._validate_task_name(task_name)
+        state = self._load()
+        tasks = state["tasks"]
+
+        if name not in tasks:
+            return False
+
+        del tasks[name]
+        self._save(state)
+        return True
+
+    def list_tasks(self) -> list[dict[str, Any]]:
+        """Return all task records sorted by task name."""
+        state = self._load()
+        records: list[dict[str, Any]] = []
+
+        for name, raw_task in state["tasks"].items():
+            if not isinstance(raw_task, dict):
+                continue
+
+            task = dict(raw_task)
+            task.setdefault("name", name)
+            task["due"] = self._task_due(task)
+            task["next_run"] = self._next_run(task)
+            records.append(task)
+
+        return sorted(records, key=lambda task: str(task["name"]))
+
+    def task_state(
+        self,
+        task_name: str,
+    ) -> dict[str, Any]:
+        """Return the persisted state for a task."""
+        name = self._validate_task_name(task_name)
+        state = self._load()
+        tasks = state["tasks"]
+
+        if name not in tasks:
+            return {}
+
+        task = tasks[name]
+        if not isinstance(task, dict):
+            return {}
+
+        result = dict(task)
+        result.setdefault("name", name)
+        result["due"] = self._task_due(result)
+        result["next_run"] = self._next_run(result)
+        return result
+
+    def due(
+        self,
+        task_name: str,
+        interval_seconds: int | None = None,
+        *,
+        now: datetime | None = None,
+    ) -> bool:
+        """Return whether a task is due based on last success."""
+        name = self._validate_task_name(task_name)
+        task = self.task_state(name)
+
+        if interval_seconds is None:
+            stored_interval = task.get("interval_seconds")
+            if not isinstance(stored_interval, int):
+                raise ValueError(
+                    "interval_seconds is required for unregistered tasks"
+                )
+            interval = stored_interval
+        else:
+            interval = interval_seconds
+
+        self._validate_interval(interval)
+        return self._task_due(task, interval_seconds=interval, now=now)
+
+    def _task_due(
+        self,
+        task: dict[str, Any],
+        *,
+        interval_seconds: int | None = None,
+        now: datetime | None = None,
+    ) -> bool:
+        if task.get("enabled", True) is False:
+            return False
+
+        interval = interval_seconds
+        if interval is None:
+            stored = task.get("interval_seconds")
+            if not isinstance(stored, int) or stored < 0:
+                return False
+            interval = stored
+
+        current_time = now or utc_now()
+        last_success = parse_timestamp(task.get("last_success"))
+        if last_success is None:
+            return True
+
+        return age_seconds(last_success, now=current_time) >= interval
+
+    def _next_run(self, task: dict[str, Any]) -> str | None:
+        if task.get("enabled", True) is False:
+            return None
+
+        interval = task.get("interval_seconds")
+        if not isinstance(interval, int) or interval < 0:
+            return None
+
+        last_success = parse_timestamp(task.get("last_success"))
+        if last_success is None:
+            return format_timestamp(utc_now())
+
+        return format_timestamp(last_success + timedelta(seconds=interval))
+
+    def started(
+        self,
+        task_name: str,
+        *,
+        now: datetime | None = None,
+    ) -> None:
+        """Record that a task execution started."""
+        self._record(
+            task_name,
+            {
+                "last_started": format_timestamp(now or utc_now()),
+                "status": "running",
+            },
+        )
+
+    def succeeded(
+        self,
+        task_name: str,
+        *,
+        now: datetime | None = None,
+        details: dict[str, Any] | None = None,
+        duration_ms: int | None = None,
+    ) -> None:
+        """Record a successful task execution."""
+        task = self.task_state(task_name)
+        run_count = int(task.get("run_count", 0))
+
+        updates: dict[str, Any] = {
+            "last_success": format_timestamp(now or utc_now()),
+            "status": "healthy",
+            "consecutive_failures": 0,
+            "last_error": None,
+            "run_count": run_count + 1,
+        }
+
+        if details is not None:
+            updates["details"] = details
+        if duration_ms is not None:
+            if duration_ms < 0:
+                raise ValueError("duration_ms cannot be negative")
+            updates["last_duration_ms"] = duration_ms
+
+        self._record(task_name, updates)
+
+    def failed(
+        self,
+        task_name: str,
+        error: str,
+        *,
+        now: datetime | None = None,
+        duration_ms: int | None = None,
+    ) -> None:
+        """Record a failed task execution."""
+        name = self._validate_task_name(task_name)
+        state = self._load()
+        tasks = state["tasks"]
+        task = tasks.get(name, {})
+
+        if not isinstance(task, dict):
+            task = {}
+
+        failures = int(task.get("consecutive_failures", 0))
+        failure_count = int(task.get("failure_count", 0))
+        run_count = int(task.get("run_count", 0))
+
+        updates: dict[str, Any] = {
+            "last_failure": format_timestamp(now or utc_now()),
+            "status": "degraded",
+            "last_error": error,
+            "consecutive_failures": failures + 1,
+            "failure_count": failure_count + 1,
+            "run_count": run_count + 1,
+        }
+        if duration_ms is not None:
+            if duration_ms < 0:
+                raise ValueError("duration_ms cannot be negative")
+            updates["last_duration_ms"] = duration_ms
+
+        task.update(updates)
+        tasks[name] = task
+        self._save(state)
+
+    def _record(
+        self,
+        task_name: str,
+        updates: dict[str, Any],
+    ) -> None:
+        name = self._validate_task_name(task_name)
+        state = self._load()
+        tasks = state["tasks"]
+        task = tasks.get(name, {})
+
+        if not isinstance(task, dict):
+            task = {}
+
+        task.update(updates)
+        tasks[name] = task
+        self._save(state)
+
+=== Scheduler CLI ===
+"""Command-line management for the Atlas scheduler registry."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+from typing import Sequence
+
+from atlas.scheduler import TaskScheduler
+
+
+def scheduler_state_file() -> Path:
+    configured = os.environ.get("ATLAS_SCHEDULER_STATE_FILE")
+    if configured:
+        return Path(configured)
+
+    runtime_root = os.environ.get(
+        "ATLAS_RUNTIME_CONFIG_DIR",
+        "/mnt/storage/configs/atlas",
+    )
+    return Path(runtime_root) / "scheduler" / "tasks.json"
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="atlas scheduler")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    subparsers.add_parser("list", help="List registered tasks")
+
+    inspect_parser = subparsers.add_parser(
+        "inspect", help="Show one registered task"
+    )
+    inspect_parser.add_argument("task_name")
+
+    register_parser = subparsers.add_parser(
+        "register", help="Register or update a task"
+    )
+    register_parser.add_argument("task_name")
+    register_parser.add_argument("interval_seconds", type=int)
+    register_parser.add_argument("callback")
+    register_parser.add_argument("--description", default="")
+    register_parser.add_argument("--module")
+    register_parser.add_argument(
+        "--disabled", action="store_true", help="Register disabled"
+    )
+
+    remove_parser = subparsers.add_parser(
+        "remove", help="Remove a registered task"
+    )
+    remove_parser.add_argument("task_name")
+
+    return parser
+
+
+def _print_task(task: dict[str, object]) -> None:
+    print(json.dumps(task, indent=2, sort_keys=True))
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    scheduler = TaskScheduler(scheduler_state_file())
+
+    try:
+        if args.command == "list":
+            tasks = scheduler.list_tasks()
+            if not tasks:
+                print("No scheduler tasks registered.")
+                return 0
+
+            print("NAME\tENABLED\tINTERVAL\tSTATUS\tDUE\tNEXT RUN")
+            for task in tasks:
+                print(
+                    f"{task['name']}\t"
+                    f"{str(task.get('enabled', True)).lower()}\t"
+                    f"{task.get('interval_seconds', '-')}\t"
+                    f"{task.get('status', 'unknown')}\t"
+                    f"{str(task.get('due', False)).lower()}\t"
+                    f"{task.get('next_run') or '-'}"
+                )
+            return 0
+
+        if args.command == "inspect":
+            task = scheduler.task_state(args.task_name)
+            if not task:
+                print(f"Scheduler task not found: {args.task_name}")
+                return 1
+            _print_task(task)
+            return 0
+
+        if args.command == "register":
+            task = scheduler.register(
+                args.task_name,
+                args.interval_seconds,
+                args.callback,
+                description=args.description,
+                enabled=not args.disabled,
+                module=args.module,
+            )
+            _print_task(task)
+            return 0
+
+        if args.command == "remove":
+            if not scheduler.remove(args.task_name):
+                print(f"Scheduler task not found: {args.task_name}")
+                return 1
+            print(f"Removed scheduler task: {args.task_name}")
+            return 0
+    except ValueError as error:
+        print(f"Scheduler error: {error}")
+        return 2
+
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+=== Scheduler command wrapper ===
+#!/usr/bin/env bash
+
+atlas_command_scheduler() {
+  PYTHONPATH="$ATLAS_PROJECT_DIR${PYTHONPATH:+:$PYTHONPATH}" \
+    python3 -m atlas.scheduler_cli "$@"
+}
+
+=== Event engine ===
+"""Event publishing helpers for Project Atlas modules."""
+
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+from collections.abc import Mapping
+from typing import Any
+
+DEFAULT_ATLAS_BINARY = "/bin/atlas"
+
+
+def publish_event(
+    module: str,
+    event_name: str,
+    payload: Mapping[str, Any] | None = None,
+    *,
+    atlas_binary: str | None = None,
+) -> None:
+    """Publish a declared module event through the Atlas CLI.
+
+    The Atlas CLI remains the authority for module validation, event
+    declaration checks, durable storage, and subscriber delivery.
+    """
+    normalized_module = module.strip()
+    normalized_event = event_name.strip()
+
+    if not normalized_module:
+        raise ValueError("module cannot be empty")
+
+    if not normalized_event:
+        raise ValueError("event_name cannot be empty")
+
+    serialized_payload = json.dumps(
+        dict(payload or {}),
+        separators=(",", ":"),
+    )
+
+    command = [
+        atlas_binary
+        or os.getenv("ATLAS_BINARY", DEFAULT_ATLAS_BINARY),
+        "module",
+        "publish",
+        normalized_module,
+        normalized_event,
+        serialized_payload,
+    ]
+
+    subprocess.run(
+        command,
+        check=True,
+    )
+
+=== Scheduler tests ===
+from __future__ import annotations
+
+import json
+import tempfile
+import unittest
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from unittest.mock import patch
+
+from atlas.scheduler import TaskScheduler
+from atlas.scheduler_cli import main
+
+
+class TaskSchedulerTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary_directory.cleanup)
+
+        self.state_file = Path(self.temporary_directory.name) / "scheduler.json"
+        self.scheduler = TaskScheduler(self.state_file)
+        self.now = datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc)
+
+    def test_new_task_is_immediately_due(self) -> None:
+        self.assertTrue(
+            self.scheduler.due("maintenance", 3600, now=self.now)
+        )
+
+    def test_register_persists_task_metadata(self) -> None:
+        task = self.scheduler.register(
+            "sports-sync",
+            300,
+            "modules/sports/scripts/sync.py",
+            description="Refresh Sports providers",
+            module="sports",
+        )
+
+        self.assertEqual(task["interval_seconds"], 300)
+        self.assertEqual(task["module"], "sports")
+        self.assertTrue(task["enabled"])
+        self.assertEqual(task["run_count"], 0)
+        self.assertEqual(task["failure_count"], 0)
+
+    def test_registered_task_uses_stored_interval(self) -> None:
+        self.scheduler.register("maintenance", 3600, "maintenance.py")
+        self.scheduler.succeeded("maintenance", now=self.now)
+
+        self.assertFalse(
+            self.scheduler.due(
+                "maintenance", now=self.now + timedelta(minutes=30)
+            )
+        )
+        self.assertTrue(
+            self.scheduler.due(
+                "maintenance", now=self.now + timedelta(hours=1)
+            )
+        )
+
+    def test_disabled_task_is_not_due(self) -> None:
+        self.scheduler.register(
+            "maintenance", 0, "maintenance.py", enabled=False
+        )
+        self.assertFalse(self.scheduler.due("maintenance", now=self.now))
+
+    def test_list_tasks_is_sorted_and_includes_schedule(self) -> None:
+        self.scheduler.register("z-task", 60, "z.py")
+        self.scheduler.register("a-task", 120, "a.py")
+
+        tasks = self.scheduler.list_tasks()
+        self.assertEqual([task["name"] for task in tasks], ["a-task", "z-task"])
+        self.assertTrue(tasks[0]["due"])
+        self.assertIsNotNone(tasks[0]["next_run"])
+
+    def test_remove_task(self) -> None:
+        self.scheduler.register("maintenance", 60, "maintenance.py")
+        self.assertTrue(self.scheduler.remove("maintenance"))
+        self.assertFalse(self.scheduler.remove("maintenance"))
+        self.assertEqual(self.scheduler.task_state("maintenance"), {})
+
+    def test_task_lifecycle_is_persisted(self) -> None:
+        self.scheduler.register("maintenance", 3600, "maintenance.py")
+        self.scheduler.started("maintenance", now=self.now)
+
+        running = self.scheduler.task_state("maintenance")
+        self.assertEqual(running["status"], "running")
+
+        self.scheduler.succeeded(
+            "maintenance",
+            now=self.now,
+            details={"removed": 2},
+            duration_ms=125,
+        )
+
+        succeeded = self.scheduler.task_state("maintenance")
+        self.assertEqual(succeeded["run_count"], 1)
+        self.assertEqual(succeeded["last_duration_ms"], 125)
+
+        self.scheduler.failed(
+            "maintenance",
+            "simulated failure",
+            now=self.now + timedelta(hours=1),
+            duration_ms=25,
+        )
+
+        failed = self.scheduler.task_state("maintenance")
+        self.assertEqual(failed["status"], "degraded")
+        self.assertEqual(failed["consecutive_failures"], 1)
+        self.assertEqual(failed["failure_count"], 1)
+        self.assertEqual(failed["run_count"], 2)
+
+        parsed_state = json.loads(self.state_file.read_text(encoding="utf-8"))
+        self.assertEqual(parsed_state["schema_version"], 1)
+        self.assertIn("tasks", parsed_state)
+
+    def test_negative_interval_is_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            self.scheduler.due("maintenance", -1, now=self.now)
+
+        with self.assertRaises(ValueError):
+            self.scheduler.register("maintenance", -1, "maintenance.py")
+
+    def test_registration_rejects_empty_callback(self) -> None:
+        with self.assertRaises(ValueError):
+            self.scheduler.register("maintenance", 60, " ")
+
+
+class SchedulerCliTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary_directory.cleanup)
+        self.state_file = Path(self.temporary_directory.name) / "tasks.json"
+        self.environment = patch.dict(
+            "os.environ",
+            {"ATLAS_SCHEDULER_STATE_FILE": str(self.state_file)},
+        )
+        self.environment.start()
+        self.addCleanup(self.environment.stop)
+
+    def test_cli_register_inspect_list_and_remove(self) -> None:
+        self.assertEqual(
+            main(["register", "maintenance", "60", "maintenance.py"]),
+            0,
+        )
+        self.assertEqual(main(["inspect", "maintenance"]), 0)
+        self.assertEqual(main(["list"]), 0)
+        self.assertEqual(main(["remove", "maintenance"]), 0)
+        self.assertEqual(main(["inspect", "maintenance"]), 1)
+
+=== Scheduler help ===
+usage: atlas scheduler [-h] {list,inspect,register,remove} ...
+
+positional arguments:
+  {list,inspect,register,remove}
+    list                List registered tasks
+    inspect             Show one registered task
+    register            Register or update a task
+    remove              Remove a registered task
+
+options:
+  -h, --help            show this help message and exit
+
+=== Current task list ===
+No scheduler tasks registered.
+
+=== Core test result ===
+Project Atlas
+Simplicity Meets Ingenuity
+
+Core Tests
+----------
+test_publish_event_defaults_to_empty_payload (core.test_events.PublishEventTests.test_publish_event_defaults_to_empty_payload) ... ok
+test_publish_event_propagates_cli_failure (core.test_events.PublishEventTests.test_publish_event_propagates_cli_failure) ... ok
+test_publish_event_rejects_empty_event (core.test_events.PublishEventTests.test_publish_event_rejects_empty_event) ... ok
+test_publish_event_rejects_empty_module (core.test_events.PublishEventTests.test_publish_event_rejects_empty_module) ... ok
+test_publish_event_uses_atlas_module_contract (core.test_events.PublishEventTests.test_publish_event_uses_atlas_module_contract) ... ok
+test_health_check_rejects_empty_name (core.test_health.HealthCheckTests.test_health_check_rejects_empty_name) ... ok
+test_health_check_rejects_invalid_status (core.test_health.HealthCheckTests.test_health_check_rejects_invalid_status) ... ok
+test_health_check_serializes_normalized_contract (core.test_health.HealthCheckTests.test_health_check_serializes_normalized_contract) ... ok
+test_empty_report_is_unknown (core.test_health.HealthReportTests.test_empty_report_is_unknown) ... ok
+test_foundation_report_detects_project_and_config (core.test_health.HealthReportTests.test_foundation_report_detects_project_and_config) ... ok
+test_foundation_report_marks_missing_project_critical (core.test_health.HealthReportTests.test_foundation_report_marks_missing_project_critical) ... ok
+test_report_aggregates_status_and_scores (core.test_health.HealthReportTests.test_report_aggregates_status_and_scores) ... ok
+test_report_json_is_machine_readable (core.test_health.HealthReportTests.test_report_json_is_machine_readable) ... ok
+test_disabled_module_health_is_skipped (core.test_health.ModuleHealthTests.test_disabled_module_health_is_skipped) ... ok
+test_enabled_module_health_is_normalized (core.test_health.ModuleHealthTests.test_enabled_module_health_is_normalized) ... ok
+test_invalid_module_contract_is_critical (core.test_health.ModuleHealthTests.test_invalid_module_contract_is_critical) ... ok
+test_command_failure_is_critical (core.test_health.OperationalHealthTests.test_command_failure_is_critical) ... ok
+test_operational_report_collects_shared_categories (core.test_health.OperationalHealthTests.test_operational_report_collects_shared_categories) ... ok
+test_text_renderer_includes_score_and_status (core.test_health.OperationalHealthTests.test_text_renderer_includes_score_and_status) ... ok
+test_cli_register_inspect_list_and_remove (core.test_scheduler.SchedulerCliTests.test_cli_register_inspect_list_and_remove) ... ok
+test_disabled_task_is_not_due (core.test_scheduler.TaskSchedulerTests.test_disabled_task_is_not_due) ... ok
+test_list_tasks_is_sorted_and_includes_schedule (core.test_scheduler.TaskSchedulerTests.test_list_tasks_is_sorted_and_includes_schedule) ... ok
+test_negative_interval_is_rejected (core.test_scheduler.TaskSchedulerTests.test_negative_interval_is_rejected) ... ok
+test_new_task_is_immediately_due (core.test_scheduler.TaskSchedulerTests.test_new_task_is_immediately_due) ... ok
+test_register_persists_task_metadata (core.test_scheduler.TaskSchedulerTests.test_register_persists_task_metadata) ... ok
+test_registered_task_uses_stored_interval (core.test_scheduler.TaskSchedulerTests.test_registered_task_uses_stored_interval) ... ok
+test_registration_rejects_empty_callback (core.test_scheduler.TaskSchedulerTests.test_registration_rejects_empty_callback) ... ok
+test_remove_task (core.test_scheduler.TaskSchedulerTests.test_remove_task) ... ok
+test_task_lifecycle_is_persisted (core.test_scheduler.TaskSchedulerTests.test_task_lifecycle_is_persisted) ... ok
+
+----------------------------------------------------------------------
+Ran 29 tests in 0.013s
+
+OK
+{
+  "callback": "maintenance.py",
+  "consecutive_failures": 0,
+  "created_at": "2026-07-19T02:04:02.176198+00:00",
+  "description": "",
+  "enabled": true,
+  "failure_count": 0,
+  "interval_seconds": 60,
+  "module": null,
+  "name": "maintenance",
+  "run_count": 0,
+  "status": "never_run",
+  "updated_at": "2026-07-19T02:04:02.176198+00:00"
+}
+{
+  "callback": "maintenance.py",
+  "consecutive_failures": 0,
+  "created_at": "2026-07-19T02:04:02.176198+00:00",
+  "description": "",
+  "due": true,
+  "enabled": true,
+  "failure_count": 0,
+  "interval_seconds": 60,
+  "module": null,
+  "name": "maintenance",
+  "next_run": "2026-07-19T02:04:02.177213+00:00",
+  "run_count": 0,
+  "status": "never_run",
+  "updated_at": "2026-07-19T02:04:02.176198+00:00"
+}
+NAME	ENABLED	INTERVAL	STATUS	DUE	NEXT RUN
+maintenance	true	60	never_run	true	2026-07-19T02:04:02.178030+00:00
+Removed scheduler task: maintenance
+Scheduler task not found: maintenance
+
+Atlas test scope 'core': PASS

@@ -1,0 +1,152 @@
+atlas/events.py:14:def publish_event(
+atlas/__init__.py:3:from atlas.events import publish_event
+atlas/__init__.py:4:from atlas.scheduler import TaskScheduler
+atlas/__init__.py:18:    "TaskScheduler",
+atlas/__init__.py:24:    "publish_event",
+atlas/scheduler.py:18:class TaskScheduler:
+atlas/scheduler.py:64:        callback: str,
+atlas/scheduler.py:73:        normalized_callback = callback.strip()
+atlas/scheduler.py:75:        if not normalized_callback:
+atlas/scheduler.py:76:            raise ValueError("callback cannot be empty")
+atlas/scheduler.py:91:                "callback": normalized_callback,
+atlas/scheduler.py:98:        task.setdefault("run_count", 0)
+atlas/scheduler.py:99:        task.setdefault("failure_count", 0)
+atlas/scheduler.py:200:        last_success = parse_timestamp(task.get("last_success"))
+atlas/scheduler.py:201:        if last_success is None:
+atlas/scheduler.py:204:        return age_seconds(last_success, now=current_time) >= interval
+atlas/scheduler.py:214:        last_success = parse_timestamp(task.get("last_success"))
+atlas/scheduler.py:215:        if last_success is None:
+atlas/scheduler.py:218:        return format_timestamp(last_success + timedelta(seconds=interval))
+atlas/scheduler.py:241:        duration_ms: int | None = None,
+atlas/scheduler.py:245:        run_count = int(task.get("run_count", 0))
+atlas/scheduler.py:248:            "last_success": format_timestamp(now or utc_now()),
+atlas/scheduler.py:252:            "run_count": run_count + 1,
+atlas/scheduler.py:257:        if duration_ms is not None:
+atlas/scheduler.py:258:            if duration_ms < 0:
+atlas/scheduler.py:259:                raise ValueError("duration_ms cannot be negative")
+atlas/scheduler.py:260:            updates["last_duration_ms"] = duration_ms
+atlas/scheduler.py:270:        duration_ms: int | None = None,
+atlas/scheduler.py:282:        failure_count = int(task.get("failure_count", 0))
+atlas/scheduler.py:283:        run_count = int(task.get("run_count", 0))
+atlas/scheduler.py:286:            "last_failure": format_timestamp(now or utc_now()),
+atlas/scheduler.py:290:            "failure_count": failure_count + 1,
+atlas/scheduler.py:291:            "run_count": run_count + 1,
+atlas/scheduler.py:293:        if duration_ms is not None:
+atlas/scheduler.py:294:            if duration_ms < 0:
+atlas/scheduler.py:295:                raise ValueError("duration_ms cannot be negative")
+atlas/scheduler.py:296:            updates["last_duration_ms"] = duration_ms
+atlas/scheduler_cli.py:1:"""Command-line management for the Atlas scheduler registry."""
+atlas/scheduler_cli.py:11:from atlas.scheduler import TaskScheduler
+atlas/scheduler_cli.py:14:def scheduler_state_file() -> Path:
+atlas/scheduler_cli.py:23:    return Path(runtime_root) / "scheduler" / "tasks.json"
+atlas/scheduler_cli.py:27:    parser = argparse.ArgumentParser(prog="atlas scheduler")
+atlas/scheduler_cli.py:42:    register_parser.add_argument("callback")
+atlas/scheduler_cli.py:63:    scheduler = TaskScheduler(scheduler_state_file())
+atlas/scheduler_cli.py:67:            tasks = scheduler.list_tasks()
+atlas/scheduler_cli.py:69:                print("No scheduler tasks registered.")
+atlas/scheduler_cli.py:85:            task = scheduler.task_state(args.task_name)
+atlas/scheduler_cli.py:93:            task = scheduler.register(
+atlas/scheduler_cli.py:96:                args.callback,
+atlas/scheduler_cli.py:105:            if not scheduler.remove(args.task_name):
+atlas/scheduler_cli.py:108:            print(f"Removed scheduler task: {args.task_name}")
+scripts/commands/scheduler.sh:3:atlas_command_scheduler() {
+scripts/commands/scheduler.sh:5:    python3 -m atlas.scheduler_cli "$@"
+scripts/commands/module.sh:344:        integration_scheduler.py \
+scripts/commands/module.sh:594:      atlas_module_publish_event \
+scripts/commands/help.sh:20:  atlas scheduler list
+scripts/commands/help.sh:21:  atlas scheduler inspect <task>
+scripts/commands/help.sh:22:  atlas scheduler register <task> <interval-seconds> <callback> [options]
+scripts/commands/help.sh:23:  atlas scheduler remove <task>
+scripts/atlas-ari.sh:244:  ari_publish_event \
+scripts/atlas-ari.sh:248:  ari_publish_event \
+scripts/atlas-ari.sh:1431:ari_publish_event() {
+scripts/atlas-ari.sh:1498:  ari_publish_event \
+scripts/atlas-ari.sh:1554:  ari_publish_event \
+scripts/atlas-ari.sh:1626:    ari_publish_event \
+scripts/atlas-ari.sh:1633:  ari_publish_event \
+scripts/atlas:42:source "$ATLAS_CLI_ROOT/commands/scheduler.sh"
+scripts/atlas:129:  scheduler)
+scripts/atlas:130:    atlas_command_scheduler "${@:2}"
+scripts/lib/modules.sh:473:atlas_module_publish_event() {
+modules/sports/tests/integration_provider.py:128:    game["duration_minutes"] = 180
+modules/sports/tests/run_tests.py:26:    # Integration recording and scheduler tests require the
+modules/sports/tests/integration_scheduler.py:18:TEST_ID = f"atlas-sports-scheduler-{uuid.uuid4().hex[:8]}"
+modules/sports/tests/integration_scheduler.py:85:        "Deterministic scheduler fixture created",
+modules/sports/tests/integration_scheduler.py:363:        "Failed scheduler recording created no final output",
+modules/sports/tests/integration_recording.py:159:        "color=size=320x240:rate=25:duration=2",
+modules/sports/scripts/verify.sh:205:check "Sports recording scheduler valid" \
+modules/sports/scripts/verify.sh:233:    "duration_minutes": 240,
+modules/sports/docker-compose.yml:68:      SPORTS_TASK_SCHEDULER_STATE_FILE: "${SPORTS_TASK_SCHEDULER_STATE_FILE:-/mnt/storage/configs/atlas/runtime/scheduler/sports.json}"
+modules/sports/.env.example:41:SPORTS_TASK_SCHEDULER_STATE_FILE=/mnt/storage/configs/atlas/runtime/scheduler/sports.json
+modules/sports/src/feed.py:122:            duration_minutes = int(
+modules/sports/src/feed.py:123:                game.get("duration_minutes", 240)
+modules/sports/src/feed.py:127:                minutes=duration_minutes
+modules/sports/src/providers/thesportsdb.py:423:            "duration_minutes": 240,
+modules/sports/src/worker.py:13:from atlas.events import publish_event
+modules/sports/src/worker.py:14:from atlas.scheduler import TaskScheduler
+modules/sports/src/worker.py:112:            "scheduler/sports.json"
+modules/sports/src/worker.py:117:TASK_SCHEDULER = TaskScheduler(
+modules/sports/src/worker.py:243:        "last_success_at": utc_now(),
+modules/sports/src/worker.py:244:        "last_failure_at": previous.get(
+modules/sports/src/worker.py:245:            "last_failure_at"
+modules/sports/src/worker.py:253:        publish_event(
+modules/sports/src/worker.py:291:        "last_success_at": previous.get(
+modules/sports/src/worker.py:292:            "last_success_at"
+modules/sports/src/worker.py:294:        "last_failure_at": utc_now(),
+modules/sports/src/worker.py:304:        publish_event(
+modules/sports/src/recordings.py:153:    duration_minutes = int(
+modules/sports/src/recordings.py:155:            "duration_minutes",
+modules/sports/src/recordings.py:171:                duration_minutes
+modules/sports/src/controller.py:154:            publish_event(
+modules/sports/src/controller.py:186:            publish_event(
+tests/core/test_scheduler.py:10:from atlas.scheduler import TaskScheduler
+tests/core/test_scheduler.py:11:from atlas.scheduler_cli import main
+tests/core/test_scheduler.py:14:class TaskSchedulerTests(unittest.TestCase):
+tests/core/test_scheduler.py:19:        self.state_file = Path(self.temporary_directory.name) / "scheduler.json"
+tests/core/test_scheduler.py:20:        self.scheduler = TaskScheduler(self.state_file)
+tests/core/test_scheduler.py:25:            self.scheduler.due("maintenance", 3600, now=self.now)
+tests/core/test_scheduler.py:29:        task = self.scheduler.register(
+tests/core/test_scheduler.py:40:        self.assertEqual(task["run_count"], 0)
+tests/core/test_scheduler.py:41:        self.assertEqual(task["failure_count"], 0)
+tests/core/test_scheduler.py:44:        self.scheduler.register("maintenance", 3600, "maintenance.py")
+tests/core/test_scheduler.py:45:        self.scheduler.succeeded("maintenance", now=self.now)
+tests/core/test_scheduler.py:48:            self.scheduler.due(
+tests/core/test_scheduler.py:53:            self.scheduler.due(
+tests/core/test_scheduler.py:59:        self.scheduler.register(
+tests/core/test_scheduler.py:62:        self.assertFalse(self.scheduler.due("maintenance", now=self.now))
+tests/core/test_scheduler.py:65:        self.scheduler.register("z-task", 60, "z.py")
+tests/core/test_scheduler.py:66:        self.scheduler.register("a-task", 120, "a.py")
+tests/core/test_scheduler.py:68:        tasks = self.scheduler.list_tasks()
+tests/core/test_scheduler.py:74:        self.scheduler.register("maintenance", 60, "maintenance.py")
+tests/core/test_scheduler.py:75:        self.assertTrue(self.scheduler.remove("maintenance"))
+tests/core/test_scheduler.py:76:        self.assertFalse(self.scheduler.remove("maintenance"))
+tests/core/test_scheduler.py:77:        self.assertEqual(self.scheduler.task_state("maintenance"), {})
+tests/core/test_scheduler.py:80:        self.scheduler.register("maintenance", 3600, "maintenance.py")
+tests/core/test_scheduler.py:81:        self.scheduler.started("maintenance", now=self.now)
+tests/core/test_scheduler.py:83:        running = self.scheduler.task_state("maintenance")
+tests/core/test_scheduler.py:86:        self.scheduler.succeeded(
+tests/core/test_scheduler.py:90:            duration_ms=125,
+tests/core/test_scheduler.py:93:        succeeded = self.scheduler.task_state("maintenance")
+tests/core/test_scheduler.py:94:        self.assertEqual(succeeded["run_count"], 1)
+tests/core/test_scheduler.py:95:        self.assertEqual(succeeded["last_duration_ms"], 125)
+tests/core/test_scheduler.py:97:        self.scheduler.failed(
+tests/core/test_scheduler.py:101:            duration_ms=25,
+tests/core/test_scheduler.py:104:        failed = self.scheduler.task_state("maintenance")
+tests/core/test_scheduler.py:107:        self.assertEqual(failed["failure_count"], 1)
+tests/core/test_scheduler.py:108:        self.assertEqual(failed["run_count"], 2)
+tests/core/test_scheduler.py:116:            self.scheduler.due("maintenance", -1, now=self.now)
+tests/core/test_scheduler.py:119:            self.scheduler.register("maintenance", -1, "maintenance.py")
+tests/core/test_scheduler.py:121:    def test_registration_rejects_empty_callback(self) -> None:
+tests/core/test_scheduler.py:123:            self.scheduler.register("maintenance", 60, " ")
+tests/core/test_events.py:8:from atlas.events import publish_event
+tests/core/test_events.py:13:    def test_publish_event_uses_atlas_module_contract(
+tests/core/test_events.py:17:        publish_event(
+tests/core/test_events.py:52:    def test_publish_event_defaults_to_empty_payload(
+tests/core/test_events.py:56:        publish_event(
+tests/core/test_events.py:65:    def test_publish_event_rejects_empty_module(self) -> None:
+tests/core/test_events.py:67:            publish_event(" ", "sports.refresh")
+tests/core/test_events.py:69:    def test_publish_event_rejects_empty_event(self) -> None:
+tests/core/test_events.py:71:            publish_event("sports", " ")
+tests/core/test_events.py:74:    def test_publish_event_propagates_cli_failure(
+tests/core/test_events.py:84:            publish_event(
+config/atlas.conf:26:ATLAS_SCHEDULER_DIR="${ATLAS_RUNTIME_CONFIG_DIR}/scheduler"

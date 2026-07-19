@@ -21,9 +21,6 @@ Core Commands
   atlas scheduler inspect <task>
   atlas scheduler register <task> <interval-seconds> <callback> [options]
   atlas scheduler remove <task>
-  atlas scheduler run [task] [--due-only]
-  atlas scheduler dry-run
-  atlas scheduler history [--limit N]
 
 Modules
 -------

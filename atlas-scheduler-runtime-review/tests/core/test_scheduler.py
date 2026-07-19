@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from atlas.scheduler import SchedulerLockedError, TaskScheduler
+from atlas.scheduler import TaskScheduler
 from atlas.scheduler_cli import main
 
 
@@ -108,7 +108,7 @@ class TaskSchedulerTests(unittest.TestCase):
         self.assertEqual(failed["run_count"], 2)
 
         parsed_state = json.loads(self.state_file.read_text(encoding="utf-8"))
-        self.assertEqual(parsed_state["schema_version"], 2)
+        self.assertEqual(parsed_state["schema_version"], 1)
         self.assertIn("tasks", parsed_state)
 
     def test_negative_interval_is_rejected(self) -> None:
@@ -121,87 +121,6 @@ class TaskSchedulerTests(unittest.TestCase):
     def test_registration_rejects_empty_callback(self) -> None:
         with self.assertRaises(ValueError):
             self.scheduler.register("maintenance", 60, " ")
-
-    def test_run_task_success_updates_history(self) -> None:
-        events: list[tuple[str, dict[str, object]]] = []
-        scheduler = TaskScheduler(
-            self.state_file,
-            event_publisher=lambda name, payload: events.append((name, dict(payload))),
-        )
-        scheduler.register("success", 60, "/bin/true")
-
-        result = scheduler.run_task("success")
-
-        self.assertEqual(result.result, "success")
-        self.assertEqual(result.return_code, 0)
-        state = scheduler.task_state("success")
-        self.assertEqual(state["run_count"], 1)
-        self.assertEqual(state["status"], "healthy")
-        self.assertEqual(scheduler.history(1)[0]["task"], "success")
-        self.assertEqual([event[0] for event in events], [
-            "scheduler.task.started",
-            "scheduler.task.completed",
-        ])
-
-    def test_run_task_failure_records_error(self) -> None:
-        self.scheduler.register("failure", 60, "/bin/false")
-
-        result = self.scheduler.run_task("failure")
-
-        self.assertEqual(result.result, "failed")
-        self.assertNotEqual(result.return_code, 0)
-        state = self.scheduler.task_state("failure")
-        self.assertEqual(state["failure_count"], 1)
-        self.assertEqual(state["consecutive_failures"], 1)
-        self.assertEqual(state["status"], "degraded")
-
-    def test_run_due_tasks_skips_disabled_and_not_due(self) -> None:
-        self.scheduler.register("due", 60, "/bin/true")
-        self.scheduler.register("disabled", 60, "/bin/true", enabled=False)
-        self.scheduler.register("recent", 3600, "/bin/true")
-        self.scheduler.succeeded("recent", now=datetime.now(timezone.utc))
-
-        results = self.scheduler.run_due_tasks()
-
-        self.assertEqual([result.task for result in results], ["due"])
-
-    def test_dry_run_does_not_execute(self) -> None:
-        marker = Path(self.temporary_directory.name) / "marker"
-        self.scheduler.register("touch", 60, f"/usr/bin/touch {marker}")
-
-        tasks = self.scheduler.dry_run()
-
-        self.assertEqual([task["name"] for task in tasks], ["touch"])
-        self.assertFalse(marker.exists())
-
-    def test_runtime_lock_prevents_overlap(self) -> None:
-        self.scheduler.register("success", 60, "/bin/true")
-        self.scheduler.lock_file.parent.mkdir(parents=True, exist_ok=True)
-        self.scheduler.lock_file.write_text(f"{__import__('os').getpid()}\n", encoding="utf-8")
-
-        with self.assertRaises(SchedulerLockedError):
-            self.scheduler.run_due_tasks()
-
-    def test_history_is_bounded(self) -> None:
-        self.scheduler.register("success", 0, "/bin/true")
-        with patch.object(self.scheduler, "HISTORY_LIMIT", 2):
-            self.scheduler.run_task("success")
-            self.scheduler.run_task("success")
-            self.scheduler.run_task("success")
-
-        self.assertEqual(len(self.scheduler.history(10)), 2)
-
-    def test_event_failure_does_not_fail_task(self) -> None:
-        def fail_event(name: str, payload: dict[str, object]) -> None:
-            raise RuntimeError("event unavailable")
-
-        scheduler = TaskScheduler(self.state_file, event_publisher=fail_event)
-        scheduler.register("success", 60, "/bin/true")
-
-        result = scheduler.run_task("success")
-
-        self.assertEqual(result.result, "success")
-        self.assertEqual(result.event_error, "event unavailable")
 
 
 class SchedulerCliTests(unittest.TestCase):
@@ -225,12 +144,3 @@ class SchedulerCliTests(unittest.TestCase):
         self.assertEqual(main(["list"]), 0)
         self.assertEqual(main(["remove", "maintenance"]), 0)
         self.assertEqual(main(["inspect", "maintenance"]), 1)
-    def test_cli_run_dry_run_and_history(self) -> None:
-        self.assertEqual(main(["register", "success", "0", "/bin/true"]), 0)
-        self.assertEqual(main(["dry-run"]), 0)
-        self.assertEqual(main(["run"]), 0)
-        self.assertEqual(main(["history", "--limit", "1"]), 0)
-
-    def test_cli_failed_task_returns_one(self) -> None:
-        self.assertEqual(main(["register", "failure", "0", "/bin/false"]), 0)
-        self.assertEqual(main(["run", "failure"]), 1)

@@ -1,0 +1,825 @@
+diff -ruN '--exclude=__pycache__' a/CHANGELOG.md b/CHANGELOG.md
+--- a/CHANGELOG.md	2026-07-19 02:03:36.000000000 +0000
++++ b/CHANGELOG.md	2026-07-19 02:10:40.683127394 +0000
+@@ -2,6 +2,9 @@
+ 
+ ## [Unreleased]
+ 
++- Added one-shot scheduler execution for due or named tasks with subprocess isolation, runtime locking, stale-lock recovery, success/failure metadata, bounded history, and best-effort module events.
++- Added `atlas scheduler run`, `dry-run`, and `history` commands.
++
+ ### Validation
+ 
+ - Added `atlas test [all|core|sports]` as the authoritative repository-wide validation command.
+diff -ruN '--exclude=__pycache__' a/atlas/scheduler.py b/atlas/scheduler.py
+--- a/atlas/scheduler.py	2026-07-19 02:03:36.000000000 +0000
++++ b/atlas/scheduler.py	2026-07-19 02:09:52.714318603 +0000
+@@ -1,45 +1,72 @@
+-"""Persistent interval scheduling for Project Atlas workers."""
++"""Persistent interval scheduling and execution for Project Atlas workers."""
+ 
+ from __future__ import annotations
+ 
++import os
++import shlex
++import subprocess
++import time
++from dataclasses import asdict, dataclass
+ from datetime import datetime, timedelta
+ from pathlib import Path
+-from typing import Any
++from typing import Any, Callable, Mapping
+ 
+ from atlas.state import load_json_object, save_json
+-from atlas.time import (
+-    age_seconds,
+-    format_timestamp,
+-    parse_timestamp,
+-    utc_now,
+-)
++from atlas.time import age_seconds, format_timestamp, parse_timestamp, utc_now
++
++EventPublisher = Callable[[str, Mapping[str, Any]], None]
++
++
++@dataclass(frozen=True)
++class ExecutionResult:
++    """Normalized result returned by scheduler executions."""
++
++    task: str
++    result: str
++    started_at: str
++    ended_at: str
++    duration_ms: int
++    return_code: int | None = None
++    error: str | None = None
++    event_error: str | None = None
++
++    def to_dict(self) -> dict[str, Any]:
++        return asdict(self)
++
++
++class SchedulerLockedError(RuntimeError):
++    """Raised when another scheduler runtime owns the execution lock."""
+ 
+ 
+ class TaskScheduler:
+-    """Track persistent interval-based worker tasks and metadata."""
++    """Track and execute persistent interval-based worker tasks."""
+ 
+-    SCHEMA_VERSION = 1
++    SCHEMA_VERSION = 2
++    HISTORY_LIMIT = 100
+ 
+     def __init__(
+         self,
+         state_file: Path,
++        *,
++        lock_file: Path | None = None,
++        event_publisher: EventPublisher | None = None,
++        working_directory: Path | None = None,
+     ) -> None:
+         self.state_file = state_file
++        self.lock_file = lock_file or state_file.with_suffix(".lock")
++        self.event_publisher = event_publisher
++        self.working_directory = working_directory
+ 
+     def _load(self) -> dict[str, Any]:
+         state = load_json_object(self.state_file)
+-
+-        tasks = state.get("tasks")
+-        if not isinstance(tasks, dict):
++        if not isinstance(state.get("tasks"), dict):
+             state["tasks"] = {}
+-
++        if not isinstance(state.get("history"), list):
++            state["history"] = []
+         state.setdefault("schema_version", self.SCHEMA_VERSION)
+         return state
+ 
+-    def _save(
+-        self,
+-        state: dict[str, Any],
+-    ) -> None:
++    def _save(self, state: dict[str, Any]) -> None:
+         state["schema_version"] = self.SCHEMA_VERSION
+         state["updated_at"] = format_timestamp(utc_now())
+         save_json(self.state_file, state)
+@@ -71,7 +98,6 @@
+         name = self._validate_task_name(task_name)
+         interval = self._validate_interval(interval_seconds)
+         normalized_callback = callback.strip()
+-
+         if not normalized_callback:
+             raise ValueError("callback cannot be empty")
+ 
+@@ -98,7 +124,6 @@
+         task.setdefault("run_count", 0)
+         task.setdefault("failure_count", 0)
+         task.setdefault("consecutive_failures", 0)
+-
+         tasks[name] = task
+         self._save(state)
+         return dict(task)
+@@ -107,12 +132,9 @@
+         """Remove a task definition and its persisted runtime state."""
+         name = self._validate_task_name(task_name)
+         state = self._load()
+-        tasks = state["tasks"]
+-
+-        if name not in tasks:
++        if name not in state["tasks"]:
+             return False
+-
+-        del tasks[name]
++        del state["tasks"][name]
+         self._save(state)
+         return True
+ 
+@@ -120,35 +142,22 @@
+         """Return all task records sorted by task name."""
+         state = self._load()
+         records: list[dict[str, Any]] = []
+-
+         for name, raw_task in state["tasks"].items():
+             if not isinstance(raw_task, dict):
+                 continue
+-
+             task = dict(raw_task)
+             task.setdefault("name", name)
+             task["due"] = self._task_due(task)
+             task["next_run"] = self._next_run(task)
+             records.append(task)
+-
+         return sorted(records, key=lambda task: str(task["name"]))
+ 
+-    def task_state(
+-        self,
+-        task_name: str,
+-    ) -> dict[str, Any]:
++    def task_state(self, task_name: str) -> dict[str, Any]:
+         """Return the persisted state for a task."""
+         name = self._validate_task_name(task_name)
+-        state = self._load()
+-        tasks = state["tasks"]
+-
+-        if name not in tasks:
+-            return {}
+-
+-        task = tasks[name]
++        task = self._load()["tasks"].get(name)
+         if not isinstance(task, dict):
+             return {}
+-
+         result = dict(task)
+         result.setdefault("name", name)
+         result["due"] = self._task_due(result)
+@@ -165,17 +174,13 @@
+         """Return whether a task is due based on last success."""
+         name = self._validate_task_name(task_name)
+         task = self.task_state(name)
+-
+         if interval_seconds is None:
+             stored_interval = task.get("interval_seconds")
+             if not isinstance(stored_interval, int):
+-                raise ValueError(
+-                    "interval_seconds is required for unregistered tasks"
+-                )
++                raise ValueError("interval_seconds is required for unregistered tasks")
+             interval = stored_interval
+         else:
+             interval = interval_seconds
+-
+         self._validate_interval(interval)
+         return self._task_due(task, interval_seconds=interval, now=now)
+ 
+@@ -188,49 +193,30 @@
+     ) -> bool:
+         if task.get("enabled", True) is False:
+             return False
+-
+         interval = interval_seconds
+         if interval is None:
+             stored = task.get("interval_seconds")
+             if not isinstance(stored, int) or stored < 0:
+                 return False
+             interval = stored
+-
+-        current_time = now or utc_now()
+         last_success = parse_timestamp(task.get("last_success"))
+         if last_success is None:
+             return True
+-
+-        return age_seconds(last_success, now=current_time) >= interval
++        return age_seconds(last_success, now=now or utc_now()) >= interval
+ 
+     def _next_run(self, task: dict[str, Any]) -> str | None:
+         if task.get("enabled", True) is False:
+             return None
+-
+         interval = task.get("interval_seconds")
+         if not isinstance(interval, int) or interval < 0:
+             return None
+-
+         last_success = parse_timestamp(task.get("last_success"))
+         if last_success is None:
+             return format_timestamp(utc_now())
+-
+         return format_timestamp(last_success + timedelta(seconds=interval))
+ 
+-    def started(
+-        self,
+-        task_name: str,
+-        *,
+-        now: datetime | None = None,
+-    ) -> None:
+-        """Record that a task execution started."""
+-        self._record(
+-            task_name,
+-            {
+-                "last_started": format_timestamp(now or utc_now()),
+-                "status": "running",
+-            },
+-        )
++    def started(self, task_name: str, *, now: datetime | None = None) -> None:
++        self._record(task_name, {"last_started": format_timestamp(now or utc_now()), "status": "running"})
+ 
+     def succeeded(
+         self,
+@@ -240,25 +226,20 @@
+         details: dict[str, Any] | None = None,
+         duration_ms: int | None = None,
+     ) -> None:
+-        """Record a successful task execution."""
+         task = self.task_state(task_name)
+-        run_count = int(task.get("run_count", 0))
+-
+         updates: dict[str, Any] = {
+             "last_success": format_timestamp(now or utc_now()),
+             "status": "healthy",
+             "consecutive_failures": 0,
+             "last_error": None,
+-            "run_count": run_count + 1,
++            "run_count": int(task.get("run_count", 0)) + 1,
+         }
+-
+         if details is not None:
+             updates["details"] = details
+         if duration_ms is not None:
+             if duration_ms < 0:
+                 raise ValueError("duration_ms cannot be negative")
+             updates["last_duration_ms"] = duration_ms
+-
+         self._record(task_name, updates)
+ 
+     def failed(
+@@ -269,49 +250,183 @@
+         now: datetime | None = None,
+         duration_ms: int | None = None,
+     ) -> None:
+-        """Record a failed task execution."""
+-        name = self._validate_task_name(task_name)
+-        state = self._load()
+-        tasks = state["tasks"]
+-        task = tasks.get(name, {})
+-
+-        if not isinstance(task, dict):
+-            task = {}
+-
+-        failures = int(task.get("consecutive_failures", 0))
+-        failure_count = int(task.get("failure_count", 0))
+-        run_count = int(task.get("run_count", 0))
+-
++        task = self.task_state(task_name)
+         updates: dict[str, Any] = {
+             "last_failure": format_timestamp(now or utc_now()),
+             "status": "degraded",
+             "last_error": error,
+-            "consecutive_failures": failures + 1,
+-            "failure_count": failure_count + 1,
+-            "run_count": run_count + 1,
++            "consecutive_failures": int(task.get("consecutive_failures", 0)) + 1,
++            "failure_count": int(task.get("failure_count", 0)) + 1,
++            "run_count": int(task.get("run_count", 0)) + 1,
+         }
+         if duration_ms is not None:
+             if duration_ms < 0:
+                 raise ValueError("duration_ms cannot be negative")
+             updates["last_duration_ms"] = duration_ms
++        self._record(task_name, updates)
+ 
+-        task.update(updates)
+-        tasks[name] = task
+-        self._save(state)
++    def dry_run(self) -> list[dict[str, Any]]:
++        """Return enabled tasks that are currently due without executing them."""
++        return [task for task in self.list_tasks() if task.get("due") is True]
++
++    def history(self, limit: int = 25) -> list[dict[str, Any]]:
++        """Return newest execution history entries first."""
++        if limit < 0:
++            raise ValueError("limit cannot be negative")
++        entries = self._load()["history"]
++        return [dict(entry) for entry in reversed(entries[-limit:]) if isinstance(entry, dict)]
++
++    def run_task(self, task_name: str, *, force: bool = True) -> ExecutionResult:
++        """Execute one registered task under the scheduler runtime lock."""
++        with self._runtime_lock():
++            task = self.task_state(task_name)
++            if not task:
++                raise KeyError(task_name)
++            if task.get("enabled", True) is False:
++                raise ValueError(f"scheduler task is disabled: {task_name}")
++            if not force and not task.get("due", False):
++                raise ValueError(f"scheduler task is not due: {task_name}")
++            return self._execute(task)
++
++    def run_due_tasks(self) -> list[ExecutionResult]:
++        """Execute every enabled task that is currently due."""
++        with self._runtime_lock():
++            tasks = self.dry_run()
++            return [self._execute(task) for task in tasks]
++
++    def _execute(self, task: dict[str, Any]) -> ExecutionResult:
++        name = str(task["name"])
++        callback = task.get("callback")
++        if not isinstance(callback, str) or not callback.strip():
++            raise ValueError(f"scheduler task has no callback: {name}")
++
++        command = shlex.split(callback)
++        if not command:
++            raise ValueError(f"scheduler task has no callback: {name}")
++
++        started_at = utc_now()
++        started_text = format_timestamp(started_at)
++        self.started(name, now=started_at)
++        event_error = self._publish("scheduler.task.started", task, {"started_at": started_text})
++        clock_start = time.monotonic()
++
++        return_code: int | None = None
++        error: str | None = None
++        try:
++            completed = subprocess.run(
++                command,
++                cwd=self.working_directory,
++                check=False,
++                text=True,
++                stdout=subprocess.PIPE,
++                stderr=subprocess.PIPE,
++            )
++            return_code = completed.returncode
++            if return_code != 0:
++                error = completed.stderr.strip() or completed.stdout.strip() or f"callback exited with status {return_code}"
++        except OSError as exc:
++            error = str(exc)
++
++        duration_ms = max(0, round((time.monotonic() - clock_start) * 1000))
++        ended_at = utc_now()
++        ended_text = format_timestamp(ended_at)
++        result_name = "success" if error is None else "failed"
++
++        if error is None:
++            self.succeeded(name, now=ended_at, duration_ms=duration_ms)
++            completion_event_error = self._publish(
++                "scheduler.task.completed",
++                task,
++                {"ended_at": ended_text, "duration_ms": duration_ms, "return_code": return_code},
++            )
++        else:
++            self.failed(name, error, now=ended_at, duration_ms=duration_ms)
++            completion_event_error = self._publish(
++                "scheduler.task.failed",
++                task,
++                {"ended_at": ended_text, "duration_ms": duration_ms, "return_code": return_code, "error": error},
++            )
++        event_error = completion_event_error or event_error
++
++        execution = ExecutionResult(
++            task=name,
++            result=result_name,
++            started_at=started_text,
++            ended_at=ended_text,
++            duration_ms=duration_ms,
++            return_code=return_code,
++            error=error,
++            event_error=event_error,
++        )
++        self._append_history(execution.to_dict())
++        return execution
+ 
+-    def _record(
++    def _publish(
+         self,
+-        task_name: str,
+-        updates: dict[str, Any],
+-    ) -> None:
+-        name = self._validate_task_name(task_name)
++        event_name: str,
++        task: dict[str, Any],
++        payload: dict[str, Any],
++    ) -> str | None:
++        if self.event_publisher is None:
++            return None
++        event_payload = {"task": task.get("name"), "module": task.get("module"), **payload}
++        try:
++            self.event_publisher(event_name, event_payload)
++        except Exception as exc:  # Event delivery must not alter task outcome.
++            return str(exc)
++        return None
++
++    def _append_history(self, entry: dict[str, Any]) -> None:
+         state = self._load()
+-        tasks = state["tasks"]
+-        task = tasks.get(name, {})
++        state["history"].append(entry)
++        state["history"] = state["history"][-self.HISTORY_LIMIT :]
++        self._save(state)
+ 
++    def _record(self, task_name: str, updates: dict[str, Any]) -> None:
++        name = self._validate_task_name(task_name)
++        state = self._load()
++        task = state["tasks"].get(name, {})
+         if not isinstance(task, dict):
+             task = {}
+-
+         task.update(updates)
+-        tasks[name] = task
++        state["tasks"][name] = task
+         self._save(state)
++
++    class _Lock:
++        def __init__(self, path: Path) -> None:
++            self.path = path
++            self.fd: int | None = None
++
++        def __enter__(self) -> None:
++            self.path.parent.mkdir(parents=True, exist_ok=True)
++            try:
++                self.fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
++            except FileExistsError as exc:
++                if self._remove_stale_lock():
++                    self.fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
++                else:
++                    raise SchedulerLockedError(f"scheduler runtime is already locked: {self.path}") from exc
++            os.write(self.fd, f"{os.getpid()}\n".encode())
++
++        def _remove_stale_lock(self) -> bool:
++            try:
++                owner = int(self.path.read_text(encoding="utf-8").strip())
++            except (OSError, ValueError):
++                self.path.unlink(missing_ok=True)
++                return True
++            try:
++                os.kill(owner, 0)
++            except ProcessLookupError:
++                self.path.unlink(missing_ok=True)
++                return True
++            except PermissionError:
++                return False
++            return False
++
++        def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
++            if self.fd is not None:
++                os.close(self.fd)
++            self.path.unlink(missing_ok=True)
++
++    def _runtime_lock(self) -> TaskScheduler._Lock:
++        return self._Lock(self.lock_file)
+diff -ruN '--exclude=__pycache__' a/atlas/scheduler_cli.py b/atlas/scheduler_cli.py
+--- a/atlas/scheduler_cli.py	2026-07-19 02:03:36.000000000 +0000
++++ b/atlas/scheduler_cli.py	2026-07-19 02:10:06.872660610 +0000
+@@ -1,4 +1,4 @@
+-"""Command-line management for the Atlas scheduler registry."""
++"""Command-line management for the Atlas scheduler runtime."""
+ 
+ from __future__ import annotations
+ 
+@@ -8,59 +8,71 @@
+ from pathlib import Path
+ from typing import Sequence
+ 
+-from atlas.scheduler import TaskScheduler
++from atlas.events import publish_event
++from atlas.scheduler import SchedulerLockedError, TaskScheduler
+ 
+ 
+ def scheduler_state_file() -> Path:
+     configured = os.environ.get("ATLAS_SCHEDULER_STATE_FILE")
+     if configured:
+         return Path(configured)
+-
+-    runtime_root = os.environ.get(
+-        "ATLAS_RUNTIME_CONFIG_DIR",
+-        "/mnt/storage/configs/atlas",
+-    )
++    runtime_root = os.environ.get("ATLAS_RUNTIME_CONFIG_DIR", "/mnt/storage/configs/atlas")
+     return Path(runtime_root) / "scheduler" / "tasks.json"
+ 
+ 
++def scheduler_lock_file() -> Path | None:
++    configured = os.environ.get("ATLAS_SCHEDULER_LOCK_FILE")
++    return Path(configured) if configured else None
++
++
++def _publish_scheduler_event(event_name: str, payload: dict[str, object]) -> None:
++    module = payload.get("module")
++    if isinstance(module, str) and module.strip():
++        publish_event(module, event_name, payload)
++
++
+ def build_parser() -> argparse.ArgumentParser:
+     parser = argparse.ArgumentParser(prog="atlas scheduler")
+     subparsers = parser.add_subparsers(dest="command", required=True)
+-
+     subparsers.add_parser("list", help="List registered tasks")
+ 
+-    inspect_parser = subparsers.add_parser(
+-        "inspect", help="Show one registered task"
+-    )
++    inspect_parser = subparsers.add_parser("inspect", help="Show one registered task")
+     inspect_parser.add_argument("task_name")
+ 
+-    register_parser = subparsers.add_parser(
+-        "register", help="Register or update a task"
+-    )
++    register_parser = subparsers.add_parser("register", help="Register or update a task")
+     register_parser.add_argument("task_name")
+     register_parser.add_argument("interval_seconds", type=int)
+     register_parser.add_argument("callback")
+     register_parser.add_argument("--description", default="")
+     register_parser.add_argument("--module")
+-    register_parser.add_argument(
+-        "--disabled", action="store_true", help="Register disabled"
+-    )
++    register_parser.add_argument("--disabled", action="store_true", help="Register disabled")
+ 
+-    remove_parser = subparsers.add_parser(
+-        "remove", help="Remove a registered task"
+-    )
++    remove_parser = subparsers.add_parser("remove", help="Remove a registered task")
+     remove_parser.add_argument("task_name")
+ 
++    run_parser = subparsers.add_parser("run", help="Execute due tasks or one named task")
++    run_parser.add_argument("task_name", nargs="?")
++    run_parser.add_argument("--due-only", action="store_true", help="Require a named task to be due")
++
++    subparsers.add_parser("dry-run", help="Show tasks that are currently due")
++    history_parser = subparsers.add_parser("history", help="Show recent task executions")
++    history_parser.add_argument("--limit", type=int, default=25)
+     return parser
+ 
+ 
+-def _print_task(task: dict[str, object]) -> None:
+-    print(json.dumps(task, indent=2, sort_keys=True))
++def _print_json(value: object) -> None:
++    print(json.dumps(value, indent=2, sort_keys=True))
+ 
+ 
+ def main(argv: Sequence[str] | None = None) -> int:
+     args = build_parser().parse_args(argv)
+-    scheduler = TaskScheduler(scheduler_state_file())
++    project_directory = Path(os.environ.get("ATLAS_PROJECT_DIR", "/opt/project-atlas"))
++    scheduler = TaskScheduler(
++        scheduler_state_file(),
++        lock_file=scheduler_lock_file(),
++        event_publisher=_publish_scheduler_event,
++        working_directory=project_directory if project_directory.is_dir() else None,
++    )
+ 
+     try:
+         if args.command == "list":
+@@ -68,17 +80,9 @@
+             if not tasks:
+                 print("No scheduler tasks registered.")
+                 return 0
+-
+             print("NAME\tENABLED\tINTERVAL\tSTATUS\tDUE\tNEXT RUN")
+             for task in tasks:
+-                print(
+-                    f"{task['name']}\t"
+-                    f"{str(task.get('enabled', True)).lower()}\t"
+-                    f"{task.get('interval_seconds', '-')}\t"
+-                    f"{task.get('status', 'unknown')}\t"
+-                    f"{str(task.get('due', False)).lower()}\t"
+-                    f"{task.get('next_run') or '-'}"
+-                )
++                print(f"{task['name']}\t{str(task.get('enabled', True)).lower()}\t{task.get('interval_seconds', '-')}\t{task.get('status', 'unknown')}\t{str(task.get('due', False)).lower()}\t{task.get('next_run') or '-'}")
+             return 0
+ 
+         if args.command == "inspect":
+@@ -86,19 +90,11 @@
+             if not task:
+                 print(f"Scheduler task not found: {args.task_name}")
+                 return 1
+-            _print_task(task)
++            _print_json(task)
+             return 0
+ 
+         if args.command == "register":
+-            task = scheduler.register(
+-                args.task_name,
+-                args.interval_seconds,
+-                args.callback,
+-                description=args.description,
+-                enabled=not args.disabled,
+-                module=args.module,
+-            )
+-            _print_task(task)
++            _print_json(scheduler.register(args.task_name, args.interval_seconds, args.callback, description=args.description, enabled=not args.disabled, module=args.module))
+             return 0
+ 
+         if args.command == "remove":
+@@ -107,10 +103,34 @@
+                 return 1
+             print(f"Removed scheduler task: {args.task_name}")
+             return 0
++
++        if args.command == "dry-run":
++            tasks = scheduler.dry_run()
++            _print_json(tasks)
++            return 0
++
++        if args.command == "history":
++            _print_json(scheduler.history(args.limit))
++            return 0
++
++        if args.command == "run":
++            if args.task_name:
++                result = scheduler.run_task(args.task_name, force=not args.due_only)
++                _print_json(result.to_dict())
++                return 0 if result.result == "success" else 1
++            results = scheduler.run_due_tasks()
++            _print_json([result.to_dict() for result in results])
++            return 0 if all(result.result == "success" for result in results) else 1
++
++    except KeyError as error:
++        print(f"Scheduler task not found: {error.args[0]}")
++        return 1
++    except SchedulerLockedError as error:
++        print(f"Scheduler error: {error}")
++        return 3
+     except ValueError as error:
+         print(f"Scheduler error: {error}")
+         return 2
+-
+     return 2
+ 
+ 
+diff -ruN '--exclude=__pycache__' a/config/atlas.conf b/config/atlas.conf
+--- a/config/atlas.conf	2026-07-19 02:03:36.000000000 +0000
++++ b/config/atlas.conf	2026-07-19 02:09:54.153997756 +0000
+@@ -25,3 +25,4 @@
+ 
+ ATLAS_SCHEDULER_DIR="${ATLAS_RUNTIME_CONFIG_DIR}/scheduler"
+ ATLAS_SCHEDULER_STATE_FILE="${ATLAS_SCHEDULER_DIR}/tasks.json"
++ATLAS_SCHEDULER_LOCK_FILE="${ATLAS_SCHEDULER_DIR}/scheduler.lock"
+diff -ruN '--exclude=__pycache__' a/docs/BUILD_LOG.md b/docs/BUILD_LOG.md
+--- a/docs/BUILD_LOG.md	2026-07-19 02:03:36.000000000 +0000
++++ b/docs/BUILD_LOG.md	2026-07-19 02:09:55.189057478 +0000
+@@ -328,3 +328,10 @@
+ enablement, run counts, failure counts, last duration, due state, and next-run time. The CLI
+ supports registering, listing, inspecting, and removing tasks. Execution remains manually
+ invoked and is deferred to M-019.2.
++### M-019.2 — Scheduler Runtime
++
++- Added deterministic one-shot execution for due and explicitly named scheduler tasks.
++- Added shell-free callback parsing, execution timing, success/failure counters, bounded history, runtime locking, stale-lock recovery, and best-effort module event publication.
++- Added CLI commands for run, dry-run, and execution history.
++- Added scheduler runtime tests for success, failure, due selection, dry runs, history limits, event isolation, and overlap protection.
++
+diff -ruN '--exclude=__pycache__' a/scripts/commands/help.sh b/scripts/commands/help.sh
+--- a/scripts/commands/help.sh	2026-07-19 02:03:36.000000000 +0000
++++ b/scripts/commands/help.sh	2026-07-19 02:09:55.188172767 +0000
+@@ -21,6 +21,9 @@
+   atlas scheduler inspect <task>
+   atlas scheduler register <task> <interval-seconds> <callback> [options]
+   atlas scheduler remove <task>
++  atlas scheduler run [task] [--due-only]
++  atlas scheduler dry-run
++  atlas scheduler history [--limit N]
+ 
+ Modules
+ -------
+diff -ruN '--exclude=__pycache__' a/tests/core/test_scheduler.py b/tests/core/test_scheduler.py
+--- a/tests/core/test_scheduler.py	2026-07-19 02:03:36.000000000 +0000
++++ b/tests/core/test_scheduler.py	2026-07-19 02:09:52.713455610 +0000
+@@ -7,7 +7,7 @@
+ from pathlib import Path
+ from unittest.mock import patch
+ 
+-from atlas.scheduler import TaskScheduler
++from atlas.scheduler import SchedulerLockedError, TaskScheduler
+ from atlas.scheduler_cli import main
+ 
+ 
+@@ -108,7 +108,7 @@
+         self.assertEqual(failed["run_count"], 2)
+ 
+         parsed_state = json.loads(self.state_file.read_text(encoding="utf-8"))
+-        self.assertEqual(parsed_state["schema_version"], 1)
++        self.assertEqual(parsed_state["schema_version"], 2)
+         self.assertIn("tasks", parsed_state)
+ 
+     def test_negative_interval_is_rejected(self) -> None:
+@@ -122,6 +122,87 @@
+         with self.assertRaises(ValueError):
+             self.scheduler.register("maintenance", 60, " ")
+ 
++    def test_run_task_success_updates_history(self) -> None:
++        events: list[tuple[str, dict[str, object]]] = []
++        scheduler = TaskScheduler(
++            self.state_file,
++            event_publisher=lambda name, payload: events.append((name, dict(payload))),
++        )
++        scheduler.register("success", 60, "/bin/true")
++
++        result = scheduler.run_task("success")
++
++        self.assertEqual(result.result, "success")
++        self.assertEqual(result.return_code, 0)
++        state = scheduler.task_state("success")
++        self.assertEqual(state["run_count"], 1)
++        self.assertEqual(state["status"], "healthy")
++        self.assertEqual(scheduler.history(1)[0]["task"], "success")
++        self.assertEqual([event[0] for event in events], [
++            "scheduler.task.started",
++            "scheduler.task.completed",
++        ])
++
++    def test_run_task_failure_records_error(self) -> None:
++        self.scheduler.register("failure", 60, "/bin/false")
++
++        result = self.scheduler.run_task("failure")
++
++        self.assertEqual(result.result, "failed")
++        self.assertNotEqual(result.return_code, 0)
++        state = self.scheduler.task_state("failure")
++        self.assertEqual(state["failure_count"], 1)
++        self.assertEqual(state["consecutive_failures"], 1)
++        self.assertEqual(state["status"], "degraded")
++
++    def test_run_due_tasks_skips_disabled_and_not_due(self) -> None:
++        self.scheduler.register("due", 60, "/bin/true")
++        self.scheduler.register("disabled", 60, "/bin/true", enabled=False)
++        self.scheduler.register("recent", 3600, "/bin/true")
++        self.scheduler.succeeded("recent", now=datetime.now(timezone.utc))
++
++        results = self.scheduler.run_due_tasks()
++
++        self.assertEqual([result.task for result in results], ["due"])
++
++    def test_dry_run_does_not_execute(self) -> None:
++        marker = Path(self.temporary_directory.name) / "marker"
++        self.scheduler.register("touch", 60, f"/usr/bin/touch {marker}")
++
++        tasks = self.scheduler.dry_run()
++
++        self.assertEqual([task["name"] for task in tasks], ["touch"])
++        self.assertFalse(marker.exists())
++
++    def test_runtime_lock_prevents_overlap(self) -> None:
++        self.scheduler.register("success", 60, "/bin/true")
++        self.scheduler.lock_file.parent.mkdir(parents=True, exist_ok=True)
++        self.scheduler.lock_file.write_text(f"{__import__('os').getpid()}\n", encoding="utf-8")
++
++        with self.assertRaises(SchedulerLockedError):
++            self.scheduler.run_due_tasks()
++
++    def test_history_is_bounded(self) -> None:
++        self.scheduler.register("success", 0, "/bin/true")
++        with patch.object(self.scheduler, "HISTORY_LIMIT", 2):
++            self.scheduler.run_task("success")
++            self.scheduler.run_task("success")
++            self.scheduler.run_task("success")
++
++        self.assertEqual(len(self.scheduler.history(10)), 2)
++
++    def test_event_failure_does_not_fail_task(self) -> None:
++        def fail_event(name: str, payload: dict[str, object]) -> None:
++            raise RuntimeError("event unavailable")
++
++        scheduler = TaskScheduler(self.state_file, event_publisher=fail_event)
++        scheduler.register("success", 60, "/bin/true")
++
++        result = scheduler.run_task("success")
++
++        self.assertEqual(result.result, "success")
++        self.assertEqual(result.event_error, "event unavailable")
++
+ 
+ class SchedulerCliTests(unittest.TestCase):
+     def setUp(self) -> None:
+@@ -144,3 +225,13 @@
+         self.assertEqual(main(["list"]), 0)
+         self.assertEqual(main(["remove", "maintenance"]), 0)
+         self.assertEqual(main(["inspect", "maintenance"]), 1)
++    def test_cli_run_dry_run_and_history(self) -> None:
++        self.assertEqual(main(["register", "success", "0", "/bin/true"]), 0)
++        self.assertEqual(main(["dry-run"]), 0)
++        self.assertEqual(main(["run"]), 0)
++        self.assertEqual(main(["history", "--limit", "1"]), 0)
++
++    def test_cli_failed_task_returns_one(self) -> None:
++        self.assertEqual(main(["register", "failure", "0", "/bin/false"]), 0)
++        self.assertEqual(main(["run", "failure"]), 1)
++

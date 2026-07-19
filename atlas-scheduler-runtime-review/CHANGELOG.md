@@ -2,9 +2,6 @@
 
 ## [Unreleased]
 
-- Added one-shot scheduler execution for due or named tasks with subprocess isolation, runtime locking, stale-lock recovery, success/failure metadata, bounded history, and best-effort module events.
-- Added `atlas scheduler run`, `dry-run`, and `history` commands.
-
 ### Validation
 
 - Added `atlas test [all|core|sports]` as the authoritative repository-wide validation command.

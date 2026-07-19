@@ -328,9 +328,3 @@ Tasks carry durable definitions and runtime metadata, including callback, interv
 enablement, run counts, failure counts, last duration, due state, and next-run time. The CLI
 supports registering, listing, inspecting, and removing tasks. Execution remains manually
 invoked and is deferred to M-019.2.
-### M-019.2 — Scheduler Runtime
-
-- Added deterministic one-shot execution for due and explicitly named scheduler tasks.
-- Added shell-free callback parsing, execution timing, success/failure counters, bounded history, runtime locking, stale-lock recovery, and best-effort module event publication.
-- Added CLI commands for run, dry-run, and execution history.
-- Added scheduler runtime tests for success, failure, due selection, dry runs, history limits, event isolation, and overlap protection.

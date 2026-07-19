@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_DIR="/opt/project-atlas"
+ATLAS_CONFIG_FILE="$PROJECT_DIR/config/atlas.conf"
+ATLAS_MODULE_CONFIG_FILE="$PROJECT_DIR/config/modules/modules.conf"
+ATLAS_CLI_ROOT="$PROJECT_DIR/scripts"
+
+if [[ ! -f "$ATLAS_CONFIG_FILE" ]]; then
+  echo "Missing Atlas config: $ATLAS_CONFIG_FILE"
+  exit 1
+fi
+
+source "$ATLAS_CONFIG_FILE"
+
+if [[ -f "$ATLAS_MODULE_CONFIG_FILE" ]]; then
+  source "$ATLAS_MODULE_CONFIG_FILE"
+fi
+
+source "$ATLAS_CLI_ROOT/lib/common.sh"
+
+source "$ATLAS_CLI_ROOT/commands/help.sh"
+source "$ATLAS_CLI_ROOT/commands/version.sh"
+source "$ATLAS_CLI_ROOT/commands/status.sh"
+source "$ATLAS_CLI_ROOT/commands/services.sh"
+source "$ATLAS_CLI_ROOT/commands/urls.sh"
+source "$ATLAS_CLI_ROOT/commands/git.sh"
+source "$ATLAS_CLI_ROOT/commands/restart.sh"
+source "$ATLAS_CLI_ROOT/commands/logs.sh"
+source "$ATLAS_CLI_ROOT/commands/ari.sh"
+source "$ATLAS_CLI_ROOT/commands/module.sh"
+
+# shellcheck disable=SC1091
+source "$ATLAS_CLI_ROOT/commands/event.sh"
+
+source "$ATLAS_CLI_ROOT/commands/verify.sh"
+source "$ATLAS_CLI_ROOT/commands/doctor.sh"
+source "$ATLAS_CLI_ROOT/commands/update.sh"
+source "$ATLAS_CLI_ROOT/commands/backup.sh"
+source "$ATLAS_CLI_ROOT/commands/test.sh"
+source "$ATLAS_CLI_ROOT/commands/health.sh"
+source "$ATLAS_CLI_ROOT/commands/scheduler.sh"
+
+atlas_initialize
+
+cd "$ATLAS_PROJECT_DIR"
+
+command="${1:-help}"
+
+print_header() {
+  echo "Project Atlas"
+  echo "Simplicity Meets Ingenuity"
+  echo
+}
+
+case "$command" in
+  help)
+    atlas_command_help
+    ;;
+
+  version)
+    atlas_command_version
+    ;;
+
+  status)
+    atlas_command_status
+    ;;
+
+  services)
+    atlas_command_services
+    ;;
+
+  urls)
+    atlas_command_urls
+    ;;
+
+  git)
+    atlas_command_git
+    ;;
+
+  modules)
+    atlas_command_modules
+    ;;
+
+  module)
+    atlas_command_module "${@:2}"
+    ;;
+
+  verify)
+    atlas_command_verify
+    ;;
+
+  doctor)
+    atlas_command_doctor
+    ;;
+
+  update)
+    atlas_command_update
+    ;;
+
+  backup)
+    atlas_command_backup "${2:-}" "${3:-}"
+    ;;
+
+  restart)
+    atlas_command_restart
+    ;;
+
+  logs)
+    atlas_command_logs "${2:-}"
+    ;;
+
+  ari)
+    atlas_command_ari "${@:2}"
+    ;;
+
+  event)
+    atlas_command_event "${@:2}"
+    ;;
+
+  test)
+    atlas_command_test "${2:-all}"
+    ;;
+
+  health)
+    atlas_command_health "${2:-json}"
+    ;;
+
+  scheduler)
+    atlas_command_scheduler "${@:2}"
+    ;;
+
+  *)
+    echo "Unknown command: $command"
+    echo "Run: atlas help"
+    exit 1
+    ;;
+esac
