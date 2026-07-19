@@ -371,6 +371,40 @@ class ModuleSchedulerTests(unittest.TestCase):
             self._sync("unknown")
 
 
+class SportsSchedulerManifestTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.project_directory = Path(__file__).resolve().parents[2]
+
+    def test_sports_maintenance_uses_module_command_callback(self) -> None:
+        manifest = json.loads(
+            (
+                self.project_directory
+                / "modules"
+                / "sports"
+                / "scheduler.json"
+            ).read_text(encoding="utf-8")
+        )
+
+        self.assertEqual(manifest["schema_version"], 1)
+        self.assertEqual(len(manifest["jobs"]), 1)
+        job = manifest["jobs"][0]
+        self.assertEqual(job["name"], "maintenance")
+        self.assertEqual(job["callback"], "scripts/maintenance_job.py")
+        self.assertEqual(job["interval_seconds"], 3600)
+
+    def test_sports_worker_has_no_private_scheduler(self) -> None:
+        worker_source = (
+            self.project_directory
+            / "modules"
+            / "sports"
+            / "src"
+            / "worker.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertNotIn("TaskScheduler", worker_source)
+        self.assertNotIn("run_scheduled_maintenance", worker_source)
+
+
 class ModuleSchedulerCliTests(unittest.TestCase):
     def test_cli_sync_registers_module_job(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

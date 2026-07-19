@@ -1,45 +1,68 @@
 {
-  "schema_version": 1,
   "commands": {
     "follow-event": {
+      "arguments": [
+        "follow-event"
+      ],
       "callback": "src/sports_cli.py",
-      "arguments": ["follow-event"],
       "description": "Follow a Sports event for a user"
     },
     "follow-league": {
+      "arguments": [
+        "follow-league"
+      ],
       "callback": "src/sports_cli.py",
-      "arguments": ["follow-league"],
       "description": "Follow a Sports league for a user"
     },
     "follow-team": {
+      "arguments": [
+        "follow-team"
+      ],
       "callback": "src/sports_cli.py",
-      "arguments": ["follow-team"],
       "description": "Follow a Sports team for a user"
     },
+    "maintenance": {
+      "arguments": [
+        "--apply"
+      ],
+      "callback": "src/maintenance.py",
+      "description": "Apply Sports artifact and metadata maintenance"
+    },
     "search": {
+      "arguments": [
+        "search"
+      ],
       "callback": "src/sports_cli.py",
-      "arguments": ["search"],
       "description": "Search Sports providers"
     },
     "subscribe": {
+      "arguments": [
+        "subscribe"
+      ],
       "callback": "src/sports_cli.py",
-      "arguments": ["subscribe"],
       "description": "Create a Sports subscription"
     },
     "subscriptions": {
+      "arguments": [
+        "subscriptions"
+      ],
       "callback": "src/sports_cli.py",
-      "arguments": ["subscriptions"],
       "description": "List Sports subscriptions"
     },
     "unsubscribe": {
+      "arguments": [
+        "unsubscribe"
+      ],
       "callback": "src/sports_cli.py",
-      "arguments": ["unsubscribe"],
       "description": "Remove a Sports subscription"
     },
     "upcoming": {
+      "arguments": [
+        "upcoming"
+      ],
       "callback": "src/sports_cli.py",
-      "arguments": ["upcoming"],
       "description": "List upcoming games for a team"
     }
-  }
+  },
+  "schema_version": 1
 }

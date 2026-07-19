@@ -348,3 +348,11 @@ invoked and is deferred to M-019.2.
 - Added safe command discovery and execution through `atlas module commands` and `atlas module exec`.
 - Enforced enabled-module checks, callback containment, command allowlisting, and exit-code propagation.
 - Added the Sports module as the reference command-manifest implementation while preserving its existing CLI shortcut.
+
+## M-019.5 — Sports Scheduler Integration
+
+- Added the Sports `scheduler.json` manifest for hourly maintenance.
+- Added an allowlisted `maintenance` module command using the existing maintenance implementation.
+- Added a scheduler callback that delegates through the Atlas Module Command Interface.
+- Removed the private Sports `TaskScheduler` and maintenance timing state from `worker.py`.
+- Added tests confirming the Sports scheduler contract and removal of duplicate scheduling logic.

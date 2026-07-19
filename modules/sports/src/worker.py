@@ -11,9 +11,6 @@ from pathlib import Path
 from typing import Any
 
 from atlas.events import publish_event
-from atlas.scheduler import TaskScheduler
-
-import maintenance
 from controller import load_state, process_games
 from health import write_health_report
 from providers.registry import enabled_providers
@@ -86,39 +83,6 @@ def environment_boolean(
         f"{variable_name} must be a boolean value"
     )
 
-
-MAINTENANCE_ENABLED = environment_boolean(
-    "SPORTS_MAINTENANCE_ENABLED",
-    True,
-)
-
-MAINTENANCE_INTERVAL_SECONDS = int(
-    os.getenv(
-        "SPORTS_MAINTENANCE_INTERVAL_SECONDS",
-        "3600",
-    )
-)
-
-MAINTENANCE_DRY_RUN = environment_boolean(
-    "SPORTS_MAINTENANCE_DRY_RUN",
-    False,
-)
-
-TASK_SCHEDULER_STATE_FILE = Path(
-    os.getenv(
-        "SPORTS_TASK_SCHEDULER_STATE_FILE",
-        (
-            "/mnt/storage/configs/atlas/runtime/"
-            "scheduler/sports.json"
-        ),
-    )
-)
-
-TASK_SCHEDULER = TaskScheduler(
-    TASK_SCHEDULER_STATE_FILE
-)
-
-MAINTENANCE_TASK_NAME = "sports.maintenance"
 
 
 def utc_now() -> str:
@@ -492,99 +456,6 @@ def recording_counts(
     }
 
 
-def run_scheduled_maintenance() -> dict[str, Any] | None:
-    """Run persistent Sports maintenance when it becomes due."""
-    if not MAINTENANCE_ENABLED:
-        return None
-
-    if not TASK_SCHEDULER.due(
-        MAINTENANCE_TASK_NAME,
-        MAINTENANCE_INTERVAL_SECONDS,
-    ):
-        return None
-
-    TASK_SCHEDULER.started(
-        MAINTENANCE_TASK_NAME
-    )
-
-    try:
-        report = maintenance.run_maintenance(
-            dry_run=MAINTENANCE_DRY_RUN
-        )
-    except Exception as error:
-        TASK_SCHEDULER.failed(
-            MAINTENANCE_TASK_NAME,
-            str(error),
-        )
-
-        print(
-            "Sports maintenance failed: "
-            f"{error}",
-            file=sys.stderr,
-        )
-
-        return None
-
-    error_count = len(
-        report.get(
-            "errors",
-            [],
-        )
-    )
-
-    if error_count:
-        error_message = (
-            "Sports maintenance completed with "
-            f"{error_count} error(s)"
-        )
-
-        TASK_SCHEDULER.failed(
-            MAINTENANCE_TASK_NAME,
-            error_message,
-        )
-
-        print(
-            error_message,
-            file=sys.stderr,
-        )
-
-        return report
-
-    summary = report.get(
-        "summary",
-        {},
-    )
-
-    if not isinstance(summary, dict):
-        summary = {}
-
-    TASK_SCHEDULER.succeeded(
-        MAINTENANCE_TASK_NAME,
-        details={
-            "dry_run": bool(
-                report.get("dry_run")
-            ),
-            "status": str(
-                report.get(
-                    "status",
-                    "unknown",
-                )
-            ),
-            **summary,
-        },
-    )
-
-    print(
-        "Sports maintenance complete: "
-        f"dry_run={report.get('dry_run')}, "
-        f"removed={summary.get('removed', 0)}, "
-        "metadata_pruned="
-        f"{summary.get('metadata_pruned', 0)}, "
-        f"protected={summary.get('protected', 0)}"
-    )
-
-    return report
-
 
 def run_operations_pipeline(
     provider_result: dict[str, Any],
@@ -623,7 +494,6 @@ def run_operations_pipeline(
         provider_health
     )
 
-    run_scheduled_maintenance()
 
     write_heartbeat()
 
