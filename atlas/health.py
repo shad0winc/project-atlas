@@ -241,6 +241,106 @@ def collect_foundation_health(project_dir: str | Path | None = None) -> HealthRe
     return report
 
 
+
+def _module_enabled(state_file: Path, module: str) -> bool:
+    """Return whether a module is enabled in the Atlas module state file."""
+
+    variable = f"ATLAS_MODULE_{module.upper().replace('-', '_')}_ENABLED"
+    try:
+        lines = state_file.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return False
+
+    for line in lines:
+        key, separator, value = line.partition("=")
+        if separator and key.strip() == variable:
+            return value.strip().lower() == "true"
+    return False
+
+
+def collect_module_health(
+    project_dir: str | Path,
+    *,
+    runner: CommandRunner = _run,
+) -> list[HealthCheck]:
+    """Discover enabled module health providers and normalize their results."""
+
+    root = Path(project_dir)
+    modules_dir = root / "modules"
+    state_file = root / "config" / "modules" / "modules.conf"
+    checks: list[HealthCheck] = []
+
+    if not modules_dir.is_dir():
+        return checks
+
+    for module_dir in sorted(modules_dir.iterdir()):
+        module = module_dir.name
+        if module == "template" or not (module_dir / "module.conf").is_file():
+            continue
+        if not _module_enabled(state_file, module):
+            continue
+
+        python_provider = module_dir / "scripts" / "health.py"
+        shell_provider = module_dir / "scripts" / "health.sh"
+        if python_provider.is_file():
+            command = ("python3", str(python_provider))
+        elif shell_provider.is_file():
+            command = (str(shell_provider),)
+        else:
+            continue
+
+        category = f"module:{module}"
+        try:
+            result = runner(command)
+        except (OSError, subprocess.SubprocessError) as exc:
+            checks.append(HealthCheck(
+                name=f"{module} Health Provider",
+                category=category,
+                status=HealthStatus.CRITICAL,
+                message="Module health provider could not be executed",
+                details={"error": str(exc), "provider": str(command[0])},
+            ))
+            continue
+
+        if result.returncode != 0:
+            checks.append(HealthCheck(
+                name=f"{module} Health Provider",
+                category=category,
+                status=HealthStatus.CRITICAL,
+                message="Module health provider failed",
+                details={
+                    "returncode": result.returncode,
+                    "error": (result.stderr or result.stdout).strip()[:300],
+                },
+            ))
+            continue
+
+        try:
+            payload = json.loads(result.stdout)
+            raw_checks = payload.get("checks", []) if isinstance(payload, dict) else payload
+            if not isinstance(raw_checks, list):
+                raise ValueError("module payload must contain a checks list")
+            for item in raw_checks:
+                if not isinstance(item, dict):
+                    raise ValueError("module checks must be JSON objects")
+                checks.append(HealthCheck(
+                    name=item["name"],
+                    category=category,
+                    status=item["status"],
+                    message=item.get("message", ""),
+                    details={"module": module, **dict(item.get("details", {}))},
+                ))
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            checks.append(HealthCheck(
+                name=f"{module} Health Provider",
+                category=category,
+                status=HealthStatus.CRITICAL,
+                message="Module health provider returned an invalid contract",
+                details={"error": str(exc)},
+            ))
+
+    return checks
+
 def collect_operational_health(
     *,
     project_dir: str | Path | None = None,
@@ -347,6 +447,7 @@ def collect_operational_health(
     ):
         report.add(_path_check(relative, "project", root / relative))
 
+    report.extend(collect_module_health(root, runner=runner))
     return report
 
 

@@ -122,3 +122,10 @@
 
 - Expanded the Health Engine with infrastructure, service, storage, project, and Git diagnostics.
 - Migrated `atlas doctor` to the shared Health Engine text renderer.
+
+### M-018.3 — Module Health Integration
+
+- Added automatic discovery of enabled module health providers.
+- Added a normalized JSON health-provider contract for Atlas modules.
+- Added Sports runtime health reporting for containers, heartbeat, providers, and endpoint reachability.
+- Added Core tests for enabled, disabled, and malformed module health providers.

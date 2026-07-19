@@ -312,3 +312,11 @@ Existing `status`, `services`, `verify`, and `doctor` behavior remains unchanged
 - Added shared operational collectors to `atlas.health`.
 - Migrated `atlas doctor` to render the Health Engine report.
 - Preserved `atlas verify` and `atlas services` for the next migration section.
+
+## M-018.3 — Module Health Integration
+
+Atlas Health Engine now discovers health providers under `modules/<module>/scripts/health.py`
+or `health.sh` for enabled modules. Provider output is normalized into Core `HealthCheck`
+objects and appears automatically in both `atlas health` and `atlas doctor`. Sports is the
+first module implementation and reports container state, controller heartbeat freshness,
+provider health, and endpoint availability without introducing Sports-specific logic into Core.

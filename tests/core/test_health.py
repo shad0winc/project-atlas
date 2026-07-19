@@ -10,6 +10,7 @@ from atlas.health import (
     HealthStatus,
     _command_check,
     collect_foundation_health,
+    collect_module_health,
     collect_operational_health,
     render_text,
 )
@@ -147,6 +148,57 @@ class OperationalHealthTests(unittest.TestCase):
         self.assertIn("Overall Status: HEALTHY", rendered)
         self.assertIn("Overall Score:  100%", rendered)
         self.assertIn("OK      Docker", rendered)
+
+
+class ModuleHealthTests(unittest.TestCase):
+    def _project(self, root: Path, *, enabled: bool = True) -> Path:
+        project = root / "project"
+        (project / "config" / "modules").mkdir(parents=True)
+        (project / "modules" / "sports" / "scripts").mkdir(parents=True)
+        (project / "modules" / "sports" / "module.conf").write_text("", encoding="utf-8")
+        (project / "config" / "modules" / "modules.conf").write_text(
+            f"ATLAS_MODULE_SPORTS_ENABLED={'true' if enabled else 'false'}\n",
+            encoding="utf-8",
+        )
+        return project
+
+    def test_enabled_module_health_is_normalized(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            project = self._project(Path(temporary_directory))
+            (project / "modules" / "sports" / "scripts" / "health.py").write_text("", encoding="utf-8")
+
+            def runner(command):
+                payload = {"checks": [{
+                    "name": "Feed", "status": "healthy", "message": "reachable"
+                }]}
+                return subprocess.CompletedProcess(command, 0, stdout=json.dumps(payload), stderr="")
+
+            checks = collect_module_health(project, runner=runner)
+
+        self.assertEqual(len(checks), 1)
+        self.assertEqual(checks[0].category, "module:sports")
+        self.assertEqual(checks[0].details["module"], "sports")
+
+    def test_disabled_module_health_is_skipped(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            project = self._project(Path(temporary_directory), enabled=False)
+            (project / "modules" / "sports" / "scripts" / "health.py").write_text("", encoding="utf-8")
+            checks = collect_module_health(project)
+
+        self.assertEqual(checks, [])
+
+    def test_invalid_module_contract_is_critical(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            project = self._project(Path(temporary_directory))
+            (project / "modules" / "sports" / "scripts" / "health.py").write_text("", encoding="utf-8")
+
+            def runner(command):
+                return subprocess.CompletedProcess(command, 0, stdout="not-json", stderr="")
+
+            checks = collect_module_health(project, runner=runner)
+
+        self.assertEqual(checks[0].status, HealthStatus.CRITICAL)
+        self.assertIn("invalid contract", checks[0].message)
 
 
 if __name__ == "__main__":
