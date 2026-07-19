@@ -365,3 +365,12 @@ invoked and is deferred to M-019.2.
 - Added `atlas users` and `atlas user` commands for creation, inspection, updates, enable/disable, Jellyfin linking, and verification.
 - Added focused Core tests for profile storage, validation, registry consistency, and CLI lifecycle operations.
 - Passwords remain owned by Jellyfin and are not stored by Atlas.
+
+## M-020.2 Patch 1 — Identity Infrastructure
+
+- Added a shared Atlas identity runtime layout under the persistent configuration root.
+- Added secure one-time invitation token generation with SHA-256-only durable storage.
+- Added pending, completed, revoked, and expired invitation lifecycle handling.
+- Added atomic invitation registry and record persistence with path-containment and schema validation.
+- Added expiration cleanup, storage verification, and focused Core unit tests.
+- Deferred CLI commands, registration, Jellyfin provisioning, email delivery, and portal integration to later M-020.2 patches.

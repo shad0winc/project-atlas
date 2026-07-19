@@ -304,6 +304,8 @@ Every module follows the Atlas Module SDK and can be installed, enabled, updated
 
 ### M-020.2 — Invitation and Registration
 
+- [x] Identity runtime layout and invitation persistence
+- [x] Secure hashed invitation tokens and lifecycle validation
 - [ ] Email invitations
 - [ ] Shareable invitation links
 - [ ] Expiring single-use tokens
