@@ -119,3 +119,6 @@
 - Improved CLI
 - Enhanced validation
 - Runtime state management
+
+- Expanded the Health Engine with infrastructure, service, storage, project, and Git diagnostics.
+- Migrated `atlas doctor` to the shared Health Engine text renderer.

@@ -306,3 +306,9 @@ Result: eight Core tests passed.
 ### Scope
 
 Existing `status`, `services`, `verify`, and `doctor` behavior remains unchanged. Migration to the shared engine is deferred to later M-018 sections.
+
+## 2026-07-19 — M-018.2 Health diagnostics migration
+
+- Added shared operational collectors to `atlas.health`.
+- Migrated `atlas doctor` to render the Health Engine report.
+- Preserved `atlas verify` and `atlas services` for the next migration section.
