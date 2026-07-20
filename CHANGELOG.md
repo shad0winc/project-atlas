@@ -145,3 +145,19 @@ All notable changes to Project Atlas are documented in this file.
 - Homepage dashboard.
 - Environment template.
 - Configuration documentation.
+
+### Added
+
+- Cleanup execution planning infrastructure with normalized execution models and reports.
+- Provider-neutral CleanupExecutionService for converting cleanup scan reports into non-destructive execution plans.
+- `atlas cleanup execute` CLI with human-readable and JSON output.
+- Dry-run cleanup execution planning for Jellyfin libraries.
+- Cleanup execution CLI regression tests.
+
+### Validation
+
+- Added cleanup execution model, service, and CLI regression coverage.
+- Verified focused cleanup execution tests (13 passing).
+- Verified cleanup regression suite (70 passing).
+- Verified full Atlas Core regression suite (229 passing).
+- Live-tested `atlas cleanup execute jellyfin --dry-run` in human-readable and JSON modes.

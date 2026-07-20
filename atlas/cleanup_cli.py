@@ -7,6 +7,8 @@ import json
 import sys
 from collections.abc import Sequence
 
+from atlas.cleanup.execution_models import CleanupExecutionReport
+from atlas.cleanup.execution_service import CleanupExecutionService
 from atlas.cleanup.models import CleanupDecision, CleanupError
 from atlas.cleanup.scan_models import CleanupScanReport
 from atlas.cleanup.scanner import CleanupScanner
@@ -69,6 +71,33 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         dest="json_output",
         help="Output the cleanup scan report as JSON.",
+    )
+
+    execute_parser = subparsers.add_parser(
+        "execute",
+        help="Build a non-destructive cleanup execution plan.",
+    )
+    execute_parser.add_argument(
+        "provider",
+        help="Media provider name, such as jellyfin.",
+    )
+    execute_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=True,
+        help="Plan cleanup actions without modifying media.",
+    )
+    execute_parser.add_argument(
+        "--page-size",
+        type=int,
+        default=200,
+        help="Number of provider items requested per page.",
+    )
+    execute_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="Output the cleanup execution report as JSON.",
     )
 
     return parser
@@ -135,11 +164,49 @@ def render_scan_human(report: CleanupScanReport) -> str:
     )
 
 
+def render_execution_human(
+    report: CleanupExecutionReport,
+) -> str:
+    """Render a cleanup execution report for terminal users."""
+
+    planned_items = tuple(
+        item
+        for item in report.items
+        if item.status.value == "planned"
+    )
+
+    planned = (
+        "\n".join(
+            f"  - {item.item_id}"
+            for item in planned_items
+        )
+        if planned_items
+        else "  - None"
+    )
+
+    return "\n".join(
+        [
+            "Atlas Cleanup Execution",
+            "-----------------------",
+            f"Provider: {report.provider}",
+            f"Mode: {report.mode.value}",
+            f"Total: {report.total}",
+            f"Planned: {report.planned_count}",
+            f"Skipped: {report.skipped_count}",
+            f"Modified: {report.modified_count}",
+            "Planned items:",
+            planned,
+            f"Created at: {report.created_at}",
+        ]
+    )
+
+
 def main(
     argv: Sequence[str] | None = None,
     *,
     service: CleanupService | None = None,
     scanner: CleanupScanner | None = None,
+    execution_service: CleanupExecutionService | None = None,
     jellyfin_provider: JellyfinProvider | None = None,
 ) -> int:
     """Run the Cleanup CLI."""
@@ -173,12 +240,17 @@ def main(
 
             return 0
 
-        if args.command == "scan":
+        if args.command in {"scan", "execute"}:
             provider_name = args.provider.strip().lower()
 
             if provider_name != "jellyfin":
+                operation = (
+                    "scan"
+                    if args.command == "scan"
+                    else "execution"
+                )
                 raise CleanupError(
-                    "unsupported cleanup scan provider: "
+                    f"unsupported cleanup {operation} provider: "
                     f"{provider_name or args.provider}"
                 )
 
@@ -198,21 +270,50 @@ def main(
                 else CleanupScanner(cleanup_service)
             )
 
-            report = cleanup_scanner.scan(
+            scan_report = cleanup_scanner.scan(
                 provider_name,
                 item_ids,
+            )
+
+            if args.command == "scan":
+                if args.json_output:
+                    print(
+                        json.dumps(
+                            scan_report.to_dict(),
+                            indent=2,
+                            sort_keys=True,
+                        )
+                    )
+                else:
+                    print(render_scan_human(scan_report))
+
+                return 0
+
+            planner = (
+                execution_service
+                if execution_service is not None
+                else CleanupExecutionService()
+            )
+
+            execution_report = planner.plan(
+                scan_report,
+                mode="dry_run",
             )
 
             if args.json_output:
                 print(
                     json.dumps(
-                        report.to_dict(),
+                        execution_report.to_dict(),
                         indent=2,
                         sort_keys=True,
                     )
                 )
             else:
-                print(render_scan_human(report))
+                print(
+                    render_execution_human(
+                        execution_report
+                    )
+                )
 
             return 0
 
@@ -222,10 +323,13 @@ def main(
         ValueError,
         RuntimeError,
     ) as exc:
-        operation = (
-            "evaluation"
-            if args.command == "evaluate"
-            else "scan"
+        operation = {
+            "evaluate": "evaluation",
+            "scan": "scan",
+            "execute": "execution",
+        }.get(
+            args.command,
+            args.command,
         )
 
         print(

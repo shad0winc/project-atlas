@@ -400,3 +400,52 @@ Added:
 Core Tests:
 167 passing
 0 failures
+
+---
+
+# 2026-07-20
+
+## M-023.3 — Cleanup Execution Planning
+
+### Objective
+
+Introduce a non-destructive execution layer that converts cleanup scan results into an execution plan while guaranteeing that no media or provider state is modified.
+
+### Completed
+
+- Added normalized cleanup execution models.
+- Added CleanupExecutionService.
+- Added dry-run execution planning.
+- Added execution report rendering.
+- Added `atlas cleanup execute`.
+- Added JSON execution output.
+- Added human-readable execution output.
+- Added execution CLI dependency injection.
+- Added focused execution model, service, and CLI tests.
+
+### Verification
+
+- `git diff --check` passed.
+- Focused cleanup execution tests: 13 passing.
+- Cleanup regression suite: 70 passing.
+- Full Atlas Core regression suite: 229 passing.
+- Live execution of `atlas cleanup execute jellyfin --dry-run`.
+- Live execution of `atlas cleanup execute jellyfin --dry-run --json`.
+
+### Result
+
+Atlas now provides a complete read-only cleanup planning pipeline:
+
+Jellyfin Provider
+    ↓
+Cleanup Scanner
+    ↓
+Cleanup Execution Planner
+    ↓
+Human / JSON Report
+
+No filesystem mutations.
+No Jellyfin modifications.
+No deletion logic.
+Execution planning remains intentionally dry-run only.
+

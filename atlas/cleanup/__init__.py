@@ -1,5 +1,14 @@
 """Atlas cleanup evaluation framework."""
 
+from atlas.cleanup.execution_models import (
+    CleanupExecutionItem,
+    CleanupExecutionMode,
+    CleanupExecutionReport,
+    CleanupExecutionStatus,
+)
+from atlas.cleanup.execution_service import (
+    CleanupExecutionService,
+)
 from atlas.cleanup.models import (
     CleanupAction,
     CleanupDecision,
@@ -13,6 +22,11 @@ __all__ = [
     "CleanupAction",
     "CleanupDecision",
     "CleanupError",
+    "CleanupExecutionItem",
+    "CleanupExecutionMode",
+    "CleanupExecutionReport",
+    "CleanupExecutionService",
+    "CleanupExecutionStatus",
     "CleanupScanReport",
     "CleanupScanner",
     "CleanupService",
