@@ -4,13 +4,23 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any, Callable
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
-from atlas.media.provider import MediaItem, MediaProviderError
+from atlas.media.provider import (
+    MediaItem,
+    MediaProviderError,
+    ProviderMutationResult,
+    ProviderOperation,
+)
+
+
+class _JellyfinResourceNotFoundError(MediaProviderError):
+    """Raised when Jellyfin returns HTTP 404."""
 
 
 _TYPE_MAP = {
@@ -21,6 +31,15 @@ _TYPE_MAP = {
 }
 
 
+Clock = Callable[[], datetime]
+
+
+def _utc_now() -> datetime:
+    """Return the current UTC time."""
+
+    return datetime.now(timezone.utc)
+
+
 @dataclass(frozen=True)
 class JellyfinProvider:
     """Jellyfin-backed Atlas media provider."""
@@ -28,6 +47,11 @@ class JellyfinProvider:
     base_url: str
     api_key: str
     timeout: float = 10.0
+    clock: Clock = field(
+        default=_utc_now,
+        repr=False,
+        compare=False,
+    )
 
     @property
     def name(self) -> str:
@@ -120,6 +144,59 @@ class JellyfinProvider:
             _TYPE_MAP.get(raw_type, "other"),
             title,
             metadata,
+        )
+
+    def preview_delete_item(
+        self,
+        item_id: str,
+    ) -> ProviderMutationResult:
+        """Verify an item for deletion without modifying Jellyfin."""
+
+        normalized_id = _required(
+            item_id,
+            "item_id",
+        )
+
+        try:
+            self.get_item(normalized_id)
+        except _JellyfinResourceNotFoundError:
+            return ProviderMutationResult(
+                provider=self.name,
+                operation=ProviderOperation.DELETE,
+                item_id=normalized_id,
+                success=False,
+                message="Item not found",
+                executed_at=self._executed_at(),
+            )
+
+        return ProviderMutationResult(
+            provider=self.name,
+            operation=ProviderOperation.DELETE,
+            item_id=normalized_id,
+            success=True,
+            message="Preview verified",
+            executed_at=self._executed_at(),
+        )
+
+    def _executed_at(self) -> str:
+        """Return a validated UTC provider-operation timestamp."""
+
+        value = self.clock()
+
+        if not isinstance(value, datetime):
+            raise MediaProviderError(
+                "clock must return a datetime"
+            )
+
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise MediaProviderError(
+                "clock must return a timezone-aware datetime"
+            )
+
+        return (
+            value.astimezone(timezone.utc)
+            .isoformat()
+            .replace("+00:00", "Z")
         )
 
     def list_media_item_ids(
@@ -261,7 +338,7 @@ class JellyfinProvider:
                 )
         except HTTPError as exc:
             if exc.code == 404:
-                raise MediaProviderError(
+                raise _JellyfinResourceNotFoundError(
                     "Jellyfin resource not found"
                 ) from exc
 
