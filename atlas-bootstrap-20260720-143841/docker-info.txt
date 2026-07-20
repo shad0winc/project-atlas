@@ -1,0 +1,430 @@
+===== compose config =====
+name: project-atlas
+services:
+  bazarr:
+    container_name: bazarr
+    environment:
+      PGID: "1000"
+      PUID: "1000"
+      TZ: America/New_York
+    image: lscr.io/linuxserver/bazarr:latest
+    networks:
+      atlas: null
+    ports:
+      - mode: ingress
+        target: 6767
+        published: "6767"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /mnt/storage/configs/bazarr
+        target: /config
+        bind: {}
+      - type: bind
+        source: /mnt/storage/media
+        target: /media
+        bind: {}
+  dozzle:
+    container_name: dozzle
+    image: amir20/dozzle:latest
+    networks:
+      atlas: null
+    ports:
+      - mode: ingress
+        target: 8080
+        published: "9999"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+        read_only: true
+        bind: {}
+  gluetun:
+    cap_add:
+      - NET_ADMIN
+    container_name: gluetun
+    devices:
+      - source: /dev/net/tun
+        target: /dev/net/tun
+        permissions: rwm
+    environment:
+      FIREWALL: "on"
+      OPENVPN_PASSWORD: 2yndagm389
+      OPENVPN_USER: shad0winc_uk64fb
+      SERVER_REGIONS: Switzerland
+      TZ: America/New_York
+      VPN_SERVICE_PROVIDER: windscribe
+      VPN_TYPE: openvpn
+    image: qmcgaw/gluetun:latest
+    networks:
+      atlas: null
+    ports:
+      - mode: ingress
+        target: 8080
+        published: "8080"
+        protocol: tcp
+      - mode: ingress
+        target: 6881
+        published: "6881"
+        protocol: tcp
+      - mode: ingress
+        target: 6881
+        published: "6881"
+        protocol: udp
+    restart: unless-stopped
+  homepage:
+    container_name: homepage
+    environment:
+      HOMEPAGE_ALLOWED_HOSTS: '*'
+      PGID: "1000"
+      PUID: "1000"
+      TZ: America/New_York
+    image: ghcr.io/gethomepage/homepage:latest
+    networks:
+      atlas: null
+    ports:
+      - mode: ingress
+        target: 3000
+        published: "3000"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /mnt/storage/configs/homepage
+        target: /app/config
+        bind: {}
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+        read_only: true
+        bind: {}
+  jellyfin:
+    container_name: jellyfin
+    devices:
+      - source: /dev/dri
+        target: /dev/dri
+        permissions: rwm
+    environment:
+      TZ: America/New_York
+    group_add:
+      - "44"
+      - "104"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -fsS http://localhost:8096/health || exit 1
+      timeout: 10s
+      interval: 30s
+      retries: 10
+      start_period: 1m0s
+    image: jellyfin/jellyfin:latest
+    networks:
+      atlas: null
+    ports:
+      - mode: ingress
+        target: 8096
+        published: "8096"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /mnt/storage/configs/jellyfin
+        target: /config
+        bind: {}
+      - type: bind
+        source: /mnt/storage/configs/jellyfin-cache
+        target: /cache
+        bind: {}
+      - type: bind
+        source: /mnt/storage/media
+        target: /media
+        bind: {}
+  jellyseerr:
+    container_name: jellyseerr
+    depends_on:
+      jellyfin:
+        condition: service_started
+        required: true
+      radarr:
+        condition: service_started
+        required: true
+      sonarr:
+        condition: service_started
+        required: true
+    environment:
+      LOG_LEVEL: info
+      TZ: America/New_York
+    image: fallenbagel/jellyseerr:latest
+    networks:
+      atlas: null
+    ports:
+      - mode: ingress
+        target: 5055
+        published: "5055"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /mnt/storage/configs/jellyseerr
+        target: /app/config
+        bind: {}
+  maintainerr:
+    container_name: maintainerr
+    depends_on:
+      jellyfin:
+        condition: service_started
+        required: true
+      radarr:
+        condition: service_started
+        required: true
+      sonarr:
+        condition: service_started
+        required: true
+    environment:
+      TZ: America/New_York
+    image: ghcr.io/jorenn92/maintainerr:latest
+    networks:
+      atlas: null
+    ports:
+      - mode: ingress
+        target: 6246
+        published: "6246"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /mnt/storage/configs/maintainerr
+        target: /opt/data
+        bind: {}
+      - type: bind
+        source: /mnt/storage/media
+        target: /media
+        bind: {}
+  prowlarr:
+    container_name: prowlarr
+    environment:
+      PGID: "1000"
+      PUID: "1000"
+      TZ: America/New_York
+    image: lscr.io/linuxserver/prowlarr:latest
+    networks:
+      atlas: null
+    ports:
+      - mode: ingress
+        target: 9696
+        published: "9696"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /mnt/storage/configs/prowlarr
+        target: /config
+        bind: {}
+  qbittorrent:
+    container_name: qbittorrent
+    depends_on:
+      gluetun:
+        condition: service_started
+        required: true
+    environment:
+      PGID: "1000"
+      PUID: "1000"
+      TZ: America/New_York
+      WEBUI_PORT: "8080"
+    image: lscr.io/linuxserver/qbittorrent:latest
+    network_mode: service:gluetun
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /mnt/storage/configs/qbittorrent
+        target: /config
+        bind: {}
+      - type: bind
+        source: /mnt/storage/downloads
+        target: /downloads
+        bind: {}
+  radarr:
+    container_name: radarr
+    environment:
+      PGID: "1000"
+      PUID: "1000"
+      TZ: America/New_York
+    image: lscr.io/linuxserver/radarr:latest
+    networks:
+      atlas: null
+    ports:
+      - mode: ingress
+        target: 7878
+        published: "7878"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /mnt/storage/configs/radarr
+        target: /config
+        bind: {}
+      - type: bind
+        source: /mnt/storage/media
+        target: /media
+        bind: {}
+      - type: bind
+        source: /mnt/storage/downloads
+        target: /downloads
+        bind: {}
+  radarr-anime:
+    container_name: radarr-anime
+    environment:
+      PGID: "1000"
+      PUID: "1000"
+      TZ: America/New_York
+    image: lscr.io/linuxserver/radarr:latest
+    networks:
+      atlas: null
+    ports:
+      - mode: ingress
+        target: 7878
+        published: "7879"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /mnt/storage/configs/radarr-anime
+        target: /config
+        bind: {}
+      - type: bind
+        source: /mnt/storage/media
+        target: /media
+        bind: {}
+      - type: bind
+        source: /mnt/storage/downloads
+        target: /downloads
+        bind: {}
+  sonarr:
+    container_name: sonarr
+    environment:
+      PGID: "1000"
+      PUID: "1000"
+      TZ: America/New_York
+    image: lscr.io/linuxserver/sonarr:latest
+    networks:
+      atlas: null
+    ports:
+      - mode: ingress
+        target: 8989
+        published: "8989"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /mnt/storage/configs/sonarr
+        target: /config
+        bind: {}
+      - type: bind
+        source: /mnt/storage/media
+        target: /media
+        bind: {}
+      - type: bind
+        source: /mnt/storage/downloads
+        target: /downloads
+        bind: {}
+  sonarr-anime:
+    container_name: sonarr-anime
+    environment:
+      PGID: "1000"
+      PUID: "1000"
+      TZ: America/New_York
+    image: lscr.io/linuxserver/sonarr:latest
+    networks:
+      atlas: null
+    ports:
+      - mode: ingress
+        target: 8989
+        published: "8990"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /mnt/storage/configs/sonarr-anime
+        target: /config
+        bind: {}
+      - type: bind
+        source: /mnt/storage/media
+        target: /media
+        bind: {}
+      - type: bind
+        source: /mnt/storage/downloads
+        target: /downloads
+        bind: {}
+  tautulli:
+    container_name: tautulli
+    depends_on:
+      jellyfin:
+        condition: service_started
+        required: true
+    environment:
+      PGID: "1000"
+      PUID: "1000"
+      TZ: America/New_York
+    image: lscr.io/linuxserver/tautulli:latest
+    networks:
+      atlas: null
+    ports:
+      - mode: ingress
+        target: 8181
+        published: "8181"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /mnt/storage/configs/tautulli
+        target: /config
+        bind: {}
+networks:
+  atlas:
+    name: atlas
+    driver: bridge
+
+===== containers =====
+CONTAINER ID   IMAGE                                      COMMAND                  CREATED        STATUS                  PORTS                                                                                                                                                                                               NAMES
+06463c450938   project-atlas-atlas-sports-controller      "python3 /opt/projec…"   39 hours ago   Up 39 hours (healthy)                                                                                                                                                                                                       atlas-sports-controller
+404bd79f76cc   nginx:alpine                               "/docker-entrypoint.…"   2 days ago     Up 2 days (healthy)     80/tcp, 0.0.0.0:8097->8080/tcp, [::]:8097->8080/tcp                                                                                                                                                 atlas-sports-feed
+c55e72632ebd   notifications-atlas-notifications-worker   "/opt/project-atlas/…"   7 days ago     Up 7 days (healthy)                                                                                                                                                                                                         atlas-notifications-worker
+527ae3bfb034   lscr.io/linuxserver/sonarr:latest          "/init"                  2 weeks ago    Up 2 weeks              0.0.0.0:8990->8989/tcp, [::]:8990->8989/tcp                                                                                                                                                         sonarr-anime
+a06aeeb2404a   lscr.io/linuxserver/sonarr:latest          "/init"                  2 weeks ago    Up 2 weeks              0.0.0.0:8989->8989/tcp, [::]:8989->8989/tcp                                                                                                                                                         sonarr
+fc712317f98d   lscr.io/linuxserver/bazarr:latest          "/init"                  2 weeks ago    Up 2 weeks              0.0.0.0:6767->6767/tcp, [::]:6767->6767/tcp                                                                                                                                                         bazarr
+8ca43f4bb8e8   lscr.io/linuxserver/radarr:latest          "/init"                  2 weeks ago    Up 2 weeks              0.0.0.0:7879->7878/tcp, [::]:7879->7878/tcp                                                                                                                                                         radarr-anime
+5114b3aa8943   lscr.io/linuxserver/qbittorrent:latest     "/init"                  2 weeks ago    Up 2 weeks                                                                                                                                                                                                                  qbittorrent
+30d78df4d703   qmcgaw/gluetun:latest                      "/gluetun-entrypoint"    2 weeks ago    Up 2 weeks (healthy)    1080/tcp, 0.0.0.0:6881->6881/tcp, [::]:6881->6881/tcp, 8000/tcp, 1080/udp, 8388/tcp, 8888/tcp, 8388/udp, 0.0.0.0:8080->8080/tcp, 0.0.0.0:6881->6881/udp, [::]:8080->8080/tcp, [::]:6881->6881/udp   gluetun
+7be690f98028   ghcr.io/jorenn92/maintainerr:latest        "/opt/app/start.sh"      2 weeks ago    Up 2 weeks              0.0.0.0:6246->6246/tcp, [::]:6246->6246/tcp                                                                                                                                                         maintainerr
+160acf5061fe   fallenbagel/jellyseerr:latest              "/sbin/tini -- pnpm …"   2 weeks ago    Up 2 weeks              0.0.0.0:5055->5055/tcp, [::]:5055->5055/tcp                                                                                                                                                         jellyseerr
+c843dceeef91   lscr.io/linuxserver/radarr:latest          "/init"                  2 weeks ago    Up 2 weeks              0.0.0.0:7878->7878/tcp, [::]:7878->7878/tcp                                                                                                                                                         radarr
+54026c25fb60   lscr.io/linuxserver/tautulli:latest        "/init"                  2 weeks ago    Up 2 weeks              0.0.0.0:8181->8181/tcp, [::]:8181->8181/tcp                                                                                                                                                         tautulli
+8aaecad11a6c   lscr.io/linuxserver/prowlarr:latest        "/init"                  2 weeks ago    Up 2 weeks              0.0.0.0:9696->9696/tcp, [::]:9696->9696/tcp                                                                                                                                                         prowlarr
+9fa3b759e72c   amir20/dozzle:latest                       "/dozzle"                2 weeks ago    Up 2 weeks              0.0.0.0:9999->8080/tcp, [::]:9999->8080/tcp                                                                                                                                                         dozzle
+63de71fa2199   jellyfin/jellyfin:latest                   "/jellyfin/jellyfin"     2 weeks ago    Up 2 weeks (healthy)    0.0.0.0:8096->8096/tcp, [::]:8096->8096/tcp                                                                                                                                                         jellyfin
+3487021be34f   ghcr.io/gethomepage/homepage:latest        "docker-entrypoint.s…"   2 weeks ago    Up 2 weeks (healthy)    0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp                                                                                                                                                         homepage
+
+===== images =====
+IMAGE                                             ID             DISK USAGE   CONTENT SIZE   EXTRA
+amir20/dozzle:latest                              43d933ebda11       89.8MB         21.6MB   U    
+atlas-sports-controller-test:latest               df4760f3c65b        176MB           43MB        
+fallenbagel/jellyseerr:latest                     4538137bc5af       2.12GB          429MB   U    
+ghcr.io/gethomepage/homepage:latest               a0b71c8e7572        371MB         84.5MB   U    
+ghcr.io/jorenn92/maintainerr:latest               bee84707edaf       1.17GB          196MB   U    
+ghcr.io/recyclarr/recyclarr:latest                55afe316d3e4        186MB         55.9MB        
+golift/unpackerr:latest                           4ec141eeb0cb       40.3MB         11.3MB        
+jellyfin/jellyfin:latest                          aefb67e6a7ff       2.27GB          690MB   U    
+lscr.io/linuxserver/bazarr:latest                 5d916d074042        639MB          157MB   U    
+lscr.io/linuxserver/prowlarr:latest               3e9bd62ca90c        286MB         86.3MB   U    
+lscr.io/linuxserver/qbittorrent:latest            163f3384db6c        290MB         88.2MB   U    
+lscr.io/linuxserver/radarr:latest                 39da107b5a93        322MB         96.9MB   U    
+lscr.io/linuxserver/sonarr:latest                 633e0e66d85c        299MB         89.8MB   U    
+lscr.io/linuxserver/tautulli:latest               fb1a686e4b67        232MB         59.8MB   U    
+nginx:alpine                                      54f2a904c251       93.3MB         26.9MB   U    
+notifications-atlas-notifications-worker:latest   c0526bbd00f6        176MB           43MB   U    
+project-atlas-atlas-sports-controller:latest      49c059cdb39d        803MB          213MB   U    
+qmcgaw/gluetun:latest                             b0ee2135e6ba         63MB         15.2MB   U    
+sports-atlas-sports-controller:latest             f91ea2a50655        803MB          213MB        

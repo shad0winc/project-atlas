@@ -26,10 +26,6 @@ All notable changes to Project Atlas are documented in this file.
 - Shared shell health-result helpers and Core health-engine unit tests.
 - Shared Atlas Core Python event publisher in `atlas/events.py`.
 - Discoverable unit tests for Core event publishing.
-- `atlas retention evaluate` CLI.
-- human-readable retention reports.
-- JSON retention output.
-- Retention CLI regression tests.
 
 ### Improved
 

@@ -1,0 +1,385 @@
+test_publish_core_event_uses_atlas_event_contract (core.test_events.PublishCoreEventTests.test_publish_core_event_uses_atlas_event_contract) ... ok
+test_publish_event_defaults_to_empty_payload (core.test_events.PublishEventTests.test_publish_event_defaults_to_empty_payload) ... ok
+test_publish_event_propagates_cli_failure (core.test_events.PublishEventTests.test_publish_event_propagates_cli_failure) ... ok
+test_publish_event_rejects_empty_event (core.test_events.PublishEventTests.test_publish_event_rejects_empty_event) ... ok
+test_publish_event_rejects_empty_module (core.test_events.PublishEventTests.test_publish_event_rejects_empty_module) ... ok
+test_publish_event_uses_atlas_module_contract (core.test_events.PublishEventTests.test_publish_event_uses_atlas_module_contract) ... ok
+test_add_show_list_and_remove_by_relationship (core.test_favorite_cli.FavoriteCliTests.test_add_show_list_and_remove_by_relationship) ... ok
+test_invalid_user_and_metadata_return_nonzero (core.test_favorite_cli.FavoriteCliTests.test_invalid_user_and_metadata_return_nonzero) ... ok
+test_list_filters_and_table_output (core.test_favorite_cli.FavoriteCliTests.test_list_filters_and_table_output) ... ok
+test_remove_requires_relationship_context (core.test_favorite_cli.FavoriteCliTests.test_remove_requires_relationship_context) ... ok
+test_verify_reports_success_and_failure (core.test_favorite_cli.FavoriteCliTests.test_verify_reports_success_and_failure) ... ok
+test_add_enriches_record_and_publishes_event (core.test_favorite_service.FavoriteServiceTests.test_add_enriches_record_and_publishes_event) ... ok
+test_event_failure_does_not_rollback (core.test_favorite_service.FavoriteServiceTests.test_event_failure_does_not_rollback) ... ok
+test_provider_failure_and_unknown_provider_are_errors (core.test_favorite_service.FavoriteServiceTests.test_provider_failure_and_unknown_provider_are_errors) ... ok
+test_remove_publishes_event (core.test_favorite_service.FavoriteServiceTests.test_remove_publishes_event) ... ok
+test_add_persists_metadata_relationship (core.test_favorites.FavoriteStoreTests.test_add_persists_metadata_relationship) ... ok
+test_duplicate_relationship_is_rejected (core.test_favorites.FavoriteStoreTests.test_duplicate_relationship_is_rejected) ... ok
+test_initializes_empty_registry (core.test_favorites.FavoriteStoreTests.test_initializes_empty_registry) ... ok
+test_list_filters_by_user_provider_and_type (core.test_favorites.FavoriteStoreTests.test_list_filters_by_user_provider_and_type) ... ok
+test_remove_updates_registry_and_deletes_record (core.test_favorites.FavoriteStoreTests.test_remove_updates_registry_and_deletes_record) ... ok
+test_validation_rejects_bad_values_and_large_metadata (core.test_favorites.FavoriteStoreTests.test_validation_rejects_bad_values_and_large_metadata) ... ok
+test_verify_detects_registry_mismatch_orphan_and_escape (core.test_favorites.FavoriteStoreTests.test_verify_detects_registry_mismatch_orphan_and_escape) ... ok
+test_health_check_rejects_empty_name (core.test_health.HealthCheckTests.test_health_check_rejects_empty_name) ... ok
+test_health_check_rejects_invalid_status (core.test_health.HealthCheckTests.test_health_check_rejects_invalid_status) ... ok
+test_health_check_serializes_normalized_contract (core.test_health.HealthCheckTests.test_health_check_serializes_normalized_contract) ... ok
+test_empty_report_is_unknown (core.test_health.HealthReportTests.test_empty_report_is_unknown) ... ok
+test_foundation_report_detects_project_and_config (core.test_health.HealthReportTests.test_foundation_report_detects_project_and_config) ... ok
+test_foundation_report_marks_missing_project_critical (core.test_health.HealthReportTests.test_foundation_report_marks_missing_project_critical) ... ok
+test_report_aggregates_status_and_scores (core.test_health.HealthReportTests.test_report_aggregates_status_and_scores) ... ok
+test_report_json_is_machine_readable (core.test_health.HealthReportTests.test_report_json_is_machine_readable) ... ok
+test_disabled_module_health_is_skipped (core.test_health.ModuleHealthTests.test_disabled_module_health_is_skipped) ... ok
+test_enabled_module_health_is_normalized (core.test_health.ModuleHealthTests.test_enabled_module_health_is_normalized) ... ok
+test_invalid_module_contract_is_critical (core.test_health.ModuleHealthTests.test_invalid_module_contract_is_critical) ... ok
+test_command_failure_is_critical (core.test_health.OperationalHealthTests.test_command_failure_is_critical) ... ok
+test_operational_report_collects_shared_categories (core.test_health.OperationalHealthTests.test_operational_report_collects_shared_categories) ... ok
+test_text_renderer_includes_score_and_status (core.test_health.OperationalHealthTests.test_text_renderer_includes_score_and_status) ... ok
+test_cleanup_reports_count (core.test_invitation_cli.InvitationCliTests.test_cleanup_reports_count) ... ok
+test_create_outputs_one_time_registration_url_without_persisting_token (core.test_invitation_cli.InvitationCliTests.test_create_outputs_one_time_registration_url_without_persisting_token) ... ok
+test_list_show_revoke_and_verify_storage (core.test_invitation_cli.InvitationCliTests.test_list_show_revoke_and_verify_storage) ... ok
+test_token_verification_and_invalid_expiration (core.test_invitation_cli.InvitationCliTests.test_token_verification_and_invalid_expiration) ... ok
+test_cleanup_expired_archives_only_expired_pending_records (core.test_invitations.InvitationStoreTests.test_cleanup_expired_archives_only_expired_pending_records) ... ok
+test_complete_moves_record_and_requires_actor (core.test_invitations.InvitationStoreTests.test_complete_moves_record_and_requires_actor) ... ok
+test_create_returns_plaintext_once_and_persists_only_hash (core.test_invitations.InvitationStoreTests.test_create_returns_plaintext_once_and_persists_only_hash) ... ok
+test_expired_token_is_archived_and_rejected (core.test_invitations.InvitationStoreTests.test_expired_token_is_archived_and_rejected) ... ok
+test_initializes_identity_layout_and_registry (core.test_invitations.InvitationStoreTests.test_initializes_identity_layout_and_registry) ... ok
+test_registry_path_escape_is_rejected (core.test_invitations.InvitationStoreTests.test_registry_path_escape_is_rejected) ... ok
+test_rejects_nonpositive_expiration (core.test_invitations.InvitationStoreTests.test_rejects_nonpositive_expiration) ... ok
+test_revoke_moves_record_and_preserves_audit_metadata (core.test_invitations.InvitationStoreTests.test_revoke_moves_record_and_preserves_audit_metadata) ... ok
+test_verify_detects_registry_mismatch_and_orphan (core.test_invitations.InvitationStoreTests.test_verify_detects_registry_mismatch_and_orphan) ... ok
+test_verify_token_rejects_invalid_and_accepts_valid_token (core.test_invitations.InvitationStoreTests.test_verify_token_rejects_invalid_and_accepts_valid_token) ... ok
+test_get_user_rejects_invalid_response (core.test_jellyfin_provider.JellyfinProviderTests.test_get_user_rejects_invalid_response) ... ok
+test_get_user_rejects_mismatched_identity (core.test_jellyfin_provider.JellyfinProviderTests.test_get_user_rejects_mismatched_identity) ... ok
+test_get_user_returns_normalized_identity (core.test_jellyfin_provider.JellyfinProviderTests.test_get_user_returns_normalized_identity) ... ok
+test_missing_key_and_not_found_are_clear (core.test_jellyfin_provider.JellyfinProviderTests.test_missing_key_and_not_found_are_clear) ... ok
+test_normalizes_movie_metadata_and_library (core.test_jellyfin_provider.JellyfinProviderTests.test_normalizes_movie_metadata_and_library) ... ok
+test_series_maps_to_tv_and_ancestor_failure_is_nonfatal (core.test_jellyfin_provider.JellyfinProviderTests.test_series_maps_to_tv_and_ancestor_failure_is_nonfatal) ... ok
+test_callback_escape_is_rejected (core.test_module_commands.ModuleCommandTests.test_callback_escape_is_rejected) ... ok
+test_disabled_module_is_rejected (core.test_module_commands.ModuleCommandTests.test_disabled_module_is_rejected) ... ok
+test_execution_uses_argument_list_and_propagates_return_code (core.test_module_commands.ModuleCommandTests.test_execution_uses_argument_list_and_propagates_return_code) ... ok
+test_lists_normalized_commands (core.test_module_commands.ModuleCommandTests.test_lists_normalized_commands) ... ok
+test_missing_manifest_is_rejected (core.test_module_commands.ModuleCommandTests.test_missing_manifest_is_rejected) ... ok
+test_unknown_command_is_rejected (core.test_module_commands.ModuleCommandTests.test_unknown_command_is_rejected) ... ok
+test_unknown_module_is_rejected (core.test_module_commands.ModuleCommandTests.test_unknown_module_is_rejected) ... ok
+test_builtin_rules_include_favorite_rule (core.test_policy_engine.PolicyEngineTests.test_builtin_rules_include_favorite_rule) ... ok
+test_empty_engine_returns_ignore (core.test_policy_engine.PolicyEngineTests.test_empty_engine_returns_ignore) ... ok
+test_empty_rule_does_not_protect (core.test_policy_engine.PolicyEngineTests.test_empty_rule_does_not_protect) ... ok
+test_favorite_rule_combines_multiple_user_relationships (core.test_policy_engine.PolicyEngineTests.test_favorite_rule_combines_multiple_user_relationships) ... ok
+test_favorite_rule_ignores_unfavorited_media (core.test_policy_engine.PolicyEngineTests.test_favorite_rule_ignores_unfavorited_media) ... ok
+test_favorite_rule_protects_favorited_media (core.test_policy_engine.PolicyEngineTests.test_favorite_rule_protects_favorited_media) ... ok
+test_favorite_rule_respects_provider_boundary (core.test_policy_engine.PolicyEngineTests.test_favorite_rule_respects_provider_boundary) ... ok
+test_multiple_rules_merge (core.test_policy_engine.PolicyEngineTests.test_multiple_rules_merge) ... ok
+test_single_rule_protects (core.test_policy_engine.PolicyEngineTests.test_single_rule_protects) ... ok
+test_nonprotect_decision_is_not_protected (core.test_policy_models.PolicyDecisionTests.test_nonprotect_decision_is_not_protected) ... ok
+test_protect_decision_exposes_normalized_contract (core.test_policy_models.PolicyDecisionTests.test_protect_decision_exposes_normalized_contract) ... ok
+test_rejects_invalid_action_and_reason_type (core.test_policy_models.PolicyDecisionTests.test_rejects_invalid_action_and_reason_type) ... ok
+test_rejects_naive_timestamps (core.test_policy_models.PolicyDecisionTests.test_rejects_naive_timestamps) ... ok
+test_normalizes_reason_and_serializes_metadata (core.test_policy_models.PolicyReasonTests.test_normalizes_reason_and_serializes_metadata) ... ok
+test_rejects_invalid_reason_values (core.test_policy_models.PolicyReasonTests.test_rejects_invalid_reason_values) ... ok
+test_explicit_empty_rule_set_disables_builtin_rules (core.test_policy_service.PolicyServiceTests.test_explicit_empty_rule_set_disables_builtin_rules) ... ok
+test_favorited_media_is_protected (core.test_policy_service.PolicyServiceTests.test_favorited_media_is_protected) ... ok
+test_service_can_be_reused_for_multiple_evaluations (core.test_policy_service.PolicyServiceTests.test_service_can_be_reused_for_multiple_evaluations) ... ok
+test_service_loads_builtin_rules (core.test_policy_service.PolicyServiceTests.test_service_loads_builtin_rules) ... ok
+test_unfavorited_media_is_ignored (core.test_policy_service.PolicyServiceTests.test_unfavorited_media_is_ignored) ... ok
+test_completion_failure_rolls_back_profile_and_external_user (core.test_registration.RegistrationServiceTests.test_completion_failure_rolls_back_profile_and_external_user) ... ok
+test_event_failure_does_not_rollback_successful_registration (core.test_registration.RegistrationServiceTests.test_event_failure_does_not_rollback_successful_registration) ... ok
+test_invalid_token_does_not_provision (core.test_registration.RegistrationServiceTests.test_invalid_token_does_not_provision) ... ok
+test_invitation_email_must_match (core.test_registration.RegistrationServiceTests.test_invitation_email_must_match) ... ok
+test_password_is_required (core.test_registration.RegistrationServiceTests.test_password_is_required) ... ok
+test_profile_failure_deletes_external_user_and_preserves_invitation (core.test_registration.RegistrationServiceTests.test_profile_failure_deletes_external_user_and_preserves_invitation) ... ok
+test_provisioning_failure_leaves_invitation_pending (core.test_registration.RegistrationServiceTests.test_provisioning_failure_leaves_invitation_pending) ... ok
+test_success_creates_linked_profile_completes_invite_and_publishes_event (core.test_registration.RegistrationServiceTests.test_success_creates_linked_profile_completes_invite_and_publishes_event) ... ok
+test_delete_user_removes_profile_and_registry_entry (core.test_registration.UserProfileDeletionTests.test_delete_user_removes_profile_and_registry_entry) ... ok
+test_get_valid_invitation_renders_form_without_exposing_hash (core.test_registration_web.RegistrationWebTests.test_get_valid_invitation_renders_form_without_exposing_hash) ... ok
+test_health_and_not_found (core.test_registration_web.RegistrationWebTests.test_health_and_not_found) ... ok
+test_invalid_invitation_returns_friendly_gone_page (core.test_registration_web.RegistrationWebTests.test_invalid_invitation_returns_friendly_gone_page) ... ok
+test_password_mismatch_does_not_call_registration_service (core.test_registration_web.RegistrationWebTests.test_password_mismatch_does_not_call_registration_service) ... ok
+test_registration_error_is_rendered_without_password_echo (core.test_registration_web.RegistrationWebTests.test_registration_error_is_rendered_without_password_echo) ... ok
+test_success_delegates_to_registration_engine_and_renders_welcome (core.test_registration_web.RegistrationWebTests.test_success_delegates_to_registration_engine_and_renders_welcome) ... ok
+test_eligible_decision_exposes_normalized_contract (core.test_retention_models.RetentionDecisionTests.test_eligible_decision_exposes_normalized_contract) ... ok
+test_ineligible_decision_preserves_policy_reasons (core.test_retention_models.RetentionDecisionTests.test_ineligible_decision_preserves_policy_reasons) ... ok
+test_rejects_invalid_boolean_and_policy_type (core.test_retention_models.RetentionDecisionTests.test_rejects_invalid_boolean_and_policy_type) ... ok
+test_rejects_invalid_identity_and_timestamp (core.test_retention_models.RetentionDecisionTests.test_rejects_invalid_identity_and_timestamp) ... ok
+test_rejects_mismatched_policy_identity (core.test_retention_models.RetentionDecisionTests.test_rejects_mismatched_policy_identity) ... ok
+test_favorited_media_is_not_eligible (core.test_retention_service.RetentionServiceTests.test_favorited_media_is_not_eligible) ... ok
+test_release_policy_is_eligible (core.test_retention_service.RetentionServiceTests.test_release_policy_is_eligible) ... ok
+test_service_can_be_reused_after_policy_state_changes (core.test_retention_service.RetentionServiceTests.test_service_can_be_reused_after_policy_state_changes) ... ok
+test_service_uses_normalized_policy_identity (core.test_retention_service.RetentionServiceTests.test_service_uses_normalized_policy_identity) ... ok
+test_unprotected_media_is_eligible (core.test_retention_service.RetentionServiceTests.test_unprotected_media_is_eligible) ... ok
+test_cli_sync_registers_module_job (core.test_scheduler.ModuleSchedulerCliTests.test_cli_sync_registers_module_job) ... ok
+test_disabled_module_jobs_are_removed (core.test_scheduler.ModuleSchedulerTests.test_disabled_module_jobs_are_removed) ... ok
+test_sync_registers_enabled_module_jobs (core.test_scheduler.ModuleSchedulerTests.test_sync_registers_enabled_module_jobs) ... ok
+test_sync_rejects_callback_escape (core.test_scheduler.ModuleSchedulerTests.test_sync_rejects_callback_escape) ... ok
+test_sync_rejects_malformed_manifest (core.test_scheduler.ModuleSchedulerTests.test_sync_rejects_malformed_manifest) ... ok
+test_sync_removes_stale_module_jobs (core.test_scheduler.ModuleSchedulerTests.test_sync_removes_stale_module_jobs) ... ok
+test_sync_specific_unknown_module_is_rejected (core.test_scheduler.ModuleSchedulerTests.test_sync_specific_unknown_module_is_rejected) ... ok
+test_sync_updates_definition_and_preserves_runtime_state (core.test_scheduler.ModuleSchedulerTests.test_sync_updates_definition_and_preserves_runtime_state) ... ok
+test_cli_failed_task_returns_one (core.test_scheduler.SchedulerCliTests.test_cli_failed_task_returns_one) ... ok
+test_cli_register_inspect_list_and_remove (core.test_scheduler.SchedulerCliTests.test_cli_register_inspect_list_and_remove) ... ok
+test_cli_run_dry_run_and_history (core.test_scheduler.SchedulerCliTests.test_cli_run_dry_run_and_history) ... ok
+test_sports_maintenance_uses_module_command_callback (core.test_scheduler.SportsSchedulerManifestTests.test_sports_maintenance_uses_module_command_callback) ... ok
+test_sports_worker_has_no_private_scheduler (core.test_scheduler.SportsSchedulerManifestTests.test_sports_worker_has_no_private_scheduler) ... ok
+test_disabled_task_is_not_due (core.test_scheduler.TaskSchedulerTests.test_disabled_task_is_not_due) ... ok
+test_dry_run_does_not_execute (core.test_scheduler.TaskSchedulerTests.test_dry_run_does_not_execute) ... ok
+test_event_failure_does_not_fail_task (core.test_scheduler.TaskSchedulerTests.test_event_failure_does_not_fail_task) ... ok
+test_history_is_bounded (core.test_scheduler.TaskSchedulerTests.test_history_is_bounded) ... ok
+test_list_tasks_is_sorted_and_includes_schedule (core.test_scheduler.TaskSchedulerTests.test_list_tasks_is_sorted_and_includes_schedule) ... ok
+test_negative_interval_is_rejected (core.test_scheduler.TaskSchedulerTests.test_negative_interval_is_rejected) ... ok
+test_new_task_is_immediately_due (core.test_scheduler.TaskSchedulerTests.test_new_task_is_immediately_due) ... ok
+test_register_persists_task_metadata (core.test_scheduler.TaskSchedulerTests.test_register_persists_task_metadata) ... ok
+test_registered_task_uses_stored_interval (core.test_scheduler.TaskSchedulerTests.test_registered_task_uses_stored_interval) ... ok
+test_registration_rejects_empty_callback (core.test_scheduler.TaskSchedulerTests.test_registration_rejects_empty_callback) ... ok
+test_remove_task (core.test_scheduler.TaskSchedulerTests.test_remove_task) ... ok
+test_run_due_tasks_skips_disabled_and_not_due (core.test_scheduler.TaskSchedulerTests.test_run_due_tasks_skips_disabled_and_not_due) ... ok
+test_run_task_failure_records_error (core.test_scheduler.TaskSchedulerTests.test_run_task_failure_records_error) ... ok
+test_run_task_success_updates_history (core.test_scheduler.TaskSchedulerTests.test_run_task_success_updates_history) ... ok
+test_runtime_lock_prevents_overlap (core.test_scheduler.TaskSchedulerTests.test_runtime_lock_prevents_overlap) ... ok
+test_task_lifecycle_is_persisted (core.test_scheduler.TaskSchedulerTests.test_task_lifecycle_is_persisted) ... ok
+test_create_list_disable_enable_and_verify (core.test_user_profiles.UserProfileCliTests.test_create_list_disable_enable_and_verify) ... ok
+test_link_jellyfin_rejects_unknown_user_without_persisting (core.test_user_profiles.UserProfileCliTests.test_link_jellyfin_rejects_unknown_user_without_persisting) ... unable to link Jellyfin user: Jellyfin resource not found
+ok
+test_link_jellyfin_validates_user_before_persisting (core.test_user_profiles.UserProfileCliTests.test_link_jellyfin_validates_user_before_persisting) ... ok
+test_update_requires_changes (core.test_user_profiles.UserProfileCliTests.test_update_requires_changes) ... no profile changes were provided
+ok
+test_creates_and_reads_normalized_profile (core.test_user_profiles.UserProfileStoreTests.test_creates_and_reads_normalized_profile) ... ok
+test_initializes_empty_registry (core.test_user_profiles.UserProfileStoreTests.test_initializes_empty_registry) ... ok
+test_lists_users_in_username_order (core.test_user_profiles.UserProfileStoreTests.test_lists_users_in_username_order) ... ok
+test_rejects_duplicate_email (core.test_user_profiles.UserProfileStoreTests.test_rejects_duplicate_email) ... ok
+test_rejects_duplicate_username (core.test_user_profiles.UserProfileStoreTests.test_rejects_duplicate_username) ... ok
+test_rejects_invalid_username_role_birthday_and_jellyfin_id (core.test_user_profiles.UserProfileStoreTests.test_rejects_invalid_username_role_birthday_and_jellyfin_id) ... ok
+test_updates_profile_and_registry (core.test_user_profiles.UserProfileStoreTests.test_updates_profile_and_registry) ... ok
+test_verify_detects_registry_mismatch (core.test_user_profiles.UserProfileStoreTests.test_verify_detects_registry_mismatch) ... ok
+
+----------------------------------------------------------------------
+Ran 149 tests in 0.189s
+
+OK
+{
+  "registered": [
+    "sports.sync"
+  ],
+  "removed": [],
+  "skipped": []
+}
+{
+  "callback": "/bin/false",
+  "consecutive_failures": 0,
+  "created_at": "2026-07-20T14:38:43.831338+00:00",
+  "description": "",
+  "enabled": true,
+  "failure_count": 0,
+  "interval_seconds": 0,
+  "module": null,
+  "name": "failure",
+  "run_count": 0,
+  "status": "never_run",
+  "updated_at": "2026-07-20T14:38:43.831338+00:00"
+}
+{
+  "duration_ms": 1,
+  "ended_at": "2026-07-20T14:38:43.835026+00:00",
+  "error": "callback exited with status 1",
+  "event_error": null,
+  "result": "failed",
+  "return_code": 1,
+  "started_at": "2026-07-20T14:38:43.833587+00:00",
+  "task": "failure"
+}
+{
+  "callback": "maintenance.py",
+  "consecutive_failures": 0,
+  "created_at": "2026-07-20T14:38:43.837656+00:00",
+  "description": "",
+  "enabled": true,
+  "failure_count": 0,
+  "interval_seconds": 60,
+  "module": null,
+  "name": "maintenance",
+  "run_count": 0,
+  "status": "never_run",
+  "updated_at": "2026-07-20T14:38:43.837656+00:00"
+}
+{
+  "callback": "maintenance.py",
+  "consecutive_failures": 0,
+  "created_at": "2026-07-20T14:38:43.837656+00:00",
+  "description": "",
+  "due": true,
+  "enabled": true,
+  "failure_count": 0,
+  "interval_seconds": 60,
+  "module": null,
+  "name": "maintenance",
+  "next_run": "2026-07-20T14:38:43.839591+00:00",
+  "run_count": 0,
+  "status": "never_run",
+  "updated_at": "2026-07-20T14:38:43.837656+00:00"
+}
+NAME	ENABLED	INTERVAL	STATUS	DUE	NEXT RUN
+maintenance	true	60	never_run	true	2026-07-20T14:38:43.841213+00:00
+Removed scheduler task: maintenance
+Scheduler task not found: maintenance
+{
+  "callback": "/bin/true",
+  "consecutive_failures": 0,
+  "created_at": "2026-07-20T14:38:43.846038+00:00",
+  "description": "",
+  "enabled": true,
+  "failure_count": 0,
+  "interval_seconds": 0,
+  "module": null,
+  "name": "success",
+  "run_count": 0,
+  "status": "never_run",
+  "updated_at": "2026-07-20T14:38:43.846038+00:00"
+}
+[
+  {
+    "callback": "/bin/true",
+    "consecutive_failures": 0,
+    "created_at": "2026-07-20T14:38:43.846038+00:00",
+    "description": "",
+    "due": true,
+    "enabled": true,
+    "failure_count": 0,
+    "interval_seconds": 0,
+    "module": null,
+    "name": "success",
+    "next_run": "2026-07-20T14:38:43.847547+00:00",
+    "run_count": 0,
+    "status": "never_run",
+    "updated_at": "2026-07-20T14:38:43.846038+00:00"
+  }
+]
+[
+  {
+    "duration_ms": 1,
+    "ended_at": "2026-07-20T14:38:43.850022+00:00",
+    "error": null,
+    "event_error": null,
+    "result": "success",
+    "return_code": 0,
+    "started_at": "2026-07-20T14:38:43.849015+00:00",
+    "task": "success"
+  }
+]
+[
+  {
+    "duration_ms": 1,
+    "ended_at": "2026-07-20T14:38:43.850022+00:00",
+    "error": null,
+    "event_error": null,
+    "result": "success",
+    "return_code": 0,
+    "started_at": "2026-07-20T14:38:43.849015+00:00",
+    "task": "success"
+  }
+]
+{
+  "birthday": null,
+  "created_at": "2026-07-20T14:38:43Z",
+  "display_name": "michael",
+  "email": null,
+  "first_name": null,
+  "jellyfin_user_id": null,
+  "last_name": null,
+  "role": "admin",
+  "schema_version": 1,
+  "status": "active",
+  "updated_at": "2026-07-20T14:38:43Z",
+  "user_id": "usr_f5882ec37fdd4bb0b18626f37a630322",
+  "username": "michael"
+}
+USERNAME	ROLE	STATUS	JELLYFIN	DISPLAY NAME
+michael	admin	active	unlinked	michael
+{
+  "birthday": null,
+  "created_at": "2026-07-20T14:38:43Z",
+  "display_name": "michael",
+  "email": null,
+  "first_name": null,
+  "jellyfin_user_id": null,
+  "last_name": null,
+  "role": "admin",
+  "schema_version": 1,
+  "status": "disabled",
+  "updated_at": "2026-07-20T14:38:43Z",
+  "user_id": "usr_f5882ec37fdd4bb0b18626f37a630322",
+  "username": "michael"
+}
+{
+  "birthday": null,
+  "created_at": "2026-07-20T14:38:43Z",
+  "display_name": "michael",
+  "email": null,
+  "first_name": null,
+  "jellyfin_user_id": null,
+  "last_name": null,
+  "role": "admin",
+  "schema_version": 1,
+  "status": "active",
+  "updated_at": "2026-07-20T14:38:43Z",
+  "user_id": "usr_f5882ec37fdd4bb0b18626f37a630322",
+  "username": "michael"
+}
+PASS	user profiles valid
+{
+  "birthday": null,
+  "created_at": "2026-07-20T14:38:43Z",
+  "display_name": "michael",
+  "email": null,
+  "first_name": null,
+  "jellyfin_user_id": null,
+  "last_name": null,
+  "role": "user",
+  "schema_version": 1,
+  "status": "active",
+  "updated_at": "2026-07-20T14:38:43Z",
+  "user_id": "usr_e09320973c3d4b3ea0e84aad24550433",
+  "username": "michael"
+}
+{
+  "birthday": null,
+  "created_at": "2026-07-20T14:38:43Z",
+  "display_name": "michael",
+  "email": null,
+  "first_name": null,
+  "jellyfin_user_id": null,
+  "last_name": null,
+  "role": "user",
+  "schema_version": 1,
+  "status": "active",
+  "updated_at": "2026-07-20T14:38:43Z",
+  "user_id": "usr_87fa637b64ef464982c70031d09ca589",
+  "username": "michael"
+}
+{
+  "birthday": null,
+  "created_at": "2026-07-20T14:38:43Z",
+  "display_name": "michael",
+  "email": null,
+  "first_name": null,
+  "jellyfin_user_id": "e29fdc8501124a5d8a1f40653e487407",
+  "last_name": null,
+  "role": "user",
+  "schema_version": 1,
+  "status": "active",
+  "updated_at": "2026-07-20T14:38:43Z",
+  "user_id": "usr_87fa637b64ef464982c70031d09ca589",
+  "username": "michael"
+}
+{
+  "birthday": null,
+  "created_at": "2026-07-20T14:38:43Z",
+  "display_name": "michael",
+  "email": null,
+  "first_name": null,
+  "jellyfin_user_id": null,
+  "last_name": null,
+  "role": "user",
+  "schema_version": 1,
+  "status": "active",
+  "updated_at": "2026-07-20T14:38:43Z",
+  "user_id": "usr_77f504db8f2e4b17997575d78430de35",
+  "username": "michael"
+}

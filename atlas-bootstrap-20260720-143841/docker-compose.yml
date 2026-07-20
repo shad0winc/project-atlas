@@ -1,0 +1,283 @@
+name: project-atlas
+
+networks:
+  atlas:
+    name: atlas
+    driver: bridge
+
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    networks: [atlas]
+    ports:
+      - "${JELLYFIN_PORT:-8096}:8096"
+    volumes:
+      - ${CONFIG}/jellyfin:/config
+      - ${CONFIG}/jellyfin-cache:/cache
+      - ${MEDIA}:/media
+    devices:
+      - /dev/dri:/dev/dri
+    group_add:
+      - "44"
+      - "104"
+    environment:
+      - TZ=${TZ}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8096/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    networks: [atlas]
+    ports:
+      - "${PROWLARR_PORT:-9696}:9696"
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG}/prowlarr:/config
+    restart: unless-stopped
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    networks: [atlas]
+    ports:
+      - "${SONARR_PORT:-8989}:8989"
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG}/sonarr:/config
+      - ${MEDIA}:/media
+      - ${DOWNLOADS}:/downloads
+    restart: unless-stopped
+
+  sonarr-anime:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr-anime
+    networks: [atlas]
+    ports:
+      - "${SONARR_ANIME_PORT:-8990}:8989"
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG}/sonarr-anime:/config
+      - ${MEDIA}:/media
+      - ${DOWNLOADS}:/downloads
+    restart: unless-stopped
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    networks: [atlas]
+    ports:
+      - "${RADARR_PORT:-7878}:7878"
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG}/radarr:/config
+      - ${MEDIA}:/media
+      - ${DOWNLOADS}:/downloads
+    restart: unless-stopped
+
+  radarr-anime:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr-anime
+    networks: [atlas]
+    ports:
+      - "${RADARR_ANIME_PORT:-7879}:7878"
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG}/radarr-anime:/config
+      - ${MEDIA}:/media
+      - ${DOWNLOADS}:/downloads
+    restart: unless-stopped
+
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    networks: [atlas]
+    ports:
+      - "${QBITTORRENT_PORT:-8080}:8080"
+      - "6881:6881"
+      - "6881:6881/udp"
+    environment:
+      - VPN_SERVICE_PROVIDER=windscribe
+      - VPN_TYPE=openvpn
+      - OPENVPN_USER=${WINDSCRIBE_USER}
+      - OPENVPN_PASSWORD=${WINDSCRIBE_PASSWORD}
+      - SERVER_REGIONS=${VPN_REGION}
+      - TZ=${TZ}
+      - FIREWALL=on
+    restart: unless-stopped
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    network_mode: "service:gluetun"
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - WEBUI_PORT=8080
+    volumes:
+      - ${CONFIG}/qbittorrent:/config
+      - ${DOWNLOADS}:/downloads
+    restart: unless-stopped
+    depends_on:
+      gluetun:
+        condition: service_started
+
+  jellyseerr:
+    image: fallenbagel/jellyseerr:latest
+    container_name: jellyseerr
+    networks: [atlas]
+    ports:
+      - "${JELLYSEERR_PORT:-5055}:5055"
+    environment:
+      - LOG_LEVEL=info
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG}/jellyseerr:/app/config
+    restart: unless-stopped
+    depends_on:
+      - jellyfin
+      - sonarr
+      - radarr
+
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    networks: [atlas]
+    ports:
+      - "${BAZARR_PORT:-6767}:6767"
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG}/bazarr:/config
+      - ${MEDIA}:/media
+    restart: unless-stopped
+
+  maintainerr:
+    image: ghcr.io/jorenn92/maintainerr:latest
+    container_name: maintainerr
+    networks: [atlas]
+    ports:
+      - "${MAINTAINERR_PORT:-6246}:6246"
+    environment:
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG}/maintainerr:/opt/data
+      - ${MEDIA}:/media
+    restart: unless-stopped
+    depends_on:
+      - jellyfin
+      - radarr
+      - sonarr
+
+  tautulli:
+    image: lscr.io/linuxserver/tautulli:latest
+    container_name: tautulli
+    networks: [atlas]
+    ports:
+      - "${TAUTULLI_PORT:-8181}:8181"
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG}/tautulli:/config
+    restart: unless-stopped
+    depends_on:
+      - jellyfin
+
+  unpackerr:
+    image: golift/unpackerr:latest
+    container_name: unpackerr
+    networks: [atlas]
+
+    profiles:
+      - advanced
+
+    environment:
+      - TZ=${TZ}
+      - UN_SONARR_0_URL=http://sonarr:8989
+      - UN_SONARR_0_API_KEY=REPLACE_AFTER_SETUP
+      - UN_RADARR_0_URL=http://radarr:7878
+      - UN_RADARR_0_API_KEY=REPLACE_AFTER_SETUP
+      - UN_FOLDER_0_PATH=/downloads
+      - UN_FOLDER_0_EXTRACT_PATH=/downloads/complete
+      - UN_FOLDER_0_DELETE_AFTER=10m
+    volumes:
+      - ${DOWNLOADS}:/downloads
+    restart: unless-stopped
+    depends_on:
+      - sonarr
+      - radarr
+
+  recyclarr:
+    image: ghcr.io/recyclarr/recyclarr:latest
+    container_name: recyclarr
+    networks: [atlas]
+    user: "${PUID}:${PGID}"
+    environment:
+      - TZ=${TZ}
+      - SONARR_API_KEY=${SONARR_API_KEY}
+      - SONARR_ANIME_API_KEY=${SONARR_ANIME_API_KEY}
+      - RADARR_API_KEY=${RADARR_API_KEY}
+      - RADARR_ANIME_API_KEY=${RADARR_ANIME_API_KEY}
+    volumes:
+      - ${CONFIG}/recyclarr:/config
+    profiles:
+      - manual
+    depends_on:
+      - sonarr
+      - radarr
+
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    networks: [atlas]
+    ports:
+      - "${HOMEPAGE_PORT:-3000}:3000"
+    environment:
+      - HOMEPAGE_ALLOWED_HOSTS=*
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${CONFIG}/homepage:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: dozzle
+    networks: [atlas]
+    ports:
+      - "${DOZZLE_PORT:-9999}:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped

@@ -1,0 +1,168 @@
+Project Atlas
+Simplicity Meets Ingenuity
+
+Version: 0.9.0-rc.1
+Branch:  main
+
+NAMES                        STATUS                  PORTS
+atlas-sports-controller      Up 39 hours (healthy)   
+atlas-sports-feed            Up 2 days (healthy)     80/tcp, 0.0.0.0:8097->8080/tcp, [::]:8097->8080/tcp
+atlas-notifications-worker   Up 7 days (healthy)     
+sonarr-anime                 Up 2 weeks              0.0.0.0:8990->8989/tcp, [::]:8990->8989/tcp
+sonarr                       Up 2 weeks              0.0.0.0:8989->8989/tcp, [::]:8989->8989/tcp
+bazarr                       Up 2 weeks              0.0.0.0:6767->6767/tcp, [::]:6767->6767/tcp
+radarr-anime                 Up 2 weeks              0.0.0.0:7879->7878/tcp, [::]:7879->7878/tcp
+qbittorrent                  Up 2 weeks              
+gluetun                      Up 2 weeks (healthy)    1080/tcp, 0.0.0.0:6881->6881/tcp, [::]:6881->6881/tcp, 8000/tcp, 1080/udp, 8388/tcp, 8888/tcp, 8388/udp, 0.0.0.0:8080->8080/tcp, 0.0.0.0:6881->6881/udp, [::]:8080->8080/tcp, [::]:6881->6881/udp
+maintainerr                  Up 2 weeks              0.0.0.0:6246->6246/tcp, [::]:6246->6246/tcp
+jellyseerr                   Up 2 weeks              0.0.0.0:5055->5055/tcp, [::]:5055->5055/tcp
+radarr                       Up 2 weeks              0.0.0.0:7878->7878/tcp, [::]:7878->7878/tcp
+tautulli                     Up 2 weeks              0.0.0.0:8181->8181/tcp, [::]:8181->8181/tcp
+prowlarr                     Up 2 weeks              0.0.0.0:9696->9696/tcp, [::]:9696->9696/tcp
+dozzle                       Up 2 weeks              0.0.0.0:9999->8080/tcp, [::]:9999->8080/tcp
+jellyfin                     Up 2 weeks (healthy)    0.0.0.0:8096->8096/tcp, [::]:8096->8096/tcp
+homepage                     Up 2 weeks (healthy)    0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp
+
+Project Atlas
+Simplicity Meets Ingenuity
+
+Atlas Health Diagnostics
+
+Core
+----
+  OK      Python Runtime: Python runtime is available
+  OK      Project Directory: Project Directory is present
+  OK      Atlas Configuration: Atlas Configuration is present
+  WARN    Git Working Tree: Git working tree has uncommitted changes
+
+Infrastructure
+--------------
+  OK      Docker Engine: Docker daemon is reachable
+  OK      Docker Compose: Docker Compose is available
+  OK      Storage Root: Storage Root is present
+  OK      Intel GPU: Intel render device is available
+
+Services
+--------
+  OK      jellyfin: jellyfin container is running
+  OK      jellyseerr: jellyseerr container is running
+  OK      prowlarr: prowlarr container is running
+  OK      sonarr: sonarr container is running
+  OK      sonarr-anime: sonarr-anime container is running
+  OK      radarr: radarr container is running
+  OK      radarr-anime: radarr-anime container is running
+  OK      gluetun: gluetun container is running
+  OK      qbittorrent: qbittorrent container is running
+  OK      homepage: homepage container is running
+
+Storage
+-------
+  OK      Writable: Movies: Storage path is writable
+  OK      Writable: TV: Storage path is writable
+  OK      Writable: Anime Movies: Storage path is writable
+  OK      Writable: Anime TV: Storage path is writable
+  OK      Writable: downloads: Storage path is writable
+
+Project
+-------
+  OK      VERSION: VERSION is present
+  OK      CHARTER.md: CHARTER.md is present
+  OK      ROADMAP.md: ROADMAP.md is present
+  OK      CHANGELOG.md: CHANGELOG.md is present
+  OK      docs/BUILD_LOG.md: docs/BUILD_LOG.md is present
+  OK      docs/MATURITY.md: docs/MATURITY.md is present
+  OK      docs/INDEXERS.md: docs/INDEXERS.md is present
+
+Module:Sports
+-------------
+  OK      atlas-sports-feed Running: atlas-sports-feed is running
+  OK      atlas-sports-feed Health: atlas-sports-feed health check is healthy
+  OK      atlas-sports-controller Running: atlas-sports-controller is running
+  OK      atlas-sports-controller Health: atlas-sports-controller health check is healthy
+  OK      Controller Heartbeat: Sports controller heartbeat is fresh
+  OK      Provider Health: All configured Sports providers are healthy
+  OK      Sports Health Endpoint: Sports health endpoint is reachable
+
+Overall Status: WARNING
+Overall Score:  99%
+  Core             88%
+  Infrastructure   100%
+  Module:Sports    100%
+  Project          100%
+  Services         100%
+  Storage          100%
+
+Project Atlas
+Simplicity Meets Ingenuity
+
+Atlas Verification
+
+Infrastructure
+--------------
+OK   Docker Engine
+OK   Docker Compose
+OK   Project Directory
+OK   Storage Mounted
+OK   Intel GPU Available
+
+Core Services
+-------------
+OK   jellyfin running
+OK   jellyseerr running
+OK   prowlarr running
+OK   sonarr running
+OK   sonarr-anime running
+OK   radarr running
+OK   radarr-anime running
+OK   gluetun running
+OK   qbittorrent running
+OK   homepage running
+
+Storage Paths
+-------------
+OK   /mnt/storage/media/Movies writable
+OK   /mnt/storage/media/TV writable
+OK   /mnt/storage/media/Anime Movies writable
+OK   /mnt/storage/media/Anime TV writable
+OK   /mnt/storage/downloads writable
+
+Project Files
+-------------
+OK   VERSION present
+OK   CHARTER.md present
+OK   ROADMAP.md present
+OK   CHANGELOG.md present
+OK   docs/BUILD_LOG.md present
+OK   docs/MATURITY.md present
+OK   docs/INDEXERS.md present
+
+VPN
+---
+OK   Gluetun running
+OK   qBittorrent reachable through VPN namespace
+
+Overall Status: PASS
+
+Project Atlas
+Simplicity Meets Ingenuity
+
+Installed Modules
+-----------------
+Atlas Notifications
+  ID:      notifications
+  Version: 0.1.0
+  Enabled: Yes
+
+Sports Platform
+  ID:      sports
+  Version: 0.1.0
+  Enabled: Yes
+
+
+Project Atlas
+Simplicity Meets Ingenuity
+
+Atlas Module List
+-----------------
+notifications    true     Atlas Notifications
+sports           true     Sports Platform

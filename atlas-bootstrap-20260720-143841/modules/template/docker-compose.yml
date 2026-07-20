@@ -1,0 +1,5 @@
+# Project Atlas Module Template
+#
+# Replace __MODULE_ID__ and other placeholders when creating a module.
+
+services: {}

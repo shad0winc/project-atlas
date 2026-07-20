@@ -1,0 +1,101 @@
+services:
+  atlas-sports-feed:
+    image: nginx:alpine
+    container_name: atlas-sports-feed
+    restart: unless-stopped
+
+    volumes:
+      - /mnt/storage/configs/sportyfin/output:/usr/share/nginx/html:ro
+      - /mnt/storage/configs/sportyfin/state/health.json:/etc/nginx/sports-health.json:ro
+      - ./config/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+
+    ports:
+      - "8097:8080"
+
+    mem_limit: 128m
+    cpus: 0.50
+
+    networks:
+      - atlas
+
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --quiet
+        - --tries=1
+        - --spider
+        - http://127.0.0.1:8080/health
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    labels:
+      project-atlas.module: sports
+      project-atlas.service: sports-feed
+
+  atlas-sports-controller:
+    build:
+      context: /opt/project-atlas
+      dockerfile: modules/sports/Dockerfile
+
+    container_name: atlas-sports-controller
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      PYTHONUNBUFFERED: "1"
+      SPORTS_CONTROLLER_INTERVAL_SECONDS: "${SPORTS_CONTROLLER_INTERVAL_SECONDS:-30}"
+      SPORTS_CONTROLLER_HEARTBEAT_FILE: "${SPORTS_CONTROLLER_HEARTBEAT_FILE:-/mnt/storage/configs/sportyfin/state/controller-heartbeat}"
+      SPORTS_PROVIDER_HEALTH_FILE: "${SPORTS_PROVIDER_HEALTH_FILE:-/mnt/storage/configs/sportyfin/state/provider-health.json}"
+      SPORTS_HEALTH_FILE: "${SPORTS_HEALTH_FILE:-/mnt/storage/configs/sportyfin/state/health.json}"
+      SPORTS_SUBSCRIPTIONS_FILE: "${SPORTS_SUBSCRIPTIONS_FILE:-/mnt/storage/configs/sportyfin/state/subscriptions.json}"
+      SPORTS_RECORDINGS_FILE: "${SPORTS_RECORDINGS_FILE:-/mnt/storage/configs/sportyfin/recordings/recordings.json}"
+      SPORTS_RECORDING_PREROLL_MINUTES: "${SPORTS_RECORDING_PREROLL_MINUTES:-5}"
+      SPORTS_RECORDING_POSTROLL_MINUTES: "${SPORTS_RECORDING_POSTROLL_MINUTES:-15}"
+      SPORTS_RECORDING_LOG_DIR: "${SPORTS_RECORDING_LOG_DIR:-/mnt/storage/configs/sportyfin/logs/recordings}"
+      SPORTS_FAKE_RECORDER_SECONDS: "${SPORTS_FAKE_RECORDER_SECONDS:-300}"
+      SPORTS_RECORDER_MODE: "${SPORTS_RECORDER_MODE:-fake}"
+      SPORTS_FFMPEG_BINARY: "${SPORTS_FFMPEG_BINARY:-ffmpeg}"
+      SPORTS_FFMPEG_LOG_LEVEL: "${SPORTS_FFMPEG_LOG_LEVEL:-warning}"
+      SPORTS_MAINTENANCE_ENABLED: "${SPORTS_MAINTENANCE_ENABLED:-true}"
+      SPORTS_MAINTENANCE_INTERVAL_SECONDS: "${SPORTS_MAINTENANCE_INTERVAL_SECONDS:-3600}"
+      SPORTS_MAINTENANCE_DRY_RUN: "${SPORTS_MAINTENANCE_DRY_RUN:-false}"
+      SPORTS_MAINTENANCE_STATE_FILE: "${SPORTS_MAINTENANCE_STATE_FILE:-/mnt/storage/configs/sportyfin/state/maintenance.json}"
+      SPORTS_TASK_SCHEDULER_STATE_FILE: "${SPORTS_TASK_SCHEDULER_STATE_FILE:-/mnt/storage/configs/atlas/runtime/scheduler/sports.json}"
+      SPORTS_PARTIAL_RETENTION_HOURS: "${SPORTS_PARTIAL_RETENTION_HOURS:-6}"
+      SPORTS_RECORDING_LOG_RETENTION_DAYS: "${SPORTS_RECORDING_LOG_RETENTION_DAYS:-14}"
+      SPORTS_RECORDING_EXIT_RETENTION_DAYS: "${SPORTS_RECORDING_EXIT_RETENTION_DAYS:-7}"
+      SPORTS_RECORDING_METADATA_RETENTION_DAYS: "${SPORTS_RECORDING_METADATA_RETENTION_DAYS:-30}"
+
+    volumes:
+      - /opt/project-atlas:/opt/project-atlas:ro
+      - /mnt/storage/configs/sportyfin:/mnt/storage/configs/sportyfin
+      - /mnt/storage/media/Sports:/mnt/storage/media/Sports
+      - /mnt/storage/configs/atlas/runtime:/mnt/storage/configs/atlas/runtime
+
+    mem_limit: 128m
+    cpus: 0.50
+
+    networks:
+      - atlas
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - test -f /mnt/storage/configs/sportyfin/state/controller-heartbeat && test $$(( $$(date +%s) - $$(stat -c %Y /mnt/storage/configs/sportyfin/state/controller-heartbeat) )) -lt 90
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
+
+    labels:
+      project-atlas.module: sports
+      project-atlas.service: sports-controller
+
+networks:
+  atlas:
+    external: true

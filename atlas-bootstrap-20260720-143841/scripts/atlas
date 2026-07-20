@@ -43,7 +43,6 @@ source "$ATLAS_CLI_ROOT/commands/scheduler.sh"
 source "$ATLAS_CLI_ROOT/commands/user.sh"
 source "$ATLAS_CLI_ROOT/commands/invite.sh"
 source "$ATLAS_CLI_ROOT/commands/favorite.sh"
-source "$ATLAS_CLI_ROOT/commands/retention.sh"
 
 atlas_initialize
 
@@ -100,10 +99,6 @@ case "$command" in
 
   favorite)
     atlas_command_favorite "${@:2}"
-    ;;
-
-  retention)
-    atlas_command_retention "${@:2}"
     ;;
 
   module)

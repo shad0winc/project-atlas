@@ -82,7 +82,6 @@ Intelligence
 ------------
   atlas ari collect
   atlas ari report
-  atlas retention evaluate <provider> <item-id> [--json]
 
 Runtime
 -------

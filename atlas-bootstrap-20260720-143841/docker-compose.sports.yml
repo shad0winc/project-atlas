@@ -1,0 +1,7 @@
+# Project Atlas Sports Module
+#
+# Root compose entry point for the optional Sports module.
+# Runtime services are defined by the included module compose file.
+
+include:
+  - modules/sports/docker-compose.yml

@@ -1,0 +1,524 @@
+.
+├── ARCHITECTURE.md
+├── atlas
+│   ├── atomic.py
+│   ├── events.py
+│   ├── favorite_cli.py
+│   ├── favorite_service.py
+│   ├── favorites.py
+│   ├── health.py
+│   ├── identity.py
+│   ├── __init__.py
+│   ├── invitation_cli.py
+│   ├── invitations.py
+│   ├── media
+│   │   ├── __init__.py
+│   │   ├── jellyfin.py
+│   │   └── provider.py
+│   ├── module_commands.py
+│   ├── module_scheduler.py
+│   ├── policies
+│   │   ├── engine.py
+│   │   ├── favorites.py
+│   │   ├── __init__.py
+│   │   ├── models.py
+│   │   ├── providers.py
+│   │   ├── rules.py
+│   │   └── service.py
+│   ├── registration.py
+│   ├── registration_web.py
+│   ├── retention
+│   │   ├── __init__.py
+│   │   ├── models.py
+│   │   └── service.py
+│   ├── scheduler_cli.py
+│   ├── scheduler.py
+│   ├── state.py
+│   ├── templates
+│   │   └── registration
+│   │       ├── error.html
+│   │       ├── register.html
+│   │       └── success.html
+│   ├── time.py
+│   ├── user_cli.py
+│   └── user_profiles.py
+├── atlas-bootstrap-20260720-143841
+│   ├── atlas
+│   │   ├── atomic.py
+│   │   ├── events.py
+│   │   ├── favorite_cli.py
+│   │   ├── favorite_service.py
+│   │   ├── favorites.py
+│   │   ├── health.py
+│   │   ├── identity.py
+│   │   ├── __init__.py
+│   │   ├── invitation_cli.py
+│   │   ├── invitations.py
+│   │   ├── media
+│   │   │   ├── __init__.py
+│   │   │   ├── jellyfin.py
+│   │   │   └── provider.py
+│   │   ├── module_commands.py
+│   │   ├── module_scheduler.py
+│   │   ├── policies
+│   │   │   ├── engine.py
+│   │   │   ├── favorites.py
+│   │   │   ├── __init__.py
+│   │   │   ├── models.py
+│   │   │   ├── providers.py
+│   │   │   ├── rules.py
+│   │   │   └── service.py
+│   │   ├── registration.py
+│   │   ├── registration_web.py
+│   │   ├── retention
+│   │   │   ├── __init__.py
+│   │   │   ├── models.py
+│   │   │   └── service.py
+│   │   ├── scheduler_cli.py
+│   │   ├── scheduler.py
+│   │   ├── state.py
+│   │   ├── templates
+│   │   │   └── registration
+│   │   │       ├── error.html
+│   │   │       ├── register.html
+│   │   │       └── success.html
+│   │   ├── time.py
+│   │   ├── user_cli.py
+│   │   └── user_profiles.py
+│   ├── CHANGELOG.md
+│   ├── CHARTER.md
+│   ├── config
+│   │   ├── atlas.conf
+│   │   └── modules
+│   │       └── modules.conf
+│   ├── docker-compose.sports.yml
+│   ├── docker-compose.yml
+│   ├── docs
+│   │   ├── 01-install.md
+│   │   ├── 02-service-wiring.md
+│   │   ├── 03-maintainerr-72-hour-cleanup.md
+│   │   ├── 04-backup-restore.md
+│   │   ├── ADR
+│   │   │   ├── 0006-separate-anime-services.md
+│   │   │   ├── 0007-atlas-retention-intelligence.md
+│   │   │   ├── ADR-0001—Atlas-Platform-Architecture.md
+│   │   │   ├── ADR-0002—Atlas-Retention-Intelligence-Architecture.md
+│   │   │   ├── ADR-0003—Immutable-Snapshot-Architecture.md
+│   │   │   ├── ADR-0004—Runtime-State-Architecture.md
+│   │   │   └── ADR-0005—Docker-Networking.md
+│   │   ├── BUILD_LOG.md
+│   │   ├── CONFIGURATION.md
+│   │   ├── DECISIONS.md
+│   │   ├── EDR
+│   │   │   ├── EDR-0001—Health-Engine.md
+│   │   │   ├── EDR-0002—Analytics-Engine.md
+│   │   │   ├── EDR-0003—Forecast-Engine.md
+│   │   │   ├── EDR-0004—Recommendation-Engine.md
+│   │   │   └── EDR-0005—Runtime-State.md
+│   │   ├── guides
+│   │   │   └── ADMINISTRATOR_GUIDE.md
+│   │   ├── INDEXERS.md
+│   │   ├── MATURITY.md
+│   │   ├── milestones
+│   │   │   └── M-002-Anime-Expansion.md
+│   │   ├── modules
+│   │   ├── OPERATIONS.md
+│   │   ├── RELEASES.md
+│   │   ├── services
+│   │   └── SPORTS.md
+│   ├── modules
+│   │   ├── notifications
+│   │   │   ├── config
+│   │   │   ├── docker-compose.yml
+│   │   │   ├── Dockerfile
+│   │   │   ├── docs
+│   │   │   ├── .env
+│   │   │   ├── .env.example
+│   │   │   ├── module.conf
+│   │   │   ├── README.md
+│   │   │   ├── scripts
+│   │   │   │   ├── install.sh
+│   │   │   │   ├── process.sh
+│   │   │   │   ├── uninstall.sh
+│   │   │   │   ├── update.sh
+│   │   │   │   ├── verify.sh
+│   │   │   │   └── worker.sh
+│   │   │   └── src
+│   │   │       ├── adapters
+│   │   │       │   ├── base.py
+│   │   │       │   ├── discord.py
+│   │   │       │   ├── __init__.py
+│   │   │       │   └── webhook.py
+│   │   │       ├── formatter.py
+│   │   │       ├── processor.py
+│   │   │       └── router.py
+│   │   ├── sports
+│   │   │   ├── commands.json
+│   │   │   ├── config
+│   │   │   │   └── nginx.conf
+│   │   │   ├── docker-compose.yml
+│   │   │   ├── Dockerfile
+│   │   │   ├── docs
+│   │   │   ├── .env
+│   │   │   ├── .env.example
+│   │   │   ├── module.conf
+│   │   │   ├── README.md
+│   │   │   ├── scheduler.json
+│   │   │   ├── scripts
+│   │   │   │   ├── health.py
+│   │   │   │   ├── install.sh
+│   │   │   │   ├── maintenance_job.py
+│   │   │   │   ├── uninstall.sh
+│   │   │   │   ├── update.sh
+│   │   │   │   └── verify.sh
+│   │   │   ├── src
+│   │   │   │   ├── controller.py
+│   │   │   │   ├── feed.py
+│   │   │   │   ├── health.py
+│   │   │   │   ├── lifecycle.py
+│   │   │   │   ├── maintenance.py
+│   │   │   │   ├── providers
+│   │   │   │   │   ├── base.py
+│   │   │   │   │   ├── __init__.py
+│   │   │   │   │   ├── registry.py
+│   │   │   │   │   └── thesportsdb.py
+│   │   │   │   ├── recorder.py
+│   │   │   │   ├── recordings.py
+│   │   │   │   ├── resolver.py
+│   │   │   │   ├── sports_cli.py
+│   │   │   │   ├── subscriptions.py
+│   │   │   │   └── worker.py
+│   │   │   └── tests
+│   │   │       ├── integration_maintenance.py
+│   │   │       ├── integration_provider.py
+│   │   │       ├── integration_recording.py
+│   │   │       ├── integration_recovery.py
+│   │   │       ├── integration_scheduler.py
+│   │   │       └── run_tests.py
+│   │   └── template
+│   │       ├── config
+│   │       ├── docker-compose.yml
+│   │       ├── docs
+│   │       ├── .env.example
+│   │       ├── module.conf
+│   │       ├── README.md
+│   │       ├── scripts
+│   │       │   ├── install.sh
+│   │       │   ├── uninstall.sh
+│   │       │   ├── update.sh
+│   │       │   └── verify.sh
+│   │       └── src
+│   ├── README.md
+│   ├── repository-tree.txt
+│   ├── ROADMAP.md
+│   ├── scripts
+│   │   ├── atlas
+│   │   ├── atlas-ari.sh
+│   │   ├── atlas-module-create.sh
+│   │   ├── backup.sh
+│   │   ├── commands
+│   │   │   ├── ari.sh
+│   │   │   ├── backup.sh
+│   │   │   ├── doctor.sh
+│   │   │   ├── event.sh
+│   │   │   ├── favorite.sh
+│   │   │   ├── git.sh
+│   │   │   ├── health.sh
+│   │   │   ├── help.sh
+│   │   │   ├── invite.sh
+│   │   │   ├── logs.sh
+│   │   │   ├── module.sh
+│   │   │   ├── restart.sh
+│   │   │   ├── scheduler.sh
+│   │   │   ├── services.sh
+│   │   │   ├── status.sh
+│   │   │   ├── test.sh
+│   │   │   ├── update.sh
+│   │   │   ├── urls.sh
+│   │   │   ├── user.sh
+│   │   │   ├── verify.sh
+│   │   │   └── version.sh
+│   │   ├── install.sh
+│   │   ├── lib
+│   │   │   ├── common.sh
+│   │   │   ├── config.sh
+│   │   │   ├── docker.sh
+│   │   │   ├── events.sh
+│   │   │   ├── health.sh
+│   │   │   ├── modules.sh
+│   │   │   └── output.sh
+│   │   ├── permissions.sh
+│   │   ├── update.sh
+│   │   └── verify.sh
+│   ├── tests
+│   │   ├── core
+│   │   │   ├── __init__.py
+│   │   │   ├── test_events.py
+│   │   │   ├── test_favorite_cli.py
+│   │   │   ├── test_favorite_service.py
+│   │   │   ├── test_favorites.py
+│   │   │   ├── test_health.py
+│   │   │   ├── test_invitation_cli.py
+│   │   │   ├── test_invitations.py
+│   │   │   ├── test_jellyfin_provider.py
+│   │   │   ├── test_module_commands.py
+│   │   │   ├── test_policy_engine.py
+│   │   │   ├── test_policy_models.py
+│   │   │   ├── test_policy_service.py
+│   │   │   ├── test_registration.py
+│   │   │   ├── test_registration_web.py
+│   │   │   ├── test_retention_models.py
+│   │   │   ├── test_retention_service.py
+│   │   │   ├── test_scheduler.py
+│   │   │   └── test_user_profiles.py
+│   │   └── __init__.py
+│   └── VERSION
+├── atlas-scheduler-runtime.patch
+├── atlas-scheduler-runtime-review
+│   ├── atlas
+│   │   ├── events.py
+│   │   ├── health.py
+│   │   ├── scheduler_cli.py
+│   │   └── scheduler.py
+│   ├── CHANGELOG.md
+│   ├── config
+│   │   └── atlas.conf
+│   ├── current-state.txt
+│   ├── docs
+│   │   └── BUILD_LOG.md
+│   ├── executable-files.txt
+│   ├── ROADMAP.md
+│   ├── runtime-references.txt
+│   ├── scripts
+│   │   ├── atlas
+│   │   └── commands
+│   │       ├── help.sh
+│   │       └── scheduler.sh
+│   └── tests
+│       └── core
+│           ├── test_events.py
+│           ├── test_health.py
+│           └── test_scheduler.py
+├── atlas-scheduler-runtime-review.tar.gz
+├── backups
+│   └── sports-maintenance-scheduler-20260718T213310Z
+│       ├── docker-compose.sports.yml
+│       ├── .env.example
+│       └── modules
+│           └── sports
+│               ├── docker-compose.yml
+│               ├── Dockerfile
+│               ├── .env.example
+│               └── src
+│                   └── worker.py
+├── CHANGELOG.md
+├── CHARTER.md
+├── config
+│   ├── atlas.conf
+│   └── modules
+│       └── modules.conf
+├── configs
+│   ├── examples
+│   ├── homepage
+│   │   ├── bookmarks.yaml
+│   │   ├── docker.yaml
+│   │   ├── kubernetes.yaml
+│   │   ├── services.yaml
+│   │   ├── settings.yaml
+│   │   └── widgets.yaml
+│   ├── recyclarr
+│   │   ├── README.md
+│   │   ├── recyclarr.placeholder.yml
+│   │   └── recyclarr.yml
+│   └── templates
+├── docker-compose.sports.yml
+├── docker-compose.yml
+├── docs
+│   ├── 01-install.md
+│   ├── 02-service-wiring.md
+│   ├── 03-maintainerr-72-hour-cleanup.md
+│   ├── 04-backup-restore.md
+│   ├── ADR
+│   │   ├── 0006-separate-anime-services.md
+│   │   ├── 0007-atlas-retention-intelligence.md
+│   │   ├── ADR-0001—Atlas-Platform-Architecture.md
+│   │   ├── ADR-0002—Atlas-Retention-Intelligence-Architecture.md
+│   │   ├── ADR-0003—Immutable-Snapshot-Architecture.md
+│   │   ├── ADR-0004—Runtime-State-Architecture.md
+│   │   └── ADR-0005—Docker-Networking.md
+│   ├── BUILD_LOG.md
+│   ├── CONFIGURATION.md
+│   ├── DECISIONS.md
+│   ├── EDR
+│   │   ├── EDR-0001—Health-Engine.md
+│   │   ├── EDR-0002—Analytics-Engine.md
+│   │   ├── EDR-0003—Forecast-Engine.md
+│   │   ├── EDR-0004—Recommendation-Engine.md
+│   │   └── EDR-0005—Runtime-State.md
+│   ├── guides
+│   │   └── ADMINISTRATOR_GUIDE.md
+│   ├── INDEXERS.md
+│   ├── MATURITY.md
+│   ├── milestones
+│   │   └── M-002-Anime-Expansion.md
+│   ├── modules
+│   ├── OPERATIONS.md
+│   ├── RELEASES.md
+│   ├── services
+│   └── SPORTS.md
+├── .env
+├── .env.example
+├── .gitignore
+├── M-D
+├── modules
+│   ├── notifications
+│   │   ├── config
+│   │   ├── docker-compose.yml
+│   │   ├── Dockerfile
+│   │   ├── docs
+│   │   ├── .env
+│   │   ├── .env.example
+│   │   ├── module.conf
+│   │   ├── README.md
+│   │   ├── scripts
+│   │   │   ├── install.sh
+│   │   │   ├── process.sh
+│   │   │   ├── uninstall.sh
+│   │   │   ├── update.sh
+│   │   │   ├── verify.sh
+│   │   │   └── worker.sh
+│   │   └── src
+│   │       ├── adapters
+│   │       │   ├── base.py
+│   │       │   ├── discord.py
+│   │       │   ├── __init__.py
+│   │       │   └── webhook.py
+│   │       ├── formatter.py
+│   │       ├── processor.py
+│   │       └── router.py
+│   ├── sports
+│   │   ├── commands.json
+│   │   ├── config
+│   │   │   └── nginx.conf
+│   │   ├── docker-compose.yml
+│   │   ├── Dockerfile
+│   │   ├── docs
+│   │   ├── .env
+│   │   ├── .env.example
+│   │   ├── module.conf
+│   │   ├── README.md
+│   │   ├── scheduler.json
+│   │   ├── scripts
+│   │   │   ├── health.py
+│   │   │   ├── install.sh
+│   │   │   ├── maintenance_job.py
+│   │   │   ├── uninstall.sh
+│   │   │   ├── update.sh
+│   │   │   └── verify.sh
+│   │   ├── src
+│   │   │   ├── controller.py
+│   │   │   ├── feed.py
+│   │   │   ├── health.py
+│   │   │   ├── lifecycle.py
+│   │   │   ├── maintenance.py
+│   │   │   ├── providers
+│   │   │   │   ├── base.py
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── registry.py
+│   │   │   │   └── thesportsdb.py
+│   │   │   ├── recorder.py
+│   │   │   ├── recordings.py
+│   │   │   ├── resolver.py
+│   │   │   ├── sports_cli.py
+│   │   │   ├── subscriptions.py
+│   │   │   └── worker.py
+│   │   └── tests
+│   │       ├── integration_maintenance.py
+│   │       ├── integration_provider.py
+│   │       ├── integration_recording.py
+│   │       ├── integration_recovery.py
+│   │       ├── integration_scheduler.py
+│   │       └── run_tests.py
+│   └── template
+│       ├── config
+│       ├── docker-compose.yml
+│       ├── docs
+│       ├── .env.example
+│       ├── module.conf
+│       ├── README.md
+│       ├── scripts
+│       │   ├── install.sh
+│       │   ├── uninstall.sh
+│       │   ├── update.sh
+│       │   └── verify.sh
+│       └── src
+├── README.md
+├── RELEASES.md
+├── ROADMAP.md
+├── scripts
+│   ├── atlas
+│   ├── atlas-ari.sh
+│   ├── atlas-module-create.sh
+│   ├── backup.sh
+│   ├── commands
+│   │   ├── ari.sh
+│   │   ├── backup.sh
+│   │   ├── doctor.sh
+│   │   ├── event.sh
+│   │   ├── favorite.sh
+│   │   ├── git.sh
+│   │   ├── health.sh
+│   │   ├── help.sh
+│   │   ├── invite.sh
+│   │   ├── logs.sh
+│   │   ├── module.sh
+│   │   ├── restart.sh
+│   │   ├── scheduler.sh
+│   │   ├── services.sh
+│   │   ├── status.sh
+│   │   ├── test.sh
+│   │   ├── update.sh
+│   │   ├── urls.sh
+│   │   ├── user.sh
+│   │   ├── verify.sh
+│   │   └── version.sh
+│   ├── install.sh
+│   ├── lib
+│   │   ├── common.sh
+│   │   ├── config.sh
+│   │   ├── docker.sh
+│   │   ├── events.sh
+│   │   ├── health.sh
+│   │   ├── modules.sh
+│   │   └── output.sh
+│   ├── permissions.sh
+│   ├── update.sh
+│   └── verify.sh
+├── systemd
+│   ├── atlas-health-report.service
+│   └── atlas-health-report.timer
+├── tests
+│   ├── core
+│   │   ├── __init__.py
+│   │   ├── test_events.py
+│   │   ├── test_favorite_cli.py
+│   │   ├── test_favorite_service.py
+│   │   ├── test_favorites.py
+│   │   ├── test_health.py
+│   │   ├── test_invitation_cli.py
+│   │   ├── test_invitations.py
+│   │   ├── test_jellyfin_provider.py
+│   │   ├── test_module_commands.py
+│   │   ├── test_policy_engine.py
+│   │   ├── test_policy_models.py
+│   │   ├── test_policy_service.py
+│   │   ├── test_registration.py
+│   │   ├── test_registration_web.py
+│   │   ├── test_retention_models.py
+│   │   ├── test_retention_service.py
+│   │   ├── test_scheduler.py
+│   │   └── test_user_profiles.py
+│   └── __init__.py
+└── VERSION
+
+99 directories, 423 files
