@@ -71,6 +71,8 @@ class CleanupPublicApiTests(unittest.TestCase):
                 "CleanupDecision",
                 "CleanupError",
                 "CleanupExecutionError",
+                "CleanupExecutionEvent",
+                "CleanupExecutionEventStatus",
                 "CleanupExecutionItem",
                 "CleanupExecutionMode",
                 "CleanupExecutionReport",
