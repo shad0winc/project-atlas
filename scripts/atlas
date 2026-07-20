@@ -5,6 +5,14 @@ PROJECT_DIR="/opt/project-atlas"
 ATLAS_CONFIG_FILE="$PROJECT_DIR/config/atlas.conf"
 ATLAS_MODULE_CONFIG_FILE="$PROJECT_DIR/config/modules/modules.conf"
 ATLAS_CLI_ROOT="$PROJECT_DIR/scripts"
+ATLAS_ENV_FILE="$PROJECT_DIR/.env"
+
+if [[ -f "$ATLAS_ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ATLAS_ENV_FILE"
+  set +a
+fi
 
 if [[ ! -f "$ATLAS_CONFIG_FILE" ]]; then
   echo "Missing Atlas config: $ATLAS_CONFIG_FILE"

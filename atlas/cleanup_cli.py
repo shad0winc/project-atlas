@@ -8,7 +8,14 @@ import sys
 from collections.abc import Sequence
 
 from atlas.cleanup.models import CleanupDecision, CleanupError
+from atlas.cleanup.scan_models import CleanupScanReport
+from atlas.cleanup.scanner import CleanupScanner
 from atlas.cleanup.service import CleanupService
+from atlas.media.jellyfin import (
+    JellyfinProvider,
+    default_jellyfin_provider,
+)
+from atlas.media.provider import MediaProviderError
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -41,6 +48,27 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         dest="json_output",
         help="Output the cleanup decision as JSON.",
+    )
+
+    scan_parser = subparsers.add_parser(
+        "scan",
+        help="Scan a provider library for cleanup recommendations.",
+    )
+    scan_parser.add_argument(
+        "provider",
+        help="Media provider name, such as jellyfin.",
+    )
+    scan_parser.add_argument(
+        "--page-size",
+        type=int,
+        default=200,
+        help="Number of provider items requested per page.",
+    )
+    scan_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="Output the cleanup scan report as JSON.",
     )
 
     return parser
@@ -78,10 +106,41 @@ def render_human(decision: CleanupDecision) -> str:
     )
 
 
+def render_scan_human(report: CleanupScanReport) -> str:
+    """Render a cleanup scan report for terminal users."""
+
+    decisions = (
+        "\n".join(
+            f"  - {decision.action.value.upper()}: "
+            f"{decision.item_id}"
+            for decision in report.decisions
+        )
+        if report.decisions
+        else "  - None"
+    )
+
+    return "\n".join(
+        [
+            "Atlas Cleanup Scan",
+            "------------------",
+            f"Provider: {report.provider}",
+            f"Scanned: {report.scanned}",
+            f"Delete: {report.delete_count}",
+            f"Keep: {report.keep_count}",
+            f"Review: {report.review_count}",
+            "Decisions:",
+            decisions,
+            f"Scanned at: {report.scanned_at}",
+        ]
+    )
+
+
 def main(
     argv: Sequence[str] | None = None,
     *,
     service: CleanupService | None = None,
+    scanner: CleanupScanner | None = None,
+    jellyfin_provider: JellyfinProvider | None = None,
 ) -> int:
     """Run the Cleanup CLI."""
 
@@ -114,14 +173,70 @@ def main(
 
             return 0
 
-    except (CleanupError, ValueError, RuntimeError) as exc:
+        if args.command == "scan":
+            provider_name = args.provider.strip().lower()
+
+            if provider_name != "jellyfin":
+                raise CleanupError(
+                    "unsupported cleanup scan provider: "
+                    f"{provider_name or args.provider}"
+                )
+
+            provider = (
+                jellyfin_provider
+                if jellyfin_provider is not None
+                else default_jellyfin_provider()
+            )
+
+            item_ids = provider.list_media_item_ids(
+                page_size=args.page_size
+            )
+
+            cleanup_scanner = (
+                scanner
+                if scanner is not None
+                else CleanupScanner(cleanup_service)
+            )
+
+            report = cleanup_scanner.scan(
+                provider_name,
+                item_ids,
+            )
+
+            if args.json_output:
+                print(
+                    json.dumps(
+                        report.to_dict(),
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+            else:
+                print(render_scan_human(report))
+
+            return 0
+
+    except (
+        CleanupError,
+        MediaProviderError,
+        ValueError,
+        RuntimeError,
+    ) as exc:
+        operation = (
+            "evaluation"
+            if args.command == "evaluate"
+            else "scan"
+        )
+
         print(
-            f"cleanup evaluation failed: {exc}",
+            f"cleanup {operation} failed: {exc}",
             file=sys.stderr,
         )
         return 1
 
-    parser.error(f"unsupported cleanup command: {args.command}")
+    parser.error(
+        f"unsupported cleanup command: {args.command}"
+    )
     return 2
 
 
