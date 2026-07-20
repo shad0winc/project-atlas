@@ -111,6 +111,15 @@ class MediaProvider(Protocol):
 
         ...
 
+    def list_media_item_ids(
+        self,
+        *,
+        page_size: int = 200,
+    ) -> tuple[str, ...]:
+        """Return provider media identifiers."""
+
+        ...
+
     def get_item(
         self,
         item_id: str,

@@ -5,6 +5,9 @@ from atlas.cleanup.audit import (
     CleanupAuditWriter,
     JsonlCleanupAuditWriter,
 )
+from atlas.cleanup.default_executor import (
+    DefaultCleanupExecutor,
+)
 from atlas.cleanup.execution_events import (
     CleanupExecutionEvent,
     CleanupExecutionEventStatus,
@@ -14,9 +17,6 @@ from atlas.cleanup.execution_models import (
     CleanupExecutionMode,
     CleanupExecutionReport,
     CleanupExecutionStatus,
-)
-from atlas.cleanup.default_executor import (
-    DefaultCleanupExecutor,
 )
 from atlas.cleanup.execution_service import (
     CleanupExecutionService,
@@ -35,6 +35,7 @@ from atlas.cleanup.models import (
 from atlas.cleanup.scan_models import CleanupScanReport
 from atlas.cleanup.scanner import CleanupScanner
 from atlas.cleanup.service import CleanupService
+from atlas.cleanup.workflow import CleanupWorkflowService
 
 __all__ = [
     "CleanupAction",
@@ -53,9 +54,10 @@ __all__ = [
     "CleanupExecutionSummary",
     "CleanupExecutor",
     "CleanupRunStatus",
-    "DefaultCleanupExecutor",
-    "JsonlCleanupAuditWriter",
     "CleanupScanReport",
     "CleanupScanner",
     "CleanupService",
+    "CleanupWorkflowService",
+    "DefaultCleanupExecutor",
+    "JsonlCleanupAuditWriter",
 ]

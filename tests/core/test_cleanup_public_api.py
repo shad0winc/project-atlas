@@ -27,6 +27,7 @@ from atlas.cleanup.models import (
 from atlas.cleanup.scan_models import CleanupScanReport
 from atlas.cleanup.scanner import CleanupScanner
 from atlas.cleanup.service import CleanupService
+from atlas.cleanup.workflow import CleanupWorkflowService
 
 
 class CleanupPublicApiTests(unittest.TestCase):
@@ -51,6 +52,7 @@ class CleanupPublicApiTests(unittest.TestCase):
             "CleanupScanReport": CleanupScanReport,
             "CleanupScanner": CleanupScanner,
             "CleanupService": CleanupService,
+            "CleanupWorkflowService": CleanupWorkflowService,
             "DefaultCleanupExecutor": DefaultCleanupExecutor,
         }
 
@@ -86,6 +88,7 @@ class CleanupPublicApiTests(unittest.TestCase):
                 "CleanupScanReport",
                 "CleanupScanner",
                 "CleanupService",
+                "CleanupWorkflowService",
                 "DefaultCleanupExecutor",
                 "JsonlCleanupAuditWriter",
             },
