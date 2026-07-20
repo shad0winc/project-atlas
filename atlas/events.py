@@ -51,3 +51,24 @@ def publish_event(
         command,
         check=True,
     )
+
+
+def publish_core_event(
+    event_name: str,
+    payload: Mapping[str, Any] | None = None,
+    *,
+    source: str = "atlas",
+    atlas_binary: str | None = None,
+) -> None:
+    """Publish a core Atlas event through the durable event stream."""
+    normalized_event = event_name.strip()
+    normalized_source = source.strip()
+    if not normalized_event:
+        raise ValueError("event_name cannot be empty")
+    if not normalized_source:
+        raise ValueError("source cannot be empty")
+    serialized_payload = json.dumps(dict(payload or {}), separators=(",", ":"))
+    subprocess.run(
+        [atlas_binary or os.getenv("ATLAS_BINARY", DEFAULT_ATLAS_BINARY), "event", "publish", normalized_event, serialized_payload, normalized_source],
+        check=True,
+    )

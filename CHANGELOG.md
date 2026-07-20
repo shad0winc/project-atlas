@@ -1,157 +1,137 @@
 # Changelog
 
+All notable changes to Project Atlas are documented in this file.
+
 ## [Unreleased]
 
-- Added one-shot scheduler execution for due or named tasks with subprocess isolation, runtime locking, stale-lock recovery, success/failure metadata, bounded history, and best-effort module events.
-- Added `atlas scheduler run`, `dry-run`, and `history` commands.
+### Added
+
+- One-shot scheduler execution for due or named tasks with subprocess isolation, runtime locking, stale-lock recovery, success/failure metadata, bounded history, and best-effort module events.
+- `atlas scheduler run`, `atlas scheduler dry-run`, and `atlas scheduler history` commands.
+- `atlas test [all|core|sports]` as the authoritative repository-wide validation command.
+- Provider-neutral favorites service with Jellyfin item validation, automatic metadata enrichment, and best-effort favorite lifecycle events.
+- Jellyfin REST adapter using the configured Atlas URL and API key.
+- Favorites infrastructure with durable per-user media relationships, metadata-only storage, atomic persistence, filtering, removal, and consistency verification.
+- Atlas Favorites CLI commands to add, remove, list, show, and verify favorite relationships.
+- Username-or-user-ID resolution through the Atlas user profile store.
+- JSON output, relationship-based removal, filters, metadata input, and stable exit codes for Favorites CLI operations.
+- Dependency-free WSGI registration portal with invitation validation, secure form handling, friendly success and error pages, and no-store security headers.
+- Transactional invitation redemption and registration service with external user provisioning, Atlas/Jellyfin identity linkage, compensating rollback, and best-effort audit event delivery.
+- Rollback-safe Atlas profile deletion for failed multi-system registration transactions.
+- Invitation lifecycle CLI for issuing, listing, inspecting, revoking, verifying, and cleaning up invitations.
+- Atlas identity infrastructure with secure hashed invitation tokens, durable lifecycle storage, expiration handling, and consistency verification.
+- Atlas user identity and profile framework with Jellyfin linkage, optional personal fields, atomic storage, validation, and user-management CLI commands.
+- Foundational Atlas Health Engine with a normalized Python data model and JSON report output.
+- `atlas health` command for machine-readable foundational health reporting.
+- Shared shell health-result helpers and Core health-engine unit tests.
+- Shared Atlas Core Python event publisher in `atlas/events.py`.
+- Discoverable unit tests for Core event publishing.
+
+### Improved
+
+- Jellyfin user linking now validates the supplied Jellyfin user ID against the Jellyfin API before persisting the association.
+- Jellyfin user validation preserves an existing valid link when a replacement ID is rejected.
+- Jellyfin provider errors now use resource-neutral not-found messaging for both media and user lookups.
+- Sports worker and controller now use the shared Core event publisher.
+- Core scheduler validation now runs through standard `unittest` discovery.
+- Python compilation, Atlas Core unit tests, and Sports integration tests are unified behind one CLI entry point.
+- Nested module `.env` files are explicitly ignored.
 
 ### Validation
 
-- Added `atlas test [all|core|sports]` as the authoritative repository-wide validation command.
-- Unified Python compilation, Atlas Core unit tests, and Sports integration tests behind one CLI entry point.
+- Added focused Jellyfin provider tests for valid users, malformed responses, mismatched identities, and not-found responses.
+- Added user CLI tests confirming valid Jellyfin IDs are persisted only after provider validation.
+- Added regression coverage confirming invalid Jellyfin IDs are rejected without overwriting an existing valid link.
+- Verified the complete repository test suite with 119 passing tests.
+- Live-tested Jellyfin API authentication, user discovery, valid identity linking, invalid identity rejection, and preservation of the prior valid association.
+
+## [1.0.0] — Production Foundation
 
 ### Added
 
-- Favorites infrastructure with durable per-user media relationships, metadata-only storage, atomic persistence, filtering, removal, and consistency verification
+#### Atlas Retention Intelligence
 
-- Dependency-free WSGI registration portal with invitation validation, secure form handling, friendly success/error pages, and no-store security headers
+- Health Engine.
+- Analytics Engine.
+- Forecast Engine.
+- Recommendation Engine.
+- Immutable historical snapshots.
+- Shared configuration architecture.
+- Jellyfin server, library, and user adapters.
+- Jellyfin aggregate metrics.
+- Human-readable operational reports.
+- Machine-readable snapshot schema.
+- Library and library-path validation.
+- Filesystem-to-Jellyfin synchronization analysis.
+- Historical snapshot comparison.
+- Operational change summaries.
+- Byte-accurate storage metrics.
 
-- Transactional invitation redemption and registration service with external user provisioning, Atlas/Jellyfin identity linkage, compensating rollback, and best-effort audit event delivery
-- Rollback-safe Atlas profile deletion for failed multi-system registration transactions
+#### Health
 
-- Invitation lifecycle CLI for issuing, listing, inspecting, revoking, verifying, and cleaning up invitations
+- Health scoring.
+- Platform, media, Docker, VPN, storage, project, and Git checks.
+- Machine-readable and human-readable health reporting.
+- Automatic discovery of enabled module health providers.
+- Normalized JSON health-provider contract for Atlas modules.
+- Sports runtime health reporting for containers, heartbeat, providers, and endpoint reachability.
 
-- Atlas identity infrastructure with secure hashed invitation tokens, durable lifecycle storage, expiration handling, and consistency verification
-- Atlas user identity and profile framework with Jellyfin linkage, optional personal fields, atomic storage, validation, and user-management CLI commands
-- Foundational Atlas Health Engine with a normalized Python data model and JSON report output
-- `atlas health` command for machine-readable foundational health reporting
-- Shared shell health-result helpers and Core health-engine unit tests
-- Shared Atlas Core Python event publisher in `atlas/events.py`
-- Discoverable unit tests for Core event publishing
+#### Forecasting and Recommendations
+
+- Daily storage growth calculations.
+- Time-normalized forecasting.
+- 30-day projection.
+- Estimated storage exhaustion date.
+- Forecast confidence.
+- Storage, health, capacity, and forecast recommendations.
+
+#### Scheduler
+
+- Persistent scheduler records with task definitions, execution counters, descriptions, callbacks, module ownership, enablement, and timing metadata.
+- Scheduler task registration, inspection, listing, and removal through the Atlas CLI.
+- Compatibility with existing interval and lifecycle callers while adding stored-interval scheduling.
+
+#### Infrastructure
+
+- Improved Atlas CLI.
+- Enhanced validation framework.
+- Runtime state management.
+- Modular service architecture.
 
 ### Improved
 
-- Sports worker and controller now use the shared Core event publisher
-- Core scheduler validation now runs through standard `unittest` discovery
-- Nested module `.env` files are explicitly ignored
+- ARI script organization.
+- Snapshot schema and report formatting.
+- Documentation coverage.
+- `atlas doctor` migration to the shared Health Engine text renderer.
 
-## [0.4.0]
-
-### Added
-- Initial Docker media stack
-- Windscribe VPN via Gluetun
-- qBittorrent routed through VPN
-- Sonarr/Radarr connected to qBittorrent
-- Homepage dashboard
-- Environment template
-- Configuration documentation
-
-## [0.5.0]
+## [0.5.0] — Retention Intelligence Foundation
 
 ### Added
 
-- Atlas Retention Intelligence (ARI)
-- Immutable operational snapshots
-- Shared Atlas configuration
-- Jellyfin server integration
-- Jellyfin library discovery
-- Jellyfin user discovery
-- Library validation
-- Library path validation
-- Human-readable ARI reporting
+- Atlas Retention Intelligence foundation.
+- Immutable operational snapshots.
+- Shared Atlas configuration.
+- Jellyfin server integration.
+- Jellyfin library and user discovery.
+- Library and library-path validation.
+- Human-readable ARI reporting.
 
 ### Improved
 
-- Configuration centralization
-- Validation framework
-- Runtime state separation
-- Snapshot schema
+- Configuration centralization.
+- Validation framework.
+- Runtime state separation.
+- Snapshot schema.
 
-# Changelog
-
-## [0.9.0] — Operational Intelligence
+## [0.4.0] — Initial Media Platform
 
 ### Added
 
-- Atlas Retention Intelligence (ARI)
-- Immutable historical snapshots
-- Shared configuration architecture
-- Jellyfin server adapter
-- Jellyfin library adapter
-- Jellyfin user adapter
-- Jellyfin aggregate metrics
-- Human-readable operational reports
-- Machine-readable snapshot schema
-- Library validation
-- Library path validation
-- Filesystem ↔ Jellyfin synchronization analysis
-- Historical snapshot comparison
-- Operational change summaries
-- Byte-accurate storage metrics
-
-### Improved
-
-- ARI script organization
-- Snapshot schema
-- Report formatting
-- Documentation
-
-# v1.0.0
-
-## 🚀 Major Features
-
-### Atlas Retention Intelligence (ARI)
-
-- Added Health Engine
-- Added Analytics Engine
-- Added Forecast Engine
-- Added Recommendation Engine
-
-### Health
-
-- Health scoring
-- Platform checks
-- Media checks
-- Intelligence checks
-
-### Forecasting
-
-- Daily storage growth
-- Time-normalized forecasting
-- 30-day projection
-- Estimated storage exhaustion
-- Forecast confidence
-
-### Recommendations
-
-- Storage recommendations
-- Health recommendations
-- Forecast recommendations
-
-### Infrastructure
-
-- Improved CLI
-- Enhanced validation
-- Runtime state management
-
-- Expanded the Health Engine with infrastructure, service, storage, project, and Git diagnostics.
-- Migrated `atlas doctor` to the shared Health Engine text renderer.
-
-### M-018.3 — Module Health Integration
-
-- Added automatic discovery of enabled module health providers.
-- Added a normalized JSON health-provider contract for Atlas modules.
-- Added Sports runtime health reporting for containers, heartbeat, providers, and endpoint reachability.
-- Added Core tests for enabled, disabled, and malformed module health providers.
-
-### M-019.1 — Scheduler Core Management
-
-- Expanded persistent scheduler records with task definitions, execution counters, descriptions, callbacks, module ownership, enablement, and timing metadata.
-- Added scheduler task registration, inspection, listing, and removal through the Atlas CLI.
-- Preserved compatibility with existing interval and lifecycle callers while adding stored-interval scheduling.
-
-### M-020.3 — Favorites CLI
-
-- Added Atlas CLI commands to add, remove, list, show, and verify favorite relationships.
-- Added username-or-user-ID resolution through the Atlas user profile store.
-- Added JSON output, relationship-based removal, filters, metadata input, and stable exit codes.
+- Initial Docker media stack.
+- Windscribe VPN through Gluetun.
+- qBittorrent routed through the VPN.
+- Sonarr and Radarr connected to qBittorrent.
+- Homepage dashboard.
+- Environment template.
+- Configuration documentation.

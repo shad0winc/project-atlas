@@ -7,6 +7,8 @@ import json
 from collections.abc import Sequence
 from typing import Any
 
+from atlas.media.jellyfin import default_jellyfin_provider
+from atlas.media.provider import MediaProviderError
 from atlas.user_profiles import UserProfileError, UserProfileStore, default_store
 
 
@@ -114,8 +116,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
 
         if args.action == "link-jellyfin":
+            try:
+                jellyfin_user = default_jellyfin_provider().get_user(
+                    args.jellyfin_user_id
+                )
+            except MediaProviderError as exc:
+                raise UserProfileError(
+                    f"unable to link Jellyfin user: {exc}"
+                ) from exc
+
             profile = store.update_user(
-                args.identifier, {"jellyfin_user_id": args.jellyfin_user_id}
+                args.identifier,
+                {"jellyfin_user_id": jellyfin_user["id"]},
             )
             print(json.dumps(profile, indent=2, sort_keys=True))
             return 0

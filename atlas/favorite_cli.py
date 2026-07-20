@@ -9,7 +9,10 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+from atlas.events import publish_core_event
+from atlas.favorite_service import FavoriteService
 from atlas.favorites import FavoriteError, FavoriteStore, default_favorite_store
+from atlas.media import default_jellyfin_provider
 from atlas.user_profiles import UserProfileError, UserProfileStore, default_store
 
 
@@ -20,10 +23,8 @@ def _parser() -> argparse.ArgumentParser:
 
     add_parser = subparsers.add_parser("add")
     add_parser.add_argument("--user", required=True, help="Atlas username or user ID")
-    add_parser.add_argument("--provider", required=True)
+    add_parser.add_argument("--provider", default="jellyfin")
     add_parser.add_argument("--item-id", required=True)
-    add_parser.add_argument("--type", dest="media_type", required=True)
-    add_parser.add_argument("--title")
     add_parser.add_argument("--metadata-json")
     add_parser.add_argument("--json", action="store_true")
 
@@ -82,14 +83,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     favorites, users = _stores(args)
     try:
         if args.action == "add":
-            record = favorites.add(
-                _resolve_user_id(users, args.user),
-                args.provider,
-                args.item_id,
-                media_type=args.media_type,
-                title=args.title,
-                metadata=_metadata(args.metadata_json),
-            )
+            service = FavoriteService(favorites, {"jellyfin": default_jellyfin_provider()}, event_publisher=publish_core_event)
+            result = service.add(_resolve_user_id(users, args.user), args.provider, args.item_id, metadata=_metadata(args.metadata_json))
+            record = result.record
+            if result.event_error:
+                print(f"warning: favorite event failed: {result.event_error}", file=sys.stderr)
             if args.json:
                 _print_json(record)
             else:
@@ -111,7 +109,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 if record is None:
                     raise FavoriteError("favorite relationship not found")
                 favorite_id = str(record["favorite_id"])
-            removed = favorites.remove(favorite_id)
+            service = FavoriteService(favorites, {"jellyfin": default_jellyfin_provider()}, event_publisher=publish_core_event)
+            result = service.remove(favorite_id)
+            removed = result.record
+            if result.event_error:
+                print(f"warning: favorite event failed: {result.event_error}", file=sys.stderr)
             if args.json:
                 _print_json(removed)
             else:

@@ -194,7 +194,8 @@ Planned:
 
 - [x] Metadata storage foundation
 - [ ] CLI lifecycle commands
-- [ ] Jellyfin and retention-policy integration
+- [x] Jellyfin integration and favorite lifecycle events
+- [ ] Retention-policy subscriber
 - [ ] Web favorites controls and personalized view
 - Movies
 - TV

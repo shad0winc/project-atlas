@@ -14,26 +14,26 @@ Build the core infrastructure required to host Project Atlas.
 
 ### Completed
 
-- Created Debian Docker LXC on Proxmox
-- Mounted dedicated media storage
-- Installed Docker and Docker Compose
-- Deployed the initial Project Atlas stack
-- Configured Gluetun with Windscribe VPN
-- Routed qBittorrent through the VPN
-- Connected Sonarr and Radarr to qBittorrent
-- Created environment template and configuration documentation
+- Created a Debian Docker LXC on Proxmox.
+- Mounted dedicated media storage.
+- Installed Docker and Docker Compose.
+- Deployed the initial Project Atlas stack.
+- Configured Gluetun with Windscribe VPN.
+- Routed qBittorrent through the VPN.
+- Connected Sonarr and Radarr to qBittorrent.
+- Created the environment template and configuration documentation.
 
 ### Verification
 
-- Docker stack healthy
-- Jellyfin operational
-- Homepage operational
-- VPN verified
-- Sonarr/Radarr download tests passed
+- Docker stack healthy.
+- Jellyfin operational.
+- Homepage operational.
+- VPN verified.
+- Sonarr and Radarr download tests passed.
 
 ### Result
 
-Project Atlas infrastructure operational.
+Project Atlas infrastructure became operational.
 
 ---
 
@@ -45,23 +45,22 @@ Separate anime management from standard media libraries.
 
 ### Completed
 
-- Added Sonarr Anime
-- Added Radarr Anime
-- Added Anime TV library
-- Added Anime Movies library
-- Added anime download categories
-- Connected all Arr applications to Prowlarr
-- Simplified Docker startup dependencies
-- Added Project Atlas Maturity Model
+- Added Sonarr Anime.
+- Added Radarr Anime.
+- Added Anime TV and Anime Movies libraries.
+- Added anime download categories.
+- Connected all Arr applications to Prowlarr.
+- Simplified Docker startup dependencies.
+- Added the Project Atlas Maturity Model.
 
 ### Engineering Decisions
 
-- Runtime resilience over startup ordering
-- Dedicated anime management workflow
+- Favored runtime resilience over strict startup ordering.
+- Adopted a dedicated anime management workflow.
 
 ### Result
 
-Anime is now independently managed while remaining fully integrated into Atlas.
+Anime became independently managed while remaining fully integrated into Atlas.
 
 ---
 
@@ -73,15 +72,15 @@ Centralize media quality management.
 
 ### Completed
 
-- Added Recyclarr
-- Integrated TRaSH Guides
-- Imported Custom Formats
-- Updated Quality Definitions
-- Implemented version-controlled quality profiles
+- Added Recyclarr.
+- Integrated TRaSH Guides.
+- Imported Custom Formats.
+- Updated Quality Definitions.
+- Implemented version-controlled quality profiles.
 
 ### Result
 
-Media quality standards are now centrally managed and reproducible.
+Media quality standards became centrally managed and reproducible.
 
 ---
 
@@ -93,14 +92,11 @@ Complete the media acquisition platform.
 
 ### Completed
 
-- Configured Jellyfin libraries
-- Integrated Jellyseerr
-- Configured Movies
-- Configured TV
-- Configured Anime Movies
-- Configured Anime TV
-- Added dedicated anime root folders
-- Verified Prowlarr synchronization
+- Configured Jellyfin libraries.
+- Integrated Jellyseerr.
+- Configured Movies, TV, Anime Movies, and Anime TV libraries.
+- Added dedicated anime root folders.
+- Verified Prowlarr synchronization.
 
 ### Result
 
@@ -118,16 +114,13 @@ Create the intelligence layer for Atlas.
 
 ### Completed
 
-- Shared configuration framework
-- Immutable snapshot architecture
-- Historical snapshot storage
-- Jellyfin server adapter
-- Jellyfin library adapter
-- Jellyfin user adapter
-- Library validation
-- Library path validation
-- Human-readable reporting
-- Configuration-driven validation
+- Shared configuration framework.
+- Immutable snapshot architecture.
+- Historical snapshot storage.
+- Jellyfin server, library, and user adapters.
+- Library and library-path validation.
+- Human-readable reporting.
+- Configuration-driven validation.
 
 ### Result
 
@@ -143,13 +136,13 @@ Introduce historical analysis and operational awareness.
 
 ### Completed
 
-- Jellyfin aggregate metrics
-- User inventory
-- Library synchronization validation
-- Historical snapshot comparison
-- Operational summaries
-- Byte-accurate storage metrics
-- ARI functional refactor
+- Jellyfin aggregate metrics.
+- User inventory.
+- Library synchronization validation.
+- Historical snapshot comparison.
+- Operational summaries.
+- Byte-accurate storage metrics.
+- ARI functional refactor.
 
 ### Result
 
@@ -167,18 +160,14 @@ Measure the operational health of Atlas.
 
 ### Completed
 
-- Health scoring
-- Platform validation
-- Media validation
-- Docker validation
-- VPN validation
-- Storage validation
-- Snapshot freshness monitoring
-- Categorized health reporting
+- Health scoring.
+- Platform, media, Docker, VPN, and storage validation.
+- Snapshot freshness monitoring.
+- Categorized health reporting.
 
 ### Result
 
-ARI can now evaluate overall platform health.
+ARI can evaluate overall platform health.
 
 ---
 
@@ -190,16 +179,16 @@ Transform snapshots into operational metrics.
 
 ### Completed
 
-- Historical storage trends
-- Library growth analysis
-- Metric helper framework
-- Historical averages
-- Minimum/maximum tracking
-- Trend analysis
+- Historical storage trends.
+- Library growth analysis.
+- Metric helper framework.
+- Historical averages.
+- Minimum and maximum tracking.
+- Trend analysis.
 
 ### Result
 
-Atlas now understands historical behavior instead of simply reporting snapshots.
+Atlas understands historical behavior instead of only reporting snapshots.
 
 ---
 
@@ -211,16 +200,16 @@ Predict future storage usage.
 
 ### Completed
 
-- Time-normalized growth calculations
-- Average daily growth
-- 30-day projection
-- Days remaining estimation
-- Estimated storage exhaustion date
-- Forecast confidence
+- Time-normalized growth calculations.
+- Average daily growth.
+- 30-day projection.
+- Days-remaining estimation.
+- Estimated storage exhaustion date.
+- Forecast confidence.
 
 ### Result
 
-ARI now performs predictive capacity planning.
+ARI performs predictive capacity planning.
 
 ---
 
@@ -232,185 +221,147 @@ Provide operational guidance based on system state.
 
 ### Completed
 
-- Runtime state framework
-- Recommendation engine
-- Health recommendations
-- Capacity recommendations
-- Forecast recommendations
+- Runtime state framework.
+- Recommendation engine.
+- Health, capacity, and forecast recommendations.
 
 ### Result
 
-Atlas now provides actionable operational guidance instead of reporting alone.
+Atlas provides actionable operational guidance instead of reporting alone.
+
+---
+
+# 2026-07-19
+
+## M-020.1 — User Identity Framework
+
+### Objective
+
+Introduce durable Atlas-native user identities that can be linked to external services.
+
+### Completed
+
+- Added normalized Atlas user profiles.
+- Added durable per-user storage and a registry index.
+- Added username and Atlas user-ID resolution.
+- Added role, status, personal-field, and Jellyfin-ID validation.
+- Added atomic profile updates and consistency verification.
+- Added user-management CLI commands.
+
+### Result
+
+Atlas gained a stable identity layer independent of any single media provider.
+
+---
+
+## M-020.2 — Registration System
+
+### Objective
+
+Provide secure invitation-based registration and cross-system account provisioning.
+
+### Completed
+
+- Added secure hashed invitation tokens.
+- Added invitation creation, inspection, revocation, verification, cleanup, and expiration handling.
+- Added a dependency-free WSGI registration portal.
+- Added transactional Atlas and Jellyfin account provisioning.
+- Added compensating rollback for partial registration failures.
+- Added best-effort registration lifecycle events.
+
+### Result
+
+Atlas can securely onboard users and maintain consistent identity state across Atlas and Jellyfin.
+
+---
+
+## M-020.3 — Favorites and Jellyfin Integration
+
+### Objective
+
+Create durable user-to-media favorite relationships with provider-neutral service boundaries and Jellyfin metadata enrichment.
+
+### Completed
+
+- Added durable favorite storage with per-user relationships and metadata-only records.
+- Added favorite creation, removal, listing, inspection, filtering, and verification.
+- Added a provider-neutral `FavoriteService`.
+- Added a Jellyfin REST provider for media lookup and metadata normalization.
+- Added automatic enrichment for title, normalized media type, Jellyfin type, year, path, series name, and library.
+- Added best-effort `favorite.created` and `favorite.removed` event publication.
+- Added CLI support without requiring callers to manually provide media type or title.
+- Added focused provider, service, store, event, and CLI tests.
+
+### Live Validation
+
+- Confirmed Jellyfin API authentication using the configured Atlas URL and API key.
+- Confirmed Jellyfin user discovery through the API.
+- Linked the Atlas profile `michael` to the real Jellyfin user `admin`.
+- Confirmed the configured media libraries are present but intentionally empty.
+- Deferred the real-media favorite smoke test until the first Movie or Series item exists in Jellyfin.
+
+### Result
+
+Atlas now has a reusable favorites domain layer and a functioning Jellyfin integration. The only deferred validation depends on real media being added to the library.
+
+---
+
+# 2026-07-20
+
+## M-020.3 Hardening — Jellyfin User Link Validation
+
+### Objective
+
+Prevent invalid Jellyfin user IDs from being stored in Atlas profiles.
+
+### Completed
+
+- Added `JellyfinProvider.get_user()` for validated Jellyfin identity lookup.
+- Added response-shape validation for Jellyfin user payloads.
+- Added requested-versus-returned user ID matching.
+- Updated `atlas user link-jellyfin` to verify the user through Jellyfin before persistence.
+- Updated not-found errors to use resource-neutral wording.
+- Ensured failed replacement attempts do not overwrite an existing valid Jellyfin link.
+- Added focused tests for valid users, malformed responses, mismatched identities, and unknown users.
+
+### Verification
+
+- Python compilation passed.
+- Bash syntax validation passed.
+- `git diff --check` passed.
+- Focused Jellyfin provider and user profile tests passed: 18 tests.
+- Full regression suite passed: 119 tests.
+- Live valid-user linking succeeded.
+- Live invalid-user linking was rejected.
+- The existing valid Jellyfin association remained unchanged after the failed attempt.
+
+### Result
+
+Jellyfin identity linkage is now validated before persistence and is safe against accidental replacement with nonexistent users.
 
 ---
 
 # Current Status
 
-**Version:** 1.0.0
-
-**Development State:** Production Ready
+**Development State:** Active post-foundation development
 
 ## Platform Capabilities
 
-- Production media platform
-- Operational CLI
-- Health monitoring
-- Historical analytics
-- Capacity forecasting
-- Operational recommendations
+- Production media platform.
+- Operational Atlas CLI.
+- Health monitoring.
+- Historical analytics.
+- Capacity forecasting.
+- Operational recommendations.
+- Modular sports platform foundation.
+- Atlas-native identity and invitation system.
+- Transactional registration workflow.
+- Provider-neutral favorites infrastructure.
+- Jellyfin-backed metadata enrichment and user validation.
 
-## Next Milestone
+## Next Planned Work
 
-**M-014 — Documentation & Release Preparation**
----
-
-## Atlas Core Event Publisher Consolidation
-
-### Completed
-
-- Added `atlas/events.py` as the shared Python interface for module event publishing.
-- Preserved the Atlas CLI as the authority for event declaration validation, durable event storage, and subscriber delivery.
-- Removed duplicate Sports event publisher implementations from the worker and controller.
-- Converted Core scheduler checks into discoverable `unittest` tests.
-- Added Core event publisher tests covering command construction, payload serialization, input validation, and CLI failure propagation.
-- Updated `.gitignore` to exclude nested module `.env` files.
-
-### Validation
-
-```bash
-python3 -m compileall -q atlas modules/sports/src tests
-python3 -m unittest discover -s tests -p 'test_*.py' -v
-```
-
-Result: eight Core tests passed.
-
-
-
-## Unified Atlas Test Command
-
-- Added `atlas test` with `all`, `core`, and `sports` scopes.
-- Core validation runs compilation and discoverable unit tests.
-- Sports validation runs the complete module integration suite.
-- Verified eight Core tests and five Sports integration suites pass.
-
-## M-018.1 — Health Engine Foundation
-
-### Completed
-
-- Added `atlas/health.py` with normalized health statuses, checks, reports, scoring, and JSON serialization.
-- Added foundational Core checks for the Python runtime, Atlas project directory, and Atlas configuration.
-- Added `atlas health` with formatted and compact JSON output.
-- Added shared shell helpers for emitting normalized health-check results.
-- Added Core unit tests for health validation, aggregation, scoring, serialization, and foundational collection.
-
-### Scope
-
-Existing `status`, `services`, `verify`, and `doctor` behavior remains unchanged. Migration to the shared engine is deferred to later M-018 sections.
-
-## 2026-07-19 — M-018.2 Health diagnostics migration
-
-- Added shared operational collectors to `atlas.health`.
-- Migrated `atlas doctor` to render the Health Engine report.
-- Preserved `atlas verify` and `atlas services` for the next migration section.
-
-## M-018.3 — Module Health Integration
-
-Atlas Health Engine now discovers health providers under `modules/<module>/scripts/health.py`
-or `health.sh` for enabled modules. Provider output is normalized into Core `HealthCheck`
-objects and appears automatically in both `atlas health` and `atlas doctor`. Sports is the
-first module implementation and reports container state, controller heartbeat freshness,
-provider health, and endpoint availability without introducing Sports-specific logic into Core.
-
-## M-019.1 — Scheduler Core Management
-
-Atlas now exposes its existing persistent interval scheduler as a first-class Core subsystem.
-Tasks carry durable definitions and runtime metadata, including callback, interval, module,
-enablement, run counts, failure counts, last duration, due state, and next-run time. The CLI
-supports registering, listing, inspecting, and removing tasks. Execution remains manually
-invoked and is deferred to M-019.2.
-### M-019.2 — Scheduler Runtime
-
-- Added deterministic one-shot execution for due and explicitly named scheduler tasks.
-- Added shell-free callback parsing, execution timing, success/failure counters, bounded history, runtime locking, stale-lock recovery, and best-effort module event publication.
-- Added CLI commands for run, dry-run, and execution history.
-- Added scheduler runtime tests for success, failure, due selection, dry runs, history limits, event isolation, and overlap protection.
-
-## M-019.3 — Module Scheduler API
-
-- Added optional `modules/<module>/scheduler.json` manifests.
-- Added enabled-module discovery and scheduler task reconciliation.
-- Added callback containment validation and stale module task cleanup.
-- Added `atlas scheduler sync [module]` and focused module scheduler tests.
-
-## M-019.4 — Module Command Interface
-
-- Added declarative `commands.json` manifests for module-owned commands.
-- Added safe command discovery and execution through `atlas module commands` and `atlas module exec`.
-- Enforced enabled-module checks, callback containment, command allowlisting, and exit-code propagation.
-- Added the Sports module as the reference command-manifest implementation while preserving its existing CLI shortcut.
-
-## M-019.5 — Sports Scheduler Integration
-
-- Added the Sports `scheduler.json` manifest for hourly maintenance.
-- Added an allowlisted `maintenance` module command using the existing maintenance implementation.
-- Added a scheduler callback that delegates through the Atlas Module Command Interface.
-- Removed the private Sports `TaskScheduler` and maintenance timing state from `worker.py`.
-- Added tests confirming the Sports scheduler contract and removal of duplicate scheduling logic.
-
-## M-020.1 — User Identity and Profile Framework
-
-- Added durable Atlas user profiles under the shared runtime configuration root.
-- Added normalized usernames, optional personal profile fields, roles, account status, and Jellyfin user linkage.
-- Added atomic registry and profile writes with schema validation and duplicate username/email protection.
-- Added `atlas users` and `atlas user` commands for creation, inspection, updates, enable/disable, Jellyfin linking, and verification.
-- Added focused Core tests for profile storage, validation, registry consistency, and CLI lifecycle operations.
-- Passwords remain owned by Jellyfin and are not stored by Atlas.
-
-## M-020.2 Patch 1 — Identity Infrastructure
-
-- Added a shared Atlas identity runtime layout under the persistent configuration root.
-- Added secure one-time invitation token generation with SHA-256-only durable storage.
-- Added pending, completed, revoked, and expired invitation lifecycle handling.
-- Added atomic invitation registry and record persistence with path-containment and schema validation.
-- Added expiration cleanup, storage verification, and focused Core unit tests.
-- Deferred CLI commands, registration, Jellyfin provisioning, email delivery, and portal integration to later M-020.2 patches.
-
-
-## M-020.2.2 — Invitation CLI
-
-- Added `atlas invite` lifecycle commands backed by the shared identity invitation store.
-- Added one-time registration URL output without persisting plaintext invitation tokens.
-- Added focused CLI tests for creation, listing, inspection, revocation, verification, and cleanup.
-
-## M-020.2.3 — Registration Engine
-
-- Added a transactional registration service that redeems pending invitations, provisions an external account, creates a linked Atlas profile, and completes the invitation.
-- Added a provider interface so Jellyfin and future Atlas services can be integrated without coupling their APIs to registration business logic.
-- Added compensating rollback for external accounts and Atlas profiles when any pre-completion step fails.
-- Added rollback-safe profile deletion with staged filesystem removal and atomic registry updates.
-- Added best-effort registration audit events that report delivery failures without undoing successful registrations.
-- Added focused tests for success, invalid tokens, invitation email enforcement, provisioning failures, profile failures, completion failures, rollback, password handling, and event isolation.
-
-## M-020.2.4 — Web Registration Portal
-
-- Added a dependency-free WSGI registration application at `/register`.
-- Added invitation-link validation, server-side form validation, password confirmation, and delegation to the transactional registration engine.
-- Added friendly invalid, expired, failed, and successful registration pages.
-- Added no-store caching, content-type, frame, referrer, and content-security response headers.
-- Added a `/health` endpoint and focused portal tests.
-- Kept framework selection, production serving, reverse-proxy configuration, and concrete Jellyfin provisioning outside the presentation layer.
-
-## M-020.3.1 — Favorites Infrastructure
-
-- Added metadata-only favorites storage under the shared Atlas identity runtime.
-- Added durable user/provider/media relationships without copying media or creating filesystem links.
-- Added atomic record and registry persistence, duplicate prevention, filtering, removal, path containment, schema validation, and storage verification.
-- Added focused tests for lifecycle operations, validation, duplicate handling, filtering, and corruption detection.
-- Deferred CLI, Jellyfin synchronization, retention protection, events, and web controls to later M-020.3 patches.
-
-## M-020.3 — Favorites CLI
-
-- Added `atlas favorite add`, `remove`, `list`, `show`, and `verify`.
-- Kept all persistence and validation in `FavoriteStore`; the CLI is an adapter only.
-- Added username resolution through `UserProfileStore` and machine-readable JSON output.
-- Added focused CLI lifecycle, filtering, verification, and error tests.
+- Commit and close M-020.3.
+- Begin M-020.4 — Media Policy Engine.
+- Add retention decisions driven by favorites, requests, watch history, and user policy.
+- Integrate policy decisions with Maintainerr in a later patch.

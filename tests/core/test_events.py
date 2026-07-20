@@ -85,3 +85,11 @@ class PublishEventTests(unittest.TestCase):
                 "sports",
                 "sports.refresh",
             )
+
+
+class PublishCoreEventTests(unittest.TestCase):
+    @patch("atlas.events.subprocess.run")
+    def test_publish_core_event_uses_atlas_event_contract(self, run):
+        from atlas.events import publish_core_event
+        publish_core_event("favorite.created", {"id": "fav_1"}, atlas_binary="/tmp/atlas")
+        run.assert_called_once_with(["/tmp/atlas", "event", "publish", "favorite.created", '{"id":"fav_1"}', "atlas"], check=True)

@@ -5,9 +5,11 @@ import io
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from atlas.favorite_cli import main
+from atlas.media.provider import MediaItem
 from atlas.favorites import FavoriteStore
 from atlas.user_profiles import UserProfileStore
 
@@ -25,14 +27,18 @@ class FavoriteCliTests(unittest.TestCase):
     def run_cli(self, *arguments: str) -> tuple[int, str, str]:
         stdout = io.StringIO()
         stderr = io.StringIO()
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+        provider = unittest.mock.Mock()
+        provider.get_item.return_value = MediaItem("jellyfin", "movie-1", "movie", "The Matrix", {"year": 1999})
+        with patch("atlas.favorite_cli.default_jellyfin_provider", return_value=provider), \
+             patch("atlas.favorite_cli.publish_core_event"), \
+             contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
             code = main(("--identity-directory", str(self.root), *arguments))
         return code, stdout.getvalue(), stderr.getvalue()
 
     def test_add_show_list_and_remove_by_relationship(self) -> None:
         code, output, error = self.run_cli(
             "add", "--user", "michael", "--provider", "jellyfin",
-            "--item-id", "movie-1", "--type", "movie", "--title", "The Matrix",
+            "--item-id", "movie-1",
             "--metadata-json", '{"year": 1999}', "--json",
         )
         self.assertEqual(0, code, error)
@@ -60,7 +66,7 @@ class FavoriteCliTests(unittest.TestCase):
         store = FavoriteStore(self.root)
         store.add(self.profile["user_id"], "jellyfin", "movie-1", media_type="movie", title="Movie")
         store.add(self.profile["user_id"], "plex", "show-1", media_type="tv", title="Show")
-        code, output, error = self.run_cli("list", "--provider", "jellyfin", "--type", "movie")
+        code, output, error = self.run_cli("list", "--provider", "jellyfin")
         self.assertEqual(0, code, error)
         self.assertIn("FAVORITE ID", output)
         self.assertIn("Movie", output)
@@ -81,14 +87,14 @@ class FavoriteCliTests(unittest.TestCase):
     def test_invalid_user_and_metadata_return_nonzero(self) -> None:
         code, _, error = self.run_cli(
             "add", "--user", "missing", "--provider", "jellyfin",
-            "--item-id", "movie-1", "--type", "movie",
+            "--item-id", "movie-1",
         )
         self.assertEqual(1, code)
         self.assertIn("user not found", error)
 
         code, _, error = self.run_cli(
             "add", "--user", "michael", "--provider", "jellyfin",
-            "--item-id", "movie-1", "--type", "movie", "--metadata-json", "[]",
+            "--item-id", "movie-1", "--metadata-json", "[]",
         )
         self.assertEqual(1, code)
         self.assertIn("must be an object", error)

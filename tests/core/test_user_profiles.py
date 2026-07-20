@@ -4,7 +4,9 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+from atlas.media.provider import MediaProviderError
 from atlas.user_cli import main as user_cli_main
 from atlas.user_profiles import UserProfileError, UserProfileStore
 
@@ -117,6 +119,57 @@ class UserProfileCliTests(unittest.TestCase):
         self.assertEqual(self.invoke("create", "michael"), 0)
         self.assertEqual(self.invoke("update", "michael"), 1)
 
+    def test_link_jellyfin_validates_user_before_persisting(self) -> None:
+        self.assertEqual(self.invoke("create", "michael"), 0)
+
+        jellyfin_id = "e29fdc8501124a5d8a1f40653e487407"
+
+        with patch(
+            "atlas.user_cli.default_jellyfin_provider"
+        ) as provider_factory:
+            provider_factory.return_value.get_user.return_value = {
+                "id": jellyfin_id,
+                "name": "admin",
+            }
+
+            self.assertEqual(
+                self.invoke(
+                    "link-jellyfin",
+                    "michael",
+                    jellyfin_id,
+                ),
+                0,
+            )
+
+        profile = UserProfileStore(self.root).get_user("michael")
+        self.assertEqual(jellyfin_id, profile["jellyfin_user_id"])
+        provider_factory.return_value.get_user.assert_called_once_with(
+            jellyfin_id
+        )
+
+    def test_link_jellyfin_rejects_unknown_user_without_persisting(self) -> None:
+        self.assertEqual(self.invoke("create", "michael"), 0)
+
+        invalid_id = "a" * 32
+
+        with patch(
+            "atlas.user_cli.default_jellyfin_provider"
+        ) as provider_factory:
+            provider_factory.return_value.get_user.side_effect = (
+                MediaProviderError("Jellyfin resource not found")
+            )
+
+            self.assertEqual(
+                self.invoke(
+                    "link-jellyfin",
+                    "michael",
+                    invalid_id,
+                ),
+                1,
+            )
+
+        profile = UserProfileStore(self.root).get_user("michael")
+        self.assertIsNone(profile["jellyfin_user_id"])
 
 if __name__ == "__main__":
     unittest.main()
