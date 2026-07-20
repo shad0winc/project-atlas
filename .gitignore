@@ -19,3 +19,6 @@ __pycache__/
 *.pyo
 *.pyd
 .pytest_cache/
+
+# Local Python virtual environment
+.venv/
