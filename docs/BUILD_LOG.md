@@ -369,7 +369,7 @@ Jellyfin identity linkage is now validated before persistence and is safe agains
 
 ---
 
-M-021.4
+## M-021.4
 --------
 Implemented the Atlas Retention CLI.
 
@@ -384,3 +384,19 @@ Added:
 
 Regression:
 153/153 PASS
+
+---
+
+## Completed M-022.2 Cleanup CLI
+--------
+Added:
+- atlas.cleanup_cli
+- scripts/commands/cleanup.sh
+- CLI routing
+- Help integration
+- Human and JSON output
+- Full regression validation
+
+Core Tests:
+167 passing
+0 failures

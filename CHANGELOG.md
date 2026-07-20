@@ -120,6 +120,12 @@ All notable changes to Project Atlas are documented in this file.
 - Jellyfin library and user discovery.
 - Library and library-path validation.
 - Human-readable ARI reporting.
+- Cleanup evaluation framework
+- Cleanup decision model
+- Cleanup service
+- atlas cleanup evaluate CLI
+- JSON and human-readable cleanup output
+- Cleanup CLI shell integration
 
 ### Improved
 
