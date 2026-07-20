@@ -5,7 +5,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import datetime, timezone
 
+from atlas.cleanup.audit import CleanupAuditWriter
+from atlas.cleanup.execution_events import (
+    CleanupExecutionEvent,
+    CleanupExecutionEventStatus,
+)
 from atlas.cleanup.execution_models import (
+    CleanupExecutionItem,
     CleanupExecutionMode,
     CleanupExecutionReport,
     CleanupExecutionStatus,
@@ -38,22 +44,36 @@ class DefaultCleanupExecutor(CleanupExecutor):
     Dry-run execution never modifies media. When a media provider is
     supplied, planned deletions are sent only to the provider's safe
     ``preview_delete_item`` operation.
+
+    When an audit writer is supplied, every execution item produces one
+    normalized cleanup execution event.
     """
 
     def __init__(
         self,
         *,
         provider: MediaProvider | None = None,
+        audit_writer: CleanupAuditWriter | None = None,
         clock: Clock | None = None,
     ) -> None:
         """Initialize the executor.
 
         Args:
             provider: Optional provider used to preview planned deletions.
+            audit_writer: Optional execution-event persistence writer.
             clock: Optional timezone-aware datetime provider.
         """
 
+        if (
+            audit_writer is not None
+            and not isinstance(audit_writer, CleanupAuditWriter)
+        ):
+            raise CleanupExecutionError(
+                "audit_writer must be a CleanupAuditWriter"
+            )
+
         self._provider = provider
+        self._audit_writer = audit_writer
         self._clock = clock or _utc_now
 
     def execute(
@@ -80,16 +100,34 @@ class DefaultCleanupExecutor(CleanupExecutor):
                 "media provider does not match execution report provider"
             )
 
-        started_at = self._timestamp(self._now())
+        occurred_at = self._now()
+        started_at = self._timestamp(occurred_at)
 
         errors: list[str] = []
         previewed = 0
 
         for item in report.items:
             if item.status is CleanupExecutionStatus.SKIPPED:
+                self._record_event(
+                    item=item,
+                    status=CleanupExecutionEventStatus.SKIPPED,
+                    message="Cleanup item was not planned",
+                    occurred_at=occurred_at,
+                    errors=errors,
+                )
                 continue
 
             if self._provider is None:
+                self._record_event(
+                    item=item,
+                    status=CleanupExecutionEventStatus.SKIPPED,
+                    message=(
+                        "Preview skipped because no media provider "
+                        "was configured"
+                    ),
+                    occurred_at=occurred_at,
+                    errors=errors,
+                )
                 continue
 
             try:
@@ -102,12 +140,34 @@ class DefaultCleanupExecutor(CleanupExecutor):
                     item_id=item.item_id,
                 )
             except Exception as exc:
+                message = str(exc)
+
                 errors.append(
-                    f"{item.item_id}: {exc}"
+                    f"{item.item_id}: {message}"
+                )
+
+                self._record_event(
+                    item=item,
+                    status=(
+                        CleanupExecutionEventStatus.PREVIEW_FAILED
+                    ),
+                    message=message,
+                    occurred_at=occurred_at,
+                    errors=errors,
                 )
                 continue
 
             previewed += 1
+
+            self._record_event(
+                item=item,
+                status=(
+                    CleanupExecutionEventStatus.PREVIEW_SUCCEEDED
+                ),
+                message=result.message,
+                occurred_at=occurred_at,
+                errors=errors,
+            )
 
         completed_at = self._timestamp(self._now())
 
@@ -130,6 +190,38 @@ class DefaultCleanupExecutor(CleanupExecutor):
             modified=0,
             errors=tuple(errors),
         )
+
+    def _record_event(
+        self,
+        *,
+        item: CleanupExecutionItem,
+        status: CleanupExecutionEventStatus,
+        message: str,
+        occurred_at: datetime,
+        errors: list[str],
+    ) -> None:
+        """Create and optionally persist one execution event."""
+
+        if self._audit_writer is None:
+            return
+
+        event = CleanupExecutionEvent(
+            provider=item.provider,
+            item_id=item.item_id,
+            action=item.decision.action,
+            mode=item.mode,
+            status=status,
+            message=message,
+            modified=False,
+            occurred_at=occurred_at,
+        )
+
+        try:
+            self._audit_writer.write(event)
+        except Exception as exc:
+            errors.append(
+                f"audit({item.item_id}): {exc}"
+            )
 
     @staticmethod
     def _validate_preview_result(

@@ -5,7 +5,14 @@ from __future__ import annotations
 import unittest
 from datetime import datetime, timedelta, timezone
 
+from atlas.cleanup.audit import (
+    CleanupAuditError,
+    CleanupAuditWriter,
+)
 from atlas.cleanup.default_executor import DefaultCleanupExecutor
+from atlas.cleanup.execution_events import (
+    CleanupExecutionEventStatus,
+)
 from atlas.cleanup.execution_models import (
     CleanupExecutionItem,
     CleanupExecutionMode,
@@ -717,6 +724,269 @@ class DefaultCleanupExecutorTests(unittest.TestCase):
                 "delete-2: preview failed",
             ),
         )
+
+
+    def test_execute_records_one_event_per_item(
+        self,
+    ) -> None:
+        class RecordingAuditWriter(CleanupAuditWriter):
+            def __init__(self) -> None:
+                self.events = []
+
+            def write(self, event) -> None:
+                self.events.append(event)
+
+        provider = RecordingMediaProvider(
+            "jellyfin",
+            clock=lambda: STARTED_AT,
+        )
+        writer = RecordingAuditWriter()
+
+        executor = DefaultCleanupExecutor(
+            provider=provider,
+            audit_writer=writer,
+            clock=make_clock(
+                STARTED_AT,
+                COMPLETED_AT,
+            ),
+        )
+
+        summary = executor.execute(make_report())
+
+        self.assertEqual(
+            summary.status,
+            CleanupRunStatus.SUCCESS,
+        )
+        self.assertEqual(len(writer.events), 3)
+        self.assertEqual(
+            tuple(event.item_id for event in writer.events),
+            (
+                "delete-1",
+                "keep-1",
+                "review-1",
+            ),
+        )
+        self.assertEqual(
+            tuple(event.status for event in writer.events),
+            (
+                CleanupExecutionEventStatus.PREVIEW_SUCCEEDED,
+                CleanupExecutionEventStatus.SKIPPED,
+                CleanupExecutionEventStatus.SKIPPED,
+            ),
+        )
+        self.assertTrue(
+            all(
+                event.occurred_at == STARTED_AT
+                for event in writer.events
+            )
+        )
+
+    def test_successful_preview_event_uses_provider_message(
+        self,
+    ) -> None:
+        class RecordingAuditWriter(CleanupAuditWriter):
+            def __init__(self) -> None:
+                self.events = []
+
+            def write(self, event) -> None:
+                self.events.append(event)
+
+        provider = RecordingMediaProvider(
+            "jellyfin",
+            clock=lambda: STARTED_AT,
+        )
+        writer = RecordingAuditWriter()
+
+        executor = DefaultCleanupExecutor(
+            provider=provider,
+            audit_writer=writer,
+            clock=make_clock(
+                STARTED_AT,
+                COMPLETED_AT,
+            ),
+        )
+
+        executor.execute(make_report())
+
+        event = writer.events[0]
+
+        self.assertEqual(event.item_id, "delete-1")
+        self.assertEqual(
+            event.status,
+            CleanupExecutionEventStatus.PREVIEW_SUCCEEDED,
+        )
+        self.assertEqual(
+            event.message,
+            "Deletion preview recorded; no media was modified",
+        )
+        self.assertFalse(event.modified)
+
+    def test_failed_preview_records_failed_event(
+        self,
+    ) -> None:
+        class FailingProvider:
+            name = "jellyfin"
+
+            def preview_delete_item(
+                self,
+                item_id: str,
+            ) -> ProviderMutationResult:
+                raise RuntimeError("provider unavailable")
+
+        class RecordingAuditWriter(CleanupAuditWriter):
+            def __init__(self) -> None:
+                self.events = []
+
+            def write(self, event) -> None:
+                self.events.append(event)
+
+        writer = RecordingAuditWriter()
+
+        executor = DefaultCleanupExecutor(
+            provider=FailingProvider(),
+            audit_writer=writer,
+            clock=make_clock(
+                STARTED_AT,
+                COMPLETED_AT,
+            ),
+        )
+
+        summary = executor.execute(make_report())
+
+        self.assertEqual(
+            summary.status,
+            CleanupRunStatus.FAILED,
+        )
+
+        failed_event = writer.events[0]
+
+        self.assertEqual(failed_event.item_id, "delete-1")
+        self.assertEqual(
+            failed_event.status,
+            CleanupExecutionEventStatus.PREVIEW_FAILED,
+        )
+        self.assertEqual(
+            failed_event.message,
+            "provider unavailable",
+        )
+
+        self.assertEqual(
+            tuple(event.status for event in writer.events[1:]),
+            (
+                CleanupExecutionEventStatus.SKIPPED,
+                CleanupExecutionEventStatus.SKIPPED,
+            ),
+        )
+
+    def test_planned_item_without_provider_records_skipped_event(
+        self,
+    ) -> None:
+        class RecordingAuditWriter(CleanupAuditWriter):
+            def __init__(self) -> None:
+                self.events = []
+
+            def write(self, event) -> None:
+                self.events.append(event)
+
+        report = CleanupExecutionReport(
+            provider="jellyfin",
+            items=(
+                make_item(
+                    item_id="delete-1",
+                    action=CleanupAction.DELETE,
+                ),
+            ),
+            mode=CleanupExecutionMode.DRY_RUN,
+            created_at=STARTED_AT,
+        )
+        writer = RecordingAuditWriter()
+
+        executor = DefaultCleanupExecutor(
+            audit_writer=writer,
+            clock=make_clock(
+                STARTED_AT,
+                COMPLETED_AT,
+            ),
+        )
+
+        summary = executor.execute(report)
+
+        self.assertEqual(
+            summary.status,
+            CleanupRunStatus.SUCCESS,
+        )
+        self.assertEqual(len(writer.events), 1)
+        self.assertEqual(
+            writer.events[0].status,
+            CleanupExecutionEventStatus.SKIPPED,
+        )
+        self.assertIn(
+            "no media provider",
+            writer.events[0].message,
+        )
+
+    def test_audit_failure_makes_successful_run_partial(
+        self,
+    ) -> None:
+        class FailingAuditWriter(CleanupAuditWriter):
+            def write(self, event) -> None:
+                raise CleanupAuditError("disk unavailable")
+
+        provider = RecordingMediaProvider(
+            "jellyfin",
+            clock=lambda: STARTED_AT,
+        )
+
+        executor = DefaultCleanupExecutor(
+            provider=provider,
+            audit_writer=FailingAuditWriter(),
+            clock=make_clock(
+                STARTED_AT,
+                COMPLETED_AT,
+            ),
+        )
+
+        summary = executor.execute(make_report())
+
+        self.assertEqual(
+            summary.status,
+            CleanupRunStatus.PARTIAL,
+        )
+        self.assertEqual(summary.modified, 0)
+        self.assertEqual(
+            len(summary.errors),
+            3,
+        )
+        self.assertEqual(
+            summary.errors[0],
+            "audit(delete-1): disk unavailable",
+        )
+        self.assertEqual(
+            summary.errors[1],
+            "audit(keep-1): disk unavailable",
+        )
+        self.assertEqual(
+            summary.errors[2],
+            "audit(review-1): disk unavailable",
+        )
+        self.assertEqual(
+            tuple(
+                request.item_id
+                for request in provider.requests
+            ),
+            ("delete-1",),
+        )
+
+    def test_rejects_invalid_audit_writer(
+        self,
+    ) -> None:
+        with self.assertRaisesRegex(
+            CleanupExecutionError,
+            "audit_writer must be a CleanupAuditWriter",
+        ):
+            DefaultCleanupExecutor(
+                audit_writer=object(),
+            )
 
 
 if __name__ == "__main__":
