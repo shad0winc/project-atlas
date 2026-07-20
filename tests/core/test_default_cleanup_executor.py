@@ -20,6 +20,11 @@ from atlas.cleanup.models import (
     CleanupAction,
     CleanupDecision,
 )
+from atlas.media import (
+    ProviderMutationResult,
+    ProviderOperation,
+    RecordingMediaProvider,
+)
 from atlas.policies.models import PolicyDecision
 from atlas.retention.models import RetentionDecision
 
@@ -362,6 +367,355 @@ class DefaultCleanupExecutorTests(unittest.TestCase):
                 "modified": 0,
                 "errors": [],
             },
+        )
+
+    def test_execute_previews_only_planned_items(
+        self,
+    ) -> None:
+        provider = RecordingMediaProvider(
+            "jellyfin",
+            clock=lambda: STARTED_AT,
+        )
+
+        executor = DefaultCleanupExecutor(
+            provider=provider,
+            clock=make_clock(
+                STARTED_AT,
+                COMPLETED_AT,
+            ),
+        )
+
+        summary = executor.execute(make_report())
+
+        self.assertEqual(
+            tuple(
+                request.item_id
+                for request in provider.requests
+            ),
+            ("delete-1",),
+        )
+        self.assertEqual(summary.planned, 1)
+        self.assertEqual(summary.skipped, 2)
+        self.assertEqual(summary.modified, 0)
+        self.assertEqual(
+            summary.status,
+            CleanupRunStatus.SUCCESS,
+        )
+
+    def test_execute_never_previews_skipped_items(
+        self,
+    ) -> None:
+        report = CleanupExecutionReport(
+            provider="jellyfin",
+            items=(
+                make_item(
+                    item_id="keep-1",
+                    action=CleanupAction.KEEP,
+                ),
+                make_item(
+                    item_id="review-1",
+                    action=CleanupAction.REVIEW,
+                ),
+            ),
+            mode=CleanupExecutionMode.DRY_RUN,
+            created_at=STARTED_AT,
+        )
+
+        provider = RecordingMediaProvider(
+            "jellyfin",
+            clock=lambda: STARTED_AT,
+        )
+
+        executor = DefaultCleanupExecutor(
+            provider=provider,
+            clock=make_clock(
+                STARTED_AT,
+                COMPLETED_AT,
+            ),
+        )
+
+        summary = executor.execute(report)
+
+        self.assertEqual(provider.requests, ())
+        self.assertEqual(summary.planned, 0)
+        self.assertEqual(summary.skipped, 2)
+        self.assertEqual(
+            summary.status,
+            CleanupRunStatus.SUCCESS,
+        )
+
+    def test_execute_rejects_mismatched_provider(
+        self,
+    ) -> None:
+        provider = RecordingMediaProvider(
+            "plex",
+            clock=lambda: STARTED_AT,
+        )
+
+        executor = DefaultCleanupExecutor(
+            provider=provider,
+            clock=make_clock(
+                STARTED_AT,
+                COMPLETED_AT,
+            ),
+        )
+
+        with self.assertRaisesRegex(
+            CleanupExecutionError,
+            "provider does not match",
+        ):
+            executor.execute(make_report())
+
+        self.assertEqual(provider.requests, ())
+
+    def test_execute_rejects_invalid_preview_type(
+        self,
+    ) -> None:
+        class InvalidProvider:
+            name = "jellyfin"
+
+            def preview_delete_item(
+                self,
+                item_id: str,
+            ):
+                return object()
+
+        executor = DefaultCleanupExecutor(
+            provider=InvalidProvider(),
+            clock=make_clock(
+                STARTED_AT,
+                COMPLETED_AT,
+            ),
+        )
+
+        summary = executor.execute(make_report())
+
+        self.assertEqual(
+            summary.status,
+            CleanupRunStatus.FAILED,
+        )
+        self.assertEqual(summary.modified, 0)
+        self.assertEqual(len(summary.errors), 1)
+        self.assertIn(
+            "ProviderMutationResult",
+            summary.errors[0],
+        )
+
+    def test_execute_rejects_mismatched_preview_item_id(
+        self,
+    ) -> None:
+        class MismatchedItemProvider:
+            name = "jellyfin"
+
+            def preview_delete_item(
+                self,
+                item_id: str,
+            ) -> ProviderMutationResult:
+                return ProviderMutationResult(
+                    provider="jellyfin",
+                    operation=ProviderOperation.DELETE,
+                    item_id="different-item",
+                    success=True,
+                    message="Preview recorded",
+                    executed_at="2026-07-20T12:00:00Z",
+                )
+
+        executor = DefaultCleanupExecutor(
+            provider=MismatchedItemProvider(),
+            clock=make_clock(
+                STARTED_AT,
+                COMPLETED_AT,
+            ),
+        )
+
+        summary = executor.execute(make_report())
+
+        self.assertEqual(
+            summary.status,
+            CleanupRunStatus.FAILED,
+        )
+        self.assertEqual(summary.modified, 0)
+        self.assertIn(
+            "item_id does not match",
+            summary.errors[0],
+        )
+
+    def test_execute_rejects_mismatched_preview_provider(
+        self,
+    ) -> None:
+        class MismatchedProviderResult:
+            name = "jellyfin"
+
+            def preview_delete_item(
+                self,
+                item_id: str,
+            ) -> ProviderMutationResult:
+                return ProviderMutationResult(
+                    provider="plex",
+                    operation=ProviderOperation.DELETE,
+                    item_id=item_id,
+                    success=True,
+                    message="Preview recorded",
+                    executed_at="2026-07-20T12:00:00Z",
+                )
+
+        executor = DefaultCleanupExecutor(
+            provider=MismatchedProviderResult(),
+            clock=make_clock(
+                STARTED_AT,
+                COMPLETED_AT,
+            ),
+        )
+
+        summary = executor.execute(make_report())
+
+        self.assertEqual(
+            summary.status,
+            CleanupRunStatus.FAILED,
+        )
+        self.assertIn(
+            "provider does not match",
+            summary.errors[0],
+        )
+
+    def test_execute_normalizes_unsuccessful_preview(
+        self,
+    ) -> None:
+        class UnsuccessfulProvider:
+            name = "jellyfin"
+
+            def preview_delete_item(
+                self,
+                item_id: str,
+            ) -> ProviderMutationResult:
+                return ProviderMutationResult(
+                    provider="jellyfin",
+                    operation=ProviderOperation.DELETE,
+                    item_id=item_id,
+                    success=False,
+                    message="Provider rejected preview",
+                    executed_at="2026-07-20T12:00:00Z",
+                )
+
+        executor = DefaultCleanupExecutor(
+            provider=UnsuccessfulProvider(),
+            clock=make_clock(
+                STARTED_AT,
+                COMPLETED_AT,
+            ),
+        )
+
+        summary = executor.execute(make_report())
+
+        self.assertEqual(
+            summary.status,
+            CleanupRunStatus.FAILED,
+        )
+        self.assertEqual(
+            summary.errors,
+            (
+                "delete-1: Provider rejected preview",
+            ),
+        )
+        self.assertEqual(summary.modified, 0)
+
+    def test_execute_normalizes_provider_exception(
+        self,
+    ) -> None:
+        class FailingProvider:
+            name = "jellyfin"
+
+            def preview_delete_item(
+                self,
+                item_id: str,
+            ) -> ProviderMutationResult:
+                raise RuntimeError(
+                    "provider unavailable"
+                )
+
+        executor = DefaultCleanupExecutor(
+            provider=FailingProvider(),
+            clock=make_clock(
+                STARTED_AT,
+                COMPLETED_AT,
+            ),
+        )
+
+        summary = executor.execute(make_report())
+
+        self.assertEqual(
+            summary.status,
+            CleanupRunStatus.FAILED,
+        )
+        self.assertEqual(
+            summary.errors,
+            (
+                "delete-1: provider unavailable",
+            ),
+        )
+        self.assertEqual(summary.modified, 0)
+
+    def test_execute_returns_partial_when_some_previews_fail(
+        self,
+    ) -> None:
+        report = CleanupExecutionReport(
+            provider="jellyfin",
+            items=(
+                make_item(
+                    item_id="delete-1",
+                    action=CleanupAction.DELETE,
+                ),
+                make_item(
+                    item_id="delete-2",
+                    action=CleanupAction.DELETE,
+                ),
+            ),
+            mode=CleanupExecutionMode.DRY_RUN,
+            created_at=STARTED_AT,
+        )
+
+        class PartiallyFailingProvider:
+            name = "jellyfin"
+
+            def preview_delete_item(
+                self,
+                item_id: str,
+            ) -> ProviderMutationResult:
+                if item_id == "delete-2":
+                    raise RuntimeError(
+                        "preview failed"
+                    )
+
+                return ProviderMutationResult(
+                    provider="jellyfin",
+                    operation=ProviderOperation.DELETE,
+                    item_id=item_id,
+                    success=True,
+                    message="Preview recorded",
+                    executed_at="2026-07-20T12:00:00Z",
+                )
+
+        executor = DefaultCleanupExecutor(
+            provider=PartiallyFailingProvider(),
+            clock=make_clock(
+                STARTED_AT,
+                COMPLETED_AT,
+            ),
+        )
+
+        summary = executor.execute(report)
+
+        self.assertEqual(
+            summary.status,
+            CleanupRunStatus.PARTIAL,
+        )
+        self.assertEqual(summary.planned, 2)
+        self.assertEqual(summary.modified, 0)
+        self.assertEqual(
+            summary.errors,
+            (
+                "delete-2: preview failed",
+            ),
         )
 
 

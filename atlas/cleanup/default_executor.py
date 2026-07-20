@@ -1,4 +1,4 @@
-"""Default dry-run cleanup executor for Project Atlas."""
+"""Default controlled cleanup executor for Project Atlas."""
 
 from __future__ import annotations
 
@@ -16,6 +16,11 @@ from atlas.cleanup.executor import (
     CleanupExecutor,
     CleanupRunStatus,
 )
+from atlas.media.provider import (
+    MediaProvider,
+    ProviderMutationResult,
+    ProviderOperation,
+)
 
 
 Clock = Callable[[], datetime]
@@ -28,46 +33,34 @@ def _utc_now() -> datetime:
 
 
 class DefaultCleanupExecutor(CleanupExecutor):
-    """Execute validated cleanup plans without modifying media.
+    """Execute controlled cleanup reports.
 
-    The default Atlas cleanup executor currently supports dry-run reports
-    only. It walks an immutable execution plan and returns a normalized
-    summary without calling a media provider or modifying external state.
-
-    Structural report validation belongs to CleanupExecutionReport.
-    This executor is responsible only for execution orchestration.
+    Dry-run execution never modifies media. When a media provider is
+    supplied, planned deletions are sent only to the provider's safe
+    ``preview_delete_item`` operation.
     """
 
     def __init__(
         self,
         *,
+        provider: MediaProvider | None = None,
         clock: Clock | None = None,
     ) -> None:
         """Initialize the executor.
 
         Args:
-            clock: Optional timezone-aware datetime provider used for
-                deterministic execution timestamps.
+            provider: Optional provider used to preview planned deletions.
+            clock: Optional timezone-aware datetime provider.
         """
 
+        self._provider = provider
         self._clock = clock or _utc_now
 
     def execute(
         self,
         report: CleanupExecutionReport,
     ) -> CleanupExecutionSummary:
-        """Execute one validated dry-run cleanup plan.
-
-        Args:
-            report: Immutable cleanup execution report.
-
-        Returns:
-            A normalized summary of the completed dry run.
-
-        Raises:
-            CleanupExecutionError: If the report type, mode, item status,
-                mutation state, or injected clock is invalid.
-        """
+        """Execute one normalized cleanup report."""
 
         if not isinstance(report, CleanupExecutionReport):
             raise CleanupExecutionError(
@@ -76,73 +69,152 @@ class DefaultCleanupExecutor(CleanupExecutor):
 
         if report.mode is not CleanupExecutionMode.DRY_RUN:
             raise CleanupExecutionError(
-                "only dry-run cleanup execution is supported"
+                "default cleanup executor supports dry-run mode only"
             )
 
-        started_at = self._now()
+        if (
+            self._provider is not None
+            and self._provider.name != report.provider
+        ):
+            raise CleanupExecutionError(
+                "media provider does not match execution report provider"
+            )
 
-        planned = 0
-        skipped = 0
-        modified = 0
+        started_at = self._timestamp(self._now())
+
+        errors: list[str] = []
+        previewed = 0
 
         for item in report.items:
-            if item.status is CleanupExecutionStatus.PLANNED:
-                planned += 1
-            elif item.status is CleanupExecutionStatus.SKIPPED:
-                skipped += 1
-            else:
-                raise CleanupExecutionError(
-                    "unsupported cleanup execution status: "
-                    f"{item.status}"
+            if item.status is CleanupExecutionStatus.SKIPPED:
+                continue
+
+            if self._provider is None:
+                continue
+
+            try:
+                result = self._provider.preview_delete_item(
+                    item.item_id
                 )
+                self._validate_preview_result(
+                    result=result,
+                    provider=report.provider,
+                    item_id=item.item_id,
+                )
+            except Exception as exc:
+                errors.append(
+                    f"{item.item_id}: {exc}"
+                )
+                continue
 
-            if item.modified:
-                modified += 1
+            previewed += 1
 
-        if modified:
-            raise CleanupExecutionError(
-                "dry-run cleanup execution cannot modify media"
-            )
+        completed_at = self._timestamp(self._now())
 
-        completed_at = self._now()
+        status = self._run_status(
+            planned=report.planned_count,
+            previewed=previewed,
+            errors=errors,
+            provider_enabled=self._provider is not None,
+        )
 
         return CleanupExecutionSummary(
             provider=report.provider,
             mode=report.mode,
-            status=CleanupRunStatus.SUCCESS,
-            started_at=_timestamp(started_at),
-            completed_at=_timestamp(completed_at),
+            status=status,
+            started_at=started_at,
+            completed_at=completed_at,
             total=report.total,
-            planned=planned,
-            skipped=skipped,
-            modified=modified,
-            errors=(),
+            planned=report.planned_count,
+            skipped=report.skipped_count,
+            modified=0,
+            errors=tuple(errors),
         )
 
+    @staticmethod
+    def _validate_preview_result(
+        *,
+        result: ProviderMutationResult,
+        provider: str,
+        item_id: str,
+    ) -> None:
+        """Validate the relationship between a preview and its item."""
+
+        if not isinstance(result, ProviderMutationResult):
+            raise CleanupExecutionError(
+                "provider preview must return "
+                "ProviderMutationResult"
+            )
+
+        if result.provider != provider:
+            raise CleanupExecutionError(
+                "provider preview result provider does not match "
+                "execution report"
+            )
+
+        if result.item_id != item_id:
+            raise CleanupExecutionError(
+                "provider preview result item_id does not match "
+                "execution item"
+            )
+
+        if result.operation is not ProviderOperation.DELETE:
+            raise CleanupExecutionError(
+                "provider preview result operation must be delete"
+            )
+
+        if not result.success:
+            raise CleanupExecutionError(
+                result.message
+            )
+
+    @staticmethod
+    def _run_status(
+        *,
+        planned: int,
+        previewed: int,
+        errors: list[str],
+        provider_enabled: bool,
+    ) -> CleanupRunStatus:
+        """Return the normalized execution status."""
+
+        if not errors:
+            return CleanupRunStatus.SUCCESS
+
+        if (
+            provider_enabled
+            and planned > 0
+            and previewed == 0
+        ):
+            return CleanupRunStatus.FAILED
+
+        return CleanupRunStatus.PARTIAL
+
     def _now(self) -> datetime:
-        """Return a validated timezone-aware UTC timestamp."""
+        """Return a validated timezone-aware UTC datetime."""
 
         value = self._clock()
 
         if not isinstance(value, datetime):
             raise CleanupExecutionError(
-                "execution clock must return a datetime"
+                "clock must return a datetime"
             )
 
         if value.tzinfo is None or value.utcoffset() is None:
             raise CleanupExecutionError(
-                "execution clock must return a "
-                "timezone-aware datetime"
+                "clock must return a timezone-aware datetime"
             )
 
         return value.astimezone(timezone.utc)
 
+    @staticmethod
+    def _timestamp(
+        value: datetime,
+    ) -> str:
+        """Serialize a datetime as UTC ISO-8601."""
 
-def _timestamp(value: datetime) -> str:
-    """Serialize a timezone-aware datetime as a UTC timestamp."""
-
-    return (
-        value.astimezone(timezone.utc)
-        .isoformat()
-        .replace("+00:00", "Z")
-    )
+        return (
+            value.astimezone(timezone.utc)
+            .isoformat()
+            .replace("+00:00", "Z")
+        )
