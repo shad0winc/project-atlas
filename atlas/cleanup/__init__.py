@@ -1,5 +1,10 @@
 """Atlas cleanup evaluation framework."""
 
+from atlas.cleanup.audit import (
+    CleanupAuditError,
+    CleanupAuditWriter,
+    JsonlCleanupAuditWriter,
+)
 from atlas.cleanup.execution_events import (
     CleanupExecutionEvent,
     CleanupExecutionEventStatus,
@@ -33,6 +38,8 @@ from atlas.cleanup.service import CleanupService
 
 __all__ = [
     "CleanupAction",
+    "CleanupAuditError",
+    "CleanupAuditWriter",
     "CleanupDecision",
     "CleanupError",
     "CleanupExecutionError",
@@ -47,6 +54,7 @@ __all__ = [
     "CleanupExecutor",
     "CleanupRunStatus",
     "DefaultCleanupExecutor",
+    "JsonlCleanupAuditWriter",
     "CleanupScanReport",
     "CleanupScanner",
     "CleanupService",

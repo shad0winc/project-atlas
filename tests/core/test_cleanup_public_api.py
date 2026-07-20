@@ -68,6 +68,8 @@ class CleanupPublicApiTests(unittest.TestCase):
             set(cleanup.__all__),
             {
                 "CleanupAction",
+                "CleanupAuditError",
+                "CleanupAuditWriter",
                 "CleanupDecision",
                 "CleanupError",
                 "CleanupExecutionError",
@@ -85,6 +87,7 @@ class CleanupPublicApiTests(unittest.TestCase):
                 "CleanupScanner",
                 "CleanupService",
                 "DefaultCleanupExecutor",
+                "JsonlCleanupAuditWriter",
             },
         )
 
