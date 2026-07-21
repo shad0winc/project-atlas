@@ -35,3 +35,13 @@ def test_media_all_exports_capability_symbols() -> None:
     }
 
     assert expected <= set(media.__all__)
+
+
+def test_media_mutation_dispatcher_symbols_are_publicly_importable() -> None:
+    assert media.MediaMutationDispatcher is not None
+    assert media.MediaMutationDispatchError is not None
+
+
+def test_media_all_exports_mutation_dispatcher_symbols() -> None:
+    assert "MediaMutationDispatcher" in media.__all__
+    assert "MediaMutationDispatchError" in media.__all__

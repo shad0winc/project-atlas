@@ -22,13 +22,12 @@ from atlas.cleanup.executor import (
     CleanupExecutor,
     CleanupRunStatus,
 )
-from atlas.media.capabilities import (
-    ProviderCapabilities,
-    ProviderCapability,
+from atlas.media.mutations import (
+    MediaMutationDispatcher,
+    MediaMutationDispatchError,
 )
 from atlas.media.provider import (
     MediaProvider,
-    ProviderMutationResult,
     ProviderOperation,
 )
 
@@ -45,9 +44,9 @@ def _utc_now() -> datetime:
 class DefaultCleanupExecutor(CleanupExecutor):
     """Execute controlled cleanup reports.
 
-    Dry-run execution never modifies media. When a media provider is
-    supplied, planned deletions are sent only to the provider's safe
-    ``preview_delete_item`` operation.
+    Dry-run execution never modifies media. Planned deletions are delegated
+    to the provider-neutral media mutation dispatcher, which currently
+    permits safe delete previews only.
 
     When an audit writer is supplied, every execution item produces one
     normalized cleanup execution event.
@@ -58,13 +57,15 @@ class DefaultCleanupExecutor(CleanupExecutor):
         *,
         provider: MediaProvider | None = None,
         audit_writer: CleanupAuditWriter | None = None,
+        mutation_dispatcher: MediaMutationDispatcher | None = None,
         clock: Clock | None = None,
     ) -> None:
         """Initialize the executor.
 
         Args:
-            provider: Optional provider used to preview planned deletions.
+            provider: Optional provider used for planned mutations.
             audit_writer: Optional execution-event persistence writer.
+            mutation_dispatcher: Optional provider mutation dispatcher.
             clock: Optional timezone-aware datetime provider.
         """
 
@@ -76,8 +77,24 @@ class DefaultCleanupExecutor(CleanupExecutor):
                 "audit_writer must be a CleanupAuditWriter"
             )
 
+        if (
+            mutation_dispatcher is not None
+            and not isinstance(
+                mutation_dispatcher,
+                MediaMutationDispatcher,
+            )
+        ):
+            raise CleanupExecutionError(
+                "mutation_dispatcher must be a "
+                "MediaMutationDispatcher"
+            )
+
         self._provider = provider
         self._audit_writer = audit_writer
+        self._mutation_dispatcher = (
+            mutation_dispatcher
+            or MediaMutationDispatcher()
+        )
         self._clock = clock or _utc_now
 
     def execute(
@@ -111,31 +128,16 @@ class DefaultCleanupExecutor(CleanupExecutor):
             self._provider is not None
             and report.planned_count > 0
         ):
-            capabilities = self._provider_capabilities(
-                self._provider,
-            )
-
-            if not capabilities.supports(
-                ProviderCapability.PREVIEW_DELETE,
-            ):
-                raise CleanupExecutionError(
-                    (
-                        f"{report.provider} does not support "
-                        "delete previews"
-                    )
+            try:
+                self._mutation_dispatcher.validate(
+                    provider=self._provider,
+                    operation=ProviderOperation.DELETE,
+                    preview=True,
                 )
-
-            preview_delete_item = getattr(
-                self._provider,
-                "preview_delete_item",
-                None,
-            )
-
-            if not callable(preview_delete_item):
+            except MediaMutationDispatchError as exc:
                 raise CleanupExecutionError(
-                    "provider declares delete preview support "
-                    "but does not implement preview_delete_item"
-                )
+                    str(exc)
+                ) from exc
 
         errors: list[str] = []
         previewed = 0
@@ -165,13 +167,11 @@ class DefaultCleanupExecutor(CleanupExecutor):
                 continue
 
             try:
-                result = self._provider.preview_delete_item(
-                    item.item_id
-                )
-                self._validate_preview_result(
-                    result=result,
-                    provider=report.provider,
+                result = self._mutation_dispatcher.execute(
+                    provider=self._provider,
+                    operation=ProviderOperation.DELETE,
                     item_id=item.item_id,
+                    preview=True,
                 )
             except Exception as exc:
                 message = str(exc)
@@ -255,72 +255,6 @@ class DefaultCleanupExecutor(CleanupExecutor):
         except Exception as exc:
             errors.append(
                 f"audit({item.item_id}): {exc}"
-            )
-
-    @staticmethod
-    def _provider_capabilities(
-        provider: MediaProvider,
-    ) -> ProviderCapabilities:
-        """Return and validate provider capabilities."""
-
-        get_capabilities = getattr(
-            provider,
-            "get_capabilities",
-            None,
-        )
-
-        if not callable(get_capabilities):
-            raise CleanupExecutionError(
-                "provider must implement get_capabilities"
-            )
-
-        capabilities = get_capabilities()
-
-        if not isinstance(
-            capabilities,
-            ProviderCapabilities,
-        ):
-            raise CleanupExecutionError(
-                "provider must return ProviderCapabilities"
-            )
-
-        return capabilities
-
-    @staticmethod
-    def _validate_preview_result(
-        *,
-        result: ProviderMutationResult,
-        provider: str,
-        item_id: str,
-    ) -> None:
-        """Validate the relationship between a preview and its item."""
-
-        if not isinstance(result, ProviderMutationResult):
-            raise CleanupExecutionError(
-                "provider preview must return "
-                "ProviderMutationResult"
-            )
-
-        if result.provider != provider:
-            raise CleanupExecutionError(
-                "provider preview result provider does not match "
-                "execution report"
-            )
-
-        if result.item_id != item_id:
-            raise CleanupExecutionError(
-                "provider preview result item_id does not match "
-                "execution item"
-            )
-
-        if result.operation is not ProviderOperation.DELETE:
-            raise CleanupExecutionError(
-                "provider preview result operation must be delete"
-            )
-
-        if not result.success:
-            raise CleanupExecutionError(
-                result.message
             )
 
     @staticmethod
