@@ -156,14 +156,14 @@ class ProviderMutationContractTests(unittest.TestCase):
             )
         )
 
-    def test_media_provider_exposes_safe_delete_preview(self) -> None:
+    def test_media_provider_exposes_delete_contracts(self) -> None:
         self.assertTrue(
             hasattr(
                 MediaProvider,
                 "preview_delete_item",
             )
         )
-        self.assertFalse(
+        self.assertTrue(
             hasattr(
                 MediaProvider,
                 "delete_item",

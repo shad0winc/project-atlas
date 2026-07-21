@@ -143,6 +143,14 @@ class MediaProvider(Protocol):
 
         ...
 
+    def delete_item(
+        self,
+        item_id: str,
+    ) -> ProviderMutationResult:
+        """Delete one external media item."""
+
+        ...
+
 
 def _required_text(
     value: object,
