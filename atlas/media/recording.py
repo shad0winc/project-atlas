@@ -5,6 +5,10 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from datetime import datetime, timezone
 
+from atlas.media.capabilities import (
+    ProviderCapabilities,
+    ProviderCapability,
+)
 from atlas.media.provider import (
     MediaItem,
     MediaProviderError,
@@ -94,6 +98,40 @@ class RecordingMediaProvider:
         """Return recorded mutation requests in execution order."""
 
         return tuple(self._requests)
+
+    def get_capabilities(self) -> ProviderCapabilities:
+        """Return safe operations supported by this provider."""
+
+        return ProviderCapabilities(
+            provider=self.name,
+            capabilities=frozenset(
+                {
+                    ProviderCapability.LIST_MEDIA,
+                    ProviderCapability.PREVIEW_DELETE,
+                }
+            ),
+            supports_batch_listing=False,
+            supports_batch_preview=False,
+            max_batch_size=None,
+        )
+
+    def list_media_item_ids(
+        self,
+        *,
+        page_size: int = 200,
+    ) -> tuple[str, ...]:
+        """Return seeded media identifiers in insertion order."""
+
+        if (
+            isinstance(page_size, bool)
+            or not isinstance(page_size, int)
+            or page_size <= 0
+        ):
+            raise MediaProviderError(
+                "page_size must be a positive integer"
+            )
+
+        return tuple(self._items)
 
     def get_item(
         self,

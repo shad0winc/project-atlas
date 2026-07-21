@@ -28,6 +28,8 @@ from atlas.cleanup.models import (
     CleanupDecision,
 )
 from atlas.media import (
+    ProviderCapabilities,
+    ProviderCapability,
     ProviderMutationResult,
     ProviderOperation,
     RecordingMediaProvider,
@@ -475,11 +477,166 @@ class DefaultCleanupExecutorTests(unittest.TestCase):
 
         self.assertEqual(provider.requests, ())
 
+    def test_execute_rejects_missing_capability_method(
+        self,
+    ) -> None:
+        class MissingCapabilitiesProvider:
+            name = "jellyfin"
+
+            def preview_delete_item(
+                self,
+                item_id: str,
+            ) -> ProviderMutationResult:
+                raise AssertionError(
+                    "preview must not be called"
+                )
+
+        executor = DefaultCleanupExecutor(
+            provider=MissingCapabilitiesProvider(),
+            clock=make_clock(
+                STARTED_AT,
+                COMPLETED_AT,
+            ),
+        )
+
+        with self.assertRaisesRegex(
+            CleanupExecutionError,
+            "provider must implement get_capabilities",
+        ):
+            executor.execute(make_report())
+
+    def test_execute_rejects_invalid_capability_contract(
+        self,
+    ) -> None:
+        class InvalidCapabilitiesProvider:
+            name = "jellyfin"
+
+            def get_capabilities(
+                self,
+            ):
+                return object()
+
+            def preview_delete_item(
+                self,
+                item_id: str,
+            ) -> ProviderMutationResult:
+                raise AssertionError(
+                    "preview must not be called"
+                )
+
+        executor = DefaultCleanupExecutor(
+            provider=InvalidCapabilitiesProvider(),
+            clock=make_clock(
+                STARTED_AT,
+                COMPLETED_AT,
+            ),
+        )
+
+        with self.assertRaisesRegex(
+            CleanupExecutionError,
+            "provider must return ProviderCapabilities",
+        ):
+            executor.execute(make_report())
+
+    def test_execute_rejects_provider_without_preview_support(
+        self,
+    ) -> None:
+        class UnsupportedPreviewProvider:
+            name = "jellyfin"
+
+            def get_capabilities(
+                self,
+            ) -> ProviderCapabilities:
+                return ProviderCapabilities(
+                    provider="jellyfin",
+                    capabilities=frozenset(
+                        {
+                            ProviderCapability.LIST_MEDIA,
+                        }
+                    ),
+                    supports_batch_listing=False,
+                    supports_batch_preview=False,
+                    max_batch_size=None,
+                )
+
+            def preview_delete_item(
+                self,
+                item_id: str,
+            ) -> ProviderMutationResult:
+                raise AssertionError(
+                    "preview must not be called"
+                )
+
+        executor = DefaultCleanupExecutor(
+            provider=UnsupportedPreviewProvider(),
+            clock=make_clock(
+                STARTED_AT,
+                COMPLETED_AT,
+            ),
+        )
+
+        with self.assertRaisesRegex(
+            CleanupExecutionError,
+            "jellyfin does not support delete previews",
+        ):
+            executor.execute(make_report())
+
+    def test_execute_rejects_declared_preview_without_method(
+        self,
+    ) -> None:
+        class MissingPreviewMethodProvider:
+            name = "jellyfin"
+
+            def get_capabilities(
+                self,
+            ) -> ProviderCapabilities:
+                return ProviderCapabilities(
+                    provider="jellyfin",
+                    capabilities=frozenset(
+                        {
+                            ProviderCapability.PREVIEW_DELETE,
+                        }
+                    ),
+                    supports_batch_listing=False,
+                    supports_batch_preview=False,
+                    max_batch_size=None,
+                )
+
+        executor = DefaultCleanupExecutor(
+            provider=MissingPreviewMethodProvider(),
+            clock=make_clock(
+                STARTED_AT,
+                COMPLETED_AT,
+            ),
+        )
+
+        with self.assertRaisesRegex(
+            CleanupExecutionError,
+            "declares delete preview support "
+            "but does not implement preview_delete_item",
+        ):
+            executor.execute(make_report())
+
     def test_execute_rejects_invalid_preview_type(
         self,
     ) -> None:
         class InvalidProvider:
             name = "jellyfin"
+
+            def get_capabilities(
+                self,
+            ) -> ProviderCapabilities:
+                return ProviderCapabilities(
+                    provider="jellyfin",
+                    capabilities=frozenset(
+                        {
+                            ProviderCapability.PREVIEW_DELETE,
+                        }
+                    ),
+                    supports_batch_listing=False,
+                    supports_batch_preview=False,
+                    max_batch_size=None,
+                )
 
             def preview_delete_item(
                 self,
@@ -513,6 +670,21 @@ class DefaultCleanupExecutorTests(unittest.TestCase):
     ) -> None:
         class MismatchedItemProvider:
             name = "jellyfin"
+
+            def get_capabilities(
+                self,
+            ) -> ProviderCapabilities:
+                return ProviderCapabilities(
+                    provider="jellyfin",
+                    capabilities=frozenset(
+                        {
+                            ProviderCapability.PREVIEW_DELETE,
+                        }
+                    ),
+                    supports_batch_listing=False,
+                    supports_batch_preview=False,
+                    max_batch_size=None,
+                )
 
             def preview_delete_item(
                 self,
@@ -553,6 +725,21 @@ class DefaultCleanupExecutorTests(unittest.TestCase):
         class MismatchedProviderResult:
             name = "jellyfin"
 
+            def get_capabilities(
+                self,
+            ) -> ProviderCapabilities:
+                return ProviderCapabilities(
+                    provider="jellyfin",
+                    capabilities=frozenset(
+                        {
+                            ProviderCapability.PREVIEW_DELETE,
+                        }
+                    ),
+                    supports_batch_listing=False,
+                    supports_batch_preview=False,
+                    max_batch_size=None,
+                )
+
             def preview_delete_item(
                 self,
                 item_id: str,
@@ -590,6 +777,21 @@ class DefaultCleanupExecutorTests(unittest.TestCase):
     ) -> None:
         class UnsuccessfulProvider:
             name = "jellyfin"
+
+            def get_capabilities(
+                self,
+            ) -> ProviderCapabilities:
+                return ProviderCapabilities(
+                    provider="jellyfin",
+                    capabilities=frozenset(
+                        {
+                            ProviderCapability.PREVIEW_DELETE,
+                        }
+                    ),
+                    supports_batch_listing=False,
+                    supports_batch_preview=False,
+                    max_batch_size=None,
+                )
 
             def preview_delete_item(
                 self,
@@ -631,6 +833,21 @@ class DefaultCleanupExecutorTests(unittest.TestCase):
     ) -> None:
         class FailingProvider:
             name = "jellyfin"
+
+            def get_capabilities(
+                self,
+            ) -> ProviderCapabilities:
+                return ProviderCapabilities(
+                    provider="jellyfin",
+                    capabilities=frozenset(
+                        {
+                            ProviderCapability.PREVIEW_DELETE,
+                        }
+                    ),
+                    supports_batch_listing=False,
+                    supports_batch_preview=False,
+                    max_batch_size=None,
+                )
 
             def preview_delete_item(
                 self,
@@ -683,6 +900,21 @@ class DefaultCleanupExecutorTests(unittest.TestCase):
 
         class PartiallyFailingProvider:
             name = "jellyfin"
+
+            def get_capabilities(
+                self,
+            ) -> ProviderCapabilities:
+                return ProviderCapabilities(
+                    provider="jellyfin",
+                    capabilities=frozenset(
+                        {
+                            ProviderCapability.PREVIEW_DELETE,
+                        }
+                    ),
+                    supports_batch_listing=False,
+                    supports_batch_preview=False,
+                    max_batch_size=None,
+                )
 
             def preview_delete_item(
                 self,
@@ -826,6 +1058,21 @@ class DefaultCleanupExecutorTests(unittest.TestCase):
     ) -> None:
         class FailingProvider:
             name = "jellyfin"
+
+            def get_capabilities(
+                self,
+            ) -> ProviderCapabilities:
+                return ProviderCapabilities(
+                    provider="jellyfin",
+                    capabilities=frozenset(
+                        {
+                            ProviderCapability.PREVIEW_DELETE,
+                        }
+                    ),
+                    supports_batch_listing=False,
+                    supports_batch_preview=False,
+                    max_batch_size=None,
+                )
 
             def preview_delete_item(
                 self,

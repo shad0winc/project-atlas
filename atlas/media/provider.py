@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Mapping, Protocol
 
+from atlas.media.capabilities import ProviderCapabilities
+
 
 class MediaProviderError(RuntimeError):
     """Raised when a media provider operation fails."""
@@ -108,6 +110,11 @@ class MediaProvider(Protocol):
     @property
     def name(self) -> str:
         """Return the normalized provider name."""
+
+        ...
+
+    def get_capabilities(self) -> ProviderCapabilities:
+        """Return the provider's immutable capability contract."""
 
         ...
 

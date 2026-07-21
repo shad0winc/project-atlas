@@ -11,6 +11,9 @@ from atlas.media import (
     ProviderOperation,
     RecordingMediaProvider,
 )
+from atlas.media.capabilities import (
+    ProviderCapability,
+)
 
 
 FIXED_TIME = datetime(
@@ -43,6 +46,100 @@ class RecordingMediaProviderTests(unittest.TestCase):
         )
 
         self.assertEqual(provider.name, "jellyfin")
+
+    def test_capabilities_match_safe_provider_behavior(self) -> None:
+        provider = RecordingMediaProvider(
+            "  Jellyfin  ",
+        )
+
+        capabilities = provider.get_capabilities()
+
+        self.assertEqual(
+            capabilities.provider,
+            "jellyfin",
+        )
+        self.assertEqual(
+            capabilities.capabilities,
+            frozenset(
+                {
+                    ProviderCapability.LIST_MEDIA,
+                    ProviderCapability.PREVIEW_DELETE,
+                }
+            ),
+        )
+        self.assertFalse(
+            capabilities.supports_batch_listing
+        )
+        self.assertFalse(
+            capabilities.supports_batch_preview
+        )
+        self.assertIsNone(
+            capabilities.max_batch_size
+        )
+        self.assertFalse(
+            capabilities.supports(
+                ProviderCapability.DELETE
+            )
+        )
+
+    def test_list_media_item_ids_returns_seeded_ids(self) -> None:
+        first = _item(item_id="movie-1")
+        second = _item(item_id="movie-2")
+
+        provider = RecordingMediaProvider(
+            "jellyfin",
+            items={
+                first.item_id: first,
+                second.item_id: second,
+            },
+        )
+
+        self.assertEqual(
+            provider.list_media_item_ids(),
+            (
+                "movie-1",
+                "movie-2",
+            ),
+        )
+
+    def test_list_media_item_ids_accepts_page_size(self) -> None:
+        item = _item()
+
+        provider = RecordingMediaProvider(
+            "jellyfin",
+            items={item.item_id: item},
+        )
+
+        self.assertEqual(
+            provider.list_media_item_ids(
+                page_size=1,
+            ),
+            ("movie-123",),
+        )
+
+    def test_list_media_item_ids_validates_page_size(
+        self,
+    ) -> None:
+        provider = RecordingMediaProvider(
+            "jellyfin",
+        )
+
+        for page_size in (
+            0,
+            -1,
+            True,
+            1.5,
+            "200",
+            None,
+        ):
+            with self.subTest(page_size=page_size):
+                with self.assertRaisesRegex(
+                    MediaProviderError,
+                    "page_size must be a positive integer",
+                ):
+                    provider.list_media_item_ids(
+                        page_size=page_size,  # type: ignore[arg-type]
+                    )
 
     def test_get_item_returns_seeded_item(self) -> None:
         item = _item()

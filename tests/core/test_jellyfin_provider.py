@@ -2,6 +2,7 @@ from __future__ import annotations
 import io, json, unittest
 from unittest.mock import patch
 from urllib.error import HTTPError
+from atlas.media.capabilities import ProviderCapability
 from atlas.media.jellyfin import JellyfinProvider
 from atlas.media.provider import MediaProviderError
 
@@ -12,6 +13,44 @@ class Response:
     def read(self): return json.dumps(self.value).encode()
 
 class JellyfinProviderTests(unittest.TestCase):
+    def test_capability_contract(self):
+        provider = JellyfinProvider(
+            "http://jellyfin:8096",
+            "secret",
+        )
+
+        capabilities = provider.get_capabilities()
+
+        self.assertEqual(
+            capabilities.provider,
+            "jellyfin",
+        )
+        self.assertTrue(
+            capabilities.supports(
+                ProviderCapability.LIST_MEDIA
+            )
+        )
+        self.assertTrue(
+            capabilities.supports(
+                ProviderCapability.PREVIEW_DELETE
+            )
+        )
+        self.assertFalse(
+            capabilities.supports(
+                ProviderCapability.DELETE
+            )
+        )
+        self.assertTrue(
+            capabilities.supports_batch_listing
+        )
+        self.assertFalse(
+            capabilities.supports_batch_preview
+        )
+        self.assertEqual(
+            capabilities.max_batch_size,
+            200,
+        )
+
     def test_normalizes_movie_metadata_and_library(self):
         responses=[Response({"Name":"The Matrix","Type":"Movie","ProductionYear":1999,"Path":"/media/Movies/The Matrix.mkv"}),Response([{"Name":"Movies","Type":"CollectionFolder"}])]
         with patch("atlas.media.jellyfin.urlopen",side_effect=responses) as request:

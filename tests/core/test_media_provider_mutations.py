@@ -140,6 +140,22 @@ class ProviderMutationContractTests(unittest.TestCase):
                 ):
                     _result(executed_at=executed_at)
 
+    def test_media_provider_exposes_capability_contract(self) -> None:
+        self.assertTrue(
+            hasattr(
+                MediaProvider,
+                "get_capabilities",
+            )
+        )
+
+    def test_media_provider_exposes_listing_contract(self) -> None:
+        self.assertTrue(
+            hasattr(
+                MediaProvider,
+                "list_media_item_ids",
+            )
+        )
+
     def test_media_provider_exposes_safe_delete_preview(self) -> None:
         self.assertTrue(
             hasattr(

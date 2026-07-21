@@ -15,6 +15,10 @@ from atlas.cleanup.executor import (
 )
 from atlas.cleanup.scan_models import CleanupScanReport
 from atlas.cleanup.scanner import CleanupScanner
+from atlas.media.capabilities import (
+    ProviderCapabilities,
+    ProviderCapability,
+)
 from atlas.media.provider import MediaProvider
 
 
@@ -52,6 +56,17 @@ class CleanupWorkflowService:
         provider_name = self._provider_name(provider)
         self._validate_page_size(page_size)
 
+        capabilities = self._provider_capabilities(
+            provider,
+        )
+
+        if not capabilities.supports(
+            ProviderCapability.LIST_MEDIA
+        ):
+            raise CleanupExecutionError(
+                f"{provider_name} does not support media listing"
+            )
+
         list_media_item_ids = getattr(
             provider,
             "list_media_item_ids",
@@ -60,7 +75,8 @@ class CleanupWorkflowService:
 
         if not callable(list_media_item_ids):
             raise CleanupExecutionError(
-                "provider must implement list_media_item_ids"
+                "provider declares media listing support "
+                "but does not implement list_media_item_ids"
             )
 
         item_ids = list_media_item_ids(
@@ -124,6 +140,35 @@ class CleanupWorkflowService:
             )
 
         return name.strip().lower()
+
+    @staticmethod
+    def _provider_capabilities(
+        provider: MediaProvider,
+    ) -> ProviderCapabilities:
+        """Return and validate the provider capability contract."""
+
+        get_capabilities = getattr(
+            provider,
+            "get_capabilities",
+            None,
+        )
+
+        if not callable(get_capabilities):
+            raise CleanupExecutionError(
+                "provider must implement get_capabilities"
+            )
+
+        capabilities = get_capabilities()
+
+        if not isinstance(
+            capabilities,
+            ProviderCapabilities,
+        ):
+            raise CleanupExecutionError(
+                "provider must return ProviderCapabilities"
+            )
+
+        return capabilities
 
     @staticmethod
     def _validate_page_size(

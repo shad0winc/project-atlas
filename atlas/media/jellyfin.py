@@ -11,6 +11,10 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
+from atlas.media.capabilities import (
+    ProviderCapabilities,
+    ProviderCapability,
+)
 from atlas.media.provider import (
     MediaItem,
     MediaProviderError,
@@ -58,6 +62,22 @@ class JellyfinProvider:
         """Return the normalized provider name."""
 
         return "jellyfin"
+
+    def get_capabilities(self) -> ProviderCapabilities:
+        """Return the immutable Jellyfin capability contract."""
+
+        return ProviderCapabilities(
+            provider=self.name,
+            capabilities=frozenset(
+                {
+                    ProviderCapability.LIST_MEDIA,
+                    ProviderCapability.PREVIEW_DELETE,
+                }
+            ),
+            supports_batch_listing=True,
+            supports_batch_preview=False,
+            max_batch_size=200,
+        )
 
     def get_user(self, user_id: str) -> dict[str, Any]:
         """Return a normalized Jellyfin user identity."""

@@ -18,6 +18,10 @@ from atlas.cleanup.executor import (
 from atlas.cleanup.models import CleanupError
 from atlas.cleanup.scan_models import CleanupScanReport
 from atlas.cleanup.workflow import CleanupWorkflowService
+from atlas.media.capabilities import (
+    ProviderCapabilities,
+    ProviderCapability,
+)
 
 
 NOW = datetime(
@@ -71,11 +75,34 @@ def make_provider(
     *,
     name: object = "jellyfin",
     item_ids: tuple[str, ...] = (),
+    capabilities: frozenset[ProviderCapability] | None = None,
 ) -> Mock:
     """Create a provider-shaped mock."""
 
     provider = Mock()
     provider.name = name
+    provider.get_capabilities.return_value = (
+        ProviderCapabilities(
+            provider=(
+                name
+                if isinstance(name, str) and name.strip()
+                else "jellyfin"
+            ),
+            capabilities=(
+                capabilities
+                if capabilities is not None
+                else frozenset(
+                    {
+                        ProviderCapability.LIST_MEDIA,
+                        ProviderCapability.PREVIEW_DELETE,
+                    }
+                )
+            ),
+            supports_batch_listing=True,
+            supports_batch_preview=False,
+            max_batch_size=200,
+        )
+    )
     provider.list_media_item_ids.return_value = item_ids
     return provider
 
@@ -209,11 +236,10 @@ class CleanupWorkflowServiceTests(unittest.TestCase):
         ):
             workflow.execute(provider)
 
-    def test_execute_rejects_missing_enumeration_method(
+    def test_execute_rejects_declared_listing_without_method(
         self,
     ) -> None:
-        provider = Mock()
-        provider.name = "jellyfin"
+        provider = make_provider()
         provider.list_media_item_ids = None
 
         workflow = CleanupWorkflowService(
@@ -224,9 +250,129 @@ class CleanupWorkflowServiceTests(unittest.TestCase):
 
         with self.assertRaisesRegex(
             CleanupExecutionError,
-            "provider must implement list_media_item_ids",
+            "declares media listing support "
+            "but does not implement list_media_item_ids",
         ):
             workflow.execute(provider)
+
+    def test_execute_reads_provider_capabilities_once(
+        self,
+    ) -> None:
+        provider = make_provider()
+        scanner = Mock()
+        scanner.scan.return_value = make_scan_report()
+
+        planner = Mock()
+        planner.plan.return_value = make_execution_report()
+
+        executor = Mock()
+        executor.execute.return_value = make_summary()
+
+        workflow = CleanupWorkflowService(
+            scanner=scanner,
+            planner=planner,
+            executor=executor,
+        )
+
+        workflow.execute(provider)
+
+        provider.get_capabilities.assert_called_once_with()
+
+    def test_execute_rejects_missing_capability_method(
+        self,
+    ) -> None:
+        provider = make_provider()
+        provider.get_capabilities = None
+
+        workflow = CleanupWorkflowService(
+            scanner=Mock(),
+            planner=Mock(),
+            executor=Mock(),
+        )
+
+        with self.assertRaisesRegex(
+            CleanupExecutionError,
+            "provider must implement get_capabilities",
+        ):
+            workflow.execute(provider)
+
+        provider.list_media_item_ids.assert_not_called()
+
+    def test_execute_rejects_invalid_capability_contract(
+        self,
+    ) -> None:
+        provider = make_provider()
+        provider.get_capabilities.return_value = object()
+
+        workflow = CleanupWorkflowService(
+            scanner=Mock(),
+            planner=Mock(),
+            executor=Mock(),
+        )
+
+        with self.assertRaisesRegex(
+            CleanupExecutionError,
+            "provider must return ProviderCapabilities",
+        ):
+            workflow.execute(provider)
+
+        provider.list_media_item_ids.assert_not_called()
+
+    def test_execute_rejects_provider_without_listing_support(
+        self,
+    ) -> None:
+        provider = make_provider()
+
+        provider.get_capabilities.return_value = (
+            ProviderCapabilities(
+                provider="jellyfin",
+                capabilities=frozenset(
+                    {
+                        ProviderCapability.PREVIEW_DELETE,
+                    }
+                ),
+                supports_batch_listing=False,
+                supports_batch_preview=False,
+                max_batch_size=None,
+            )
+        )
+
+        workflow = CleanupWorkflowService(
+            scanner=Mock(),
+            planner=Mock(),
+            executor=Mock(),
+        )
+
+        with self.assertRaisesRegex(
+            CleanupExecutionError,
+            "jellyfin does not support media listing",
+        ):
+            workflow.execute(provider)
+
+        provider.list_media_item_ids.assert_not_called()
+
+    def test_invalid_page_size_precedes_capability_lookup(
+        self,
+    ) -> None:
+        provider = make_provider()
+
+        workflow = CleanupWorkflowService(
+            scanner=Mock(),
+            planner=Mock(),
+            executor=Mock(),
+        )
+
+        with self.assertRaisesRegex(
+            CleanupExecutionError,
+            "page_size must be a positive integer",
+        ):
+            workflow.execute(
+                provider,
+                page_size=0,
+            )
+
+        provider.get_capabilities.assert_not_called()
+        provider.list_media_item_ids.assert_not_called()
 
     def test_execute_rejects_invalid_page_size(
         self,

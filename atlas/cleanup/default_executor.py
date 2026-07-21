@@ -22,6 +22,10 @@ from atlas.cleanup.executor import (
     CleanupExecutor,
     CleanupRunStatus,
 )
+from atlas.media.capabilities import (
+    ProviderCapabilities,
+    ProviderCapability,
+)
 from atlas.media.provider import (
     MediaProvider,
     ProviderMutationResult,
@@ -102,6 +106,36 @@ class DefaultCleanupExecutor(CleanupExecutor):
 
         occurred_at = self._now()
         started_at = self._timestamp(occurred_at)
+
+        if (
+            self._provider is not None
+            and report.planned_count > 0
+        ):
+            capabilities = self._provider_capabilities(
+                self._provider,
+            )
+
+            if not capabilities.supports(
+                ProviderCapability.PREVIEW_DELETE,
+            ):
+                raise CleanupExecutionError(
+                    (
+                        f"{report.provider} does not support "
+                        "delete previews"
+                    )
+                )
+
+            preview_delete_item = getattr(
+                self._provider,
+                "preview_delete_item",
+                None,
+            )
+
+            if not callable(preview_delete_item):
+                raise CleanupExecutionError(
+                    "provider declares delete preview support "
+                    "but does not implement preview_delete_item"
+                )
 
         errors: list[str] = []
         previewed = 0
@@ -222,6 +256,35 @@ class DefaultCleanupExecutor(CleanupExecutor):
             errors.append(
                 f"audit({item.item_id}): {exc}"
             )
+
+    @staticmethod
+    def _provider_capabilities(
+        provider: MediaProvider,
+    ) -> ProviderCapabilities:
+        """Return and validate provider capabilities."""
+
+        get_capabilities = getattr(
+            provider,
+            "get_capabilities",
+            None,
+        )
+
+        if not callable(get_capabilities):
+            raise CleanupExecutionError(
+                "provider must implement get_capabilities"
+            )
+
+        capabilities = get_capabilities()
+
+        if not isinstance(
+            capabilities,
+            ProviderCapabilities,
+        ):
+            raise CleanupExecutionError(
+                "provider must return ProviderCapabilities"
+            )
+
+        return capabilities
 
     @staticmethod
     def _validate_preview_result(
