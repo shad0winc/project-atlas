@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from enum import Enum
+
 from atlas.media.capabilities import (
     ProviderCapabilities,
     ProviderCapability,
@@ -17,12 +19,19 @@ class MediaMutationDispatchError(RuntimeError):
     """Raised when a media mutation cannot be dispatched safely."""
 
 
+class MediaMutationMode(str, Enum):
+    """Provider-layer media mutation modes."""
+
+    PREVIEW = "preview"
+    LIVE = "live"
+
+
 class MediaMutationDispatcher:
     """Dispatch validated media mutations to provider implementations.
 
-    The initial dispatcher supports safe delete previews only. Real provider
-    mutations remain disabled until Atlas introduces an explicitly controlled
-    execution mode.
+    Preview mutations may be dispatched to provider preview methods. Live
+    provider mutations remain disabled until Atlas introduces all required
+    authorization and safety gates.
     """
 
     def validate(
@@ -30,16 +39,12 @@ class MediaMutationDispatcher:
         *,
         provider: MediaProvider,
         operation: ProviderOperation | str,
-        preview: bool = True,
+        mode: MediaMutationMode | str = MediaMutationMode.PREVIEW,
     ) -> None:
         """Validate that a provider can perform a mutation."""
 
         normalized_operation = self._operation(operation)
-
-        if not isinstance(preview, bool):
-            raise MediaMutationDispatchError(
-                "preview must be a boolean"
-            )
+        normalized_mode = self._mode(mode)
 
         provider_name = self._provider_name(provider)
         capabilities = self._provider_capabilities(provider)
@@ -54,7 +59,7 @@ class MediaMutationDispatcher:
             provider_name=provider_name,
             capabilities=capabilities,
             operation=normalized_operation,
-            preview=preview,
+            mode=normalized_mode,
         )
 
     def execute(
@@ -63,20 +68,16 @@ class MediaMutationDispatcher:
         provider: MediaProvider,
         operation: ProviderOperation | str,
         item_id: str,
-        preview: bool = True,
+        mode: MediaMutationMode | str = MediaMutationMode.PREVIEW,
     ) -> ProviderMutationResult:
         """Dispatch one normalized provider mutation."""
 
         normalized_operation = self._operation(operation)
+        normalized_mode = self._mode(mode)
         normalized_item_id = self._required_text(
             item_id,
             "item_id",
         )
-
-        if not isinstance(preview, bool):
-            raise MediaMutationDispatchError(
-                "preview must be a boolean"
-            )
 
         provider_name = self._provider_name(provider)
         capabilities = self._provider_capabilities(provider)
@@ -91,7 +92,7 @@ class MediaMutationDispatcher:
             provider_name=provider_name,
             capabilities=capabilities,
             operation=normalized_operation,
-            preview=preview,
+            mode=normalized_mode,
         )
 
         result = mutation_method(normalized_item_id)
@@ -112,14 +113,16 @@ class MediaMutationDispatcher:
         provider_name: str,
         capabilities: ProviderCapabilities,
         operation: ProviderOperation,
-        preview: bool,
+        mode: MediaMutationMode,
     ):
         """Return the provider method for a supported mutation."""
 
-        if (
-            operation is ProviderOperation.DELETE
-            and preview
-        ):
+        if mode is MediaMutationMode.LIVE:
+            raise MediaMutationDispatchError(
+                "live provider mutations are not enabled"
+            )
+
+        if operation is ProviderOperation.DELETE:
             if not capabilities.supports(
                 ProviderCapability.PREVIEW_DELETE,
             ):
@@ -140,11 +143,6 @@ class MediaMutationDispatcher:
                 )
 
             return preview_delete_item
-
-        if not preview:
-            raise MediaMutationDispatchError(
-                "real provider mutations are not enabled"
-            )
 
         raise MediaMutationDispatchError(
             "unsupported provider mutation: "
@@ -251,6 +249,23 @@ class MediaMutationDispatcher:
         except (TypeError, ValueError) as exc:
             raise MediaMutationDispatchError(
                 f"invalid provider operation: {operation}"
+            ) from exc
+
+    @staticmethod
+    def _mode(
+        mode: MediaMutationMode | str,
+    ) -> MediaMutationMode:
+        """Return a normalized media mutation mode."""
+
+        try:
+            return (
+                mode
+                if isinstance(mode, MediaMutationMode)
+                else MediaMutationMode(mode)
+            )
+        except (TypeError, ValueError) as exc:
+            raise MediaMutationDispatchError(
+                f"invalid media mutation mode: {mode}"
             ) from exc
 
     @staticmethod

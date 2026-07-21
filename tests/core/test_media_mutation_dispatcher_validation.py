@@ -7,6 +7,7 @@ import unittest
 from atlas.media import (
     MediaMutationDispatcher,
     MediaMutationDispatchError,
+    MediaMutationMode,
     ProviderCapabilities,
     ProviderCapability,
     ProviderMutationResult,
@@ -62,7 +63,7 @@ class MediaMutationDispatcherValidationTests(
         dispatcher.validate(
             provider=provider,
             operation=ProviderOperation.DELETE,
-            preview=True,
+            mode=MediaMutationMode.PREVIEW,
         )
 
         self.assertEqual(
@@ -78,22 +79,22 @@ class MediaMutationDispatcherValidationTests(
         dispatcher.validate(
             provider=PreviewProvider(),
             operation="delete",
-            preview=True,
+            mode=MediaMutationMode.PREVIEW,
         )
 
-    def test_validation_rejects_real_mutations(
+    def test_validation_rejects_live_mutations(
         self,
     ) -> None:
         dispatcher = MediaMutationDispatcher()
 
         with self.assertRaisesRegex(
             MediaMutationDispatchError,
-            "real provider mutations are not enabled",
+            "live provider mutations are not enabled",
         ):
             dispatcher.validate(
                 provider=PreviewProvider(),
                 operation=ProviderOperation.DELETE,
-                preview=False,
+                mode=MediaMutationMode.LIVE,
             )
 
     def test_unsuccessful_result_is_rejected(
@@ -123,7 +124,7 @@ class MediaMutationDispatcherValidationTests(
                 provider=FailedPreviewProvider(),
                 operation=ProviderOperation.DELETE,
                 item_id="movie-1",
-                preview=True,
+                mode=MediaMutationMode.PREVIEW,
             )
 
 

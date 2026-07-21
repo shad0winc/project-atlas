@@ -18,6 +18,7 @@ class CleanupExecutionMode(str, Enum):
     """Supported cleanup execution modes."""
 
     DRY_RUN = "dry_run"
+    EXECUTE = "execute"
 
 
 class CleanupExecutionStatus(str, Enum):

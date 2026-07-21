@@ -7,6 +7,7 @@ import unittest
 from atlas.media import (
     MediaMutationDispatcher,
     MediaMutationDispatchError,
+    MediaMutationMode,
     ProviderCapabilities,
     ProviderCapability,
     ProviderMutationResult,
@@ -106,7 +107,7 @@ class MediaMutationDispatcherTests(unittest.TestCase):
             provider=provider,
             operation=ProviderOperation.DELETE,
             item_id=" movie-1 ",
-            preview=True,
+            mode=MediaMutationMode.PREVIEW,
         )
 
         self.assertEqual(
@@ -134,20 +135,20 @@ class MediaMutationDispatcherTests(unittest.TestCase):
             ProviderOperation.DELETE,
         )
 
-    def test_rejects_real_mutations(
+    def test_rejects_live_mutations(
         self,
     ) -> None:
         provider = RecordingPreviewProvider()
 
         with self.assertRaisesRegex(
             MediaMutationDispatchError,
-            "real provider mutations are not enabled",
+            "live provider mutations are not enabled",
         ):
             self.dispatcher.execute(
                 provider=provider,
                 operation=ProviderOperation.DELETE,
                 item_id="movie-1",
-                preview=False,
+                mode=MediaMutationMode.LIVE,
             )
 
         self.assertEqual(
@@ -347,20 +348,20 @@ class MediaMutationDispatcherTests(unittest.TestCase):
             [],
         )
 
-    def test_rejects_invalid_preview_flag(
+    def test_rejects_invalid_mode(
         self,
     ) -> None:
         provider = RecordingPreviewProvider()
 
         with self.assertRaisesRegex(
             MediaMutationDispatchError,
-            "preview must be a boolean",
+            "invalid media mutation mode: 1",
         ):
             self.dispatcher.execute(
                 provider=provider,
                 operation=ProviderOperation.DELETE,
                 item_id="movie-1",
-                preview=1,  # type: ignore[arg-type]
+                mode=1,  # type: ignore[arg-type]
             )
 
     def test_rejects_empty_item_id(

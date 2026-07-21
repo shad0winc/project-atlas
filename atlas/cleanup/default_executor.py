@@ -25,6 +25,7 @@ from atlas.cleanup.executor import (
 from atlas.media.mutations import (
     MediaMutationDispatcher,
     MediaMutationDispatchError,
+    MediaMutationMode,
 )
 from atlas.media.provider import (
     MediaProvider,
@@ -132,7 +133,7 @@ class DefaultCleanupExecutor(CleanupExecutor):
                 self._mutation_dispatcher.validate(
                     provider=self._provider,
                     operation=ProviderOperation.DELETE,
-                    preview=True,
+                    mode=MediaMutationMode.PREVIEW,
                 )
             except MediaMutationDispatchError as exc:
                 raise CleanupExecutionError(
@@ -171,7 +172,7 @@ class DefaultCleanupExecutor(CleanupExecutor):
                     provider=self._provider,
                     operation=ProviderOperation.DELETE,
                     item_id=item.item_id,
-                    preview=True,
+                    mode=MediaMutationMode.PREVIEW,
                 )
             except Exception as exc:
                 message = str(exc)

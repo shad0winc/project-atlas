@@ -12,6 +12,7 @@ from atlas.media.jellyfin import (
 from atlas.media.mutations import (
     MediaMutationDispatcher,
     MediaMutationDispatchError,
+    MediaMutationMode,
 )
 from atlas.media.provider import (
     MediaItem,
@@ -30,6 +31,7 @@ __all__ = [
     "MediaItem",
     "MediaMutationDispatcher",
     "MediaMutationDispatchError",
+    "MediaMutationMode",
     "MediaProvider",
     "MediaProviderError",
     "ProviderCapabilities",

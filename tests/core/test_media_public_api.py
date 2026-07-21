@@ -45,3 +45,11 @@ def test_media_mutation_dispatcher_symbols_are_publicly_importable() -> None:
 def test_media_all_exports_mutation_dispatcher_symbols() -> None:
     assert "MediaMutationDispatcher" in media.__all__
     assert "MediaMutationDispatchError" in media.__all__
+
+
+def test_media_mutation_mode_is_publicly_importable() -> None:
+    assert media.MediaMutationMode is not None
+
+
+def test_media_all_exports_mutation_mode() -> None:
+    assert "MediaMutationMode" in media.__all__

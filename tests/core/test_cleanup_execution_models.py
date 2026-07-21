@@ -368,3 +368,13 @@ class CleanupExecutionReportTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CleanupExecutionModeExtensionTests(unittest.TestCase):
+    """Tests for supported cleanup execution modes."""
+
+    def test_execute_mode_is_defined(self) -> None:
+        self.assertEqual(
+            CleanupExecutionMode.EXECUTE.value,
+            "execute",
+        )
