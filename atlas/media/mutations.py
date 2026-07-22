@@ -117,10 +117,30 @@ class MediaMutationDispatcher:
     ):
         """Return the provider method for a supported mutation."""
 
-        if mode is MediaMutationMode.LIVE:
-            raise MediaMutationDispatchError(
-                "live provider mutations are not enabled"
+        if mode is MediaMutationMode.PREVIEW:
+            return MediaMutationDispatcher._resolve_preview_method(
+                provider=provider,
+                provider_name=provider_name,
+                capabilities=capabilities,
+                operation=operation,
             )
+
+        return MediaMutationDispatcher._resolve_live_method(
+            provider=provider,
+            provider_name=provider_name,
+            capabilities=capabilities,
+            operation=operation,
+        )
+
+    @staticmethod
+    def _resolve_preview_method(
+        *,
+        provider: MediaProvider,
+        provider_name: str,
+        capabilities: ProviderCapabilities,
+        operation: ProviderOperation,
+    ):
+        """Resolve a preview mutation implementation."""
 
         if operation is ProviderOperation.DELETE:
             if not capabilities.supports(
@@ -147,6 +167,20 @@ class MediaMutationDispatcher:
         raise MediaMutationDispatchError(
             "unsupported provider mutation: "
             f"{operation.value}"
+        )
+
+    @staticmethod
+    def _resolve_live_method(
+        *,
+        provider: MediaProvider,
+        provider_name: str,
+        capabilities: ProviderCapabilities,
+        operation: ProviderOperation,
+    ):
+        """Resolve a live mutation implementation."""
+
+        raise MediaMutationDispatchError(
+            "live provider mutations are not enabled"
         )
 
     @staticmethod
