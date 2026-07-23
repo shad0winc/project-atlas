@@ -13,10 +13,12 @@ from atlas.ari.models import (
     StorageSnapshot,
 )
 
+from atlas.ari.service import ARIService
 
 __all__ = [
     "ARIError",
     "ARIReport",
+    "ARIService",
     "AtlasMetadata",
     "FilesystemLibraries",
     "FilesystemLibrary",
