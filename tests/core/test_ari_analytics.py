@@ -343,6 +343,253 @@ class ARIAnalyticsTests(unittest.TestCase):
                 len(reports),
             )
 
+    def test_storage_intervals_returns_point_to_point_changes(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            history = directory / "snapshots"
+            history.mkdir()
+
+            write_snapshot(
+                history / "first.json",
+                "2026-07-20T12:00:00Z",
+                100,
+            )
+            write_snapshot(
+                history / "second.json",
+                "2026-07-21T12:00:00Z",
+                250,
+            )
+            write_snapshot(
+                history / "third.json",
+                "2026-07-22T12:00:00Z",
+                200,
+            )
+
+            intervals = ARIAnalytics(
+                ARIService(directory),
+            ).storage_intervals()
+
+            self.assertEqual(
+                2,
+                len(intervals),
+            )
+            self.assertEqual(
+                150,
+                intervals[0].change_bytes,
+            )
+            self.assertEqual(
+                -50,
+                intervals[1].change_bytes,
+            )
+            self.assertTrue(
+                intervals[0].is_growth,
+            )
+            self.assertFalse(
+                intervals[1].is_growth,
+            )
+            self.assertEqual(
+                150.0,
+                intervals[0].bytes_per_day,
+            )
+
+    def test_storage_intervals_returns_empty_for_one_report(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+
+            write_snapshot(
+                directory / "latest.json",
+                "2026-07-22T12:00:00Z",
+                100,
+            )
+
+            intervals = ARIAnalytics(
+                ARIService(directory),
+            ).storage_intervals()
+
+            self.assertEqual(
+                (),
+                intervals,
+            )
+
+    def test_capacity_forecast_uses_only_positive_growth(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            history = directory / "snapshots"
+            history.mkdir()
+
+            snapshots = (
+                (
+                    "first.json",
+                    "2026-07-20T12:00:00Z",
+                    100,
+                ),
+                (
+                    "second.json",
+                    "2026-07-21T12:00:00Z",
+                    200,
+                ),
+                (
+                    "third.json",
+                    "2026-07-22T12:00:00Z",
+                    150,
+                ),
+                (
+                    "fourth.json",
+                    "2026-07-23T12:00:00Z",
+                    250,
+                ),
+            )
+
+            for name, timestamp, used_bytes in snapshots:
+                payload = sample_snapshot(
+                    timestamp,
+                    used_bytes,
+                )
+                payload["storage"]["capacity"] = "1000"
+                payload["storage"]["capacity_bytes"] = 1000
+                payload["storage"]["available"] = str(
+                    1000 - used_bytes,
+                )
+                payload["storage"]["available_bytes"] = (
+                    1000 - used_bytes
+                )
+
+                (history / name).write_text(
+                    json.dumps(payload),
+                    encoding="utf-8",
+                )
+
+            forecast = ARIAnalytics(
+                ARIService(directory),
+            ).capacity_forecast()
+
+            self.assertEqual(
+                2,
+                forecast.positive_interval_count,
+            )
+            self.assertEqual(
+                100.0,
+                forecast.average_growth_bytes_per_day,
+            )
+            self.assertEqual(
+                750,
+                forecast.available_bytes,
+            )
+            self.assertEqual(
+                7.5,
+                forecast.days_until_full,
+            )
+            self.assertEqual(
+                "2026-07-31T00:00:00+00:00",
+                forecast.estimated_full_timestamp,
+            )
+
+    def test_capacity_forecast_rejects_no_positive_growth(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            history = directory / "snapshots"
+            history.mkdir()
+
+            write_snapshot(
+                history / "first.json",
+                "2026-07-20T12:00:00Z",
+                200,
+            )
+            write_snapshot(
+                history / "second.json",
+                "2026-07-21T12:00:00Z",
+                150,
+            )
+
+            analytics = ARIAnalytics(
+                ARIService(directory),
+            )
+
+            with self.assertRaisesRegex(
+                ARIAnalyticsError,
+                "at least one positive storage-growth interval",
+            ):
+                analytics.capacity_forecast()
+
+    def test_capacity_forecast_requires_two_reports(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+
+            write_snapshot(
+                directory / "latest.json",
+                "2026-07-22T12:00:00Z",
+                100,
+            )
+
+            analytics = ARIAnalytics(
+                ARIService(directory),
+            )
+
+            with self.assertRaisesRegex(
+                ARIAnalyticsError,
+                "at least two unique valid ARI reports",
+            ):
+                analytics.capacity_forecast()
+
+    def test_capacity_forecast_is_immediate_when_full(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            history = directory / "snapshots"
+            history.mkdir()
+
+            first = sample_snapshot(
+                "2026-07-20T12:00:00Z",
+                900,
+            )
+            second = sample_snapshot(
+                "2026-07-21T12:00:00Z",
+                1000,
+            )
+
+            for payload in (first, second):
+                payload["storage"]["capacity"] = "1000"
+                payload["storage"]["capacity_bytes"] = 1000
+                payload["storage"]["available"] = "0"
+                payload["storage"]["available_bytes"] = 0
+
+            (history / "first.json").write_text(
+                json.dumps(first),
+                encoding="utf-8",
+            )
+            (history / "second.json").write_text(
+                json.dumps(second),
+                encoding="utf-8",
+            )
+
+            forecast = ARIAnalytics(
+                ARIService(directory),
+            ).capacity_forecast()
+
+            self.assertEqual(
+                0,
+                forecast.available_bytes,
+            )
+            self.assertEqual(
+                0.0,
+                forecast.days_until_full,
+            )
+            self.assertEqual(
+                "2026-07-21T12:00:00+00:00",
+                forecast.estimated_full_timestamp,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

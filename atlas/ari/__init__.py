@@ -4,8 +4,10 @@ from atlas.ari.analytics import (
     ARIAnalytics,
     ARIAnalyticsError,
     ARIHistory,
+    CapacityForecast,
     SnapshotLoadFailure,
     StorageChange,
+    StorageInterval,
 )
 from atlas.ari.models import (
     ARIError,
@@ -34,6 +36,7 @@ __all__ = [
     "ARIService",
     "ARIServiceError",
     "AtlasMetadata",
+    "CapacityForecast",
     "FilesystemLibraries",
     "FilesystemLibrary",
     "JellyfinCounts",
@@ -42,5 +45,6 @@ __all__ = [
     "JellyfinUser",
     "SnapshotLoadFailure",
     "StorageChange",
+    "StorageInterval",
     "StorageSnapshot",
 ]
