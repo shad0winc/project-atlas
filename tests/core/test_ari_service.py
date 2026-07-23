@@ -10,10 +10,13 @@ from pathlib import Path
 from atlas.ari import (
     ARIReport,
     ARIService,
+    ARIServiceError,
 )
 
 
 def sample_snapshot() -> dict:
+    """Return a valid ARI snapshot payload."""
+
     return {
         "timestamp": "2026-07-22T20:30:00-04:00",
         "atlas": {
@@ -57,24 +60,49 @@ def sample_snapshot() -> dict:
 
 
 class ARIServiceTests(unittest.TestCase):
+    """Validate ARI snapshot loading and discovery."""
 
-    def test_load_snapshot(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "latest.json"
-
+    def test_load_snapshot(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "latest.json"
             path.write_text(
                 json.dumps(sample_snapshot()),
                 encoding="utf-8",
             )
 
-            report = ARIService(tmp).load(path)
+            report = ARIService(temporary).load(path)
 
             self.assertIsInstance(
                 report,
                 ARIReport,
             )
+            self.assertEqual(
+                "2026-07-23T00:30:00Z",
+                report.timestamp,
+            )
 
-    def test_latest_path(self):
+    def test_latest_loads_configured_latest_snapshot(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "latest.json"
+            path.write_text(
+                json.dumps(sample_snapshot()),
+                encoding="utf-8",
+            )
+
+            report = ARIService(temporary).latest()
+
+            self.assertEqual(
+                "docker",
+                report.atlas.hostname,
+            )
+
+    def test_latest_path(
+        self,
+    ) -> None:
         service = ARIService("/tmp/test")
 
         self.assertEqual(
@@ -82,27 +110,156 @@ class ARIServiceTests(unittest.TestCase):
             service.latest_path(),
         )
 
-    def test_list_snapshots(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            directory = Path(tmp)
+    def test_list_snapshots(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            history = directory / "snapshots"
+            history.mkdir()
 
-            (directory / "a.json").write_text("{}")
-            (directory / "b.json").write_text("{}")
-            (directory / "ignore.txt").write_text("")
+            latest = directory / "latest.json"
+            first = history / "20260722-120000.json"
+            second = history / "20260723-120000.json"
 
-            snapshots = ARIService(directory).list_snapshots()
+            latest.write_text(
+                "{}",
+                encoding="utf-8",
+            )
+            first.write_text(
+                "{}",
+                encoding="utf-8",
+            )
+            second.write_text(
+                "{}",
+                encoding="utf-8",
+            )
+
+            snapshots = ARIService(
+                directory,
+            ).list_snapshots()
 
             self.assertEqual(
-                2,
-                len(snapshots),
+                [
+                    latest,
+                    first,
+                    second,
+                ],
+                snapshots,
             )
 
-            self.assertTrue(
-                all(
-                    path.suffix == ".json"
-                    for path in snapshots
-                )
+    def test_list_snapshots_excludes_state_files(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+
+            latest = directory / "latest.json"
+            latest.write_text(
+                "{}",
+                encoding="utf-8",
             )
+            (directory / "health-state.json").write_text(
+                "{}",
+                encoding="utf-8",
+            )
+            (directory / "storage-state.json").write_text(
+                "{}",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                [latest],
+                ARIService(directory).list_snapshots(),
+            )
+
+    def test_list_snapshots_returns_empty_for_missing_directory(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            missing = Path(temporary) / "missing"
+
+            self.assertEqual(
+                [],
+                ARIService(missing).list_snapshots(),
+            )
+
+    def test_list_snapshots_rejects_file_as_history_directory(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            history = directory / "snapshots"
+            history.write_text(
+                "",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                ARIServiceError,
+                "ARI snapshot history path is not a directory",
+            ):
+                ARIService(directory).list_snapshots()
+
+    def test_load_rejects_missing_snapshot(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "missing.json"
+
+            with self.assertRaisesRegex(
+                ARIServiceError,
+                "ARI snapshot not found",
+            ) as context:
+                ARIService(temporary).load(path)
+
+            self.assertIsInstance(
+                context.exception.__cause__,
+                FileNotFoundError,
+            )
+
+    def test_load_rejects_invalid_json(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "invalid.json"
+            path.write_text(
+                "{invalid",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                ARIServiceError,
+                "ARI snapshot contains invalid JSON",
+            ) as context:
+                ARIService(temporary).load(path)
+
+            self.assertIsInstance(
+                context.exception.__cause__,
+                json.JSONDecodeError,
+            )
+
+    def test_load_rejects_invalid_report_contract(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "invalid-report.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "timestamp": (
+                            "2026-07-22T20:30:00-04:00"
+                        ),
+                    },
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                ARIServiceError,
+                "ARI snapshot is invalid",
+            ):
+                ARIService(temporary).load(path)
 
 
 if __name__ == "__main__":

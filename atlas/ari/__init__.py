@@ -12,13 +12,17 @@ from atlas.ari.models import (
     JellyfinUser,
     StorageSnapshot,
 )
+from atlas.ari.service import (
+    ARIService,
+    ARIServiceError,
+)
 
-from atlas.ari.service import ARIService
 
 __all__ = [
     "ARIError",
     "ARIReport",
     "ARIService",
+    "ARIServiceError",
     "AtlasMetadata",
     "FilesystemLibraries",
     "FilesystemLibrary",
