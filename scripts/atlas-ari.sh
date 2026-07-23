@@ -48,6 +48,10 @@ Usage:
   atlas-ari.sh collect
   atlas-ari.sh report
   atlas-ari.sh health-report
+  atlas-ari.sh latest [--json]
+  atlas-ari.sh history [--json]
+  atlas-ari.sh growth [--json]
+  atlas-ari.sh forecast [--json]
 EOF
 }
 
@@ -1636,6 +1640,16 @@ ari_publish_storage_transition() {
 }
 
 ###############################################################################
+# Typed Analytics CLI
+###############################################################################
+
+ari_run_analytics_cli() {
+  PYTHONPATH="$ATLAS_PROJECT_DIR${PYTHONPATH:+:$PYTHONPATH}" \
+  ATLAS_ARI_DIR="$ATLAS_ARI_DIR" \
+    python3 -m atlas.ari_cli "$@"
+}
+
+###############################################################################
 # Validation
 ###############################################################################
 
@@ -1654,6 +1668,9 @@ case "${1:-}" in
     ;;
   health-report)
     ari_publish_health_report
+    ;;
+  latest|history|growth|forecast)
+    ari_run_analytics_cli "$@"
     ;;
   ""|-h|--help|help)
     usage
