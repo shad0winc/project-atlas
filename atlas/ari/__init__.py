@@ -1,5 +1,12 @@
 """Project Atlas Retention Intelligence framework."""
 
+from atlas.ari.analytics import (
+    ARIAnalytics,
+    ARIAnalyticsError,
+    ARIHistory,
+    SnapshotLoadFailure,
+    StorageChange,
+)
 from atlas.ari.models import (
     ARIError,
     ARIReport,
@@ -19,7 +26,10 @@ from atlas.ari.service import (
 
 
 __all__ = [
+    "ARIAnalytics",
+    "ARIAnalyticsError",
     "ARIError",
+    "ARIHistory",
     "ARIReport",
     "ARIService",
     "ARIServiceError",
@@ -30,5 +40,7 @@ __all__ = [
     "JellyfinLibrary",
     "JellyfinSnapshot",
     "JellyfinUser",
+    "SnapshotLoadFailure",
+    "StorageChange",
     "StorageSnapshot",
 ]
