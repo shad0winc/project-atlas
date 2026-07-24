@@ -38,6 +38,8 @@ from atlas.policies.models import PolicyDecision
 from atlas.retention.models import RetentionDecision
 
 
+EXECUTION_ID = "cln_0123456789abcdef0123456789abcdef"
+
 STARTED_AT = datetime(
     2026,
     7,
@@ -365,6 +367,7 @@ class DefaultCleanupExecutorTests(unittest.TestCase):
         self.assertEqual(
             summary.to_dict(),
             {
+                "execution_id": summary.execution_id,
                 "provider": "jellyfin",
                 "mode": "dry_run",
                 "status": "success",
@@ -1234,6 +1237,46 @@ class DefaultCleanupExecutorTests(unittest.TestCase):
             DefaultCleanupExecutor(
                 audit_writer=object(),
             )
+
+    def test_execute_generates_one_execution_id_per_run(
+        self,
+    ) -> None:
+        calls = 0
+
+        def execution_id_factory() -> str:
+            nonlocal calls
+            calls += 1
+            return EXECUTION_ID
+
+        executor = DefaultCleanupExecutor(
+            clock=make_clock(
+                STARTED_AT,
+                COMPLETED_AT,
+            ),
+            execution_id_factory=execution_id_factory,
+        )
+
+        summary = executor.execute(make_report())
+
+        self.assertEqual(summary.execution_id, EXECUTION_ID)
+        self.assertEqual(calls, 1)
+
+    def test_execute_rejects_invalid_generated_execution_id(
+        self,
+    ) -> None:
+        executor = DefaultCleanupExecutor(
+            clock=make_clock(
+                STARTED_AT,
+                COMPLETED_AT,
+            ),
+            execution_id_factory=lambda: "invalid",
+        )
+
+        with self.assertRaisesRegex(
+            CleanupExecutionError,
+            "execution_id must match",
+        ):
+            executor.execute(make_report())
 
 
 if __name__ == "__main__":

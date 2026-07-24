@@ -14,6 +14,8 @@ from atlas.cleanup import (
 )
 
 
+EXECUTION_ID = "cln_0123456789abcdef0123456789abcdef"
+
 OCCURRED_AT = datetime(
     2026,
     7,
@@ -26,6 +28,7 @@ OCCURRED_AT = datetime(
 
 def make_event(
     *,
+    execution_id: str = EXECUTION_ID,
     provider: str = "jellyfin",
     item_id: str = "movie-1",
     action: CleanupAction | str = CleanupAction.DELETE,
@@ -42,6 +45,7 @@ def make_event(
     """Create one deterministic execution event."""
 
     return CleanupExecutionEvent(
+        execution_id=execution_id,
         provider=provider,
         item_id=item_id,
         action=action,
@@ -201,6 +205,7 @@ class CleanupExecutionEventTests(unittest.TestCase):
         self.assertEqual(
             event.to_dict(),
             {
+                "execution_id": EXECUTION_ID,
                 "provider": "jellyfin",
                 "item_id": "movie-1",
                 "action": "delete",

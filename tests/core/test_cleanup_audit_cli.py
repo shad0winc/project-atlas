@@ -20,6 +20,9 @@ from atlas.cleanup.execution_models import (
 from atlas.cleanup_cli import main
 
 
+
+EXECUTION_ID = "cln_0123456789abcdef0123456789abcdef"
+
 NOW = datetime(
     2026,
     7,
@@ -34,6 +37,7 @@ def make_summary() -> CleanupExecutionSummary:
     """Create a deterministic successful workflow summary."""
 
     return CleanupExecutionSummary(
+        execution_id=EXECUTION_ID,
         provider="jellyfin",
         mode=CleanupExecutionMode.DRY_RUN,
         status=CleanupRunStatus.SUCCESS,

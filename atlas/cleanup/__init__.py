@@ -38,6 +38,10 @@ from atlas.cleanup.models import (
     CleanupDecision,
     CleanupError,
 )
+from .execution_identity import (
+    new_execution_id,
+    normalize_execution_id,
+)
 from atlas.cleanup.scan_models import CleanupScanReport
 from atlas.cleanup.scanner import CleanupScanner
 from atlas.cleanup.service import CleanupService
@@ -69,4 +73,6 @@ __all__ = [
     "DEFAULT_ATLAS_STATE_DIR",
     "DEFAULT_CLEANUP_AUDIT_RELATIVE_PATH",
     "default_cleanup_audit_path",
+    "new_execution_id",
+    "normalize_execution_id",
 ]

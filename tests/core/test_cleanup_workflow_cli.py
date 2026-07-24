@@ -16,6 +16,9 @@ from atlas.cleanup.executor import (
 from atlas.cleanup_cli import main
 
 
+
+EXECUTION_ID = "cln_0123456789abcdef0123456789abcdef"
+
 def make_summary(
     *,
     status: CleanupRunStatus = CleanupRunStatus.SUCCESS,
@@ -24,6 +27,7 @@ def make_summary(
     """Create a normalized cleanup workflow summary."""
 
     return CleanupExecutionSummary(
+        execution_id=EXECUTION_ID,
         provider="jellyfin",
         mode=CleanupExecutionMode.DRY_RUN,
         status=status,
@@ -63,6 +67,10 @@ class CleanupWorkflowCliTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertIn(
             "Atlas Cleanup Workflow",
+            output,
+        )
+        self.assertIn(
+            f"Execution ID: {EXECUTION_ID}",
             output,
         )
         self.assertIn(

@@ -271,6 +271,7 @@ def render_workflow_human(
         [
             "Atlas Cleanup Workflow",
             "----------------------",
+            f"Execution ID: {summary.execution_id}",
             f"Provider: {summary.provider}",
             f"Mode: {summary.mode.value}",
             f"Status: {summary.status.value}",
