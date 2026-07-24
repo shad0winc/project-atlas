@@ -33,6 +33,17 @@ from atlas.cleanup.executor import (
     CleanupExecutor,
     CleanupRunStatus,
 )
+from atlas.cleanup.history_models import (
+    CleanupHistoryEntry,
+    CleanupHistoryError,
+)
+from atlas.cleanup.history_service import (
+    CleanupHistoryService,
+)
+from atlas.cleanup.history_store import (
+    CleanupHistoryStore,
+    JsonlCleanupHistoryStore,
+)
 from atlas.cleanup.models import (
     CleanupAction,
     CleanupDecision,
@@ -63,6 +74,10 @@ __all__ = [
     "CleanupExecutionStatus",
     "CleanupExecutionSummary",
     "CleanupExecutor",
+    "CleanupHistoryEntry",
+    "CleanupHistoryError",
+    "CleanupHistoryService",
+    "CleanupHistoryStore",
     "CleanupRunStatus",
     "CleanupScanReport",
     "CleanupScanner",
@@ -70,6 +85,7 @@ __all__ = [
     "CleanupWorkflowService",
     "DefaultCleanupExecutor",
     "JsonlCleanupAuditWriter",
+    "JsonlCleanupHistoryStore",
     "DEFAULT_ATLAS_STATE_DIR",
     "DEFAULT_CLEANUP_AUDIT_RELATIVE_PATH",
     "default_cleanup_audit_path",
