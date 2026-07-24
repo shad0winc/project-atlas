@@ -82,8 +82,16 @@ Intelligence
 ------------
   atlas ari collect
   atlas ari report
+  atlas ari health-report
+  atlas ari latest [--json]
+  atlas ari history [--json]
+  atlas ari growth [--json]
+  atlas ari forecast [--json]
   atlas retention evaluate <provider> <item-id> [--json]
   atlas cleanup evaluate <provider> <item-id> [--json]
+  atlas cleanup scan <provider> [--page-size N] [--json]
+  atlas cleanup execute <provider> [--page-size N] [--json]
+  atlas cleanup run <provider> [--page-size N] [--json]
 
 Runtime
 -------
