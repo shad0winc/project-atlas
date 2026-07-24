@@ -7,6 +7,11 @@ import json
 import sys
 from collections.abc import Sequence
 
+from atlas.cleanup.audit import JsonlCleanupAuditWriter
+from atlas.cleanup.audit_config import (
+    default_cleanup_audit_path,
+)
+from atlas.cleanup.default_executor import DefaultCleanupExecutor
 from atlas.cleanup.execution_models import CleanupExecutionReport
 from atlas.cleanup.execution_service import CleanupExecutionService
 from atlas.cleanup.executor import (
@@ -131,6 +136,14 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=200,
         help="Number of provider items requested per page.",
+    )
+    run_parser.add_argument(
+        "--audit-path",
+        help=(
+            "Write cleanup execution events to this JSONL file. "
+            "Defaults to ATLAS_CLEANUP_AUDIT_PATH or "
+            "ATLAS_STATE_DIR/cleanup/audit.jsonl."
+        ),
     )
     run_parser.add_argument(
         "--json",
@@ -362,14 +375,30 @@ def main(
             )
 
             if args.command == "run":
-                workflow = (
-                    workflow_service
-                    if workflow_service is not None
-                    else CleanupWorkflowService(
+                if workflow_service is not None:
+                    workflow = workflow_service
+                else:
+                    audit_path = (
+                        args.audit_path
+                        if args.audit_path is not None
+                        else default_cleanup_audit_path()
+                    )
+
+                    audit_writer = JsonlCleanupAuditWriter(
+                        audit_path,
+                        durable=True,
+                    )
+
+                    executor = DefaultCleanupExecutor(
+                        provider=provider,
+                        audit_writer=audit_writer,
+                    )
+
+                    workflow = CleanupWorkflowService(
                         scanner=cleanup_scanner,
                         planner=planner,
+                        executor=executor,
                     )
-                )
 
                 summary = workflow.execute(
                     provider,

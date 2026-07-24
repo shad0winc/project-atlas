@@ -5,6 +5,12 @@ from atlas.cleanup.audit import (
     CleanupAuditWriter,
     JsonlCleanupAuditWriter,
 )
+
+from atlas.cleanup.audit_config import (
+    DEFAULT_ATLAS_STATE_DIR,
+    DEFAULT_CLEANUP_AUDIT_RELATIVE_PATH,
+    default_cleanup_audit_path,
+)
 from atlas.cleanup.default_executor import (
     DefaultCleanupExecutor,
 )
@@ -60,4 +66,7 @@ __all__ = [
     "CleanupWorkflowService",
     "DefaultCleanupExecutor",
     "JsonlCleanupAuditWriter",
+    "DEFAULT_ATLAS_STATE_DIR",
+    "DEFAULT_CLEANUP_AUDIT_RELATIVE_PATH",
+    "default_cleanup_audit_path",
 ]
