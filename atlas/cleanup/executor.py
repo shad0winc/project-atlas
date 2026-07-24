@@ -8,6 +8,9 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
+from atlas.cleanup.execution_identity import (
+    normalize_execution_id,
+)
 from atlas.cleanup.execution_models import CleanupExecutionMode
 from atlas.cleanup.execution_models import CleanupExecutionReport
 
@@ -28,6 +31,7 @@ class CleanupRunStatus(str, Enum):
 class CleanupExecutionSummary:
     """Summary produced by a cleanup executor."""
 
+    execution_id: str
     provider: str
     mode: CleanupExecutionMode
     status: CleanupRunStatus
@@ -43,11 +47,23 @@ class CleanupExecutionSummary:
     errors: tuple[str, ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
+        try:
+            execution_id = normalize_execution_id(
+                self.execution_id
+            )
+        except ValueError as exc:
+            raise CleanupExecutionError(str(exc)) from exc
+
         provider = _required_text(
             self.provider,
             "provider",
         ).lower()
 
+        object.__setattr__(
+            self,
+            "execution_id",
+            execution_id,
+        )
         object.__setattr__(self, "provider", provider)
 
         if not isinstance(
@@ -166,6 +182,7 @@ class CleanupExecutionSummary:
         """Serialize the summary."""
 
         return {
+            "execution_id": self.execution_id,
             "provider": self.provider,
             "mode": self.mode.value,
             "status": self.status.value,

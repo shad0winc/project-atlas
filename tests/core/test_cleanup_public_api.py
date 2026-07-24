@@ -91,6 +91,11 @@ class CleanupPublicApiTests(unittest.TestCase):
                 "CleanupWorkflowService",
                 "DefaultCleanupExecutor",
                 "JsonlCleanupAuditWriter",
+                "DEFAULT_ATLAS_STATE_DIR",
+                "DEFAULT_CLEANUP_AUDIT_RELATIVE_PATH",
+                "default_cleanup_audit_path",
+                "new_execution_id",
+                "normalize_execution_id",
             },
         )
 

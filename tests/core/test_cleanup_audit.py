@@ -19,6 +19,9 @@ from atlas.cleanup import (
 )
 
 
+
+EXECUTION_ID = "cln_0123456789abcdef0123456789abcdef"
+
 OCCURRED_AT = datetime(
     2026,
     7,
@@ -40,6 +43,7 @@ def make_event(
     """Create one deterministic cleanup execution event."""
 
     return CleanupExecutionEvent(
+        execution_id=EXECUTION_ID,
         provider="jellyfin",
         item_id=item_id,
         action=CleanupAction.DELETE,

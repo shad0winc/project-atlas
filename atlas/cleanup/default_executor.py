@@ -10,6 +10,10 @@ from atlas.cleanup.execution_events import (
     CleanupExecutionEvent,
     CleanupExecutionEventStatus,
 )
+from atlas.cleanup.execution_identity import (
+    new_execution_id,
+    normalize_execution_id,
+)
 from atlas.cleanup.execution_models import (
     CleanupExecutionItem,
     CleanupExecutionMode,
@@ -34,6 +38,7 @@ from atlas.media.provider import (
 
 
 Clock = Callable[[], datetime]
+ExecutionIdFactory = Callable[[], str]
 
 
 def _utc_now() -> datetime:
@@ -60,6 +65,7 @@ class DefaultCleanupExecutor(CleanupExecutor):
         audit_writer: CleanupAuditWriter | None = None,
         mutation_dispatcher: MediaMutationDispatcher | None = None,
         clock: Clock | None = None,
+        execution_id_factory: ExecutionIdFactory | None = None,
     ) -> None:
         """Initialize the executor.
 
@@ -68,6 +74,7 @@ class DefaultCleanupExecutor(CleanupExecutor):
             audit_writer: Optional execution-event persistence writer.
             mutation_dispatcher: Optional provider mutation dispatcher.
             clock: Optional timezone-aware datetime provider.
+            execution_id_factory: Optional execution ID generator.
         """
 
         if (
@@ -90,6 +97,14 @@ class DefaultCleanupExecutor(CleanupExecutor):
                 "MediaMutationDispatcher"
             )
 
+        if (
+            execution_id_factory is not None
+            and not callable(execution_id_factory)
+        ):
+            raise CleanupExecutionError(
+                "execution_id_factory must be callable"
+            )
+
         self._provider = provider
         self._audit_writer = audit_writer
         self._mutation_dispatcher = (
@@ -97,6 +112,9 @@ class DefaultCleanupExecutor(CleanupExecutor):
             or MediaMutationDispatcher()
         )
         self._clock = clock or _utc_now
+        self._execution_id_factory = (
+            execution_id_factory or new_execution_id
+        )
 
     def execute(
         self,
@@ -122,6 +140,7 @@ class DefaultCleanupExecutor(CleanupExecutor):
                 "media provider does not match execution report provider"
             )
 
+        execution_id = self._new_execution_id()
         occurred_at = self._now()
         started_at = self._timestamp(occurred_at)
 
@@ -146,6 +165,7 @@ class DefaultCleanupExecutor(CleanupExecutor):
         for item in report.items:
             if item.status is CleanupExecutionStatus.SKIPPED:
                 self._record_event(
+                    execution_id=execution_id,
                     item=item,
                     status=CleanupExecutionEventStatus.SKIPPED,
                     message="Cleanup item was not planned",
@@ -156,6 +176,7 @@ class DefaultCleanupExecutor(CleanupExecutor):
 
             if self._provider is None:
                 self._record_event(
+                    execution_id=execution_id,
                     item=item,
                     status=CleanupExecutionEventStatus.SKIPPED,
                     message=(
@@ -182,6 +203,7 @@ class DefaultCleanupExecutor(CleanupExecutor):
                 )
 
                 self._record_event(
+                    execution_id=execution_id,
                     item=item,
                     status=(
                         CleanupExecutionEventStatus.PREVIEW_FAILED
@@ -195,6 +217,7 @@ class DefaultCleanupExecutor(CleanupExecutor):
             previewed += 1
 
             self._record_event(
+                execution_id=execution_id,
                 item=item,
                 status=(
                     CleanupExecutionEventStatus.PREVIEW_SUCCEEDED
@@ -214,6 +237,7 @@ class DefaultCleanupExecutor(CleanupExecutor):
         )
 
         return CleanupExecutionSummary(
+            execution_id=execution_id,
             provider=report.provider,
             mode=report.mode,
             status=status,
@@ -229,6 +253,7 @@ class DefaultCleanupExecutor(CleanupExecutor):
     def _record_event(
         self,
         *,
+        execution_id: str,
         item: CleanupExecutionItem,
         status: CleanupExecutionEventStatus,
         message: str,
@@ -241,6 +266,7 @@ class DefaultCleanupExecutor(CleanupExecutor):
             return
 
         event = CleanupExecutionEvent(
+            execution_id=execution_id,
             provider=item.provider,
             item_id=item.item_id,
             action=item.decision.action,
@@ -279,6 +305,21 @@ class DefaultCleanupExecutor(CleanupExecutor):
             return CleanupRunStatus.FAILED
 
         return CleanupRunStatus.PARTIAL
+
+    def _new_execution_id(self) -> str:
+        """Generate and validate one cleanup execution identifier."""
+
+        try:
+            value = self._execution_id_factory()
+        except Exception as exc:
+            raise CleanupExecutionError(
+                f"execution ID generation failed: {exc}"
+            ) from exc
+
+        try:
+            return normalize_execution_id(value)
+        except ValueError as exc:
+            raise CleanupExecutionError(str(exc)) from exc
 
     def _now(self) -> datetime:
         """Return a validated timezone-aware UTC datetime."""

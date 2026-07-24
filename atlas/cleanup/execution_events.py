@@ -7,6 +7,9 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
+from atlas.cleanup.execution_identity import (
+    normalize_execution_id,
+)
 from atlas.cleanup.execution_models import CleanupExecutionMode
 from atlas.cleanup.models import (
     CleanupAction,
@@ -139,6 +142,7 @@ def _normalize_timestamp(
 class CleanupExecutionEvent:
     """Observed execution outcome for one cleanup item."""
 
+    execution_id: str
     provider: str
     item_id: str
     action: CleanupAction
@@ -150,6 +154,13 @@ class CleanupExecutionEvent:
 
     def __post_init__(self) -> None:
         """Normalize and validate the execution event."""
+
+        try:
+            execution_id = normalize_execution_id(
+                self.execution_id
+            )
+        except ValueError as exc:
+            raise CleanupError(str(exc)) from exc
 
         provider = _normalize_identity(
             self.provider,
@@ -189,6 +200,11 @@ class CleanupExecutionEvent:
                 "preview execution events require delete action"
             )
 
+        object.__setattr__(
+            self,
+            "execution_id",
+            execution_id,
+        )
         object.__setattr__(self, "provider", provider)
         object.__setattr__(self, "item_id", item_id)
         object.__setattr__(self, "action", action)
@@ -219,6 +235,7 @@ class CleanupExecutionEvent:
         """Serialize the execution event."""
 
         return {
+            "execution_id": self.execution_id,
             "provider": self.provider,
             "item_id": self.item_id,
             "action": self.action.value,
