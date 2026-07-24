@@ -1,4 +1,4 @@
-"""Command-line interface for Atlas cleanup planning."""
+"""Command-line interface for Atlas cleanup operations."""
 
 from __future__ import annotations
 
@@ -9,10 +9,15 @@ from collections.abc import Sequence
 
 from atlas.cleanup.execution_models import CleanupExecutionReport
 from atlas.cleanup.execution_service import CleanupExecutionService
+from atlas.cleanup.executor import (
+    CleanupExecutionError,
+    CleanupExecutionSummary,
+)
 from atlas.cleanup.models import CleanupDecision, CleanupError
 from atlas.cleanup.scan_models import CleanupScanReport
 from atlas.cleanup.scanner import CleanupScanner
 from atlas.cleanup.service import CleanupService
+from atlas.cleanup.workflow import CleanupWorkflowService
 from atlas.media.jellyfin import (
     JellyfinProvider,
     default_jellyfin_provider,
@@ -25,7 +30,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser(
         prog="atlas cleanup",
-        description="Evaluate media cleanup recommendations.",
+        description=(
+            "Evaluate, scan, plan, and safely preview media cleanup."
+        ),
     )
 
     subparsers = parser.add_subparsers(
@@ -100,6 +107,38 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output the cleanup execution report as JSON.",
     )
 
+    run_parser = subparsers.add_parser(
+        "run",
+        help=(
+            "Run the complete cleanup workflow using safe "
+            "provider previews."
+        ),
+    )
+    run_parser.add_argument(
+        "provider",
+        help="Media provider name, such as jellyfin.",
+    )
+    run_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=True,
+        help=(
+            "Preview planned cleanup actions without modifying media."
+        ),
+    )
+    run_parser.add_argument(
+        "--page-size",
+        type=int,
+        default=200,
+        help="Number of provider items requested per page.",
+    )
+    run_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="Output the cleanup workflow summary as JSON.",
+    )
+
     return parser
 
 
@@ -167,7 +206,7 @@ def render_scan_human(report: CleanupScanReport) -> str:
 def render_execution_human(
     report: CleanupExecutionReport,
 ) -> str:
-    """Render a cleanup execution report for terminal users."""
+    """Render a cleanup execution plan for terminal users."""
 
     planned_items = tuple(
         item
@@ -186,8 +225,8 @@ def render_execution_human(
 
     return "\n".join(
         [
-            "Atlas Cleanup Execution",
-            "-----------------------",
+            "Atlas Cleanup Execution Plan",
+            "----------------------------",
             f"Provider: {report.provider}",
             f"Mode: {report.mode.value}",
             f"Total: {report.total}",
@@ -201,12 +240,64 @@ def render_execution_human(
     )
 
 
+def render_workflow_human(
+    summary: CleanupExecutionSummary,
+) -> str:
+    """Render a complete cleanup workflow summary."""
+
+    errors = (
+        "\n".join(
+            f"  - {error}"
+            for error in summary.errors
+        )
+        if summary.errors
+        else "  - None"
+    )
+
+    return "\n".join(
+        [
+            "Atlas Cleanup Workflow",
+            "----------------------",
+            f"Provider: {summary.provider}",
+            f"Mode: {summary.mode.value}",
+            f"Status: {summary.status.value}",
+            f"Total: {summary.total}",
+            f"Planned: {summary.planned}",
+            f"Skipped: {summary.skipped}",
+            f"Modified: {summary.modified}",
+            "Errors:",
+            errors,
+            f"Started at: {summary.started_at}",
+            f"Completed at: {summary.completed_at}",
+        ]
+    )
+
+
+def _provider_name(
+    value: str,
+    *,
+    operation: str,
+) -> str:
+    """Validate and normalize a supported provider name."""
+
+    provider_name = value.strip().lower()
+
+    if provider_name != "jellyfin":
+        raise CleanupError(
+            f"unsupported cleanup {operation} provider: "
+            f"{provider_name or value}"
+        )
+
+    return provider_name
+
+
 def main(
     argv: Sequence[str] | None = None,
     *,
     service: CleanupService | None = None,
     scanner: CleanupScanner | None = None,
     execution_service: CleanupExecutionService | None = None,
+    workflow_service: CleanupWorkflowService | None = None,
     jellyfin_provider: JellyfinProvider | None = None,
 ) -> int:
     """Run the Cleanup CLI."""
@@ -240,19 +331,17 @@ def main(
 
             return 0
 
-        if args.command in {"scan", "execute"}:
-            provider_name = args.provider.strip().lower()
+        if args.command in {"scan", "execute", "run"}:
+            provider_operation = {
+                "scan": "scan",
+                "execute": "execution",
+                "run": "workflow",
+            }[args.command]
 
-            if provider_name != "jellyfin":
-                operation = (
-                    "scan"
-                    if args.command == "scan"
-                    else "execution"
-                )
-                raise CleanupError(
-                    f"unsupported cleanup {operation} provider: "
-                    f"{provider_name or args.provider}"
-                )
+            provider_name = _provider_name(
+                args.provider,
+                operation=provider_operation,
+            )
 
             provider = (
                 jellyfin_provider
@@ -260,14 +349,49 @@ def main(
                 else default_jellyfin_provider()
             )
 
-            item_ids = provider.list_media_item_ids(
-                page_size=args.page_size
-            )
-
             cleanup_scanner = (
                 scanner
                 if scanner is not None
                 else CleanupScanner(cleanup_service)
+            )
+
+            planner = (
+                execution_service
+                if execution_service is not None
+                else CleanupExecutionService()
+            )
+
+            if args.command == "run":
+                workflow = (
+                    workflow_service
+                    if workflow_service is not None
+                    else CleanupWorkflowService(
+                        scanner=cleanup_scanner,
+                        planner=planner,
+                    )
+                )
+
+                summary = workflow.execute(
+                    provider,
+                    page_size=args.page_size,
+                    mode="dry_run",
+                )
+
+                if args.json_output:
+                    print(
+                        json.dumps(
+                            summary.to_dict(),
+                            indent=2,
+                            sort_keys=True,
+                        )
+                    )
+                else:
+                    print(render_workflow_human(summary))
+
+                return 0
+
+            item_ids = provider.list_media_item_ids(
+                page_size=args.page_size
             )
 
             scan_report = cleanup_scanner.scan(
@@ -288,12 +412,6 @@ def main(
                     print(render_scan_human(scan_report))
 
                 return 0
-
-            planner = (
-                execution_service
-                if execution_service is not None
-                else CleanupExecutionService()
-            )
 
             execution_report = planner.plan(
                 scan_report,
@@ -319,6 +437,7 @@ def main(
 
     except (
         CleanupError,
+        CleanupExecutionError,
         MediaProviderError,
         ValueError,
         RuntimeError,
@@ -327,6 +446,7 @@ def main(
             "evaluate": "evaluation",
             "scan": "scan",
             "execute": "execution",
+            "run": "workflow",
         }.get(
             args.command,
             args.command,
