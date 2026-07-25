@@ -6,11 +6,7 @@ type ButtonProps = Readonly<{
   variant?: "primary" | "secondary";
 }>;
 
-export function Button({
-  children,
-  href,
-  variant = "primary"
-}: ButtonProps): React.ReactElement {
+export function Button({ children, href, variant = "primary" }: ButtonProps): React.ReactElement {
   return (
     <a className={`button button--${variant}`} href={href}>
       {children}

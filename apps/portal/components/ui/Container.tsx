@@ -5,10 +5,7 @@ type ContainerProps = Readonly<{
   className?: string;
 }>;
 
-export function Container({
-  children,
-  className = ""
-}: ContainerProps): React.ReactElement {
+export function Container({ children, className = "" }: ContainerProps): React.ReactElement {
   const classes = ["container", className].filter(Boolean).join(" ");
 
   return <div className={classes}>{children}</div>;

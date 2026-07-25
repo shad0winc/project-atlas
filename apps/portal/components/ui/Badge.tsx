@@ -7,9 +7,6 @@ type BadgeProps = Readonly<{
   variant?: BadgeVariant;
 }>;
 
-export function Badge({
-  children,
-  variant = "default"
-}: BadgeProps): React.ReactElement {
+export function Badge({ children, variant = "default" }: BadgeProps): React.ReactElement {
   return <span className={`badge badge--${variant}`}>{children}</span>;
 }

@@ -5,10 +5,7 @@ type CardProps = Readonly<{
   className?: string;
 }>;
 
-export function Card({
-  children,
-  className = ""
-}: CardProps): React.ReactElement {
+export function Card({ children, className = "" }: CardProps): React.ReactElement {
   const classes = ["card", className].filter(Boolean).join(" ");
 
   return <section className={classes}>{children}</section>;

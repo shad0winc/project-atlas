@@ -33,3 +33,9 @@ apps/portal/yarn-error.log*
 apps/portal/.env
 apps/portal/.env.local
 apps/portal/.env.*.local
+
+# Atlas Portal generated files
+apps/portal/.next/
+apps/portal/out/
+apps/portal/next-env.d.ts
+apps/portal/*.tsbuildinfo

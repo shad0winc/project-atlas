@@ -1,22 +1,19 @@
-import { Badge } from "./ui/Badge";
-import { Button } from "./ui/Button";
-import { Container } from "./ui/Container";
+import { Badge } from "../ui/Badge";
+import { Button } from "../ui/Button";
+import { Container } from "../ui/Container";
 
 const capabilities = [
   {
     name: "Identity",
-    description:
-      "Secure user profiles, invitations, registration, and media access."
+    description: "Secure user profiles, invitations, registration, and media access."
   },
   {
     name: "Automation",
-    description:
-      "Scheduled workflows and modular services working quietly in the background."
+    description: "Scheduled workflows and modular services working quietly in the background."
   },
   {
     name: "Intelligence",
-    description:
-      "Retention, policy, favorites, cleanup planning, and system observability."
+    description: "Retention, policy, favorites, cleanup planning, and system observability."
   }
 ] as const;
 
@@ -37,8 +34,8 @@ export function Hero(): React.ReactElement {
             </h1>
 
             <p className="hero__description">
-              A private platform that brings media, users, automation, and
-              operational intelligence together under one dependable system.
+              A private platform that brings media, users, automation, and operational intelligence
+              together under one dependable system.
             </p>
 
             <div className="hero__actions">
@@ -70,17 +67,15 @@ export function Hero(): React.ReactElement {
             <p className="section-heading__eyebrow">Platform Foundation</p>
             <h2>One system. Three core capabilities.</h2>
             <p>
-              Atlas is designed as a modular platform that grows without
-              sacrificing clarity, reliability, or control.
+              Atlas is designed as a modular platform that grows without sacrificing clarity,
+              reliability, or control.
             </p>
           </div>
 
           <div className="capability-grid">
             {capabilities.map((capability, index) => (
               <article className="capability-card" key={capability.name}>
-                <span className="capability-card__number">
-                  0{index + 1}
-                </span>
+                <span className="capability-card__number">0{index + 1}</span>
                 <h3>{capability.name}</h3>
                 <p>{capability.description}</p>
               </article>

@@ -28,16 +28,8 @@ body {
   min-height: 100vh;
   margin: 0;
   background:
-    radial-gradient(
-      circle at 75% 10%,
-      rgba(31, 111, 235, 0.13),
-      transparent 34rem
-    ),
-    radial-gradient(
-      circle at 15% 45%,
-      rgba(63, 185, 80, 0.05),
-      transparent 28rem
-    ),
+    radial-gradient(circle at 75% 10%, rgba(31, 111, 235, 0.13), transparent 34rem),
+    radial-gradient(circle at 15% 45%, rgba(63, 185, 80, 0.05), transparent 28rem),
     var(--background);
   color: var(--text);
   font-family:
@@ -208,12 +200,7 @@ a {
 }
 
 .hero h1 span:nth-child(3) {
-  background: linear-gradient(
-    105deg,
-    var(--primary-bright),
-    var(--primary),
-    #79c0ff
-  );
+  background: linear-gradient(105deg, var(--primary-bright), var(--primary), #79c0ff);
   background-clip: text;
   color: transparent;
 }
@@ -295,12 +282,7 @@ a {
 .orbital--outer {
   width: min(100%, 430px);
   aspect-ratio: 1;
-  background:
-    radial-gradient(
-      circle,
-      rgba(31, 111, 235, 0.16),
-      transparent 58%
-    );
+  background: radial-gradient(circle, rgba(31, 111, 235, 0.16), transparent 58%);
   box-shadow:
     0 0 100px rgba(31, 111, 235, 0.08),
     inset 0 0 70px rgba(31, 111, 235, 0.05);
@@ -330,11 +312,7 @@ a {
   place-content: center;
   border: 1px solid rgba(88, 166, 255, 0.42);
   border-radius: 24px;
-  background: linear-gradient(
-    145deg,
-    rgba(31, 111, 235, 0.2),
-    rgba(22, 27, 34, 0.9)
-  );
+  background: linear-gradient(145deg, rgba(31, 111, 235, 0.2), rgba(22, 27, 34, 0.9));
   box-shadow:
     0 0 55px rgba(31, 111, 235, 0.18),
     inset 0 0 22px rgba(88, 166, 255, 0.06);
@@ -401,11 +379,7 @@ a {
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-medium);
-  background: linear-gradient(
-    145deg,
-    rgba(22, 27, 34, 0.96),
-    rgba(17, 24, 32, 0.92)
-  );
+  background: linear-gradient(145deg, rgba(22, 27, 34, 0.96), rgba(17, 24, 32, 0.92));
   transition:
     transform 180ms ease,
     border-color 180ms ease;

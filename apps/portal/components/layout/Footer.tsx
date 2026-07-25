@@ -1,4 +1,4 @@
-import { Container } from "./ui/Container";
+import { Container } from "../ui/Container";
 
 export function Footer(): React.ReactElement {
   return (

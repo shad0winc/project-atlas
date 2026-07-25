@@ -1,6 +1,6 @@
-import { Badge } from "./ui/Badge";
-import { Card } from "./ui/Card";
-import { Container } from "./ui/Container";
+import { Badge } from "../ui/Badge";
+import { Card } from "../ui/Card";
+import { Container } from "../ui/Container";
 
 const systems = [
   ["Atlas API", "Operational"],
@@ -20,8 +20,8 @@ export function StatusCard(): React.ReactElement {
             <h2>Atlas is standing by.</h2>
 
             <p>
-              The portal foundation is online and ready to become the primary
-              interface for the Atlas platform.
+              The portal foundation is online and ready to become the primary interface for the
+              Atlas platform.
             </p>
           </div>
 
