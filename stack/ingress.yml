@@ -1,0 +1,41 @@
+name: atlas-ingress
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: atlas-caddy
+    restart: unless-stopped
+
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+
+    volumes:
+      - ../infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../infra/caddy/site:/srv:ro
+      - /mnt/storage/configs/atlas/caddy/data:/data
+      - /mnt/storage/configs/atlas/caddy/config:/config
+
+    networks:
+      - atlas-ingress
+
+    security_opt:
+      - no-new-privileges:true
+
+    read_only: true
+
+    tmpfs:
+      - /tmp
+      - /run
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  atlas-ingress:
+    external: true
+    name: atlas-ingress
