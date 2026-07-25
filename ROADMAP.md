@@ -345,3 +345,66 @@ Next:
 - [x] Registration audit events
 
 - [x] M-020.3 Patch 2 — Favorites CLI
+
+---
+
+## M-019 — Atlas Portal
+
+### Architecture
+
+- [x] Select Next.js frontend architecture
+- [x] Select FastAPI backend architecture
+- [x] Define portal and API boundaries
+- [x] Define single-origin routing strategy
+- [x] Define server-managed session strategy
+- [x] Define role-based authorization boundary
+- [x] Define initial vertical slice
+- [x] Record portal architecture decision
+- [x] Add portal architecture documentation
+
+### Foundation
+
+- [ ] Scaffold FastAPI service
+- [ ] Add API health endpoint
+- [ ] Add API contract tests
+- [ ] Add API Docker image
+- [ ] Scaffold Next.js portal
+- [ ] Add portal Docker image
+- [ ] Add portal Compose stack
+- [ ] Add Caddy portal and API routes
+- [ ] Add service health checks
+- [ ] Add development commands
+- [ ] Add portal test scopes
+
+### Identity Experience
+
+- [ ] Define session model
+- [ ] Add session persistence
+- [ ] Add login endpoint
+- [ ] Add logout endpoint
+- [ ] Add current-session endpoint
+- [ ] Add session expiration
+- [ ] Add session revocation
+- [ ] Add login page
+- [ ] Add protected portal layout
+- [ ] Add role-aware navigation
+- [ ] Publish authentication audit events
+
+### Initial Portal
+
+- [ ] Add portal home
+- [ ] Add system status page
+- [ ] Add administrative user listing
+- [ ] Add error and empty states
+- [ ] Add responsive navigation
+- [ ] Establish accessibility baseline
+
+### Future Integration
+
+- [ ] Add media dashboard
+- [ ] Add requests experience
+- [ ] Add favorites experience
+- [ ] Add sports experience
+- [ ] Add documentation portal
+- [ ] Add notifications
+- [ ] Add administrative dashboard
