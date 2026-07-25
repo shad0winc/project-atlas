@@ -18,6 +18,12 @@ from atlas.cleanup.executor import (
     CleanupExecutionError,
     CleanupExecutionSummary,
 )
+from atlas.cleanup.history_models import (
+    CleanupHistoryEntry,
+    CleanupHistoryError,
+)
+from atlas.cleanup.history_service import CleanupHistoryService
+from atlas.cleanup.history_store import JsonlCleanupHistoryStore
 from atlas.cleanup.models import CleanupDecision, CleanupError
 from atlas.cleanup.scan_models import CleanupScanReport
 from atlas.cleanup.scanner import CleanupScanner
@@ -150,6 +156,51 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         dest="json_output",
         help="Output the cleanup workflow summary as JSON.",
+    )
+
+    history_parser = subparsers.add_parser(
+        "history",
+        help="List persisted cleanup execution history.",
+    )
+    history_parser.add_argument(
+        "--audit-path",
+        help=(
+            "Read cleanup execution history from this JSONL file. "
+            "Defaults to ATLAS_CLEANUP_AUDIT_PATH or "
+            "ATLAS_STATE_DIR/cleanup/audit.jsonl."
+        ),
+    )
+    history_parser.add_argument(
+        "--last",
+        type=int,
+        help="Return only the newest N cleanup executions.",
+    )
+    history_parser.add_argument(
+        "--provider",
+        help="Return history for one media provider.",
+    )
+
+    failure_group = history_parser.add_mutually_exclusive_group()
+    failure_group.add_argument(
+        "--failures",
+        action="store_const",
+        const=True,
+        dest="has_failures",
+        help="Return only executions containing failures.",
+    )
+    failure_group.add_argument(
+        "--without-failures",
+        action="store_const",
+        const=False,
+        dest="has_failures",
+        help="Return only executions without failures.",
+    )
+
+    history_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="Output cleanup execution history as JSON.",
     )
 
     return parser
@@ -287,6 +338,89 @@ def render_workflow_human(
     )
 
 
+def render_history_human(
+    entries: Sequence[CleanupHistoryEntry],
+) -> str:
+    """Render cleanup execution history for terminal users."""
+
+    if not entries:
+        return "\n".join(
+            [
+                "Atlas Cleanup History",
+                "---------------------",
+                "No cleanup execution history found.",
+            ]
+        )
+
+    rendered_entries: list[str] = [
+        "Atlas Cleanup History",
+        "---------------------",
+    ]
+
+    for entry in entries:
+        rendered_entries.extend(
+            [
+                "",
+                f"Execution ID: {entry.execution_id}",
+                f"Provider: {entry.provider}",
+                f"Mode: {entry.mode.value}",
+                f"Started at: {entry.started_at.isoformat().replace('+00:00', 'Z')}",
+                f"Completed at: {entry.completed_at.isoformat().replace('+00:00', 'Z')}",
+                f"Total: {entry.total}",
+                f"Successful: {entry.successful_count}",
+                f"Failed: {entry.failed_count}",
+                f"Skipped: {entry.skipped_count}",
+                f"Preview succeeded: {entry.preview_succeeded_count}",
+                f"Preview failed: {entry.preview_failed_count}",
+                f"Modified: {entry.modified_count}",
+                f"Has failures: {entry.has_failures}",
+            ]
+        )
+
+    return "\n".join(rendered_entries)
+
+
+def _handle_history(
+    args: argparse.Namespace,
+    *,
+    history_service: CleanupHistoryService | None = None,
+) -> int:
+    """Run the cleanup history command."""
+
+    if history_service is None:
+        audit_path = (
+            args.audit_path
+            if args.audit_path is not None
+            else default_cleanup_audit_path()
+        )
+
+        history_service = CleanupHistoryService(
+            JsonlCleanupHistoryStore(audit_path)
+        )
+
+    entries = history_service.list(
+        last=args.last,
+        provider=args.provider,
+        has_failures=args.has_failures,
+    )
+
+    if args.json_output:
+        print(
+            json.dumps(
+                [
+                    entry.to_dict()
+                    for entry in entries
+                ],
+                indent=2,
+                sort_keys=True,
+            )
+        )
+    else:
+        print(render_history_human(entries))
+
+    return 0
+
+
 def _provider_name(
     value: str,
     *,
@@ -312,6 +446,7 @@ def main(
     scanner: CleanupScanner | None = None,
     execution_service: CleanupExecutionService | None = None,
     workflow_service: CleanupWorkflowService | None = None,
+    history_service: CleanupHistoryService | None = None,
     jellyfin_provider: JellyfinProvider | None = None,
 ) -> int:
     """Run the Cleanup CLI."""
@@ -326,6 +461,12 @@ def main(
     )
 
     try:
+        if args.command == "history":
+            return _handle_history(
+                args,
+                history_service=history_service,
+            )
+
         if args.command == "evaluate":
             decision = cleanup_service.evaluate(
                 args.provider,
@@ -468,6 +609,7 @@ def main(
     except (
         CleanupError,
         CleanupExecutionError,
+        CleanupHistoryError,
         MediaProviderError,
         ValueError,
         RuntimeError,
@@ -477,6 +619,7 @@ def main(
             "scan": "scan",
             "execute": "execution",
             "run": "workflow",
+            "history": "history",
         }.get(
             args.command,
             args.command,

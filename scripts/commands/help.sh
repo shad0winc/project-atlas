@@ -92,6 +92,7 @@ Intelligence
   atlas cleanup scan <provider> [--page-size N] [--json]
   atlas cleanup execute <provider> [--page-size N] [--json]
   atlas cleanup run <provider> [--page-size N] [--audit-path PATH] [--json]
+  atlas cleanup history [--audit-path PATH] [--last N] [--provider PROVIDER] [--failures | --without-failures] [--json]
 
 Runtime
 -------
