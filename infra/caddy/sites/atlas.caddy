@@ -1,10 +1,14 @@
 atlas.shadowinc.co {
-	import atlas_security_headers
-	import atlas_access_log
+        import atlas_security_headers
+        import atlas_access_log
 
-	root * /srv
+        encode zstd gzip
 
-	encode zstd gzip
+        handle /api/* {
+                reverse_proxy atlas-api:8000
+        }
 
-	file_server
+        handle {
+                reverse_proxy atlas-portal:3000
+        }
 }

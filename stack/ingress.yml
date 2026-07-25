@@ -1,10 +1,62 @@
 name: atlas-ingress
 
 services:
+  portal:
+    build:
+      context: ../apps/portal
+      dockerfile: Dockerfile
+    image: atlas-portal:local
+    container_name: atlas-portal
+    restart: unless-stopped
+
+    networks:
+      - atlas-ingress
+
+    expose:
+      - "3000"
+
+    security_opt:
+      - no-new-privileges:true
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    image: atlas-api:local
+    container_name: atlas-api
+    restart: unless-stopped
+
+    networks:
+      - atlas-ingress
+
+    expose:
+      - "8000"
+
+    security_opt:
+      - no-new-privileges:true
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   caddy:
     image: caddy:2-alpine
     container_name: atlas-caddy
     restart: unless-stopped
+
+    depends_on:
+      portal:
+        condition: service_healthy
+      api:
+        condition: service_healthy
 
     ports:
       - "80:80/tcp"
