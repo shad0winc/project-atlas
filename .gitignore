@@ -39,3 +39,6 @@ apps/portal/.next/
 apps/portal/out/
 apps/portal/next-env.d.ts
 apps/portal/*.tsbuildinfo
+
+# Python package metadata
+*.egg-info/
