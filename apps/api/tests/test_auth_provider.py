@@ -173,7 +173,7 @@ class JellyfinAuthenticationProviderTests(unittest.TestCase):
         self.assertEqual(user.user_id, profile["user_id"])
         self.assertEqual(user.username, "michael")
         self.assertEqual(user.display_name, "Michael")
-        self.assertEqual(user.roles, ("admin",))
+        self.assertEqual(user.roles, ("global_admin",))
         self.assertEqual(user.provider, "jellyfin")
         self.assertEqual(
             user.metadata["jellyfin_user_id"],

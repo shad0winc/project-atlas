@@ -119,7 +119,7 @@ def get_current_user(
         user_id=profile["user_id"],
         username=profile["username"],
         display_name=profile["display_name"],
-        roles=(profile["role"],),
+        roles=tuple(profile["roles"]),
         provider="jellyfin",
         metadata={
             "jellyfin_user_id": profile.get("jellyfin_user_id"),
