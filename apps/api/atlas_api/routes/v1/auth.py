@@ -15,16 +15,16 @@ from atlas_api.auth.schemas import (
     TokenResponse,
 )
 from atlas_api.auth.service import AuthenticationService
-from atlas_api.dependencies import (
-    get_authentication_service,
-    get_current_user,
-)
+from atlas_api.dependencies import get_authentication_service
+from atlas_api.security import require_permission
 
 
 router = APIRouter(
     prefix="/auth",
     tags=["authentication"],
 )
+
+require_current_user_read = require_permission("users.self.read")
 
 
 @router.post(
@@ -72,7 +72,7 @@ def login(
     summary="Read the authenticated Atlas user",
 )
 def read_current_user(
-    user: AuthenticatedUser = Depends(get_current_user),
+    user: AuthenticatedUser = Depends(require_current_user_read),
 ) -> CurrentUserResponse:
     """Return the active Atlas profile represented by an access token."""
 

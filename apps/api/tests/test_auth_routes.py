@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import unittest
 
+from fastapi import HTTPException, status
 from fastapi.testclient import TestClient
 
 from atlas_api.auth.exceptions import (
@@ -11,11 +12,9 @@ from atlas_api.auth.exceptions import (
     InvalidCredentialsError,
 )
 from atlas_api.auth.models import AuthenticatedUser, TokenPair
-from atlas_api.dependencies import (
-    get_authentication_service,
-    get_current_user,
-)
+from atlas_api.dependencies import get_authentication_service
 from atlas_api.main import create_app
+from atlas_api.routes.v1.auth import require_current_user_read
 
 
 class SuccessfulAuthenticationService:
@@ -150,7 +149,7 @@ class AuthenticationRouteTests(unittest.TestCase):
         )
 
         self.application.dependency_overrides[
-            get_current_user
+            require_current_user_read
         ] = lambda: user
 
         response = self.client.get("/api/v1/auth/me")
@@ -164,6 +163,33 @@ class AuthenticationRouteTests(unittest.TestCase):
                 "display_name": "Michael",
                 "roles": ["admin"],
                 "provider": "jellyfin",
+            },
+        )
+
+    def test_me_returns_forbidden_when_permission_is_denied(self) -> None:
+        def deny_current_user_read() -> AuthenticatedUser:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    "No assigned role or direct grant provides the "
+                    "requested permission."
+                ),
+            )
+
+        self.application.dependency_overrides[
+            require_current_user_read
+        ] = deny_current_user_read
+
+        response = self.client.get("/api/v1/auth/me")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(
+            response.json(),
+            {
+                "detail": (
+                    "No assigned role or direct grant provides the "
+                    "requested permission."
+                )
             },
         )
 
