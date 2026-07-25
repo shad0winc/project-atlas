@@ -293,6 +293,30 @@ Future modules:
 
 Every module follows the Atlas Module SDK and can be installed, enabled, updated, verified, or removed independently.
 
+---
+
+## M-018 — Production Infrastructure
+
+- [x] Docker network architecture
+- [x] Public DNS
+- [x] Production ingress
+- [x] Modular Caddy configuration
+- [x] Automatic HTTPS
+- [x] HTTP → HTTPS redirect
+- [x] HTTP/2
+- [x] HTTP/3
+- [x] Security headers
+- [x] Access logging
+- [x] Cloudflare integration
+- [x] Public Atlas landing page
+
+Next:
+
+- [ ] Atlas Web Portal
+- [ ] Authentication
+- [ ] Reverse proxy applications
+- [ ] User dashboard
+- [ ] Administrative dashboard
 
 ---
 

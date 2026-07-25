@@ -214,3 +214,46 @@ The next major milestones include:
 # License
 
 Private project for personal, friends, and family use.
+
+---
+
+## Public Access
+
+Atlas is now available through the production ingress layer.
+
+Production URL:
+
+https://atlas.shadowinc.co
+
+Current production capabilities:
+
+- Automatic HTTPS
+- HTTP/2
+- HTTP/3
+- Let's Encrypt certificate management
+- Cloudflare compatible
+- Modular reverse proxy architecture
+- Structured access logging
+- Security-first HTTP headers
+
+---
+
+## Infrastructure
+
+Atlas currently consists of:
+
+- Proxmox VE
+- Debian LXC
+- Docker Compose
+- Caddy
+- Cloudflare DNS
+- Jellyfin
+- Jellyseerr
+- Sonarr
+- Radarr
+- qBittorrent
+- Prowlarr
+- Maintainerr
+- Homepage
+- Atlas Core
+
