@@ -1,11 +1,11 @@
-"""Health routes for the Atlas API."""
+"""Health routes for version 1 of the Atlas HTTP API."""
 
 from fastapi import APIRouter, status
 
 from atlas_api.schemas.health import HealthResponse
 
+
 router = APIRouter(
-    prefix="/api/v1",
     tags=["health"],
 )
 

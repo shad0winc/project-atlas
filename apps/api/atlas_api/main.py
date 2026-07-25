@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI
 
-from atlas_api.routes import health_router
+from atlas_api.routes import v1_router
 
 
 def create_app() -> FastAPI:
@@ -17,7 +17,7 @@ def create_app() -> FastAPI:
         openapi_url="/api/openapi.json",
     )
 
-    application.include_router(health_router)
+    application.include_router(v1_router)
 
     return application
 
