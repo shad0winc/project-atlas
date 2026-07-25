@@ -22,3 +22,14 @@ __pycache__/
 
 # Local Python virtual environment
 .venv/
+
+# Atlas Portal / Node.js
+apps/portal/node_modules/
+apps/portal/.next/
+apps/portal/out/
+apps/portal/npm-debug.log*
+apps/portal/yarn-debug.log*
+apps/portal/yarn-error.log*
+apps/portal/.env
+apps/portal/.env.local
+apps/portal/.env.*.local
