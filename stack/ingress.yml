@@ -7,15 +7,16 @@ services:
     restart: unless-stopped
 
     ports:
-      - "80:80"
-      - "443:443"
+      - "80:80/tcp"
+      - "443:443/tcp"
       - "443:443/udp"
 
     volumes:
-      - ../infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../infra/caddy:/etc/caddy:ro
       - ../infra/caddy/site:/srv:ro
       - /mnt/storage/configs/atlas/caddy/data:/data
       - /mnt/storage/configs/atlas/caddy/config:/config
+      - /mnt/storage/configs/atlas/caddy/logs:/var/log/caddy
 
     networks:
       - atlas-ingress

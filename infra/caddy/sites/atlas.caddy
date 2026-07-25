@@ -1,0 +1,10 @@
+atlas.shadowinc.co {
+	import atlas_security_headers
+	import atlas_access_log
+
+	root * /srv
+
+	encode zstd gzip
+
+	file_server
+}
