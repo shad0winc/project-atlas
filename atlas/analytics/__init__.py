@@ -1,5 +1,9 @@
 """Public analytics contracts for Project Atlas."""
 
+from .comparison_service import (
+    AnalyticsComparisonError,
+    AnalyticsComparisonService,
+)
 from .models import (
     AnalyticsSnapshot,
     ForecastHealth,
@@ -15,6 +19,8 @@ from .snapshot_reader import (
 
 __all__ = [
     "ARISnapshot",
+    "AnalyticsComparisonError",
+    "AnalyticsComparisonService",
     "AnalyticsSnapshot",
     "ForecastHealth",
     "ForecastSummary",
