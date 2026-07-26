@@ -48,6 +48,21 @@ export interface AtlasDashboardSummaryResponse {
   readonly metrics: readonly AtlasDashboardMetricResponse[];
 }
 
+export type AtlasDashboardMediaLibraryStatus = "available" | "unavailable";
+
+export interface AtlasDashboardMediaLibraryResponse {
+  readonly id: string;
+  readonly label: string;
+  readonly count: number | null;
+  readonly status: AtlasDashboardMediaLibraryStatus;
+  readonly detail: string | null;
+}
+
+export interface AtlasDashboardMediaSummaryResponse {
+  readonly generated_at: string;
+  readonly libraries: readonly AtlasDashboardMediaLibraryResponse[];
+}
+
 export interface AtlasErrorResponse {
   readonly detail?: string;
 }
