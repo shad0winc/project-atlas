@@ -32,6 +32,22 @@ export interface AtlasCurrentUserResponse {
   readonly provider: string;
 }
 
+export type AtlasDashboardMetricStatus = "healthy" | "warning" | "offline" | "unknown";
+
+export interface AtlasDashboardMetricResponse {
+  readonly id: string;
+  readonly label: string;
+  readonly value: string;
+  readonly description: string;
+  readonly status: AtlasDashboardMetricStatus;
+  readonly detail: string | null;
+}
+
+export interface AtlasDashboardSummaryResponse {
+  readonly generated_at: string;
+  readonly metrics: readonly AtlasDashboardMetricResponse[];
+}
+
 export interface AtlasErrorResponse {
   readonly detail?: string;
 }

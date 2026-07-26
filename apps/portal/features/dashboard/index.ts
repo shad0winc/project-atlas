@@ -5,7 +5,6 @@ export { DashboardSkeleton } from "./components/DashboardSkeleton";
 export { DashboardView } from "./components/DashboardView";
 export { MetricCard } from "./components/MetricCard";
 export { StatusBadge } from "./components/StatusBadge";
-export { placeholderDashboardSnapshot } from "./data/placeholder-dashboard";
 export { useDashboard } from "./hooks/use-dashboard";
 export { createDashboardMetric, createDashboardSnapshot } from "./types/dashboard";
 export { createDashboardErrorState, createDashboardState } from "./types/dashboard-state";

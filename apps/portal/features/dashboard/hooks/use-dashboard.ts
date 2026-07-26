@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { useAuth } from "../../../lib/auth/use-auth";
+
 import { loadDashboard } from "../api/dashboard";
 import type { DashboardSnapshot } from "../types/dashboard";
 import {
@@ -17,6 +19,9 @@ type UseDashboardResult = Readonly<{
 }>;
 
 export function useDashboard(): UseDashboardResult {
+  const { session } = useAuth();
+  const accessToken = session?.tokens.accessToken;
+
   const [data, setData] = useState<DashboardSnapshot | null>(null);
   const [error, setError] = useState<DashboardErrorState | null>(null);
   const [requestVersion, setRequestVersion] = useState(0);
@@ -30,7 +35,14 @@ export function useDashboard(): UseDashboardResult {
   useEffect(() => {
     const controller = new AbortController();
 
+    if (!accessToken) {
+      return () => {
+        controller.abort();
+      };
+    }
+
     void loadDashboard({
+      accessToken,
       signal: controller.signal
     })
       .then((dashboard) => {
@@ -56,7 +68,7 @@ export function useDashboard(): UseDashboardResult {
     return () => {
       controller.abort();
     };
-  }, [requestVersion]);
+  }, [accessToken, requestVersion]);
 
   const state = useMemo(() => createDashboardState(data, error), [data, error]);
 
