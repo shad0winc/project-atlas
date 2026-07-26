@@ -16,16 +16,26 @@ from .snapshot_reader import (
     SnapshotReader,
     SnapshotReaderError,
 )
+from .timeline import (
+    AnalyticsTimeline,
+    AnalyticsTimelineBuilder,
+    AnalyticsTimelineError,
+    TimelineGap,
+)
 
 __all__ = [
     "ARISnapshot",
     "AnalyticsComparisonError",
     "AnalyticsComparisonService",
     "AnalyticsSnapshot",
+    "AnalyticsTimeline",
+    "AnalyticsTimelineBuilder",
+    "AnalyticsTimelineError",
     "ForecastHealth",
     "ForecastSummary",
     "LibraryGrowth",
     "SnapshotReader",
     "SnapshotReaderError",
     "StorageSummary",
+    "TimelineGap",
 ]
