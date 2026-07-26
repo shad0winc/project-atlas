@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { useAuth } from "../../lib/auth/use-auth";
@@ -15,6 +15,7 @@ function authenticationErrorMessage(error: unknown): string {
 
 export function LoginForm(): React.ReactElement {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login, status } = useAuth();
 
   const [username, setUsername] = useState("");
@@ -41,7 +42,13 @@ export function LoginForm(): React.ReactElement {
         password
       });
 
-      router.replace("/");
+      const requestedPath = searchParams.get("next");
+      const destination =
+        requestedPath?.startsWith("/") && !requestedPath.startsWith("//")
+          ? requestedPath
+          : "/portal";
+
+      router.replace(destination);
       router.refresh();
     } catch (error: unknown) {
       setErrorMessage(authenticationErrorMessage(error));
