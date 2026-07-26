@@ -8,33 +8,50 @@ export default function PortalPage(): React.ReactElement {
   const displayName = user?.display_name.trim() || user?.username.trim() || "Atlas user";
 
   return (
-    <main className="auth-page">
-      <section aria-labelledby="atlas-portal-heading" className="auth-panel">
-        <p className="auth-eyebrow">Private Portal</p>
+    <div className="portal-page">
+      <header className="portal-page-header">
+        <div>
+          <p className="portal-page-eyebrow">Dashboard</p>
+          <h2 className="portal-page-title">Welcome back, {displayName}</h2>
+          <p className="portal-page-description">
+            Review the current state of your Project Atlas environment.
+          </p>
+        </div>
+      </header>
 
-        <h1 className="auth-title" id="atlas-portal-heading">
-          Welcome, {displayName}
-        </h1>
+      <section aria-label="Dashboard overview" className="portal-dashboard-grid">
+        <article className="portal-dashboard-card">
+          <p className="portal-dashboard-card-label">System health</p>
+          <strong className="portal-dashboard-card-value">Preparing</strong>
+          <p className="portal-dashboard-card-description">
+            Live Atlas health data will be connected in the next dashboard slice.
+          </p>
+        </article>
 
-        <p className="auth-description">Your authenticated Project Atlas session is active.</p>
+        <article className="portal-dashboard-card">
+          <p className="portal-dashboard-card-label">Media libraries</p>
+          <strong className="portal-dashboard-card-value">Preparing</strong>
+          <p className="portal-dashboard-card-description">
+            Library statistics will appear here after the media service integration.
+          </p>
+        </article>
 
-        <dl className="auth-session-details">
-          <div>
-            <dt>Username</dt>
-            <dd>{user?.username ?? "Unavailable"}</dd>
-          </div>
+        <article className="portal-dashboard-card">
+          <p className="portal-dashboard-card-label">Storage</p>
+          <strong className="portal-dashboard-card-value">Preparing</strong>
+          <p className="portal-dashboard-card-description">
+            Storage capacity and usage will be sourced from Atlas ARI.
+          </p>
+        </article>
 
-          <div>
-            <dt>Identity provider</dt>
-            <dd>{user?.provider ?? "Unavailable"}</dd>
-          </div>
-
-          <div>
-            <dt>Roles</dt>
-            <dd>{user?.roles.length ? user.roles.join(", ") : "No assigned roles"}</dd>
-          </div>
-        </dl>
+        <article className="portal-dashboard-card">
+          <p className="portal-dashboard-card-label">Requests</p>
+          <strong className="portal-dashboard-card-value">Preparing</strong>
+          <p className="portal-dashboard-card-description">
+            Pending and recent media requests will appear in this panel.
+          </p>
+        </article>
       </section>
-    </main>
+    </div>
   );
 }
