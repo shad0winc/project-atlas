@@ -1,7 +1,7 @@
 "use client";
 
+import { DashboardView } from "../../../features/dashboard";
 import { useAuth } from "../../../lib/auth/use-auth";
-import { DashboardGrid, placeholderDashboardSnapshot } from "../../../features/dashboard";
 
 export default function PortalPage(): React.ReactElement {
   const { user } = useAuth();
@@ -22,7 +22,7 @@ export default function PortalPage(): React.ReactElement {
         </div>
       </header>
 
-      <DashboardGrid metrics={placeholderDashboardSnapshot.metrics} />
+      <DashboardView />
     </div>
   );
 }

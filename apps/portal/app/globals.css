@@ -1429,3 +1429,99 @@ a {
     animation: none;
   }
 }
+
+/* AEB-0002.4.2 dashboard runtime */
+
+.dashboard-runtime {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.dashboard-generated-at {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.72rem;
+  text-align: right;
+}
+
+.dashboard-generated-at time {
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.dashboard-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  min-height: 11rem;
+  padding: 1.25rem;
+  border: 1px solid rgba(239, 68, 68, 0.24);
+  border-radius: 1rem;
+  background: rgba(127, 29, 29, 0.14);
+  box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.12);
+}
+
+.dashboard-error-eyebrow,
+.dashboard-error-title,
+.dashboard-error-message {
+  margin: 0;
+}
+
+.dashboard-error-eyebrow {
+  color: #fca5a5;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dashboard-error-title {
+  margin-top: 0.45rem;
+  color: #f8fafc;
+  font-size: 1.1rem;
+}
+
+.dashboard-error-message {
+  margin-top: 0.55rem;
+  color: #cbd5e1;
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.dashboard-retry-button {
+  flex: 0 0 auto;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid rgba(248, 250, 252, 0.2);
+  border-radius: 0.7rem;
+  background: rgba(248, 250, 252, 0.08);
+  color: #f8fafc;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.dashboard-retry-button:hover {
+  background: rgba(248, 250, 252, 0.14);
+}
+
+.dashboard-retry-button:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 3px;
+}
+
+@media (max-width: 40rem) {
+  .dashboard-error {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dashboard-retry-button {
+    width: 100%;
+  }
+
+  .dashboard-generated-at {
+    text-align: left;
+  }
+}
