@@ -17,7 +17,11 @@ dependencies = [
 
 [project.optional-dependencies]
 test = [
-    "httpx>=0.28,<1.0",
+    "httpx2>=2.7,<3.0",
+]
+
+dev = [
+    "httpx2>=2.7,<3.0",
 ]
 
 [tool.setuptools.packages.find]
