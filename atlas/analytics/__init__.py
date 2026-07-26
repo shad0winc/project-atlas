@@ -7,11 +7,19 @@ from .models import (
     LibraryGrowth,
     StorageSummary,
 )
+from .snapshot_reader import (
+    ARISnapshot,
+    SnapshotReader,
+    SnapshotReaderError,
+)
 
 __all__ = [
+    "ARISnapshot",
     "AnalyticsSnapshot",
     "ForecastHealth",
     "ForecastSummary",
     "LibraryGrowth",
+    "SnapshotReader",
+    "SnapshotReaderError",
     "StorageSummary",
 ]
