@@ -49,3 +49,6 @@ DOCS_INDEX.txt
 FILE_INDEX.txt
 PROJECT_TREE.txt
 project-atlas-export.zip
+
+# Generated validation and development evidence
+/artifacts/

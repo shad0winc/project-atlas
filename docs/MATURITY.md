@@ -45,6 +45,13 @@ ARI is the operational intelligence subsystem of Project Atlas.
 
 It continuously evaluates platform health, analyzes historical operational data, forecasts future capacity requirements, and provides actionable recommendations.
 
+The original ARI analytics and forecast capabilities are operational. Atlas has
+hardened those capabilities behind typed, independently tested domain services.
+The typed snapshot reader, comparison service, analytics timeline, and
+timeline-based forecast service are implemented and validated. Future work will
+focus on forecast refinement, confidence reporting, and additional forecasting
+strategies without changing the established timeline contract.
+
 ---
 
 # Engine Architecture

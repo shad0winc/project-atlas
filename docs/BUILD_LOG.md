@@ -308,7 +308,7 @@ Atlas now has a reusable favorites domain layer and a functioning Jellyfin integ
 
 # 2026-07-20
 
-## M-020.3 Hardening — Jellyfin User Link Validation
+## M-020.4 — Jellyfin User Link Validation
 
 ### Objective
 
@@ -341,101 +341,100 @@ Jellyfin identity linkage is now validated before persistence and is safe agains
 
 ---
 
-# Current Status
-
-**Development State:** Active post-foundation development
-
-## Platform Capabilities
-
-- Production media platform.
-- Operational Atlas CLI.
-- Health monitoring.
-- Historical analytics.
-- Capacity forecasting.
-- Operational recommendations.
-- Modular sports platform foundation.
-- Atlas-native identity and invitation system.
-- Transactional registration workflow.
-- Provider-neutral favorites infrastructure.
-- Jellyfin-backed metadata enrichment and user validation.
-
-## Next Planned Work
-
-- Commit and close M-020.3.
-- Begin M-020.4 — Media Policy Engine.
-- Add retention decisions driven by favorites, requests, watch history, and user policy.
-- Integrate policy decisions with Maintainerr in a later patch.
-
-
----
-
-## M-021.4
---------
-Implemented the Atlas Retention CLI.
-
-Added:
-- atlas.retention_cli
-- scripts/commands/retention.sh
-- CLI routing
-- Help integration
-- JSON output
-- Human-readable output
-- Regression tests
-
-Regression:
-153/153 PASS
-
----
-
-## Completed M-022.2 Cleanup CLI
---------
-Added:
-- atlas.cleanup_cli
-- scripts/commands/cleanup.sh
-- CLI routing
-- Help integration
-- Human and JSON output
-- Full regression validation
-
-Core Tests:
-167 passing
-0 failures
-
----
-
 # 2026-07-20
+
+## M-021.4 — Retention CLI
+
+### Objective
+
+Expose Atlas retention decisions through a stable command-line interface with both human-readable and machine-readable output.
+
+### Completed
+
+- Added `atlas.retention_cli`.
+- Added `scripts/commands/retention.sh`.
+- Added CLI routing.
+- Added help integration.
+- Added human-readable output.
+- Added JSON output.
+- Added regression coverage for retention command behavior.
+
+### Verification
+
+- Full regression suite passed: 153 tests.
+- No test failures were reported.
+
+### Result
+
+Atlas retention decisions became directly accessible through the Atlas CLI for operators and automation consumers.
+
+---
+
+## M-022.2 — Cleanup CLI
+
+### Objective
+
+Expose cleanup evaluations through a stable command-line interface without introducing media deletion or provider mutation behavior.
+
+### Completed
+
+- Added `atlas.cleanup_cli`.
+- Added `scripts/commands/cleanup.sh`.
+- Added CLI routing.
+- Added help integration.
+- Added human-readable output.
+- Added JSON output.
+- Added dependency injection for cleanup CLI execution.
+- Added focused CLI regression coverage.
+
+### Verification
+
+- Full Atlas Core regression suite passed: 167 tests.
+- No test failures were reported.
+- Human-readable cleanup evaluation output was validated.
+- JSON cleanup evaluation output was validated.
+
+### Result
+
+Atlas cleanup evaluations became accessible through a consistent operator and automation interface while remaining read-only.
+
+---
 
 ## M-023.3 — Cleanup Execution Planning
 
 ### Objective
 
-Introduce a non-destructive execution layer that converts cleanup scan results into an execution plan while guaranteeing that no media or provider state is modified.
+Introduce a non-destructive execution layer that converts cleanup scan results into an explicit execution plan while guaranteeing that no media, filesystem, or provider state is modified.
 
 ### Completed
 
 - Added normalized cleanup execution models.
-- Added CleanupExecutionService.
+- Added `CleanupExecutionService`.
 - Added dry-run execution planning.
-- Added execution report rendering.
-- Added `atlas cleanup execute`.
+- Added human-readable execution report rendering.
 - Added JSON execution output.
-- Added human-readable execution output.
+- Added `atlas cleanup execute`.
 - Added execution CLI dependency injection.
-- Added focused execution model, service, and CLI tests.
+- Added focused execution-model, service, and CLI tests.
+- Preserved a read-only execution boundary with no deletion implementation.
 
 ### Verification
 
 - `git diff --check` passed.
-- Focused cleanup execution tests: 13 passing.
-- Cleanup regression suite: 70 passing.
-- Full Atlas Core regression suite: 229 passing.
-- Live execution of `atlas cleanup execute jellyfin --dry-run`.
-- Live execution of `atlas cleanup execute jellyfin --dry-run --json`.
+- Focused cleanup execution tests passed: 13 tests.
+- Cleanup regression suite passed: 70 tests.
+- Full Atlas Core regression suite passed: 229 tests.
+- Live `atlas cleanup execute jellyfin --dry-run` validation passed.
+- Live `atlas cleanup execute jellyfin --dry-run --json` validation passed.
+- No filesystem mutations occurred.
+- No Jellyfin modifications occurred.
+- No deletion logic was introduced.
 
 ### Result
 
-Atlas now provides a complete read-only cleanup planning pipeline:
+Atlas gained a complete read-only cleanup planning pipeline:
 
+```text
 Jellyfin Provider
     ↓
 Cleanup Scanner
@@ -443,9 +442,155 @@ Cleanup Scanner
 Cleanup Execution Planner
     ↓
 Human / JSON Report
+```
 
-No filesystem mutations.
-No Jellyfin modifications.
-No deletion logic.
-Execution planning remains intentionally dry-run only.
+Cleanup execution remains intentionally dry-run only, making planned actions observable and reviewable before any future mutation capability is considered.
 
+---
+
+# 2026-07-26
+
+## M-011.1 — Historical Analytics Timeline
+
+### Objective
+
+Replace ad hoc snapshot comparison with a validated, gap-aware historical timeline that provides one stable analytics contract for forecasting and future intelligence features.
+
+### Completed
+
+- Added `SnapshotReader` for controlled ARI snapshot discovery and loading.
+- Added `AnalyticsTimelineBuilder` for ordered historical timeline construction.
+- Added the normalized `AnalyticsTimeline` domain model.
+- Added `AnalyticsComparisonService` for time-aware snapshot comparisons.
+- Added timestamp ordering and timeline identity validation.
+- Added rejection handling for malformed or incompatible snapshots.
+- Added cadence analysis and explicit gap detection.
+- Added median-cadence calculation.
+- Added normalized serialization through domain `to_dict()` contracts.
+- Exported the completed analytics contracts through their package interfaces.
+- Added dedicated model, reader, builder, comparison, and integration tests.
+- Documented the architecture and operational contract in EDR-0002.
+
+### Live Validation
+
+- Evaluated 44 stored ARI snapshot documents.
+- Accepted 33 compatible snapshots into the historical timeline.
+- Rejected 11 invalid or incompatible snapshot documents.
+- Detected 2 cadence gaps.
+- Calculated a median collection cadence of 86,335 seconds.
+- Confirmed that rejected snapshots do not corrupt the valid timeline.
+
+### Verification
+
+- Analytics test suite passed: 74 tests.
+- Full Atlas Core regression suite passed: 636 tests.
+- Five sports integration suites passed.
+- `git diff --check` passed.
+- Live construction of the 33-snapshot analytics timeline succeeded.
+
+### Result
+
+Atlas now has a validated, ordered, and gap-aware historical analytics timeline that can serve as the authoritative input contract for forecasting, dashboards, recommendations, and future intelligence services.
+
+---
+
+## M-012.1 — Forecast Engine Implementation
+
+### Objective
+
+Extend the original Forecast Engine into a validated, timeline-driven capacity forecasting system built upon the Analytics Timeline contract, producing explainable predictions while remaining resilient to incomplete historical data.
+
+### Completed
+
+- Refactored forecasting to consume `AnalyticsTimeline` instead of direct snapshot access.
+- Added timeline-aware forecast generation.
+- Added storage growth-rate calculations.
+- Added capacity exhaustion estimation.
+- Added remaining-days calculation.
+- Added projected exhaustion date.
+- Added forecast confidence classification.
+- Added explicit Unknown forecast state for insufficient history.
+- Added gap-aware forecast handling.
+- Added normalized forecast domain contracts and serialization.
+- Added comprehensive forecast regression tests.
+- Documented the architecture and forecasting contract in EDR-0003.
+
+### Live Validation
+
+- Successfully generated forecasts from the validated 33-snapshot historical timeline.
+- Confirmed cadence gaps do not invalidate forecasting.
+- Confirmed insufficient historical data returns an explicit Unknown state rather than unreliable projections.
+
+### Verification
+
+- Forecast functionality validated against the production ARI snapshot history.
+- Full Analytics regression suite passed.
+- Full Atlas Core regression suite passed: 636 tests.
+- `git diff --check` passed.
+
+### Result
+
+Atlas forecasting is now driven by a validated historical timeline, producing deterministic, explainable capacity forecasts while remaining isolated from filesystem implementation details.
+
+---
+
+# Current Status
+
+**Development State:** Active release-candidate development
+
+## Platform Capabilities
+
+- Production Docker-based media platform.
+- Operational Atlas CLI with modular command routing.
+- Jellyfin, Sonarr, Radarr, Prowlarr, qBittorrent, and supporting-service integration.
+- VPN-isolated download traffic through Gluetun and Windscribe.
+- Separate standard-media and anime acquisition workflows.
+- Centralized media-quality management through Recyclarr.
+- Atlas Retention Intelligence snapshot collection and reporting.
+- Platform, media, Docker, VPN, storage, and snapshot-freshness health checks.
+- Validated historical analytics timelines.
+- Snapshot rejection, cadence analysis, and gap detection.
+- Timeline-driven storage and capacity forecasting.
+- Explicit Unknown forecast handling for insufficient history.
+- Operational recommendation infrastructure.
+- Atlas-native user identities and Jellyfin account linkage.
+- Secure invitation-based registration.
+- Transactional Atlas and Jellyfin user provisioning.
+- Durable provider-neutral favorites infrastructure.
+- Jellyfin-backed metadata enrichment.
+- Retention policy evaluation through human-readable and JSON CLI output.
+- Cleanup evaluation through human-readable and JSON CLI output.
+- Non-destructive cleanup execution planning.
+- Dry-run-only cleanup execution with no deletion or provider mutation behavior.
+- Modular sports platform foundation and integration-test coverage.
+- Architecture and engineering decisions recorded through ADR and EDR documents.
+
+## Current Verification Baseline
+
+- Analytics test suite: 74 passing.
+- Full Atlas Core regression suite: 636 passing.
+- Sports integration suites: 5 passing.
+- Production ARI snapshot documents evaluated: 44.
+- Compatible snapshots accepted: 33.
+- Invalid or incompatible snapshots rejected: 11.
+- Cadence gaps detected: 2.
+- Median snapshot cadence: 86,335 seconds.
+
+## Operational Safety Boundaries
+
+- Cleanup execution remains dry-run only.
+- No media deletion logic is implemented.
+- No cleanup workflow mutates Jellyfin state.
+- No cleanup workflow mutates the media filesystem.
+- Invalid historical snapshots are rejected without corrupting valid timelines.
+- Insufficient forecast history produces an explicit Unknown state.
+
+## Next Planned Work
+
+- Complete the Backup and Restore Guide.
+- Complete the Administrator Guide.
+- Review the lifecycle of the orphaned `atlas-sports-controller` container before removal.
+- Run the final documentation consistency and Markdown validation pass.
+- Review the complete staged documentation diff.
+- Commit the documentation cleanup as a dedicated repository change.
+- Continue production-readiness work toward the Project Atlas v1.0 release.
