@@ -43,16 +43,37 @@ class StorageSummaryTests(unittest.TestCase):
                 "total_bytes": 2_000,
                 "used_bytes": 500,
                 "free_bytes": 1_500,
+                "reserved_bytes": 0,
                 "utilization_percent": 25.0,
             },
         )
 
-    def test_storage_summary_rejects_inconsistent_bytes(self) -> None:
+    def test_storage_summary_derives_reserved_bytes(self) -> None:
+        summary = StorageSummary(
+            total_bytes=1_000,
+            used_bytes=100,
+            free_bytes=850,
+            utilization_percent=10,
+        )
+
+        self.assertEqual(summary.reserved_bytes, 50)
+        self.assertEqual(
+            summary.to_dict(),
+            {
+                "total_bytes": 1_000,
+                "used_bytes": 100,
+                "free_bytes": 850,
+                "reserved_bytes": 50,
+                "utilization_percent": 10.0,
+            },
+        )
+
+    def test_storage_summary_rejects_overallocated_bytes(self) -> None:
         with self.assertRaises(ValueError):
             StorageSummary(
                 total_bytes=1_000,
                 used_bytes=400,
-                free_bytes=500,
+                free_bytes=700,
                 utilization_percent=40,
             )
 
@@ -289,6 +310,7 @@ class AnalyticsSnapshotTests(unittest.TestCase):
                     "total_bytes": 10_000,
                     "used_bytes": 4_000,
                     "free_bytes": 6_000,
+                    "reserved_bytes": 0,
                     "utilization_percent": 40.0,
                 },
                 "libraries": [

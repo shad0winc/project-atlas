@@ -108,6 +108,7 @@ class StorageSummary:
     used_bytes: int
     free_bytes: int
     utilization_percent: float
+    reserved_bytes: int = field(init=False)
 
     def __post_init__(self) -> None:
         total_bytes = _normalize_nonnegative_integer(
@@ -137,6 +138,8 @@ class StorageSummary:
                 raise ValueError(
                     "Zero total storage requires zero utilization."
                 )
+
+            reserved_bytes = 0
         else:
             if used_bytes > total_bytes:
                 raise ValueError(
@@ -148,11 +151,12 @@ class StorageSummary:
                     "free_bytes must not exceed total_bytes."
                 )
 
-            if used_bytes + free_bytes != total_bytes:
+            if used_bytes + free_bytes > total_bytes:
                 raise ValueError(
-                    "used_bytes and free_bytes must equal total_bytes."
+                    "used_bytes and free_bytes must not exceed total_bytes."
                 )
 
+            reserved_bytes = total_bytes - used_bytes - free_bytes
             expected_utilization = used_bytes / total_bytes * 100
 
             if abs(utilization_percent - expected_utilization) > 0.01:
@@ -168,6 +172,7 @@ class StorageSummary:
         object.__setattr__(self, "total_bytes", total_bytes)
         object.__setattr__(self, "used_bytes", used_bytes)
         object.__setattr__(self, "free_bytes", free_bytes)
+        object.__setattr__(self, "reserved_bytes", reserved_bytes)
         object.__setattr__(
             self,
             "utilization_percent",
@@ -217,6 +222,7 @@ class StorageSummary:
             "total_bytes": self.total_bytes,
             "used_bytes": self.used_bytes,
             "free_bytes": self.free_bytes,
+            "reserved_bytes": self.reserved_bytes,
             "utilization_percent": self.utilization_percent,
         }
 
