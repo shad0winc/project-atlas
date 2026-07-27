@@ -7,6 +7,14 @@
 
 export const ATLAS_API_PREFIX = "/api/v1";
 
+/**
+ * Default maximum duration for a Portal request to the Atlas API.
+ *
+ * Individual requests may override this value when a different operational
+ * requirement is justified.
+ */
+export const ATLAS_API_DEFAULT_TIMEOUT_MS = 10_000;
+
 export function atlasApiPath(path: string): string {
   const normalizedPath = path.trim();
 
