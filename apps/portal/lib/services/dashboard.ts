@@ -1,4 +1,3 @@
-import { atlasApiRequest } from "../api/client";
 import type { AtlasDashboardMetricResponse, AtlasDashboardSummaryResponse } from "../api/contracts";
 
 import {
@@ -7,20 +6,11 @@ import {
   type DashboardSnapshot
 } from "../../features/dashboard/types/dashboard";
 
+import { authenticatedAtlasApiRequest } from "./authenticated";
+
 export type ReadDashboardSummaryOptions = Readonly<{
-  accessToken: string;
   signal?: AbortSignal;
 }>;
-
-function normalizeAccessToken(accessToken: string): string {
-  const normalizedToken = accessToken.trim();
-
-  if (!normalizedToken) {
-    throw new Error("Atlas access token cannot be empty.");
-  }
-
-  return normalizedToken;
-}
 
 function mapDashboardMetric(metric: AtlasDashboardMetricResponse): DashboardMetric {
   return {
@@ -45,15 +35,16 @@ function mapDashboardSummary(summary: AtlasDashboardSummaryResponse): DashboardS
 }
 
 export async function readDashboardSummary({
-  accessToken,
   signal
-}: ReadDashboardSummaryOptions): Promise<DashboardSnapshot> {
-  const summary = await atlasApiRequest<AtlasDashboardSummaryResponse>("/dashboard/summary", {
-    method: "GET",
-    accessToken: normalizeAccessToken(accessToken),
-    cache: "no-store",
-    signal
-  });
+}: ReadDashboardSummaryOptions = {}): Promise<DashboardSnapshot> {
+  const summary = await authenticatedAtlasApiRequest<AtlasDashboardSummaryResponse>(
+    "/dashboard/summary",
+    {
+      method: "GET",
+      cache: "no-store",
+      signal
+    }
+  );
 
   return mapDashboardSummary(summary);
 }

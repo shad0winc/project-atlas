@@ -63,6 +63,15 @@ All notable changes to Project Atlas are documented in this file.
 - Added authentication refresh route coverage for successful rotation, invalid identity, user mismatch, empty tokens, and unknown request fields.
 - Verified the complete Atlas API regression suite with 98 passing tests.
 
+### Authenticated Services
+
+- Added a shared authenticated service request boundary for protected Portal API operations.
+- Removed access-token parameters from dashboard services and dashboard feature APIs.
+- Removed direct access-token handling from dashboard hooks.
+- Centralized active-session token resolution inside the authentication service boundary.
+- Preserved explicit token handling for login, refresh, and current-user authentication operations.
+- Added regression coverage for authenticated service requests and unavailable sessions.
+
 ### Portal Authentication
 
 - Added single-flight Portal access-token rotation for concurrent authenticated requests.

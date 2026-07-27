@@ -725,3 +725,46 @@ Strengthen the existing Portal request architecture with reliable token rotation
 ### Result
 
 The Portal can recover transparently from an expired access token while ensuring refresh failures and repeated unauthorized responses safely terminate the active session.
+
+---
+
+# 2026-07-27
+
+## AEB-0003.2 — Authenticated Service Layer
+
+### Objective
+
+Remove access-token ownership from Portal feature hooks while preserving the established authenticated request, refresh, replay, and expiration pipeline.
+
+### Completed
+
+- Added a shared authenticated service request boundary.
+- Centralized active access-token retrieval through the existing in-memory authentication store.
+- Removed explicit access-token parameters from dashboard services.
+- Removed explicit access-token parameters from dashboard feature APIs.
+- Reduced dashboard hooks to authentication state and UI request state.
+- Preserved explicit token handling for login, refresh, and current-user authentication.
+- Added focused authenticated-service regression coverage.
+
+### Architecture
+
+- React authentication context owns session creation, rotation, and expiration.
+- Authentication storage owns the current in-memory session.
+- Authenticated services resolve credentials through one central boundary.
+- The API client owns token refresh, authenticated replay, and retry orchestration.
+- The HTTP transport owns one request attempt.
+- Feature hooks own loading, ready, error, cancellation, and refresh state.
+
+### Validation
+
+- Portal unit tests.
+- Prettier verification.
+- ESLint verification.
+- TypeScript verification.
+- Next.js production build.
+- Atlas API regression tests.
+- Patch-integrity verification.
+
+### Result
+
+Protected Portal services no longer require UI callers to retrieve or pass access tokens.

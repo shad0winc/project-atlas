@@ -38,13 +38,10 @@ function normalizeError(value: unknown): Error {
 }
 
 export function useDashboardMedia(): UseDashboardMediaResult {
-  const { session } = useAuth();
-  const accessToken = session?.tokens.accessToken;
+  const { isAuthenticated } = useAuth();
 
   const [data, setData] = useState<DashboardMediaSnapshot | null>(null);
-
   const [error, setError] = useState<Error | null>(null);
-
   const [requestVersion, setRequestVersion] = useState(0);
 
   const refresh = useCallback((): void => {
@@ -56,14 +53,13 @@ export function useDashboardMedia(): UseDashboardMediaResult {
   useEffect(() => {
     const controller = new AbortController();
 
-    if (!accessToken) {
+    if (!isAuthenticated) {
       return () => {
         controller.abort();
       };
     }
 
     void loadDashboardMedia({
-      accessToken,
       signal: controller.signal
     })
       .then((dashboardMedia) => {
@@ -89,7 +85,7 @@ export function useDashboardMedia(): UseDashboardMediaResult {
     return () => {
       controller.abort();
     };
-  }, [accessToken, requestVersion]);
+  }, [isAuthenticated, requestVersion]);
 
   const state = useMemo((): DashboardMediaState => {
     if (error) {

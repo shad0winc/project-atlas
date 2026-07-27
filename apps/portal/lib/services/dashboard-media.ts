@@ -1,4 +1,3 @@
-import { atlasApiRequest } from "../api/client";
 import type {
   AtlasDashboardMediaLibraryResponse,
   AtlasDashboardMediaSummaryResponse
@@ -10,20 +9,11 @@ import {
   type DashboardMediaSnapshot
 } from "../../features/dashboard/types/dashboard-media";
 
+import { authenticatedAtlasApiRequest } from "./authenticated";
+
 export type ReadDashboardMediaSummaryOptions = Readonly<{
-  accessToken: string;
   signal?: AbortSignal;
 }>;
-
-function normalizeAccessToken(accessToken: string): string {
-  const normalizedToken = accessToken.trim();
-
-  if (!normalizedToken) {
-    throw new Error("Atlas access token cannot be empty.");
-  }
-
-  return normalizedToken;
-}
 
 function mapDashboardMediaLibrary(
   library: AtlasDashboardMediaLibraryResponse
@@ -55,15 +45,16 @@ function mapDashboardMediaSummary(
 }
 
 export async function readDashboardMediaSummary({
-  accessToken,
   signal
-}: ReadDashboardMediaSummaryOptions): Promise<DashboardMediaSnapshot> {
-  const summary = await atlasApiRequest<AtlasDashboardMediaSummaryResponse>("/dashboard/media", {
-    method: "GET",
-    accessToken: normalizeAccessToken(accessToken),
-    cache: "no-store",
-    signal
-  });
+}: ReadDashboardMediaSummaryOptions = {}): Promise<DashboardMediaSnapshot> {
+  const summary = await authenticatedAtlasApiRequest<AtlasDashboardMediaSummaryResponse>(
+    "/dashboard/media",
+    {
+      method: "GET",
+      cache: "no-store",
+      signal
+    }
+  );
 
   return mapDashboardMediaSummary(summary);
 }
