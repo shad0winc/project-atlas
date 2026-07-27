@@ -11,6 +11,17 @@ export type AtlasApiHttpErrorKind =
   | "unavailable"
   | "http";
 
+export interface AtlasApiErrorOptions {
+  readonly status: number;
+  readonly detail: string;
+  readonly method: string;
+  readonly path: string;
+  readonly requestId: string;
+  readonly kind: AtlasApiHttpErrorKind;
+}
+
+type AtlasApiAuthorizationErrorOptions = Readonly<Omit<AtlasApiErrorOptions, "status" | "kind">>;
+
 export abstract class AtlasApiClientError extends Error {
   readonly method: string;
   readonly path: string;
@@ -47,21 +58,7 @@ export class AtlasApiError extends AtlasApiClientError {
   readonly detail: string;
   readonly kind: AtlasApiHttpErrorKind;
 
-  constructor({
-    status,
-    detail,
-    method,
-    path,
-    requestId,
-    kind
-  }: Readonly<{
-    status: number;
-    detail: string;
-    method: string;
-    path: string;
-    requestId: string;
-    kind: AtlasApiHttpErrorKind;
-  }>) {
+  constructor({ status, detail, method, path, requestId, kind }: AtlasApiErrorOptions) {
     super({
       name: "AtlasApiError",
       message: detail,
@@ -73,6 +70,61 @@ export class AtlasApiError extends AtlasApiClientError {
     this.status = status;
     this.detail = detail;
     this.kind = kind;
+  }
+}
+
+/**
+ * A request was rejected because its access token was missing, invalid,
+ * expired, or no longer represents an active Atlas user.
+ */
+export class AtlasApiAuthenticationError extends AtlasApiError {
+  constructor(options: AtlasApiAuthorizationErrorOptions) {
+    super({
+      ...options,
+      status: 401,
+      kind: "authentication"
+    });
+  }
+}
+
+/**
+ * The authenticated user is valid but does not have the required permission.
+ */
+export class AtlasApiAuthorizationError extends AtlasApiError {
+  constructor(options: AtlasApiAuthorizationErrorOptions) {
+    super({
+      ...options,
+      status: 403,
+      kind: "authorization"
+    });
+  }
+}
+
+/**
+ * Atlas could not restore an authenticated request through token rotation.
+ */
+export class AtlasAuthenticationExpiredError extends AtlasApiClientError {
+  readonly status = 401;
+
+  constructor({
+    method,
+    path,
+    requestId,
+    cause
+  }: Readonly<{
+    method: string;
+    path: string;
+    requestId: string;
+    cause?: unknown;
+  }>) {
+    super({
+      name: "AtlasAuthenticationExpiredError",
+      message: "Your Atlas session has expired. Sign in again to continue.",
+      method,
+      path,
+      requestId,
+      cause
+    });
   }
 }
 

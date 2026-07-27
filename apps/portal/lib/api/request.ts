@@ -8,6 +8,8 @@
 import { ATLAS_API_DEFAULT_TIMEOUT_MS, atlasApiPath } from "./config";
 import {
   AtlasApiAbortError,
+  AtlasApiAuthenticationError,
+  AtlasApiAuthorizationError,
   AtlasApiError,
   AtlasApiNetworkError,
   AtlasApiResponseError,
@@ -314,14 +316,23 @@ export async function performAtlasApiRequest<T>(
   const responseRequestId = response.headers.get("X-Request-ID")?.trim() || requestId;
 
   if (!response.ok) {
-    const requestError = new AtlasApiError({
-      status: response.status,
+    const errorDetails = {
       detail: await readErrorDetail(response),
       method,
       path: requestPath,
-      requestId: responseRequestId,
-      kind: classifyHttpError(response.status)
-    });
+      requestId: responseRequestId
+    };
+
+    const requestError =
+      response.status === 401
+        ? new AtlasApiAuthenticationError(errorDetails)
+        : response.status === 403
+          ? new AtlasApiAuthorizationError(errorDetails)
+          : new AtlasApiError({
+              ...errorDetails,
+              status: response.status,
+              kind: classifyHttpError(response.status)
+            });
 
     const completedAt = currentTimeMs();
 

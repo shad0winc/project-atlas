@@ -683,3 +683,45 @@ authentication alone.
 AEB-0002.4 is complete. Atlas dashboard routes now use the established
 permission-based authorization boundary, while the public health contract
 remains unchanged.
+
+---
+
+# 2026-07-27
+
+## AEB-0003.1 — Authenticated Request Pipeline
+
+### Objective
+
+Strengthen the existing Portal request architecture with reliable token rotation and consistent authentication-failure handling.
+
+### Completed
+
+- Preserved the existing separation between one-attempt transport and multi-attempt client orchestration.
+- Added a process-local authentication lifecycle coordinator.
+- Added single-flight refresh behavior so concurrent HTTP 401 responses share one token-rotation request.
+- Added automatic one-time replay with the replacement access token.
+- Added explicit authentication, authorization, and expired-session error contracts.
+- Connected the authentication provider to the request lifecycle without coupling the API client to React.
+- Added isolated lifecycle observations for refresh and expiration events.
+- Added focused authentication-pipeline regression tests.
+
+### Engineering Principles
+
+- Retained all established Project Atlas philosophies.
+- Strengthened existing abstractions before introducing new ones.
+- Kept authentication orchestration outside the one-attempt HTTP transport.
+- Preserved API authorization as the final source of truth.
+- Prevented observability callbacks from changing request or session behavior.
+
+### Validation
+
+- Portal unit tests.
+- Prettier formatting verification.
+- ESLint verification.
+- TypeScript verification.
+- Next.js production build.
+- Repository patch-integrity verification.
+
+### Result
+
+The Portal can recover transparently from an expired access token while ensuring refresh failures and repeated unauthorized responses safely terminate the active session.

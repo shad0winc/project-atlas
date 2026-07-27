@@ -11,9 +11,6 @@ export type AtlasAuthStatus = "loading" | "authenticated" | "unauthenticated";
 
 /**
  * Token pair issued by the Atlas API.
- *
- * Refresh-token exchange is intentionally not implemented until the API
- * exposes a public refresh endpoint.
  */
 export interface AtlasAuthTokens {
   readonly accessToken: string;

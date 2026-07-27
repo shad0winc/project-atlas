@@ -9,7 +9,25 @@ export async function loginAtlasUser(credentials: AtlasLoginRequest): Promise<At
   return atlasApiRequest<AtlasTokenResponse>("/auth/login", {
     method: "POST",
     body: credentials,
-    cache: "no-store"
+    cache: "no-store",
+    retryAuthentication: false
+  });
+}
+
+export async function refreshAtlasTokens(refreshToken: string): Promise<AtlasTokenResponse> {
+  const normalizedToken = refreshToken.trim();
+
+  if (!normalizedToken) {
+    throw new Error("Atlas refresh token cannot be empty.");
+  }
+
+  return atlasApiRequest<AtlasTokenResponse>("/auth/refresh", {
+    method: "POST",
+    body: {
+      refresh_token: normalizedToken
+    },
+    cache: "no-store",
+    retryAuthentication: false
   });
 }
 

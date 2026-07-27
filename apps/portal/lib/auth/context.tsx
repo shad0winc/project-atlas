@@ -1,10 +1,11 @@
 "use client";
 
-import { createContext, useCallback, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import type { AtlasLoginRequest } from "../api/contracts";
-import { loginAtlasUser, readCurrentAtlasUser } from "../services/auth";
+import { loginAtlasUser, readCurrentAtlasUser, refreshAtlasTokens } from "../services/auth";
 
+import { registerAtlasAuthLifecycle } from "./session-lifecycle";
 import { clearAtlasAuthSession, readAtlasAuthSession, writeAtlasAuthSession } from "./storage";
 import {
   normalizeAtlasAuthTokens,
@@ -25,6 +26,7 @@ function initialSession(): AtlasAuthSession | null {
 
 export function AuthProvider({ children }: AuthProviderProps): React.ReactElement {
   const [session, setSession] = useState<AtlasAuthSession | null>(initialSession);
+
   const [status, setStatus] = useState<AtlasAuthStatus>(() =>
     initialSession() ? "authenticated" : "unauthenticated"
   );
@@ -58,6 +60,36 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
     setSession(null);
     setStatus("unauthenticated");
   }, []);
+
+  const refreshAccessToken = useCallback(async (): Promise<string> => {
+    const currentSession = readAtlasAuthSession();
+
+    if (currentSession === null) {
+      throw new Error("Atlas authentication session is unavailable.");
+    }
+
+    const tokenResponse = await refreshAtlasTokens(currentSession.tokens.refreshToken);
+
+    const tokens = normalizeAtlasAuthTokens(tokenResponse);
+
+    const nextSession: AtlasAuthSession = {
+      ...currentSession,
+      tokens
+    };
+
+    writeAtlasAuthSession(nextSession);
+    setSession(nextSession);
+    setStatus("authenticated");
+
+    return tokens.accessToken;
+  }, []);
+
+  useEffect(() => {
+    return registerAtlasAuthLifecycle({
+      refreshAccessToken,
+      expireSession: logout
+    });
+  }, [logout, refreshAccessToken]);
 
   const value = useMemo<AtlasAuthContextValue>(
     () => ({

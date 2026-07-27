@@ -63,6 +63,52 @@ All notable changes to Project Atlas are documented in this file.
 - Added authentication refresh route coverage for successful rotation, invalid identity, user mismatch, empty tokens, and unknown request fields.
 - Verified the complete Atlas API regression suite with 98 passing tests.
 
+### Portal Authentication
+
+- Added single-flight Portal access-token rotation for concurrent authenticated requests.
+- Added automatic one-time replay of requests rejected with HTTP 401 after successful token rotation.
+- Added typed authentication, authorization, and expired-session client errors.
+- Added authentication lifecycle observations for refresh start, success, failure, and session expiration.
+- Preserved HTTP 403 responses as authorization failures without attempting token refresh.
+- Added focused regression coverage for refresh sharing, replay behavior, refresh failure, repeated HTTP 401 responses, and HTTP 403 handling.
+
+### Added
+
+- Production public ingress stack
+- Modular Caddy configuration
+- Automatic HTTPS via Let's Encrypt
+- HTTP/2 and HTTP/3 support
+- Automatic HTTP → HTTPS redirection
+- Production security headers
+- Structured access logging
+- Persistent TLS certificate storage
+- Cloudflare-ready ingress architecture
+
+### Infrastructure
+
+- Atlas is now publicly available at:
+
+  https://atlas.shadowinc.co
+
+- Added modular Caddy configuration:
+  - snippets/
+  - sites/
+
+- Added persistent Caddy storage:
+  - certificates
+  - configuration
+  - logs
+
+### Security
+
+- Strict-Transport-Security
+- X-Content-Type-Options
+- X-Frame-Options
+- Referrer-Policy
+- Permissions-Policy
+- Cross-Origin-Opener-Policy
+- Removed Server header
+
 ## [1.0.0] — Production Foundation
 
 ### Added
@@ -175,42 +221,3 @@ All notable changes to Project Atlas are documented in this file.
 - Verified cleanup regression suite (70 passing).
 - Verified full Atlas Core regression suite (229 passing).
 - Live-tested `atlas cleanup execute jellyfin --dry-run` in human-readable and JSON modes.
-
-## [Unreleased]
-
-### Added
-
-- Production public ingress stack
-- Modular Caddy configuration
-- Automatic HTTPS via Let's Encrypt
-- HTTP/2 and HTTP/3 support
-- Automatic HTTP → HTTPS redirection
-- Production security headers
-- Structured access logging
-- Persistent TLS certificate storage
-- Cloudflare-ready ingress architecture
-
-### Infrastructure
-
-- Atlas is now publicly available at:
-
-  https://atlas.shadowinc.co
-
-- Added modular Caddy configuration:
-  - snippets/
-  - sites/
-
-- Added persistent Caddy storage:
-  - certificates
-  - configuration
-  - logs
-
-### Security
-
-- Strict-Transport-Security
-- X-Content-Type-Options
-- X-Frame-Options
-- Referrer-Policy
-- Permissions-Policy
-- Cross-Origin-Opener-Policy
-- Removed Server header
