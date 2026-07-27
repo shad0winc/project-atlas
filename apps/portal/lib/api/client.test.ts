@@ -335,4 +335,168 @@ describe("atlasApiRequest", () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("notifies observers when a request starts and succeeds", async () => {
+    const onRequest = vi.fn();
+    const onResponse = vi.fn();
+    const onError = vi.fn();
+
+    vi.spyOn(Date, "now").mockReturnValueOnce(1_000).mockReturnValueOnce(1_025);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        successfulJsonResponse(
+          {
+            status: "ok"
+          },
+          {
+            requestId: "server-request"
+          }
+        )
+      )
+    );
+
+    await atlasApiRequest("/observed", {
+      requestId: "client-request",
+      observers: [
+        {
+          onRequest,
+          onResponse,
+          onError
+        }
+      ]
+    });
+
+    expect(onRequest).toHaveBeenCalledOnce();
+    expect(onRequest).toHaveBeenCalledWith({
+      requestId: "client-request",
+      method: "GET",
+      path: "/api/v1/observed",
+      startedAt: 1_000
+    });
+
+    expect(onResponse).toHaveBeenCalledOnce();
+    expect(onResponse).toHaveBeenCalledWith({
+      requestId: "server-request",
+      method: "GET",
+      path: "/api/v1/observed",
+      startedAt: 1_000,
+      completedAt: 1_025,
+      durationMs: 25,
+      status: 200
+    });
+
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("notifies observers when an HTTP request fails", async () => {
+    const onError = vi.fn();
+
+    vi.spyOn(Date, "now").mockReturnValueOnce(2_000).mockReturnValueOnce(2_040);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        successfulJsonResponse(
+          {
+            detail: "Unavailable."
+          },
+          {
+            status: 503,
+            requestId: "server-error-request"
+          }
+        )
+      )
+    );
+
+    await expect(
+      atlasApiRequest("/failure", {
+        requestId: "client-error-request",
+        observers: [
+          {
+            onError
+          }
+        ]
+      })
+    ).rejects.toBeInstanceOf(AtlasApiError);
+
+    expect(onError).toHaveBeenCalledOnce();
+
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestId: "server-error-request",
+        method: "GET",
+        path: "/api/v1/failure",
+        startedAt: 2_000,
+        completedAt: 2_040,
+        durationMs: 40,
+        status: 503,
+        error: expect.any(AtlasApiError)
+      })
+    );
+  });
+
+  it("isolates observer failures from request behavior", async () => {
+    const onRequest = vi.fn(() => {
+      throw new Error("observer failed");
+    });
+
+    const onResponse = vi.fn(() => {
+      throw new Error("observer failed");
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        successfulJsonResponse({
+          status: "ok"
+        })
+      )
+    );
+
+    await expect(
+      atlasApiRequest<{ status: string }>("/observer-isolation", {
+        observers: [
+          {
+            onRequest,
+            onResponse
+          }
+        ]
+      })
+    ).resolves.toEqual({
+      status: "ok"
+    });
+
+    expect(onRequest).toHaveBeenCalledOnce();
+    expect(onResponse).toHaveBeenCalledOnce();
+  });
+
+  it("notifies every registered observer", async () => {
+    const firstObserver = vi.fn();
+    const secondObserver = vi.fn();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        successfulJsonResponse({
+          status: "ok"
+        })
+      )
+    );
+
+    await atlasApiRequest("/multiple-observers", {
+      observers: [
+        {
+          onResponse: firstObserver
+        },
+        {
+          onResponse: secondObserver
+        }
+      ]
+    });
+
+    expect(firstObserver).toHaveBeenCalledOnce();
+    expect(secondObserver).toHaveBeenCalledOnce();
+  });
 });

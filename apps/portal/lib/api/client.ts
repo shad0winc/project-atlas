@@ -8,6 +8,11 @@ import {
   type AtlasApiHttpErrorKind
 } from "./errors";
 import type { AtlasErrorResponse } from "./contracts";
+import {
+  notifyAtlasApiObservers,
+  type AtlasApiObserver,
+  type AtlasApiRequestObservation
+} from "./observer";
 
 export interface AtlasApiRequestOptions extends Omit<RequestInit, "body" | "headers" | "signal"> {
   readonly body?: unknown;
@@ -16,6 +21,7 @@ export interface AtlasApiRequestOptions extends Omit<RequestInit, "body" | "head
   readonly requestId?: string;
   readonly signal?: AbortSignal;
   readonly timeoutMs?: number;
+  readonly observers?: readonly AtlasApiObserver[];
 }
 
 type RequestSignalLifecycle = Readonly<{
@@ -26,6 +32,14 @@ type RequestSignalLifecycle = Readonly<{
 
 function requestMethod(options: AtlasApiRequestOptions): string {
   return (options.method ?? "GET").toUpperCase();
+}
+
+function currentTimeMs(): number {
+  return Date.now();
+}
+
+function requestDurationMs(startedAt: number, completedAt: number): number {
+  return Math.max(0, completedAt - startedAt);
 }
 
 function normalizeTimeoutMs(timeoutMs: number | undefined): number {
@@ -200,6 +214,16 @@ export async function atlasApiRequest<T>(
   const headers = new Headers(options.headers);
   const requestId = resolveRequestId(headers, options.requestId);
   const accessToken = normalizeAccessToken(options.accessToken);
+  const startedAt = currentTimeMs();
+
+  const requestObservation: AtlasApiRequestObservation = {
+    requestId,
+    method,
+    path: requestPath,
+    startedAt
+  };
+
+  notifyAtlasApiObservers(options.observers, (observer) => observer.onRequest, requestObservation);
 
   const body = options.body;
   const externalSignal = options.signal;
@@ -240,18 +264,25 @@ export async function atlasApiRequest<T>(
       signal: requestSignal.signal
     });
   } catch (cause: unknown) {
+    let requestError: unknown;
+
     if (requestSignal.didTimeout()) {
-      throw new AtlasApiTimeoutError({
+      requestError = new AtlasApiTimeoutError({
         method,
         path: requestPath,
         requestId,
         timeoutMs,
         cause
       });
-    }
-
-    if (externalSignal?.aborted) {
-      throw new AtlasApiAbortError({
+    } else if (externalSignal?.aborted) {
+      requestError = new AtlasApiAbortError({
+        method,
+        path: requestPath,
+        requestId,
+        cause
+      });
+    } else {
+      requestError = new AtlasApiNetworkError({
         method,
         path: requestPath,
         requestId,
@@ -259,12 +290,16 @@ export async function atlasApiRequest<T>(
       });
     }
 
-    throw new AtlasApiNetworkError({
-      method,
-      path: requestPath,
-      requestId,
-      cause
+    const completedAt = currentTimeMs();
+
+    notifyAtlasApiObservers(options.observers, (observer) => observer.onError, {
+      ...requestObservation,
+      completedAt,
+      durationMs: requestDurationMs(startedAt, completedAt),
+      error: requestError
     });
+
+    throw requestError;
   } finally {
     requestSignal.cleanup();
   }
@@ -272,7 +307,7 @@ export async function atlasApiRequest<T>(
   const responseRequestId = response.headers.get("X-Request-ID")?.trim() || requestId;
 
   if (!response.ok) {
-    throw new AtlasApiError({
+    const requestError = new AtlasApiError({
       status: response.status,
       detail: await readErrorDetail(response),
       method,
@@ -280,12 +315,52 @@ export async function atlasApiRequest<T>(
       requestId: responseRequestId,
       kind: classifyHttpError(response.status)
     });
+
+    const completedAt = currentTimeMs();
+
+    notifyAtlasApiObservers(options.observers, (observer) => observer.onError, {
+      ...requestObservation,
+      requestId: responseRequestId,
+      completedAt,
+      durationMs: requestDurationMs(startedAt, completedAt),
+      status: response.status,
+      error: requestError
+    });
+
+    throw requestError;
   }
 
-  return readSuccessResponse<T>({
-    response,
-    method,
-    path: requestPath,
-    requestId: responseRequestId
-  });
+  try {
+    const result = await readSuccessResponse<T>({
+      response,
+      method,
+      path: requestPath,
+      requestId: responseRequestId
+    });
+
+    const completedAt = currentTimeMs();
+
+    notifyAtlasApiObservers(options.observers, (observer) => observer.onResponse, {
+      ...requestObservation,
+      requestId: responseRequestId,
+      completedAt,
+      durationMs: requestDurationMs(startedAt, completedAt),
+      status: response.status
+    });
+
+    return result;
+  } catch (requestError: unknown) {
+    const completedAt = currentTimeMs();
+
+    notifyAtlasApiObservers(options.observers, (observer) => observer.onError, {
+      ...requestObservation,
+      requestId: responseRequestId,
+      completedAt,
+      durationMs: requestDurationMs(startedAt, completedAt),
+      status: response.status,
+      error: requestError
+    });
+
+    throw requestError;
+  }
 }
