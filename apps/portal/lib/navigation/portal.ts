@@ -1,8 +1,15 @@
+import {
+  ATLAS_PERMISSIONS,
+  hasAtlasPermission,
+  type AtlasPermission
+} from "../authorization/permissions";
+
 export type PortalNavigationItem = Readonly<{
   href: string;
   label: string;
   description: string;
   abbreviation: string;
+  permission: AtlasPermission;
 }>;
 
 export type PortalNavigationSection = Readonly<{
@@ -18,25 +25,29 @@ export const portalNavigationSections: readonly PortalNavigationSection[] = [
         href: "/portal",
         label: "Dashboard",
         description: "Atlas system overview",
-        abbreviation: "DB"
+        abbreviation: "DB",
+        permission: ATLAS_PERMISSIONS.dashboardRead
       },
       {
         href: "/portal/media",
         label: "Media",
         description: "Libraries and media statistics",
-        abbreviation: "ME"
+        abbreviation: "ME",
+        permission: ATLAS_PERMISSIONS.mediaRead
       },
       {
         href: "/portal/requests",
         label: "Requests",
         description: "Media requests and approvals",
-        abbreviation: "RQ"
+        abbreviation: "RQ",
+        permission: ATLAS_PERMISSIONS.requestsRead
       },
       {
         href: "/portal/downloads",
         label: "Downloads",
         description: "Download activity and status",
-        abbreviation: "DL"
+        abbreviation: "DL",
+        permission: ATLAS_PERMISSIONS.monitoringRead
       }
     ]
   },
@@ -47,23 +58,37 @@ export const portalNavigationSections: readonly PortalNavigationSection[] = [
         href: "/portal/users",
         label: "Users",
         description: "Accounts and access",
-        abbreviation: "US"
+        abbreviation: "US",
+        permission: ATLAS_PERMISSIONS.usersRead
       },
       {
         href: "/portal/administration",
         label: "Administration",
         description: "Services and configuration",
-        abbreviation: "AD"
+        abbreviation: "AD",
+        permission: ATLAS_PERMISSIONS.systemHealthRead
       },
       {
         href: "/portal/settings",
         label: "Settings",
         description: "Portal preferences",
-        abbreviation: "ST"
+        abbreviation: "ST",
+        permission: ATLAS_PERMISSIONS.usersSelfRead
       }
     ]
   }
 ];
+
+export function visiblePortalNavigationSections(
+  roles: readonly string[]
+): readonly PortalNavigationSection[] {
+  return portalNavigationSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => hasAtlasPermission(roles, item.permission))
+    }))
+    .filter((section) => section.items.length > 0);
+}
 
 export function portalPageTitle(pathname: string): string {
   const matchingItem = portalNavigationSections

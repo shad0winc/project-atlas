@@ -1,6 +1,10 @@
+"use client";
+
 import Link from "next/link";
 
-import { portalNavigationSections } from "../../lib/navigation/portal";
+import { useAuth } from "../../lib/auth/use-auth";
+import { visiblePortalNavigationSections } from "../../lib/navigation/portal";
+
 import { PortalNavLink } from "./PortalNavLink";
 
 type PortalSidebarProps = Readonly<{
@@ -9,6 +13,9 @@ type PortalSidebarProps = Readonly<{
 }>;
 
 export function PortalSidebar({ isOpen, onClose }: PortalSidebarProps): React.ReactElement {
+  const { user } = useAuth();
+  const navigationSections = visiblePortalNavigationSections(user?.roles ?? []);
+
   return (
     <>
       <button
@@ -47,7 +54,7 @@ export function PortalSidebar({ isOpen, onClose }: PortalSidebarProps): React.Re
         </div>
 
         <nav className="portal-navigation">
-          {portalNavigationSections.map((section) => (
+          {navigationSections.map((section) => (
             <section className="portal-nav-section" key={section.label}>
               <h2 className="portal-nav-section-title">{section.label}</h2>
 

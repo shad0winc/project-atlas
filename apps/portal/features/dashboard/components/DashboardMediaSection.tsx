@@ -1,12 +1,15 @@
 "use client";
 
+import { RequirePermission } from "../../../components/auth/RequirePermission";
+import { ATLAS_PERMISSIONS } from "../../../lib/authorization";
+
 import { useDashboardMedia } from "../hooks/use-dashboard-media";
 
 import { DashboardError } from "./DashboardError";
 import { DashboardSkeleton } from "./DashboardSkeleton";
 import { MediaLibraryGrid } from "./MediaLibraryGrid";
 
-export function DashboardMediaSection(): React.ReactElement {
+function DashboardMediaContent(): React.ReactElement {
   const { state, refresh } = useDashboardMedia();
 
   return (
@@ -36,5 +39,13 @@ export function DashboardMediaSection(): React.ReactElement {
         </>
       ) : null}
     </section>
+  );
+}
+
+export function DashboardMediaSection(): React.ReactElement {
+  return (
+    <RequirePermission permission={ATLAS_PERMISSIONS.mediaRead}>
+      <DashboardMediaContent />
+    </RequirePermission>
   );
 }
