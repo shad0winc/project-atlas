@@ -8,10 +8,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 
 from atlas_api.auth.models import AuthenticatedUser
-from atlas_api.dependencies import get_current_user
 from atlas_api.schemas.dashboard_media import (
     DashboardMediaSummaryResponse,
 )
+from atlas_api.security import require_permission
 from atlas_api.services.dashboard_media import (
     DashboardMediaSummaryService,
 )
@@ -20,6 +20,10 @@ from atlas_api.services.dashboard_media import (
 router = APIRouter(
     prefix="/dashboard",
     tags=["dashboard"],
+)
+
+require_media_dashboard_read = require_permission(
+    "media.read"
 )
 
 
@@ -49,7 +53,7 @@ def get_dashboard_media_summary_service(
 def read_dashboard_media_summary(
     _current_user: Annotated[
         AuthenticatedUser,
-        Depends(get_current_user),
+        Depends(require_media_dashboard_read),
     ],
     service: Annotated[
         DashboardMediaSummaryService,

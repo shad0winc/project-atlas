@@ -5,29 +5,43 @@ from __future__ import annotations
 from pathlib import Path
 import unittest
 
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 from fastapi.testclient import TestClient
 
-from atlas_api.dependencies import get_current_user
+from atlas_api.auth.models import AuthenticatedUser
 from atlas_api.main import create_app
 from atlas_api.routes.v1.dashboard_media import (
     get_dashboard_media_summary_service,
+    require_media_dashboard_read,
 )
 from atlas_api.services.dashboard_media import (
     DashboardMediaSummaryService,
 )
 
 
+def _authenticated_user() -> AuthenticatedUser:
+    """Return a stable authenticated user for endpoint tests."""
+
+    return AuthenticatedUser(
+        user_id="usr_media_dashboard",
+        username="michael",
+        display_name="Michael",
+        roles=("member",),
+        provider="jellyfin",
+        metadata={},
+    )
+
+
 class DashboardMediaEndpointTests(
     unittest.TestCase
 ):
-    """Verify the authenticated media summary endpoint."""
+    """Verify the authorized media summary endpoint."""
 
     def setUp(self) -> None:
         self.app = create_app()
         self.app.dependency_overrides[
-            get_current_user
-        ] = lambda: object()
+            require_media_dashboard_read
+        ] = _authenticated_user
         self.app.dependency_overrides[
             get_dashboard_media_summary_service
         ] = lambda: DashboardMediaSummaryService(
@@ -97,15 +111,16 @@ class DashboardMediaEndpointTests(
     def test_media_summary_requires_authentication(
         self,
     ) -> None:
-        def unauthorized() -> None:
+        def unauthenticated() -> AuthenticatedUser:
             raise HTTPException(
-                status_code=401,
-                detail="Unauthorized",
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Bearer authentication is required.",
+                headers={"WWW-Authenticate": "Bearer"},
             )
 
         self.app.dependency_overrides[
-            get_current_user
-        ] = unauthorized
+            require_media_dashboard_read
+        ] = unauthenticated
 
         response = self.client.get(
             "/api/v1/dashboard/media"
@@ -114,6 +129,44 @@ class DashboardMediaEndpointTests(
         self.assertEqual(
             401,
             response.status_code,
+        )
+        self.assertEqual(
+            response.headers["www-authenticate"],
+            "Bearer",
+        )
+
+    def test_media_summary_rejects_missing_permission(
+        self,
+    ) -> None:
+        def forbidden() -> AuthenticatedUser:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    "No assigned role or direct grant provides the "
+                    "requested permission."
+                ),
+            )
+
+        self.app.dependency_overrides[
+            require_media_dashboard_read
+        ] = forbidden
+
+        response = self.client.get(
+            "/api/v1/dashboard/media"
+        )
+
+        self.assertEqual(
+            403,
+            response.status_code,
+        )
+        self.assertEqual(
+            {
+                "detail": (
+                    "No assigned role or direct grant provides the "
+                    "requested permission."
+                )
+            },
+            response.json(),
         )
 
 

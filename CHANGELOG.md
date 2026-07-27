@@ -4,6 +4,16 @@ All notable changes to Project Atlas are documented in this file.
 
 ## [Unreleased]
 
+
+<!-- AEB-0002.4: authorization-enforcement -->
+
+### Authorization
+
+- Enforced `atlas.dashboard.read` on the operational dashboard summary endpoint.
+- Enforced `media.read` on the media-library dashboard endpoint.
+- Preserved `/api/v1/health` as a public liveness endpoint.
+- Added dashboard route regression coverage for successful access, stable response contracts, unauthenticated requests, and permission-denied requests.
+
 ### Added
 
 - One-shot scheduler execution for due or named tasks with subprocess isolation, runtime locking, stale-lock recovery, success/failure metadata, bounded history, and best-effort module events.
@@ -204,4 +214,3 @@ All notable changes to Project Atlas are documented in this file.
 - Permissions-Policy
 - Cross-Origin-Opener-Policy
 - Removed Server header
-

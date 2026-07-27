@@ -6,14 +6,18 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 
 from atlas_api.auth.models import AuthenticatedUser
-from atlas_api.dependencies import get_current_user
 from atlas_api.schemas.dashboard import DashboardSummaryResponse
+from atlas_api.security import require_permission
 from atlas_api.services.dashboard import DashboardSummaryService
 
 
 router = APIRouter(
     prefix="/dashboard",
     tags=["dashboard"],
+)
+
+require_dashboard_read = require_permission(
+    "atlas.dashboard.read"
 )
 
 
@@ -33,7 +37,7 @@ def get_dashboard_summary_service() -> DashboardSummaryService:
 def read_dashboard_summary(
     _current_user: Annotated[
         AuthenticatedUser,
-        Depends(get_current_user),
+        Depends(require_dashboard_read),
     ],
     service: Annotated[
         DashboardSummaryService,

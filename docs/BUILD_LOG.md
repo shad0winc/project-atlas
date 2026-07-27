@@ -639,3 +639,47 @@ boundaries.
 - Review the complete staged documentation diff.
 - Commit the documentation cleanup as a dedicated repository change.
 - Continue production-readiness work toward the Project Atlas v1.0 release.
+---
+
+<!-- AEB-0002.4: build-log -->
+
+## 2026-07-27 — AEB-0002.4 Authorization Enforcement Integration
+
+### Objective
+
+Integrate the existing Atlas authorization service with protected dashboard
+routes so access is governed by explicit permissions rather than
+authentication alone.
+
+### Implementation
+
+- Added the reusable `require_dashboard_read` dependency for
+  `atlas.dashboard.read`.
+- Applied `require_dashboard_read` to
+  `GET /api/v1/dashboard/summary`.
+- Added the reusable `require_media_dashboard_read` dependency for
+  `media.read`.
+- Applied `require_media_dashboard_read` to
+  `GET /api/v1/dashboard/media`.
+- Preserved `GET /api/v1/health` as a public liveness endpoint for container,
+  proxy, and monitoring health checks.
+- Updated dashboard endpoint tests to override the composed permission
+  dependencies instead of bypassing authorization through
+  `get_current_user`.
+- Added explicit regression coverage for HTTP 401 and HTTP 403 responses
+  while preserving existing successful-response contracts.
+
+### Validation
+
+- Dashboard endpoint tests: 4 passed.
+- Media dashboard endpoint tests: 4 passed.
+- Complete Atlas API test suite: 100 passed.
+- Python compilation: passed.
+- Git whitespace validation: passed.
+- Temporary AEB-0002.4 source backups removed after successful validation.
+
+### Result
+
+AEB-0002.4 is complete. Atlas dashboard routes now use the established
+permission-based authorization boundary, while the public health contract
+remains unchanged.
