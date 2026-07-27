@@ -30,6 +30,7 @@ All notable changes to Project Atlas are documented in this file.
 - human-readable retention reports.
 - JSON retention output.
 - Retention CLI regression tests.
+- Atlas API refresh-token endpoint at `POST /api/v1/auth/refresh`, returning a rotated access and refresh token pair.
 
 ### Improved
 
@@ -40,6 +41,7 @@ All notable changes to Project Atlas are documented in this file.
 - Core scheduler validation now runs through standard `unittest` discovery.
 - Python compilation, Atlas Core unit tests, and Sports integration tests are unified behind one CLI entry point.
 - Nested module `.env` files are explicitly ignored.
+- Access-token and refresh-token identity resolution now share one validated active-profile resolution path.
 
 ### Validation
 
@@ -48,6 +50,8 @@ All notable changes to Project Atlas are documented in this file.
 - Added regression coverage confirming invalid Jellyfin IDs are rejected without overwriting an existing valid link.
 - Verified the complete repository test suite with 119 passing tests.
 - Live-tested Jellyfin API authentication, user discovery, valid identity linking, invalid identity rejection, and preservation of the prior valid association.
+- Added authentication refresh route coverage for successful rotation, invalid identity, user mismatch, empty tokens, and unknown request fields.
+- Verified the complete Atlas API regression suite with 98 passing tests.
 
 ## [1.0.0] — Production Foundation
 

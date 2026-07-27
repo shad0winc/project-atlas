@@ -99,21 +99,68 @@ def get_current_user(
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise _unauthorized("Bearer authentication is required.")
 
+    return _resolve_token_user(
+        credentials.credentials,
+        expected_type=TokenType.ACCESS,
+        jwt_service=jwt_service,
+        profiles=profiles,
+        invalid_token_message=None,
+    )
+
+
+def resolve_refresh_user(
+    refresh_token: str,
+    *,
+    jwt_service: JWTService,
+    profiles: UserProfileStore,
+) -> AuthenticatedUser:
+    """Validate a refresh token and resolve its active Atlas profile."""
+
+    normalized_token = refresh_token.strip()
+    if not normalized_token:
+        raise _unauthorized("Refresh token is invalid or expired.")
+
+    return _resolve_token_user(
+        normalized_token,
+        expected_type=TokenType.REFRESH,
+        jwt_service=jwt_service,
+        profiles=profiles,
+        invalid_token_message="Refresh token is invalid or expired.",
+    )
+
+
+def _resolve_token_user(
+    token: str,
+    *,
+    expected_type: TokenType,
+    jwt_service: JWTService,
+    profiles: UserProfileStore,
+    invalid_token_message: str | None,
+) -> AuthenticatedUser:
     try:
         claims = jwt_service.decode_token(
-            credentials.credentials,
-            expected_type=TokenType.ACCESS,
+            token,
+            expected_type=expected_type,
         )
     except TokenError as error:
-        raise _unauthorized(str(error)) from error
+        message = invalid_token_message or str(error)
+        raise _unauthorized(message) from error
 
     try:
         profile = profiles.get_user(claims.subject)
     except UserProfileError as error:
-        raise _unauthorized("Authenticated Atlas user was not found.") from error
+        message = (
+            invalid_token_message
+            or "Authenticated Atlas user was not found."
+        )
+        raise _unauthorized(message) from error
 
     if profile["status"] != "active":
-        raise _unauthorized("Authenticated Atlas user is disabled.")
+        message = (
+            invalid_token_message
+            or "Authenticated Atlas user is disabled."
+        )
+        raise _unauthorized(message)
 
     return AuthenticatedUser(
         user_id=profile["user_id"],

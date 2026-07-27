@@ -534,6 +534,51 @@ Atlas forecasting is now driven by a validated historical timeline, producing de
 
 ---
 
+## AEB-0002.3.5 — Authentication Refresh Orchestration
+
+### Objective
+
+Complete the Atlas API refresh-token transport and identity-resolution flow so
+an authenticated session can rotate its access and refresh token pair without
+contacting Jellyfin or duplicating authentication logic.
+
+### Completed
+
+- Added `POST /api/v1/auth/refresh`.
+- Added refresh-token request validation through the existing
+  `RefreshRequest` contract.
+- Added `resolve_refresh_user()` for refresh-token identity resolution.
+- Refactored access-token and refresh-token handling through the shared
+  `_resolve_token_user()` dependency helper.
+- Enforced refresh-token type validation through `TokenType.REFRESH`.
+- Preserved the Atlas user profile store as the authoritative active-user
+  source.
+- Delegated token-pair rotation to `AuthenticationService.refresh()`.
+- Returned a stable unauthorized response for invalid, expired, mismatched, or
+  inactive refresh identities.
+- Preserved the no-Jellyfin-call boundary during refresh.
+- Added dedicated HTTP contract tests for the refresh route.
+
+### Verification
+
+- `git diff --check` passed.
+- Targeted authentication suite passed: 20 tests.
+- Full Atlas API regression suite passed: 98 tests.
+- Successful token rotation was verified.
+- Invalid refresh identity handling was verified.
+- Refresh-token user mismatch handling was verified.
+- Empty refresh-token request validation was verified.
+- Unknown request-field rejection was verified.
+
+### Result
+
+Atlas now provides a validated refresh-token endpoint that resolves the current
+active Atlas identity and rotates the token pair through the authentication
+service while preserving clean transport, identity, token, and provider
+boundaries.
+
+---
+
 # Current Status
 
 **Development State:** Active release-candidate development

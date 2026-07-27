@@ -7,15 +7,23 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from atlas_api.auth.exceptions import (
     AuthenticationProviderError,
     InvalidCredentialsError,
+    TokenError,
 )
+from atlas_api.auth.jwt import JWTService
 from atlas_api.auth.models import AuthenticatedUser
 from atlas_api.auth.schemas import (
     CurrentUserResponse,
     LoginRequest,
+    RefreshRequest,
     TokenResponse,
 )
 from atlas_api.auth.service import AuthenticationService
-from atlas_api.dependencies import get_authentication_service
+from atlas_api.dependencies import (
+    get_authentication_service,
+    get_jwt_service,
+    get_user_profile_store,
+    resolve_refresh_user,
+)
 from atlas_api.security import require_permission
 
 
@@ -56,6 +64,46 @@ def login(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="The authentication provider is unavailable.",
+        ) from error
+
+    return TokenResponse(
+        access_token=tokens.access_token,
+        refresh_token=tokens.refresh_token,
+        token_type=tokens.token_type,
+    )
+
+
+@router.post(
+    "/refresh",
+    response_model=TokenResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Rotate an Atlas token pair",
+)
+def refresh_tokens(
+    request: RefreshRequest,
+    authentication: AuthenticationService = Depends(
+        get_authentication_service
+    ),
+    jwt_service: JWTService = Depends(get_jwt_service),
+    profiles=Depends(get_user_profile_store),
+) -> TokenResponse:
+    """Validate a refresh token and issue a replacement token pair."""
+
+    try:
+        user = resolve_refresh_user(
+            request.refresh_token,
+            jwt_service=jwt_service,
+            profiles=profiles,
+        )
+        tokens = authentication.refresh(
+            request.refresh_token,
+            user,
+        )
+    except (InvalidCredentialsError, TokenError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token is invalid or expired.",
+            headers={"WWW-Authenticate": "Bearer"},
         ) from error
 
     return TokenResponse(
