@@ -29,10 +29,12 @@ class TokenResponse(BaseModel):
 
 
 class CurrentUserResponse(BaseModel):
-    """Authenticated user information returned by the API."""
+    """Authenticated user and effective authorization state."""
 
     user_id: str
     username: str
     display_name: str
     roles: list[str]
     provider: str
+    granted_permission_patterns: list[str]
+    denied_permission_patterns: list[str]

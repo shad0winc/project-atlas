@@ -52,3 +52,6 @@ project-atlas-export.zip
 
 # Generated validation and development evidence
 /artifacts/
+
+# Generated reports
+reports/

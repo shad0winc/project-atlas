@@ -12,7 +12,10 @@ from atlas_api.auth.exceptions import (
     InvalidCredentialsError,
 )
 from atlas_api.auth.models import AuthenticatedUser, TokenPair
-from atlas_api.dependencies import get_authentication_service
+from atlas_api.dependencies import (
+    get_authentication_service,
+    get_user_profile_store,
+)
 from atlas_api.main import create_app
 from atlas_api.routes.v1.auth import require_current_user_read
 
@@ -42,6 +45,43 @@ class UnavailableAuthenticationService:
 
     def login(self, username: str, password: str) -> TokenPair:
         raise AuthenticationProviderError("provider unavailable")
+
+
+class ProfileStoreDouble:
+    """Profile-store double exposing one controlled Atlas profile."""
+
+    def __init__(self, profile: dict[str, object]) -> None:
+        self.profile = profile
+        self.requested_user_id: str | None = None
+
+    def get_user(self, user_id: str) -> dict[str, object]:
+        self.requested_user_id = user_id
+        return self.profile
+
+
+def authorization_profile(
+    *,
+    roles: tuple[str, ...] = ("member",),
+    allow: tuple[str, ...] = (),
+    deny: tuple[str, ...] = (),
+) -> dict[str, object]:
+    """Create one active profile for /auth/me authorization tests."""
+
+    return {
+        "schema_version": 2,
+        "user_id": "usr_123",
+        "username": "michael",
+        "display_name": "Michael",
+        "email": "",
+        "status": "active",
+        "roles": list(roles),
+        "permission_overrides": {
+            "allow": list(allow),
+            "deny": list(deny),
+        },
+        "created_at": "2026-07-27T00:00:00Z",
+        "updated_at": "2026-07-27T00:00:00Z",
+    }
 
 
 class AuthenticationRouteTests(unittest.TestCase):
@@ -139,7 +179,7 @@ class AuthenticationRouteTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 422)
 
-    def test_me_returns_authenticated_user(self) -> None:
+    def test_me_returns_effective_authorization_contract(self) -> None:
         user = AuthenticatedUser(
             user_id="usr_123",
             username="michael",
@@ -147,23 +187,160 @@ class AuthenticationRouteTests(unittest.TestCase):
             roles=("admin",),
             provider="jellyfin",
         )
+        profiles = ProfileStoreDouble(
+            authorization_profile(
+                roles=("admin",),
+                allow=("system.checks.run",),
+                deny=("users.delete",),
+            )
+        )
 
         self.application.dependency_overrides[
             require_current_user_read
         ] = lambda: user
+        self.application.dependency_overrides[
+            get_user_profile_store
+        ] = lambda: profiles
+
+        response = self.client.get("/api/v1/auth/me")
+
+        self.assertEqual(response.status_code, 200)
+
+        payload = response.json()
+
+        self.assertEqual(
+            payload,
+            {
+                "user_id": "usr_123",
+                "username": "michael",
+                "display_name": "Michael",
+                "roles": ["global_admin"],
+                "provider": "jellyfin",
+                "granted_permission_patterns": sorted(
+                    [
+                        "atlas.*",
+                        "audit.*",
+                        "cleanup.*",
+                        "favorites.*",
+                        "gameservers.*",
+                        "media.*",
+                        "modules.*",
+                        "monitoring.*",
+                        "requests.*",
+                        "retention.*",
+                        "roles.*",
+                        "scheduler.*",
+                        "system.*",
+                        "system.checks.run",
+                        "users.*",
+                    ]
+                ),
+                "denied_permission_patterns": ["users.delete"],
+            },
+        )
+        self.assertEqual(profiles.requested_user_id, "usr_123")
+
+    def test_me_merges_permissions_from_multiple_roles(self) -> None:
+        user = AuthenticatedUser(
+            user_id="usr_123",
+            username="michael",
+            display_name="Michael",
+            roles=("atlas_admin", "monitoring_admin"),
+            provider="jellyfin",
+        )
+        profiles = ProfileStoreDouble(
+            authorization_profile(
+                roles=("atlas_admin", "monitoring_admin"),
+            )
+        )
+
+        self.application.dependency_overrides[
+            require_current_user_read
+        ] = lambda: user
+        self.application.dependency_overrides[
+            get_user_profile_store
+        ] = lambda: profiles
+
+        response = self.client.get("/api/v1/auth/me")
+
+        self.assertEqual(response.status_code, 200)
+
+        payload = response.json()
+
+        self.assertEqual(
+            payload["roles"],
+            ["atlas_admin", "monitoring_admin"],
+        )
+        self.assertIn(
+            "atlas.*",
+            payload["granted_permission_patterns"],
+        )
+        self.assertIn(
+            "monitoring.*",
+            payload["granted_permission_patterns"],
+        )
+        self.assertEqual(
+            payload["denied_permission_patterns"],
+            [],
+        )
+
+    def test_me_exposes_direct_grant_for_member(self) -> None:
+        user = AuthenticatedUser(
+            user_id="usr_123",
+            username="michael",
+            display_name="Michael",
+            roles=("member",),
+            provider="jellyfin",
+        )
+        profiles = ProfileStoreDouble(
+            authorization_profile(
+                allow=("system.health.read",),
+            )
+        )
+
+        self.application.dependency_overrides[
+            require_current_user_read
+        ] = lambda: user
+        self.application.dependency_overrides[
+            get_user_profile_store
+        ] = lambda: profiles
+
+        response = self.client.get("/api/v1/auth/me")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            "system.health.read",
+            response.json()["granted_permission_patterns"],
+        )
+
+    def test_me_preserves_explicit_denial_separately(self) -> None:
+        user = AuthenticatedUser(
+            user_id="usr_123",
+            username="michael",
+            display_name="Michael",
+            roles=("global_admin",),
+            provider="jellyfin",
+        )
+        profiles = ProfileStoreDouble(
+            authorization_profile(
+                roles=("global_admin",),
+                deny=("users.delete", "roles.assign"),
+            )
+        )
+
+        self.application.dependency_overrides[
+            require_current_user_read
+        ] = lambda: user
+        self.application.dependency_overrides[
+            get_user_profile_store
+        ] = lambda: profiles
 
         response = self.client.get("/api/v1/auth/me")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
-            response.json(),
-            {
-                "user_id": "usr_123",
-                "username": "michael",
-                "display_name": "Michael",
-                "roles": ["admin"],
-                "provider": "jellyfin",
-            },
+            response.json()["denied_permission_patterns"],
+            ["roles.assign", "users.delete"],
         )
 
     def test_me_returns_forbidden_when_permission_is_denied(self) -> None:

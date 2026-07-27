@@ -7,6 +7,38 @@ All notable changes to Project Atlas are documented in this file.
 
 <!-- AEB-0002.4: authorization-enforcement -->
 
+<!-- M-016.1a: media-contract-boundary -->
+- Removed Dashboard-named transport contract imports from the Media feature.
+- Added adapter-local Media transport DTOs while preserving the temporary `/dashboard/media` endpoint.
+- Moved refresh-state publication from component render into a React effect.
+- Strengthened architectural validation so Dashboard feature contracts cannot leak into `features/media`.
+
+<!-- M-016.1: media-portal-foundation -->
+- Added the first protected Portal feature route at `/portal/media` with server-owned browser metadata.
+- Introduced a Media-owned domain model, authenticated endpoint adapter, loading hook, summary cards, library cards, empty state, partial-availability presentation, request failure recovery, and refresh control.
+- Reused the existing dashboard media transport behind a Media feature boundary without coupling the feature to dashboard domain types.
+- Added model and component regression coverage for normalization, identity validation, timestamps, aggregate totals, loading, empty, unavailable, and error presentations.
+
+<!-- PAI-0005.2: portal-route-model -->
+- Replaced navigation-only route records with a canonical typed Portal route model.
+- Derived navigation sections, permission visibility, page titles, and active-route matching from the shared route catalog.
+- Migrated the dashboard and navigation links to registered route metadata while preserving current Portal behavior.
+- Added regression coverage for route identity, unique paths, section projection, exact dashboard matching, nested feature matching, route lookup, and authorization-aware navigation.
+
+<!-- PAI-0004.2: portal-page-authorization-boundary -->
+- Added a canonical permission-aware Portal page boundary with standardized headers, content framing, action slots, and access-denied presentation.
+- Migrated the system dashboard from an inline permission guard to the reusable Portal page contract.
+- Added component regression coverage for authorized rendering, denied rendering, contextual denial copy, optional presentation regions, and protected child isolation.
+
+<!-- PAI-0003: portal-effective-authorization-migration -->
+- Migrated Portal presentation checks and navigation filtering to API-resolved effective grant and denial patterns.
+- Removed the duplicated Portal role-to-permission catalog while preserving stable typed permission identifiers.
+- Added regression coverage for direct grants, wildcard grants, explicit-denial precedence, empty authorization state, and authorization-aware navigation.
+
+<!-- PAI-0002: effective-authorization-session-contract -->
+- Extended the authenticated-user API contract with resolved role, grant, and denial patterns so Portal clients can consume API-owned effective authorization state.
+- Added `/auth/me` regression coverage for role aliases, multiple-role merging, direct permission grants, and explicit permission denials.
+
 ### Authorization
 
 - Enforced `atlas.dashboard.read` on the operational dashboard summary endpoint.

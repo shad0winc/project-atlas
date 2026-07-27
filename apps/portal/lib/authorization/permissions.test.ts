@@ -2,29 +2,29 @@ import { describe, expect, it } from "vitest";
 
 import {
   atlasPermissionPatternMatches,
-  atlasRolePermissions,
   hasAnyAtlasPermission,
   hasAtlasPermission,
   hasEveryAtlasPermission,
   normalizeAtlasPermission,
-  normalizeAtlasRole
+  type AtlasEffectivePermissionPatterns
 } from "./permissions";
 
-describe("Atlas Portal permission evaluation", () => {
-  it("normalizes role names and legacy aliases", () => {
-    expect(normalizeAtlasRole(" GLOBAL_ADMIN ")).toBe("global_admin");
-    expect(normalizeAtlasRole("admin")).toBe("global_admin");
-    expect(normalizeAtlasRole("user")).toBe("member");
-    expect(normalizeAtlasRole("games_admin")).toBe("gameserver_admin");
-    expect(normalizeAtlasRole("readonly")).toBe("read_only");
-  });
+function authorization(
+  grantedPermissionPatterns: readonly string[],
+  deniedPermissionPatterns: readonly string[] = []
+): AtlasEffectivePermissionPatterns {
+  return {
+    grantedPermissionPatterns,
+    deniedPermissionPatterns
+  };
+}
 
+describe("Atlas Portal effective permission evaluation", () => {
   it("normalizes permission names", () => {
     expect(normalizeAtlasPermission(" MEDIA.READ ")).toBe("media.read");
   });
 
-  it("rejects empty normalized values", () => {
-    expect(() => normalizeAtlasRole("  ")).toThrow("Atlas role cannot be empty.");
+  it("rejects empty permission names", () => {
     expect(() => normalizeAtlasPermission("  ")).toThrow("Atlas permission cannot be empty.");
   });
 
@@ -52,41 +52,47 @@ describe("Atlas Portal permission evaluation", () => {
     expect(atlasPermissionPatternMatches("media.*", "atlas.dashboard.read")).toBe(false);
   });
 
-  it("resolves owner access through the global wildcard", () => {
-    expect(hasAtlasPermission(["owner"], "users.delete")).toBe(true);
+  it("allows an exact effective grant", () => {
+    expect(hasAtlasPermission(authorization(["media.read"]), "media.read")).toBe(true);
   });
 
-  it("resolves global administrator nested permissions", () => {
-    expect(hasAtlasPermission(["global_admin"], "atlas.dashboard.read")).toBe(true);
-    expect(hasAtlasPermission(["global_admin"], "system.health.read")).toBe(true);
-    expect(hasAtlasPermission(["global_admin"], "users.self.update")).toBe(true);
+  it("allows a wildcard effective grant", () => {
+    expect(hasAtlasPermission(authorization(["atlas.*"]), "atlas.dashboard.read")).toBe(true);
   });
 
-  it("resolves read-only permissions through the action wildcard", () => {
-    expect(hasAtlasPermission(["read_only"], "atlas.dashboard.read")).toBe(true);
-    expect(hasAtlasPermission(["read_only"], "users.self.read")).toBe(true);
-    expect(hasAtlasPermission(["read_only"], "users.self.update")).toBe(false);
+  it("denies a permission without a matching grant", () => {
+    expect(hasAtlasPermission(authorization(["media.read"]), "users.read")).toBe(false);
   });
 
-  it("resolves member permissions without administrative access", () => {
-    expect(hasAtlasPermission(["member"], "atlas.dashboard.read")).toBe(true);
-    expect(hasAtlasPermission(["member"], "media.read")).toBe(true);
-    expect(hasAtlasPermission(["member"], "users.read")).toBe(false);
+  it("applies an exact denial before a wildcard grant", () => {
+    expect(hasAtlasPermission(authorization(["users.*"], ["users.delete"]), "users.delete")).toBe(
+      false
+    );
   });
 
-  it("merges permissions from multiple roles", () => {
+  it("applies a wildcard denial before an exact grant", () => {
     expect(
-      hasEveryAtlasPermission(["member", "monitoring_admin"], ["media.read", "system.health.read"])
-    ).toBe(true);
+      hasAtlasPermission(authorization(["users.self.read"], ["users.*"]), "users.self.read")
+    ).toBe(false);
   });
 
-  it("supports any/every checks and unknown roles", () => {
-    expect(hasAnyAtlasPermission(["member"], ["users.delete", "requests.read"])).toBe(true);
+  it("supports direct grants independently from roles", () => {
+    expect(hasAtlasPermission(authorization(["system.health.read"]), "system.health.read")).toBe(
+      true
+    );
+  });
 
-    expect(hasEveryAtlasPermission(["member"], ["requests.read", "users.delete"])).toBe(false);
+  it("supports any and every checks", () => {
+    const effective = authorization(["media.read", "requests.read", "users.self.read"]);
 
-    expect(atlasRolePermissions("unknown_role")).toEqual([]);
+    expect(hasAnyAtlasPermission(effective, ["users.delete", "requests.read"])).toBe(true);
 
-    expect(hasAtlasPermission(["unknown_role"], "media.read")).toBe(false);
+    expect(hasEveryAtlasPermission(effective, ["media.read", "users.self.read"])).toBe(true);
+
+    expect(hasEveryAtlasPermission(effective, ["media.read", "users.delete"])).toBe(false);
+  });
+
+  it("denies access when effective patterns are empty", () => {
+    expect(hasAtlasPermission(authorization([]), "media.read")).toBe(false);
   });
 });

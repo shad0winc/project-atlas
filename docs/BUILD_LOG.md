@@ -768,3 +768,182 @@ Remove access-token ownership from Portal feature hooks while preserving the est
 ### Result
 
 Protected Portal services no longer require UI callers to retrieve or pass access tokens.
+
+## PAI-0002 — Effective Authorization Session Contract
+
+Extended the authenticated-user transport contract so Portal clients can
+consume authorization state resolved by the Atlas API rather than rebuilding
+role permissions independently.
+
+### Changes
+
+- Added `granted_permission_patterns` and `denied_permission_patterns` to the
+  `/api/v1/auth/me` response.
+- Resolved the current profile through the existing `AuthorizationService`.
+- Preserved explicit denials as a separate ordered transport collection.
+- Returned normalized effective roles, including legacy role aliases.
+- Added route-level regression coverage for role grants, direct grants,
+  explicit denials, multiple-role merging, and stable response serialization.
+
+### Architectural result
+
+The API remains the sole authorization authority. The Portal can now migrate
+its presentation checks to the effective session contract without adding a
+second authorization request, cache, or duplicated role catalog.
+
+## PAI-0003 — Portal Effective Authorization Migration
+
+Migrated Portal presentation authorization from a duplicated role catalog to
+the effective grant and denial patterns returned by the Atlas API session
+contract.
+
+### Changes
+
+- Extended `AtlasCurrentUserResponse` with effective grant and denial patterns.
+- Replaced role-based Portal permission evaluation with effective-pattern
+  evaluation.
+- Applied explicit denials before exact or wildcard grants.
+- Migrated `usePermission()` to the authenticated session contract.
+- Migrated Portal navigation filtering and sidebar rendering.
+- Preserved `ATLAS_PERMISSIONS` as stable typed feature identifiers.
+- Removed Portal runtime ownership of role aliases and role permission maps.
+- Added regression coverage for wildcard grants, direct grants, denial
+  precedence, empty authorization state, and navigation visibility.
+
+### Architectural result
+
+The API now owns role resolution, permission merging, direct overrides, and
+enforcement. The Portal consumes that resolved state solely for presentation.
+Adding or changing an Atlas role no longer requires duplicating its permission
+definition in the Portal.
+
+## PAI-0004.2 — Portal Page Authorization Boundary
+
+Introduced the canonical presentation and permission boundary for protected
+Portal pages before expanding the authenticated route tree.
+
+### Changes
+
+- Added `PortalPage` as the standard protected-page contract.
+- Centralized page permission checks through the existing `RequirePermission`
+  component and API-resolved effective authorization state.
+- Added a reusable `PortalAccessDenied` presentation with accessible status
+  semantics and contextual copy support.
+- Standardized Portal page eyebrow, title, description, actions, and content
+  regions.
+- Added an optional actions slot for future page-level controls.
+- Migrated the system dashboard from inline authorization and duplicated page
+  markup to the reusable boundary.
+- Extended the Portal Vitest include configuration to cover component-level
+  TypeScript and TSX tests.
+- Added server-rendered component regression coverage for granted access,
+  denied access, protected-child isolation, contextual denial content, action
+  rendering, and optional page regions.
+
+### Architectural result
+
+The protected App Router layout continues to own authentication, while each
+Portal page declares one required permission through a consistent,
+presentation-only boundary. The Atlas API remains the authoritative
+authorization and enforcement layer.
+
+Future Portal routes can now adopt a small declarative contract without
+rebuilding headers, access-denied content, or permission-wrapper markup.
+
+## PAI-0005.2 — Portal Route Model
+
+Evolved the existing Portal navigation catalog into the canonical route model
+without introducing a second registry or changing the App Router structure.
+
+### Changes
+
+- Replaced `PortalNavigationItem` with a typed `PortalRoute` contract.
+- Added stable route IDs and named access through `PORTAL_ROUTES`.
+- Centralized route paths, labels, navigation descriptions, abbreviations,
+  permissions, section ownership, and optional page descriptions.
+- Derived navigation sections from the canonical route collection.
+- Centralized exact dashboard matching and nested feature-route matching.
+- Added route lookup through `portalRouteForPathname()`.
+- Kept topbar title resolution as a projection of the route model.
+- Migrated `PortalNavLink` to the shared route matcher.
+- Migrated the dashboard page to its registered label, permission, and page
+  description.
+- Preserved API-owned authorization and presentation-only Portal filtering.
+- Added regression coverage for route identity, path uniqueness, named route
+  access, navigation projection, exact and nested matching, route lookup, page
+  titles, wildcard grants, direct grants, and explicit-denial precedence.
+
+### Architectural result
+
+Portal route reasoning now has one source of truth. Navigation, active-link
+state, topbar titles, and page declarations consume the same typed route
+records instead of independently interpreting paths.
+
+Next.js page files still own actual route implementation and browser metadata.
+The model deliberately avoids module registration, dynamic loading, icons,
+breadcrumbs, and other framework concerns until real feature routes require
+them.
+
+## M-016.1 — Media Portal Foundation
+
+Implemented the first feature route beneath the authenticated Atlas Portal and
+used it to validate the complete authentication, authorization, route-model,
+page-boundary, service, state, and presentation architecture.
+
+### Changes
+
+- Added the protected `/portal/media` App Router page.
+- Added server-owned Next.js metadata for the Media route.
+- Consumed `PORTAL_ROUTES.media` for page label, description, and permission.
+- Added a Media-owned feature package with API, service, hook, component, type,
+  and export boundaries.
+- Added normalized Media library and snapshot factories.
+- Validated stable library identity, unique children, availability/count
+  contracts, optional text, and timestamps.
+- Added aggregate counts for configured libraries, available libraries,
+  unavailable libraries, and represented items.
+- Reused `/dashboard/media` through a temporary Media-owned transport adapter.
+- Kept dashboard transport naming out of Media domain callers.
+- Added loading, ready, successful-empty, partial-availability, and request-error
+  states.
+- Added page-level refresh through the existing `PortalPage` actions slot.
+- Kept unavailable libraries visible with their provider detail.
+- Added responsive Media summary and library presentation.
+- Added domain and server-rendered component regression coverage.
+
+### Architectural result
+
+The Portal now contains its first implemented feature destination beyond the
+dashboard. The Media feature owns its domain and presentation contracts while
+temporarily reusing an existing transport endpoint.
+
+This keeps M-016.1 small and product-focused without making the dashboard
+feature a shared domain dependency or introducing a duplicate API service
+before richer Media requirements exist.
+
+## M-016.1a — Media Contract Boundary Refinement
+
+Corrected the first Media Portal implementation after its architectural guard
+detected Dashboard-owned transport names inside the new Media feature.
+
+### Changes
+
+- Removed imports of `AtlasDashboardMediaLibraryResponse` and
+  `AtlasDashboardMediaSummaryResponse` from `features/media`.
+- Added private Media adapter DTOs describing the temporary wire response.
+- Preserved `/dashboard/media` as the current transport endpoint.
+- Continued mapping all transport data immediately into Media-owned normalized
+  domain models.
+- Kept Dashboard domain types, hooks, services, and presentation components out
+  of the Media feature.
+- Moved page refresh-state publication from render-time execution into a React
+  effect.
+
+### Architectural result
+
+The Media feature may temporarily consume an endpoint whose URL is
+dashboard-oriented, but it no longer depends on Dashboard transport or domain
+contracts.
+
+A future dedicated Media API endpoint can replace the adapter path and DTO
+without changing Media models, hooks, components, or route callers.

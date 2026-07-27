@@ -1,9 +1,9 @@
 /**
- * Portal-side representation of the Atlas authorization catalog.
+ * Stable permission identifiers and presentation-layer evaluation helpers.
  *
- * This catalog controls presentation and navigation only. The Atlas API
- * remains the authoritative security boundary and independently enforces
- * every protected request.
+ * The Atlas API owns role resolution, direct grants, explicit denials, and
+ * enforcement. The Portal consumes only the effective permission-pattern
+ * collections returned in the authenticated-user session contract.
  */
 
 export const ATLAS_PERMISSIONS = {
@@ -23,90 +23,10 @@ export const ATLAS_PERMISSIONS = {
 export type AtlasPermission =
   (typeof ATLAS_PERMISSIONS)[keyof typeof ATLAS_PERMISSIONS] | (string & {});
 
-export const ATLAS_ROLE_ALIASES: Readonly<Record<string, string>> = Object.freeze({
-  admin: "global_admin",
-  games_admin: "gameserver_admin",
-  readonly: "read_only",
-  user: "member"
-});
-
-export const ATLAS_ROLE_PERMISSIONS: Readonly<Record<string, readonly string[]>> = Object.freeze({
-  owner: Object.freeze(["*"]),
-
-  global_admin: Object.freeze([
-    "atlas.*",
-    "audit.*",
-    "cleanup.*",
-    "favorites.*",
-    "gameservers.*",
-    "media.*",
-    "modules.*",
-    "monitoring.*",
-    "requests.*",
-    "retention.*",
-    "roles.*",
-    "scheduler.*",
-    "system.*",
-    "users.*"
-  ]),
-
-  atlas_admin: Object.freeze([
-    "atlas.*",
-    "cleanup.*",
-    "favorites.*",
-    "media.*",
-    "modules.read",
-    "monitoring.read",
-    "requests.*",
-    "retention.*",
-    "scheduler.*",
-    "system.health.read",
-    "system.logs.read"
-  ]),
-
-  gameserver_admin: Object.freeze([
-    "gameservers.*",
-    "monitoring.read",
-    "system.health.read",
-    "system.logs.read"
-  ]),
-
-  monitoring_admin: Object.freeze([
-    "monitoring.*",
-    "system.checks.run",
-    "system.health.read",
-    "system.logs.read"
-  ]),
-
-  operator: Object.freeze([
-    "cleanup.run",
-    "gameservers.restart",
-    "gameservers.start",
-    "gameservers.stop",
-    "monitoring.read",
-    "scheduler.run",
-    "system.checks.run",
-    "system.health.read",
-    "system.logs.read"
-  ]),
-
-  check_runner: Object.freeze(["monitoring.read", "system.checks.run", "system.health.read"]),
-
-  read_only: Object.freeze(["*.read"]),
-
-  member: Object.freeze([
-    "atlas.dashboard.read",
-    "favorites.read",
-    "favorites.write",
-    "media.read",
-    "requests.create",
-    "requests.read",
-    "users.self.read",
-    "users.self.update"
-  ])
-});
-
-const EMPTY_PERMISSIONS: readonly string[] = Object.freeze([]);
+export type AtlasEffectivePermissionPatterns = Readonly<{
+  grantedPermissionPatterns: readonly string[];
+  deniedPermissionPatterns: readonly string[];
+}>;
 
 function normalizeRequiredValue(value: string, label: string): string {
   const normalized = value.trim().toLowerCase();
@@ -118,11 +38,6 @@ function normalizeRequiredValue(value: string, label: string): string {
   return normalized;
 }
 
-export function normalizeAtlasRole(role: string): string {
-  const normalized = normalizeRequiredValue(role, "Atlas role");
-  return ATLAS_ROLE_ALIASES[normalized] ?? normalized;
-}
-
 export function normalizeAtlasPermission(permission: string): string {
   return normalizeRequiredValue(permission, "Atlas permission");
 }
@@ -131,7 +46,7 @@ export function normalizeAtlasPermission(permission: string): string {
  * Match an Atlas permission pattern with the same wildcard behavior used by
  * Python fnmatchcase(), which backs the Atlas API authorization service.
  *
- * Atlas currently permits only `*` wildcard patterns:
+ * Atlas currently permits `*` wildcard patterns such as:
  *
  *   *          matches every permission
  *   atlas.*    matches atlas.dashboard.read
@@ -149,41 +64,45 @@ export function atlasPermissionPatternMatches(
     return true;
   }
 
-  /*
-   * Escape regular-expression syntax while preserving `*`, then translate
-   * each `*` into an unrestricted wildcard.
-   */
   const escapedPattern = normalizedPattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
-
   const regularExpressionPattern = escapedPattern.replace(/\*/g, ".*");
 
   return new RegExp(`^${regularExpressionPattern}$`).test(normalizedPermission);
 }
 
-export function atlasRolePermissions(role: string): readonly string[] {
-  return ATLAS_ROLE_PERMISSIONS[normalizeAtlasRole(role)] ?? EMPTY_PERMISSIONS;
+function matchesAnyPermissionPattern(patterns: readonly string[], permission: string): boolean {
+  return patterns.some((pattern) => atlasPermissionPatternMatches(pattern, permission));
 }
 
-export function hasAtlasPermission(roles: readonly string[], requestedPermission: string): boolean {
+/**
+ * Evaluate one concrete permission against API-resolved effective patterns.
+ *
+ * Explicit denials always take precedence over grants, including wildcard
+ * grants. This mirrors the Atlas API authorization service.
+ */
+export function hasAtlasPermission(
+  authorization: AtlasEffectivePermissionPatterns,
+  requestedPermission: string
+): boolean {
   const normalizedPermission = normalizeAtlasPermission(requestedPermission);
 
-  return roles.some((role) =>
-    atlasRolePermissions(role).some((pattern) =>
-      atlasPermissionPatternMatches(pattern, normalizedPermission)
-    )
-  );
+  if (matchesAnyPermissionPattern(authorization.deniedPermissionPatterns, normalizedPermission)) {
+    return false;
+  }
+
+  return matchesAnyPermissionPattern(authorization.grantedPermissionPatterns, normalizedPermission);
 }
 
 export function hasEveryAtlasPermission(
-  roles: readonly string[],
+  authorization: AtlasEffectivePermissionPatterns,
   requestedPermissions: readonly string[]
 ): boolean {
-  return requestedPermissions.every((permission) => hasAtlasPermission(roles, permission));
+  return requestedPermissions.every((permission) => hasAtlasPermission(authorization, permission));
 }
 
 export function hasAnyAtlasPermission(
-  roles: readonly string[],
+  authorization: AtlasEffectivePermissionPatterns,
   requestedPermissions: readonly string[]
 ): boolean {
-  return requestedPermissions.some((permission) => hasAtlasPermission(roles, permission));
+  return requestedPermissions.some((permission) => hasAtlasPermission(authorization, permission));
 }

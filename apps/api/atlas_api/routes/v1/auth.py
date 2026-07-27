@@ -25,6 +25,8 @@ from atlas_api.dependencies import (
     resolve_refresh_user,
 )
 from atlas_api.security import require_permission
+from atlas_api.security.dependencies import get_authorization_service
+from atlas_api.security.permissions import build_authorization_subject
 
 
 router = APIRouter(
@@ -121,13 +123,26 @@ def refresh_tokens(
 )
 def read_current_user(
     user: AuthenticatedUser = Depends(require_current_user_read),
+    profiles=Depends(get_user_profile_store),
+    authorization=Depends(get_authorization_service),
 ) -> CurrentUserResponse:
-    """Return the active Atlas profile represented by an access token."""
+    """Return the authenticated user and effective authorization state."""
+
+    profile = profiles.get_user(user.user_id)
+    effective = authorization.resolve(
+        build_authorization_subject(profile)
+    )
 
     return CurrentUserResponse(
         user_id=user.user_id,
         username=user.username,
         display_name=user.display_name,
-        roles=list(user.roles),
+        roles=list(effective.roles),
         provider=user.provider,
+        granted_permission_patterns=sorted(
+            effective.granted_permissions
+        ),
+        denied_permission_patterns=sorted(
+            effective.denied_permissions
+        ),
     )

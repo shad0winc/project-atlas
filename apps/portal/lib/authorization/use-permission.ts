@@ -6,11 +6,13 @@ import {
   hasAnyAtlasPermission,
   hasAtlasPermission,
   hasEveryAtlasPermission,
+  type AtlasEffectivePermissionPatterns,
   type AtlasPermission
 } from "./permissions";
 
 export type AtlasPermissionEvaluation = Readonly<{
-  roles: readonly string[];
+  grantedPermissionPatterns: readonly string[];
+  deniedPermissionPatterns: readonly string[];
   can: (permission: AtlasPermission) => boolean;
   canAny: (permissions: readonly AtlasPermission[]) => boolean;
   canEvery: (permissions: readonly AtlasPermission[]) => boolean;
@@ -19,17 +21,21 @@ export type AtlasPermissionEvaluation = Readonly<{
 /**
  * Evaluate presentation-layer permissions for the authenticated Portal user.
  *
- * The API remains authoritative. This hook determines only which Portal
- * controls and navigation entries should be presented to the user.
+ * Effective grants and denials are resolved by the Atlas API. This hook only
+ * applies those returned patterns to Portal navigation and presentation.
  */
 export function usePermission(): AtlasPermissionEvaluation {
   const { user } = useAuth();
-  const roles = user?.roles ?? [];
+
+  const authorization: AtlasEffectivePermissionPatterns = {
+    grantedPermissionPatterns: user?.granted_permission_patterns ?? [],
+    deniedPermissionPatterns: user?.denied_permission_patterns ?? []
+  };
 
   return {
-    roles,
-    can: (permission) => hasAtlasPermission(roles, permission),
-    canAny: (permissions) => hasAnyAtlasPermission(roles, permissions),
-    canEvery: (permissions) => hasEveryAtlasPermission(roles, permissions)
+    ...authorization,
+    can: (permission) => hasAtlasPermission(authorization, permission),
+    canAny: (permissions) => hasAnyAtlasPermission(authorization, permissions),
+    canEvery: (permissions) => hasEveryAtlasPermission(authorization, permissions)
   };
 }

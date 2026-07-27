@@ -14,7 +14,10 @@ type PortalSidebarProps = Readonly<{
 
 export function PortalSidebar({ isOpen, onClose }: PortalSidebarProps): React.ReactElement {
   const { user } = useAuth();
-  const navigationSections = visiblePortalNavigationSections(user?.roles ?? []);
+  const navigationSections = visiblePortalNavigationSections({
+    grantedPermissionPatterns: user?.granted_permission_patterns ?? [],
+    deniedPermissionPatterns: user?.denied_permission_patterns ?? []
+  });
 
   return (
     <>
@@ -60,7 +63,7 @@ export function PortalSidebar({ isOpen, onClose }: PortalSidebarProps): React.Re
 
               <div className="portal-nav-list">
                 {section.items.map((item) => (
-                  <PortalNavLink item={item} key={item.href} onNavigate={onClose} />
+                  <PortalNavLink item={item} key={item.path} onNavigate={onClose} />
                 ))}
               </div>
             </section>

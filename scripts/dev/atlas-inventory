@@ -1,0 +1,477 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+PROJECT_ROOT="${ATLAS_PROJECT_ROOT:-/opt/project-atlas}"
+OUTPUT_DIRECTORY="${ATLAS_INVENTORY_OUTPUT_DIR:-${PROJECT_ROOT}/artifacts}"
+
+usage() {
+    cat <<'USAGE'
+Usage:
+  scripts/dev/atlas-inventory
+  scripts/dev/atlas-inventory --output PATH
+  scripts/dev/atlas-inventory --stdout
+  scripts/dev/atlas-inventory --help
+
+Options:
+  --output PATH  Write the inventory to an explicit path.
+  --stdout       Print the inventory directly instead of writing a file.
+  --help         Show this help text.
+
+Environment:
+  ATLAS_PROJECT_ROOT
+      Overrides the repository root. Default: /opt/project-atlas
+
+  ATLAS_INVENTORY_OUTPUT_DIR
+      Overrides the default artifact directory.
+      Default: <project-root>/artifacts
+USAGE
+}
+
+fail() {
+    printf 'ERROR: %s\n' "$*" >&2
+    exit 1
+}
+
+timestamp() {
+    date '+%Y%m%d-%H%M%S'
+}
+
+iso_timestamp() {
+    date --iso-8601=seconds
+}
+
+require_command() {
+    local command_name="$1"
+
+    command -v "$command_name" >/dev/null 2>&1 ||
+        fail "Required command is unavailable: ${command_name}"
+}
+
+print_section() {
+    local title="$1"
+
+    printf '\n'
+    printf '===== %s =====\n' "$title"
+}
+
+repository_status() {
+    git status --short
+}
+
+inventory_body() {
+    printf '%s\n' \
+        '============================================================' \
+        'AEB-0002.1 — REPOSITORY CONTRACT INVENTORY' \
+        '============================================================'
+
+    print_section "REPORT METADATA"
+    printf 'Generated: %s\n' "$(iso_timestamp)"
+    printf 'Host: %s\n' "$(hostname)"
+    printf 'Repository: %s\n' "$PROJECT_ROOT"
+    printf 'Utility: scripts/dev/atlas-inventory\n'
+
+    print_section "REPOSITORY IDENTITY"
+    printf 'Remote: %s\n' "$(git config --get remote.origin.url || printf 'unavailable')"
+    printf 'Branch: %s\n' "$(git branch --show-current)"
+    printf 'HEAD: %s\n' "$(git rev-parse HEAD)"
+    printf 'Short HEAD: %s\n' "$(git rev-parse --short HEAD)"
+
+    print_section "WORKING TREE STATUS"
+    if [ -n "$(repository_status)" ]; then
+        repository_status
+    else
+        printf 'Working tree clean.\n'
+    fi
+
+    print_section "TOP-LEVEL REPOSITORY STRUCTURE"
+    find . \
+        -mindepth 1 \
+        -maxdepth 2 \
+        -not -path './.git' \
+        -not -path './.git/*' \
+        -printf '%y %p\n' \
+        | sort
+
+    print_section "APPLICATION AND PACKAGE DIRECTORIES"
+    find . \
+        -type d \
+        \( \
+            -iname '*api*' \
+            -o -iname '*portal*' \
+            -o -iname '*web*' \
+            -o -iname '*frontend*' \
+            -o -iname '*backend*' \
+            -o -iname '*server*' \
+            -o -iname '*client*' \
+        \) \
+        -not -path './.git/*' \
+        -not -path '*/node_modules/*' \
+        -not -path '*/dist/*' \
+        -not -path '*/build/*' \
+        -not -path '*/coverage/*' \
+        -not -path '*/.venv/*' \
+        -not -path '*/venv/*' \
+        -not -path '*/__pycache__/*' \
+        -print \
+        | sort
+
+    print_section "PROJECT MANIFESTS"
+    find . \
+        -type f \
+        \( \
+            -name 'package.json' \
+            -o -name 'package-lock.json' \
+            -o -name 'pnpm-lock.yaml' \
+            -o -name 'yarn.lock' \
+            -o -name 'pyproject.toml' \
+            -o -name 'requirements.txt' \
+            -o -name 'requirements-*.txt' \
+            -o -name 'Pipfile' \
+            -o -name 'poetry.lock' \
+            -o -name 'Cargo.toml' \
+            -o -name 'go.mod' \
+        \) \
+        -not -path './.git/*' \
+        -not -path '*/node_modules/*' \
+        -print \
+        | sort
+
+    print_section "CONTAINER AND SERVICE DEFINITIONS"
+    find . \
+        -type f \
+        \( \
+            -iname 'docker-compose*.yml' \
+            -o -iname 'docker-compose*.yaml' \
+            -o -iname 'compose*.yml' \
+            -o -iname 'compose*.yaml' \
+            -o -iname 'Dockerfile' \
+            -o -iname 'Dockerfile.*' \
+        \) \
+        -not -path './.git/*' \
+        -print \
+        | sort
+
+    print_section "RELEVANT SOURCE FILE INVENTORY"
+    find . \
+        -type f \
+        \( \
+            -name '*.py' \
+            -o -name '*.js' \
+            -o -name '*.jsx' \
+            -o -name '*.ts' \
+            -o -name '*.tsx' \
+            -o -name '*.vue' \
+            -o -name '*.svelte' \
+            -o -name '*.html' \
+            -o -name '*.css' \
+        \) \
+        -not -path './.git/*' \
+        -not -path '*/node_modules/*' \
+        -not -path '*/dist/*' \
+        -not -path '*/build/*' \
+        -not -path '*/coverage/*' \
+        -not -path '*/.venv/*' \
+        -not -path '*/venv/*' \
+        -not -path '*/__pycache__/*' \
+        -print \
+        | sort
+
+    print_section "API ROUTE DEFINITIONS"
+    grep -RInE \
+        --include='*.py' \
+        --include='*.js' \
+        --include='*.jsx' \
+        --include='*.ts' \
+        --include='*.tsx' \
+        --exclude-dir='.git' \
+        --exclude-dir='node_modules' \
+        --exclude-dir='dist' \
+        --exclude-dir='build' \
+        --exclude-dir='coverage' \
+        --exclude-dir='.venv' \
+        --exclude-dir='venv' \
+        --exclude-dir='__pycache__' \
+        '(@(app|router)\.(get|post|put|patch|delete)|APIRouter|add_api_route|route\(|Router\(|app\.(get|post|put|patch|delete)\()' \
+        . || true
+
+    print_section "API V1 REFERENCES"
+    grep -RIn \
+        --include='*.py' \
+        --include='*.js' \
+        --include='*.jsx' \
+        --include='*.ts' \
+        --include='*.tsx' \
+        --include='*.json' \
+        --include='*.md' \
+        --exclude-dir='.git' \
+        --exclude-dir='node_modules' \
+        --exclude-dir='dist' \
+        --exclude-dir='build' \
+        --exclude-dir='coverage' \
+        --exclude-dir='.venv' \
+        --exclude-dir='venv' \
+        --exclude-dir='__pycache__' \
+        '/api/v1' \
+        . || true
+
+    print_section "AUTHENTICATION REFERENCES"
+    grep -RInE \
+        --include='*.py' \
+        --include='*.js' \
+        --include='*.jsx' \
+        --include='*.ts' \
+        --include='*.tsx' \
+        --include='*.json' \
+        --include='*.md' \
+        --exclude-dir='.git' \
+        --exclude-dir='node_modules' \
+        --exclude-dir='dist' \
+        --exclude-dir='build' \
+        --exclude-dir='coverage' \
+        --exclude-dir='.venv' \
+        --exclude-dir='venv' \
+        --exclude-dir='__pycache__' \
+        '(auth/login|auth/me|current[_ -]?user|currentUser|get_current_user|Authorization|Bearer|access[_-]?token|refresh[_-]?token|JWT|jwt|sessionStorage|localStorage|HttpOnly|SameSite)' \
+        . || true
+
+    print_section "HEALTH ENDPOINT REFERENCES"
+    grep -RInE \
+        --include='*.py' \
+        --include='*.js' \
+        --include='*.jsx' \
+        --include='*.ts' \
+        --include='*.tsx' \
+        --include='*.json' \
+        --include='*.md' \
+        --exclude-dir='.git' \
+        --exclude-dir='node_modules' \
+        --exclude-dir='dist' \
+        --exclude-dir='build' \
+        --exclude-dir='coverage' \
+        --exclude-dir='.venv' \
+        --exclude-dir='venv' \
+        --exclude-dir='__pycache__' \
+        '(/health|health\(|HealthResponse|HealthStatus)' \
+        . || true
+
+    print_section "CLIENT HTTP USAGE"
+    grep -RInE \
+        --include='*.js' \
+        --include='*.jsx' \
+        --include='*.ts' \
+        --include='*.tsx' \
+        --include='*.vue' \
+        --include='*.svelte' \
+        --exclude-dir='.git' \
+        --exclude-dir='node_modules' \
+        --exclude-dir='dist' \
+        --exclude-dir='build' \
+        --exclude-dir='coverage' \
+        '(fetch\(|axios|ky\(|superagent|XMLHttpRequest|createClient|httpClient|apiClient)' \
+        . || true
+
+    print_section "API URL AND ENVIRONMENT REFERENCES"
+    grep -RInE \
+        --include='*.py' \
+        --include='*.js' \
+        --include='*.jsx' \
+        --include='*.ts' \
+        --include='*.tsx' \
+        --include='*.json' \
+        --include='*.env' \
+        --include='*.env.example' \
+        --include='*.md' \
+        --exclude-dir='.git' \
+        --exclude-dir='node_modules' \
+        --exclude-dir='dist' \
+        --exclude-dir='build' \
+        --exclude-dir='coverage' \
+        --exclude-dir='.venv' \
+        --exclude-dir='venv' \
+        --exclude-dir='__pycache__' \
+        '(API_URL|API_BASE|BASE_URL|VITE_|NEXT_PUBLIC_|PUBLIC_|REACT_APP_|localhost:[0-9]+|127\.0\.0\.1:[0-9]+)' \
+        . || true
+
+    print_section "RESPONSE AND ERROR CONTRACT REFERENCES"
+    grep -RInE \
+        --include='*.py' \
+        --include='*.js' \
+        --include='*.jsx' \
+        --include='*.ts' \
+        --include='*.tsx' \
+        --exclude-dir='.git' \
+        --exclude-dir='node_modules' \
+        --exclude-dir='dist' \
+        --exclude-dir='build' \
+        --exclude-dir='coverage' \
+        --exclude-dir='.venv' \
+        --exclude-dir='venv' \
+        --exclude-dir='__pycache__' \
+        '(ErrorResponse|APIError|ApiError|HTTPException|ResponseModel|response_model|status_code|error_code|errorCode|detail)' \
+        . || true
+
+    print_section "TYPE AND DTO REFERENCES"
+    grep -RInE \
+        --include='*.py' \
+        --include='*.js' \
+        --include='*.jsx' \
+        --include='*.ts' \
+        --include='*.tsx' \
+        --exclude-dir='.git' \
+        --exclude-dir='node_modules' \
+        --exclude-dir='dist' \
+        --exclude-dir='build' \
+        --exclude-dir='coverage' \
+        --exclude-dir='.venv' \
+        --exclude-dir='venv' \
+        --exclude-dir='__pycache__' \
+        '(DTO|Dto|RequestModel|ResponseModel|LoginRequest|LoginResponse|UserResponse|HealthResponse|interface .*Response|type .*Response)' \
+        . || true
+
+    print_section "CORS AND PROXY CONFIGURATION"
+    grep -RInE \
+        --include='*.py' \
+        --include='*.js' \
+        --include='*.ts' \
+        --include='*.json' \
+        --include='*.yml' \
+        --include='*.yaml' \
+        --include='*.conf' \
+        --exclude-dir='.git' \
+        --exclude-dir='node_modules' \
+        --exclude-dir='dist' \
+        --exclude-dir='build' \
+        --exclude-dir='coverage' \
+        --exclude-dir='.venv' \
+        --exclude-dir='venv' \
+        --exclude-dir='__pycache__' \
+        '(CORS|CORSMiddleware|allow_origins|proxy|rewrite|upstream|Access-Control-Allow-Origin)' \
+        . || true
+
+    print_section "RELATED TEST FILES"
+    find . \
+        -type f \
+        \( \
+            -iname '*api*test*' \
+            -o -iname '*test*api*' \
+            -o -iname '*auth*test*' \
+            -o -iname '*test*auth*' \
+            -o -iname '*health*test*' \
+            -o -iname '*test*health*' \
+            -o -iname '*portal*test*' \
+            -o -iname '*test*portal*' \
+        \) \
+        -not -path './.git/*' \
+        -not -path '*/node_modules/*' \
+        -not -path '*/dist/*' \
+        -not -path '*/build/*' \
+        -not -path '*/coverage/*' \
+        -not -path '*/.venv/*' \
+        -not -path '*/venv/*' \
+        -print \
+        | sort
+
+    print_section "DOCUMENTATION REFERENCES"
+    grep -RInE \
+        --include='*.md' \
+        --exclude-dir='.git' \
+        '(Portal|API Integration|API Client|Authentication|/api/v1/auth/login|/api/v1/auth/me|/api/v1/health)' \
+        docs README.md ROADMAP.md CHARTER.md 2>/dev/null || true
+
+    print_section "FINAL READ-ONLY STATUS CHECK"
+    if [ -n "$(repository_status)" ]; then
+        repository_status
+    else
+        printf 'Working tree clean.\n'
+    fi
+
+    printf '\n%s\n' \
+        '============================================================' \
+        'AEB-0002.1 INVENTORY COMPLETE' \
+        '============================================================'
+}
+
+main() {
+    local output_path=""
+    local stdout_mode="false"
+
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --output)
+                [ "$#" -ge 2 ] ||
+                    fail "--output requires a path."
+
+                output_path="$2"
+                shift 2
+                ;;
+
+            --stdout)
+                stdout_mode="true"
+                shift
+                ;;
+
+            --help|-h)
+                usage
+                exit 0
+                ;;
+
+            *)
+                fail "Unknown argument: $1"
+                ;;
+        esac
+    done
+
+    require_command git
+    require_command find
+    require_command grep
+    require_command sort
+    require_command date
+    require_command hostname
+    require_command wc
+    require_command du
+
+    [ -d "$PROJECT_ROOT" ] ||
+        fail "Project root does not exist: $PROJECT_ROOT"
+
+    cd "$PROJECT_ROOT"
+
+    git rev-parse --is-inside-work-tree >/dev/null 2>&1 ||
+        fail "Not a Git working tree: $PROJECT_ROOT"
+
+    if [ "$stdout_mode" = "true" ]; then
+        inventory_body
+        exit 0
+    fi
+
+    if [ -z "$output_path" ]; then
+        output_path="${OUTPUT_DIRECTORY}/AEB-0002.1-repository-contract-inventory-$(timestamp).txt"
+    elif [[ "$output_path" != /* ]]; then
+        output_path="${PROJECT_ROOT}/${output_path}"
+    fi
+
+    mkdir -p "$(dirname "$output_path")"
+
+    inventory_body > "$output_path" 2>&1
+
+    [ -s "$output_path" ] ||
+        fail "Inventory report was created but is empty: $output_path"
+
+    local line_count
+    local byte_count
+
+    line_count="$(wc -l < "$output_path")"
+    byte_count="$(wc -c < "$output_path")"
+
+    if [ "$line_count" -lt 25 ]; then
+        fail "Inventory report appears incomplete: only ${line_count} lines."
+    fi
+
+    printf 'Inventory completed successfully.\n'
+    printf 'File: %s\n' "$output_path"
+    printf 'Lines: %s\n' "$line_count"
+    printf 'Bytes: %s\n' "$byte_count"
+    printf 'Size: %s\n' "$(du -h "$output_path" | cut -f1)"
+}
+
+main "$@"

@@ -30,6 +30,8 @@ export interface AtlasCurrentUserResponse {
   readonly display_name: string;
   readonly roles: readonly string[];
   readonly provider: string;
+  readonly granted_permission_patterns: readonly string[];
+  readonly denied_permission_patterns: readonly string[];
 }
 
 export type AtlasDashboardMetricStatus = "healthy" | "warning" | "offline" | "unknown";
