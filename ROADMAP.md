@@ -178,6 +178,11 @@ core services rather than implementing separate platform foundations.
 - [x] Add reusable authorization dependencies
 - [x] Enforce authorization on authenticated user endpoints
 - [x] Add public-ingress architecture
+- [x] Media library detail domain model
+- [x] Media library detail service
+- [x] Media library detail API schema
+- [x] Media library detail endpoint
+- [x] Media library detail API contract tests
 
 ---
 

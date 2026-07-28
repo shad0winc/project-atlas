@@ -4,6 +4,14 @@ All notable changes to Project Atlas are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Media Library Detail domain model.
+- Media Library Detail API schema.
+- Media Library Detail service layer.
+- `GET /api/v1/media/libraries/{library_id}` endpoint.
+- Comprehensive unit and integration tests for the complete media library detail pipeline.
+
 
 <!-- AEB-0002.4: authorization-enforcement -->
 

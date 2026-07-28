@@ -947,3 +947,34 @@ contracts.
 
 A future dedicated Media API endpoint can replace the adapter path and DTO
 without changing Media models, hooks, components, or route callers.
+
+---
+
+## M-016.2 — Media Library Detail API
+
+Completed:
+
+- MediaLibraryDetail domain model
+- API response schema
+- Service layer
+- Media library detail endpoint
+- Permission integration
+- OpenAPI registration
+- Comprehensive test coverage
+
+Validation:
+
+- Focused API tests: 24 passed
+- API suite: 127 passed (5 subtests)
+- Core suite: 656 passed (104 subtests)
+
+Engineering Notes:
+
+- Verified compatibility with FastAPI's newer `_IncludedRouter` implementation.
+- Updated validation strategy to rely on the OpenAPI contract instead of internal route inspection.
+- Confirmed protected endpoint behavior requires valid JWT configuration before authorization.
+
+Status:
+
+M-016.2 complete and ready for review.
+

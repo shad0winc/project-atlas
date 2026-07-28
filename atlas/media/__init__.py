@@ -9,6 +9,15 @@ from atlas.media.jellyfin import (
     JellyfinProvider,
     default_jellyfin_provider,
 )
+from atlas.media.library_detail import (
+    MEDIA_LIBRARY_IDS,
+    MediaLibraryDetail,
+    MediaLibraryDetailStatus,
+    MediaLibraryFilesystem,
+    MediaLibraryProvider,
+    MediaLibrarySynchronization,
+    MediaLibraryValidation,
+)
 from atlas.media.library_summary import (
     MediaLibraryCount,
     MediaLibraryStatus,
@@ -33,6 +42,13 @@ from atlas.media.recording import (
 
 __all__ = [
     "JellyfinProvider",
+    "MEDIA_LIBRARY_IDS",
+    "MediaLibraryDetail",
+    "MediaLibraryDetailStatus",
+    "MediaLibraryFilesystem",
+    "MediaLibraryProvider",
+    "MediaLibrarySynchronization",
+    "MediaLibraryValidation",
     "MediaItem",
     "MediaLibraryCount",
     "MediaLibraryStatus",
