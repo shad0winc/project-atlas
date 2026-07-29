@@ -90,6 +90,22 @@ inventory_body() {
         -maxdepth 2 \
         -not -path './.git' \
         -not -path './.git/*' \
+        -not -path './artifacts' \
+        -not -path './artifacts/*' \
+        -not -path './reports' \
+        -not -path './reports/*' \
+        -not -path './.atlas-backups' \
+        -not -path './.atlas-backups/*' \
+        -not -path './atlas-bootstrap-*' \
+        -not -path './atlas-bootstrap-*/*' \
+        -not -path '*/__pycache__' \
+        -not -path '*/__pycache__/*' \
+        -not -path '*/.pytest_cache' \
+        -not -path '*/.pytest_cache/*' \
+        -not -path '*/.mypy_cache' \
+        -not -path '*/.mypy_cache/*' \
+        -not -path '*/.ruff_cache' \
+        -not -path '*/.ruff_cache/*' \
         -printf '%y %p\n' \
         | sort
 
@@ -106,6 +122,22 @@ inventory_body() {
             -o -iname '*client*' \
         \) \
         -not -path './.git/*' \
+        -not -path './artifacts' \
+        -not -path './artifacts/*' \
+        -not -path './reports' \
+        -not -path './reports/*' \
+        -not -path './.atlas-backups' \
+        -not -path './.atlas-backups/*' \
+        -not -path './atlas-bootstrap-*' \
+        -not -path './atlas-bootstrap-*/*' \
+        -not -path '*/__pycache__' \
+        -not -path '*/__pycache__/*' \
+        -not -path '*/.pytest_cache' \
+        -not -path '*/.pytest_cache/*' \
+        -not -path '*/.mypy_cache' \
+        -not -path '*/.mypy_cache/*' \
+        -not -path '*/.ruff_cache' \
+        -not -path '*/.ruff_cache/*' \
         -not -path '*/node_modules/*' \
         -not -path '*/dist/*' \
         -not -path '*/build/*' \
@@ -133,6 +165,22 @@ inventory_body() {
             -o -name 'go.mod' \
         \) \
         -not -path './.git/*' \
+        -not -path './artifacts' \
+        -not -path './artifacts/*' \
+        -not -path './reports' \
+        -not -path './reports/*' \
+        -not -path './.atlas-backups' \
+        -not -path './.atlas-backups/*' \
+        -not -path './atlas-bootstrap-*' \
+        -not -path './atlas-bootstrap-*/*' \
+        -not -path '*/__pycache__' \
+        -not -path '*/__pycache__/*' \
+        -not -path '*/.pytest_cache' \
+        -not -path '*/.pytest_cache/*' \
+        -not -path '*/.mypy_cache' \
+        -not -path '*/.mypy_cache/*' \
+        -not -path '*/.ruff_cache' \
+        -not -path '*/.ruff_cache/*' \
         -not -path '*/node_modules/*' \
         -print \
         | sort
@@ -149,6 +197,22 @@ inventory_body() {
             -o -iname 'Dockerfile.*' \
         \) \
         -not -path './.git/*' \
+        -not -path './artifacts' \
+        -not -path './artifacts/*' \
+        -not -path './reports' \
+        -not -path './reports/*' \
+        -not -path './.atlas-backups' \
+        -not -path './.atlas-backups/*' \
+        -not -path './atlas-bootstrap-*' \
+        -not -path './atlas-bootstrap-*/*' \
+        -not -path '*/__pycache__' \
+        -not -path '*/__pycache__/*' \
+        -not -path '*/.pytest_cache' \
+        -not -path '*/.pytest_cache/*' \
+        -not -path '*/.mypy_cache' \
+        -not -path '*/.mypy_cache/*' \
+        -not -path '*/.ruff_cache' \
+        -not -path '*/.ruff_cache/*' \
         -print \
         | sort
 
@@ -167,6 +231,22 @@ inventory_body() {
             -o -name '*.css' \
         \) \
         -not -path './.git/*' \
+        -not -path './artifacts' \
+        -not -path './artifacts/*' \
+        -not -path './reports' \
+        -not -path './reports/*' \
+        -not -path './.atlas-backups' \
+        -not -path './.atlas-backups/*' \
+        -not -path './atlas-bootstrap-*' \
+        -not -path './atlas-bootstrap-*/*' \
+        -not -path '*/__pycache__' \
+        -not -path '*/__pycache__/*' \
+        -not -path '*/.pytest_cache' \
+        -not -path '*/.pytest_cache/*' \
+        -not -path '*/.mypy_cache' \
+        -not -path '*/.mypy_cache/*' \
+        -not -path '*/.ruff_cache' \
+        -not -path '*/.ruff_cache/*' \
         -not -path '*/node_modules/*' \
         -not -path '*/dist/*' \
         -not -path '*/build/*' \
@@ -185,6 +265,14 @@ inventory_body() {
         --include='*.ts' \
         --include='*.tsx' \
         --exclude-dir='.git' \
+        --exclude-dir='artifacts' \
+        --exclude-dir='reports' \
+        --exclude-dir='.atlas-backups' \
+        --exclude-dir='atlas-bootstrap-*' \
+        --exclude-dir='__pycache__' \
+        --exclude-dir='.pytest_cache' \
+        --exclude-dir='.mypy_cache' \
+        --exclude-dir='.ruff_cache' \
         --exclude-dir='node_modules' \
         --exclude-dir='dist' \
         --exclude-dir='build' \
@@ -205,6 +293,14 @@ inventory_body() {
         --include='*.json' \
         --include='*.md' \
         --exclude-dir='.git' \
+        --exclude-dir='artifacts' \
+        --exclude-dir='reports' \
+        --exclude-dir='.atlas-backups' \
+        --exclude-dir='atlas-bootstrap-*' \
+        --exclude-dir='__pycache__' \
+        --exclude-dir='.pytest_cache' \
+        --exclude-dir='.mypy_cache' \
+        --exclude-dir='.ruff_cache' \
         --exclude-dir='node_modules' \
         --exclude-dir='dist' \
         --exclude-dir='build' \
@@ -225,6 +321,14 @@ inventory_body() {
         --include='*.json' \
         --include='*.md' \
         --exclude-dir='.git' \
+        --exclude-dir='artifacts' \
+        --exclude-dir='reports' \
+        --exclude-dir='.atlas-backups' \
+        --exclude-dir='atlas-bootstrap-*' \
+        --exclude-dir='__pycache__' \
+        --exclude-dir='.pytest_cache' \
+        --exclude-dir='.mypy_cache' \
+        --exclude-dir='.ruff_cache' \
         --exclude-dir='node_modules' \
         --exclude-dir='dist' \
         --exclude-dir='build' \
@@ -245,6 +349,14 @@ inventory_body() {
         --include='*.json' \
         --include='*.md' \
         --exclude-dir='.git' \
+        --exclude-dir='artifacts' \
+        --exclude-dir='reports' \
+        --exclude-dir='.atlas-backups' \
+        --exclude-dir='atlas-bootstrap-*' \
+        --exclude-dir='__pycache__' \
+        --exclude-dir='.pytest_cache' \
+        --exclude-dir='.mypy_cache' \
+        --exclude-dir='.ruff_cache' \
         --exclude-dir='node_modules' \
         --exclude-dir='dist' \
         --exclude-dir='build' \
@@ -264,6 +376,14 @@ inventory_body() {
         --include='*.vue' \
         --include='*.svelte' \
         --exclude-dir='.git' \
+        --exclude-dir='artifacts' \
+        --exclude-dir='reports' \
+        --exclude-dir='.atlas-backups' \
+        --exclude-dir='atlas-bootstrap-*' \
+        --exclude-dir='__pycache__' \
+        --exclude-dir='.pytest_cache' \
+        --exclude-dir='.mypy_cache' \
+        --exclude-dir='.ruff_cache' \
         --exclude-dir='node_modules' \
         --exclude-dir='dist' \
         --exclude-dir='build' \
@@ -283,6 +403,14 @@ inventory_body() {
         --include='*.env.example' \
         --include='*.md' \
         --exclude-dir='.git' \
+        --exclude-dir='artifacts' \
+        --exclude-dir='reports' \
+        --exclude-dir='.atlas-backups' \
+        --exclude-dir='atlas-bootstrap-*' \
+        --exclude-dir='__pycache__' \
+        --exclude-dir='.pytest_cache' \
+        --exclude-dir='.mypy_cache' \
+        --exclude-dir='.ruff_cache' \
         --exclude-dir='node_modules' \
         --exclude-dir='dist' \
         --exclude-dir='build' \
@@ -301,6 +429,14 @@ inventory_body() {
         --include='*.ts' \
         --include='*.tsx' \
         --exclude-dir='.git' \
+        --exclude-dir='artifacts' \
+        --exclude-dir='reports' \
+        --exclude-dir='.atlas-backups' \
+        --exclude-dir='atlas-bootstrap-*' \
+        --exclude-dir='__pycache__' \
+        --exclude-dir='.pytest_cache' \
+        --exclude-dir='.mypy_cache' \
+        --exclude-dir='.ruff_cache' \
         --exclude-dir='node_modules' \
         --exclude-dir='dist' \
         --exclude-dir='build' \
@@ -319,6 +455,14 @@ inventory_body() {
         --include='*.ts' \
         --include='*.tsx' \
         --exclude-dir='.git' \
+        --exclude-dir='artifacts' \
+        --exclude-dir='reports' \
+        --exclude-dir='.atlas-backups' \
+        --exclude-dir='atlas-bootstrap-*' \
+        --exclude-dir='__pycache__' \
+        --exclude-dir='.pytest_cache' \
+        --exclude-dir='.mypy_cache' \
+        --exclude-dir='.ruff_cache' \
         --exclude-dir='node_modules' \
         --exclude-dir='dist' \
         --exclude-dir='build' \
@@ -339,6 +483,14 @@ inventory_body() {
         --include='*.yaml' \
         --include='*.conf' \
         --exclude-dir='.git' \
+        --exclude-dir='artifacts' \
+        --exclude-dir='reports' \
+        --exclude-dir='.atlas-backups' \
+        --exclude-dir='atlas-bootstrap-*' \
+        --exclude-dir='__pycache__' \
+        --exclude-dir='.pytest_cache' \
+        --exclude-dir='.mypy_cache' \
+        --exclude-dir='.ruff_cache' \
         --exclude-dir='node_modules' \
         --exclude-dir='dist' \
         --exclude-dir='build' \
@@ -363,6 +515,22 @@ inventory_body() {
             -o -iname '*test*portal*' \
         \) \
         -not -path './.git/*' \
+        -not -path './artifacts' \
+        -not -path './artifacts/*' \
+        -not -path './reports' \
+        -not -path './reports/*' \
+        -not -path './.atlas-backups' \
+        -not -path './.atlas-backups/*' \
+        -not -path './atlas-bootstrap-*' \
+        -not -path './atlas-bootstrap-*/*' \
+        -not -path '*/__pycache__' \
+        -not -path '*/__pycache__/*' \
+        -not -path '*/.pytest_cache' \
+        -not -path '*/.pytest_cache/*' \
+        -not -path '*/.mypy_cache' \
+        -not -path '*/.mypy_cache/*' \
+        -not -path '*/.ruff_cache' \
+        -not -path '*/.ruff_cache/*' \
         -not -path '*/node_modules/*' \
         -not -path '*/dist/*' \
         -not -path '*/build/*' \
@@ -376,6 +544,14 @@ inventory_body() {
     grep -RInE \
         --include='*.md' \
         --exclude-dir='.git' \
+        --exclude-dir='artifacts' \
+        --exclude-dir='reports' \
+        --exclude-dir='.atlas-backups' \
+        --exclude-dir='atlas-bootstrap-*' \
+        --exclude-dir='__pycache__' \
+        --exclude-dir='.pytest_cache' \
+        --exclude-dir='.mypy_cache' \
+        --exclude-dir='.ruff_cache' \
         '(Portal|API Integration|API Client|Authentication|/api/v1/auth/login|/api/v1/auth/me|/api/v1/health)' \
         docs README.md ROADMAP.md CHARTER.md 2>/dev/null || true
 
