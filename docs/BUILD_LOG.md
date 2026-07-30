@@ -978,3 +978,45 @@ Status:
 
 M-016.2 complete and ready for review.
 
+
+---
+
+## M-019.5.1 — Engineering Toolkit Test Command
+
+Integrated the Engineering Toolkit contract-test runner into the public
+`atlas-dev` command interface.
+
+### Changes
+
+- Added the executable `scripts/dev/commands/test.sh` command adapter.
+- Exposed contract-test execution through `scripts/dev/atlas-dev test`.
+- Kept `scripts/dev/tests/run-tests` as the low-level test-suite runner.
+- Preserved the runner's success, test-failure, misuse, and infrastructure exit
+  statuses.
+- Rejected unexpected command arguments with status `2`.
+- Added the `test` command and usage example to `atlas-dev` help output.
+- Preserved dynamic command discovery through the existing toolkit dispatcher.
+
+### Validation
+
+- Contract-test suites discovered: 1.
+- Contract-test suites passed: 1.
+- Contract-test suites failed: 0.
+- Runtime contract assertions passed: 9.
+- Engineering Toolkit Bash files validated: 12.
+- Bash syntax validation passed.
+- Git diff-format validation passed.
+- Unexpected command arguments returned status `2`.
+
+### Architectural result
+
+The Engineering Toolkit now exposes contract testing through the same stable
+public command interface used for discovery and validation:
+
+```bash
+scripts/dev/atlas-dev test
+```
+
+The command remains a thin adapter around the standalone contract-test runner.
+This preserves a reusable low-level execution boundary while keeping
+`atlas-dev` as the stable developer-facing entry point.

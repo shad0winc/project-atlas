@@ -28,13 +28,16 @@ Commands:
   help       Show this help message
   discover   Run a repository discovery workflow
   validate   Run engineering validation
+  test       Run Engineering Toolkit contract tests
 
 Examples:
   scripts/dev/atlas-dev help
   scripts/dev/atlas-dev discover
   scripts/dev/atlas-dev validate
+  scripts/dev/atlas-dev test
 
-Additional commands will be introduced incrementally as the toolkit evolves.
+Additional Engineering Toolkit commands will continue to be
+introduced incrementally as Project Atlas evolves.
 HELP
 }
 
