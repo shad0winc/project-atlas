@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+
+# Execute Project Atlas Engineering Toolkit contract tests.
+
+set -euo pipefail
+
+RUNNER_FILE="$(
+    cd "$(dirname "${BASH_SOURCE[0]}")" &&
+        pwd
+)/$(basename "${BASH_SOURCE[0]}")"
+
+TESTS_DIR="$(dirname "$RUNNER_FILE")"
+
+if [[ "$#" -ne 0 ]]; then
+    printf 'ERROR: run-tests does not accept arguments.\n' >&2
+    exit 2
+fi
+
+if [[ ! -d "$TESTS_DIR" ]]; then
+    printf 'ERROR: Contract-test directory does not exist: %s\n' \
+        "$TESTS_DIR" >&2
+    exit 2
+fi
+
+mapfile -d '' TEST_FILES < <(
+    find "$TESTS_DIR" \
+        -mindepth 2 \
+        -type f \
+        -name 'test-*.sh' \
+        -perm /111 \
+        ! -path "$TESTS_DIR/lib/*" \
+        -print0 |
+        sort -z
+)
+
+test_total="${#TEST_FILES[@]}"
+test_passed=0
+test_failed=0
+
+declare -a FAILED_TESTS=()
+
+printf 'Engineering Toolkit contract tests\n'
+printf 'Test directory: %s\n' "$TESTS_DIR"
+printf 'Discovered: %s\n\n' "$test_total"
+
+if [[ "$test_total" -eq 0 ]]; then
+    printf 'ERROR: No executable contract tests were discovered.\n' >&2
+    exit 2
+fi
+
+for test_file in "${TEST_FILES[@]}"; do
+    relative_test="${test_file#"$TESTS_DIR"/}"
+
+    printf '%s\n' \
+        '============================================================'
+    printf 'RUN: %s\n' "$relative_test"
+    printf '%s\n\n' \
+        '============================================================'
+
+    test_status=0
+
+    "$test_file" ||
+        test_status=$?
+
+    printf '\n'
+
+    if [[ "$test_status" -eq 0 ]]; then
+        ((test_passed += 1))
+        printf 'PASS: %s\n\n' "$relative_test"
+    else
+        ((test_failed += 1))
+        FAILED_TESTS+=("$relative_test:$test_status")
+        printf 'FAIL: %s returned status %s\n\n' \
+            "$relative_test" \
+            "$test_status"
+    fi
+done
+
+printf '%s\n' \
+    '============================================================'
+printf 'Contract-Test Summary\n'
+printf '%s\n' \
+    '============================================================'
+printf 'Total:  %s\n' "$test_total"
+printf 'Passed: %s\n' "$test_passed"
+printf 'Failed: %s\n' "$test_failed"
+
+if [[ "$test_failed" -gt 0 ]]; then
+    printf '\nFailed tests:\n'
+
+    for failed_test in "${FAILED_TESTS[@]}"; do
+        printf '  - %s\n' "$failed_test"
+    done
+
+    exit 1
+fi
+
+printf '\nAll Engineering Toolkit contract tests passed.\n'
+exit 0
