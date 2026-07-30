@@ -222,6 +222,115 @@ atlas_assert_command_fails() {
     atlas_assert_false "$description" "$@"
 }
 
+atlas_assert_exit_status() {
+    local expected_status="${1-}"
+    local description="${2:-Expected command to return status $expected_status.}"
+    local command_status=0
+
+    atlas_test_require_active || return $?
+
+    if [[ ! "$expected_status" =~ ^[0-9]+$ ]]; then
+        atlas_dev_error \
+            "atlas_assert_exit_status requires a non-negative integer status."
+        return 2
+    fi
+
+    shift 2 || true
+
+    if [[ "$#" -eq 0 ]]; then
+        atlas_dev_error "atlas_assert_exit_status requires a command."
+        return 2
+    fi
+
+    "$@" >/dev/null 2>&1 ||
+        command_status=$?
+
+    if [[ "$command_status" -eq "$expected_status" ]]; then
+        atlas_test_record_pass "$description"
+        return 0
+    fi
+
+    atlas_test_record_failure \
+        "$description Expected status: [$expected_status] Actual status: [$command_status]"
+    return 0
+}
+
+atlas_assert_stdout_contains() {
+    local expected_text="${1-}"
+    local description="${2:-Expected stdout to contain: $expected_text}"
+    local command_status=0
+    local command_output=""
+    local stdout_file
+
+    atlas_test_require_active || return $?
+
+    shift 2 || true
+
+    if [[ "$#" -eq 0 ]]; then
+        atlas_dev_error "atlas_assert_stdout_contains requires a command."
+        return 2
+    fi
+
+    stdout_file="$(mktemp)" || {
+        atlas_dev_error \
+            "atlas_assert_stdout_contains could not create a temporary file."
+        return 2
+    }
+
+    "$@" >"$stdout_file" 2>/dev/null ||
+        command_status=$?
+
+    command_output="$(cat "$stdout_file")"
+    rm -f "$stdout_file"
+
+    if [[ "$command_output" == *"$expected_text"* ]]; then
+        atlas_test_record_pass "$description"
+        return 0
+    fi
+
+    atlas_test_record_failure \
+        "$description Expected stdout: [$expected_text] Actual stdout: [$command_output] Command status: [$command_status]"
+    return 0
+}
+
+atlas_assert_stderr_contains() {
+    local expected_text="${1-}"
+    local description="${2:-Expected stderr to contain: $expected_text}"
+    local command_status=0
+    local command_output=""
+    local stderr_file
+
+    atlas_test_require_active || return $?
+
+    shift 2 || true
+
+    if [[ "$#" -eq 0 ]]; then
+        atlas_dev_error "atlas_assert_stderr_contains requires a command."
+        return 2
+    fi
+
+    stderr_file="$(mktemp)" || {
+        atlas_dev_error \
+            "atlas_assert_stderr_contains could not create a temporary file."
+        return 2
+    }
+
+    "$@" >/dev/null 2>"$stderr_file" ||
+        command_status=$?
+
+    command_output="$(cat "$stderr_file")"
+    rm -f "$stderr_file"
+
+    if [[ "$command_output" == *"$expected_text"* ]]; then
+        atlas_test_record_pass "$description"
+        return 0
+    fi
+
+    atlas_test_record_failure \
+        "$description Expected stderr: [$expected_text] Actual stderr: [$command_output] Command status: [$command_status]"
+    return 0
+}
+
 atlas_test_end() {
     local failure
     local test_status=0
