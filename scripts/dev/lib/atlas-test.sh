@@ -331,6 +331,46 @@ atlas_assert_stderr_contains() {
     return 0
 }
 
+
+atlas_assert_worktree_unchanged() {
+    local expected_hash="${1-}"
+    local description="${2:-Expected tracked working-tree content to remain unchanged.}"
+    local actual_hash
+
+    atlas_test_require_active || return $?
+
+    actual_hash="$(
+        git diff --binary --no-ext-diff |
+            sha256sum |
+            awk '{print $1}'
+    )"
+
+    atlas_assert_equals \
+        "$expected_hash" \
+        "$actual_hash" \
+        "$description"
+}
+
+atlas_assert_index_unchanged() {
+    local expected_hash="${1-}"
+    local description="${2:-Expected staged repository content to remain unchanged.}"
+    local actual_hash
+
+    atlas_test_require_active || return $?
+
+    actual_hash="$(
+        git diff --cached --binary --no-ext-diff |
+            sha256sum |
+            awk '{print $1}'
+    )"
+
+    atlas_assert_equals \
+        "$expected_hash" \
+        "$actual_hash" \
+        "$description"
+}
+
+
 atlas_test_end() {
     local failure
     local test_status=0
