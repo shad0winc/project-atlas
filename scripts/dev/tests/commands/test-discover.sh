@@ -57,17 +57,7 @@ atlas_discover_list_reports "$ATLAS_DISCOVER_BASELINE_REPORTS"
 
 atlas_test_begin "discover command contract"
 
-worktree_before="$(
-    git diff --binary --no-ext-diff |
-        sha256sum |
-        awk '{print $1}'
-)"
-
-index_before="$(
-    git diff --cached --binary --no-ext-diff |
-        sha256sum |
-        awk '{print $1}'
-)"
+read -r worktree_before index_before     < <(atlas_capture_repository_state)
 
 discover_status=0
 discover_output="$(

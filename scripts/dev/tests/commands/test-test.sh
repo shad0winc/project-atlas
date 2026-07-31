@@ -16,17 +16,7 @@ cd "$ATLAS_PROJECT_DIR"
 
 atlas_test_begin "Engineering Toolkit test command"
 
-worktree_before="$(
-    git diff --binary --no-ext-diff |
-        sha256sum |
-        awk '{print $1}'
-)"
-
-index_before="$(
-    git diff --cached --binary --no-ext-diff |
-        sha256sum |
-        awk '{print $1}'
-)"
+read -r worktree_before index_before     < <(atlas_capture_repository_state)
 
 stderr_file="$(mktemp)"
 trap 'rm -f "$stderr_file"' EXIT

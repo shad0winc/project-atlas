@@ -332,6 +332,30 @@ atlas_assert_stderr_contains() {
 }
 
 
+atlas_capture_repository_state() {
+    local worktree_hash
+    local index_hash
+
+    atlas_test_require_active || return $?
+
+    worktree_hash="$(
+        git diff --binary --no-ext-diff |
+            sha256sum |
+            awk '{print $1}'
+    )"
+
+    index_hash="$(
+        git diff --cached --binary --no-ext-diff |
+            sha256sum |
+            awk '{print $1}'
+    )"
+
+    printf '%s %s
+'         "$worktree_hash"         "$index_hash"
+}
+
+
+
 atlas_assert_worktree_unchanged() {
     local expected_hash="${1-}"
     local description="${2:-Expected tracked working-tree content to remain unchanged.}"
