@@ -11,27 +11,44 @@ RUNNER_FILE="$(
 
 TESTS_DIR="$(dirname "$RUNNER_FILE")"
 
-if [[ "$#" -ne 0 ]]; then
-    printf 'ERROR: run-tests does not accept arguments.\n' >&2
-    exit 2
-fi
-
 if [[ ! -d "$TESTS_DIR" ]]; then
     printf 'ERROR: Contract-test directory does not exist: %s\n' \
         "$TESTS_DIR" >&2
     exit 2
 fi
 
-mapfile -d '' TEST_FILES < <(
-    find "$TESTS_DIR" \
-        -mindepth 2 \
-        -type f \
-        -name 'test-*.sh' \
-        -perm /111 \
-        ! -path "$TESTS_DIR/lib/*" \
-        -print0 |
-        sort -z
-)
+declare -a TEST_FILES=()
+
+if [[ "$#" -eq 0 ]]; then
+    mapfile -d '' TEST_FILES < <(
+        find "$TESTS_DIR" \
+            -mindepth 2 \
+            -type f \
+            -name 'test-*.sh' \
+            -perm /111 \
+            ! -path "$TESTS_DIR/lib/*" \
+            -print0 |
+            sort -z
+    )
+else
+    for requested_test in "$@"; do
+        test_path="$TESTS_DIR/$requested_test"
+
+        if [[ ! -f "$test_path" ]]; then
+            printf 'ERROR: Contract test not found: %s\n' \
+                "$requested_test" >&2
+            exit 2
+        fi
+
+        if [[ ! -x "$test_path" ]]; then
+            printf 'ERROR: Contract test is not executable: %s\n' \
+                "$requested_test" >&2
+            exit 2
+        fi
+
+        TEST_FILES+=("$test_path")
+    done
+fi
 
 test_total="${#TEST_FILES[@]}"
 test_passed=0

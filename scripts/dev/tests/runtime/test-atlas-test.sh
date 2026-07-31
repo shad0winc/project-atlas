@@ -32,6 +32,73 @@ atlas_assert_equals \
     "The active test name is retained."
 
 atlas_assert_command_succeeds \
+    "atlas_capture_command preserves command exit status." \
+    bash -c "
+        set -euo pipefail
+
+        source '$ATLAS_DEV_TEST_RUNTIME'
+
+        result_status=
+        result_stdout=
+        result_stderr=
+
+        atlas_capture_command \
+            result_status \
+            result_stdout \
+            result_stderr \
+            -- \
+            bash -c 'exit 42'
+
+        [[ \"\$result_status\" -eq 42 ]]
+    "
+
+atlas_assert_command_succeeds \
+    "atlas_capture_command captures stdout." \
+    bash -c "
+        set -euo pipefail
+
+        source '$ATLAS_DEV_TEST_RUNTIME'
+
+        result_status=
+        result_stdout=
+        result_stderr=
+
+        atlas_capture_command \
+            result_status \
+            result_stdout \
+            result_stderr \
+            -- \
+            printf stdout
+
+        [[ \"\$result_status\" -eq 0 ]]
+        [[ \"\$result_stdout\" == stdout ]]
+        [[ -z \"\$result_stderr\" ]]
+    "
+
+atlas_assert_command_succeeds \
+    "atlas_capture_command captures stderr." \
+    bash -c "
+        set -euo pipefail
+
+        source '$ATLAS_DEV_TEST_RUNTIME'
+
+        result_status=
+        result_stdout=
+        result_stderr=
+
+        atlas_capture_command \
+            result_status \
+            result_stdout \
+            result_stderr \
+            -- \
+            bash -c 'printf stderr >&2'
+
+        [[ \"\$result_status\" -eq 0 ]]
+        [[ -z \"\$result_stdout\" ]]
+        [[ \"\$result_stderr\" == stderr ]]
+    "
+
+atlas_assert_command_succeeds \
     "Repeated sourcing succeeds without replacing the active context." \
     bash -c "
         set -euo pipefail

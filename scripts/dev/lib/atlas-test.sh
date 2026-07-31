@@ -356,6 +356,66 @@ atlas_capture_repository_state() {
 
 
 
+
+atlas_capture_command() {
+    if [[ "$#" -lt 4 ]]; then
+        atlas_dev_error             "atlas_capture_command requires three destination variables and '--'."
+        return 2
+    fi
+
+    local status_var="$1"
+    local stdout_var="$2"
+    local stderr_var="$3"
+
+    shift 3
+
+    if [[ "${1-}" != "--" ]]; then
+        atlas_dev_error \
+            "atlas_capture_command requires '--' before the command."
+        return 2
+    fi
+
+    shift
+
+    if [[ "$#" -eq 0 ]]; then
+        atlas_dev_error \
+            "atlas_capture_command requires a command."
+        return 2
+    fi
+
+    local stdout_file
+    local stderr_file
+    local command_status=0
+    local captured_stdout=""
+    local captured_stderr=""
+
+    stdout_file="$(mktemp)" || {
+        atlas_dev_error \
+            "atlas_capture_command could not create stdout temporary file."
+        return 2
+    }
+
+    stderr_file="$(mktemp)" || {
+        rm -f "$stdout_file"
+        atlas_dev_error \
+            "atlas_capture_command could not create stderr temporary file."
+        return 2
+    }
+
+    "$@" >"$stdout_file" 2>"$stderr_file" || command_status=$?
+
+    captured_stdout="$(<"$stdout_file")"
+    captured_stderr="$(<"$stderr_file")"
+
+    rm -f "$stdout_file" "$stderr_file"
+
+    printf -v "$status_var" '%s' "$command_status"
+    printf -v "$stdout_var" '%s' "$captured_stdout"
+    printf -v "$stderr_var" '%s' "$captured_stderr"
+
+    return 0
+}
+
 atlas_assert_worktree_unchanged() {
     local expected_hash="${1-}"
     local description="${2:-Expected tracked working-tree content to remain unchanged.}"
