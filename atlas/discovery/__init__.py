@@ -12,7 +12,7 @@ from .models import (
     DiscoveryIndexer,
 )
 
-from .providers import DiscoveryProvider
+from .provider import DiscoveryProvider
 from .report import DiscoveryReport
 from .service import DiscoveryService
 

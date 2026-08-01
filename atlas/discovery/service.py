@@ -11,7 +11,7 @@ from .models import (
     DiscoveryHealth,
     DiscoveryIndexer,
 )
-from .providers import DiscoveryProvider
+from .provider import DiscoveryProvider
 from .report import DiscoveryReport
 
 
