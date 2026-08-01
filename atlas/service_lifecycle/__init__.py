@@ -13,6 +13,7 @@ from .models import (
     ServiceLifecycleError,
     ServiceRuntime,
 )
+from .provider import ServiceLifecycleProvider
 
 __all__ = [
     "ManagedService",
@@ -20,5 +21,6 @@ __all__ = [
     "ServiceHealthStatus",
     "ServiceImage",
     "ServiceLifecycleError",
+    "ServiceLifecycleProvider",
     "ServiceRuntime",
 ]
