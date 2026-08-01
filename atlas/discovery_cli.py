@@ -11,6 +11,7 @@ from typing import TextIO
 
 from atlas.discovery import (
     DiscoveryError,
+    DiscoveryHealth,
     DiscoveryIndexer,
     DiscoveryService,
 )
@@ -60,6 +61,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="List connected discovery applications.",
     )
     applications_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Render machine-readable JSON.",
+    )
+
+    health_parser = subparsers.add_parser(
+        "health",
+        help="Evaluate discovery health.",
+    )
+    health_parser.add_argument(
         "--json",
         action="store_true",
         dest="as_json",
@@ -353,6 +365,96 @@ def _command_applications(
     return 0
 
 
+def _render_health_json(
+    health: DiscoveryHealth,
+    *,
+    output: TextIO,
+) -> None:
+    """Render machine-readable health output."""
+
+    json.dump(
+        health.to_dict(),
+        output,
+        indent=2,
+        sort_keys=True,
+    )
+    output.write("\n")
+
+
+def _render_health_human(
+    health: DiscoveryHealth,
+    *,
+    output: TextIO,
+) -> None:
+    """Render human-readable health output."""
+
+    output.write("Atlas Discovery Health\n")
+    output.write("======================\n\n")
+
+    output.write(
+        f"Status: {'Healthy' if health.healthy else 'Unhealthy'}\n"
+    )
+    output.write(f"Score: {health.score}/100\n")
+    output.write(f"Evaluated: {health.evaluated_at}\n")
+
+    if health.details:
+        output.write("\nDetails\n")
+        output.write("-------\n")
+
+        for key in sorted(
+            health.details,
+            key=lambda value: (
+                str(value).casefold(),
+                str(value),
+            ),
+        ):
+            label = str(key).replace("_", " ").title()
+            output.write(f"{label}: {health.details[key]}\n")
+
+    output.write("\nWarnings\n")
+    output.write("--------\n")
+
+    if health.warnings:
+        for warning in health.warnings:
+            output.write(f"- {warning}\n")
+    else:
+        output.write("None\n")
+
+    output.write("\nErrors\n")
+    output.write("------\n")
+
+    if health.errors:
+        for error_message in health.errors:
+            output.write(f"- {error_message}\n")
+    else:
+        output.write("None\n")
+
+
+def _command_health(
+    *,
+    as_json: bool,
+    output: TextIO,
+) -> int:
+    """Execute the Discovery health command."""
+
+    provider = _provider_from_environment()
+    service = DiscoveryService(provider)
+    health = service.health()
+
+    if as_json:
+        _render_health_json(
+            health,
+            output=output,
+        )
+    else:
+        _render_health_human(
+            health,
+            output=output,
+        )
+
+    return 0 if health.healthy else 1
+
+
 def main(
     argv: Sequence[str] | None = None,
     *,
@@ -379,6 +481,12 @@ def main(
 
         if arguments.command == "applications":
             return _command_applications(
+                as_json=arguments.as_json,
+                output=output,
+            )
+
+        if arguments.command == "health":
+            return _command_health(
                 as_json=arguments.as_json,
                 output=output,
             )
