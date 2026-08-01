@@ -5,4 +5,12 @@ Concrete adapters for external discovery systems are exported from this
 package as they are introduced.
 """
 
-__all__: list[str] = []
+from .base import (
+    BaseDiscoveryProvider,
+    DiscoveryProviderError,
+)
+
+__all__ = [
+    "BaseDiscoveryProvider",
+    "DiscoveryProviderError",
+]
