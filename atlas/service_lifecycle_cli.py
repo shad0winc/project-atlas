@@ -57,6 +57,36 @@ def build_parser() -> argparse.ArgumentParser:
         help="Render machine-readable JSON.",
     )
 
+    runtime_parser = subparsers.add_parser(
+        "runtime",
+        help="Show normalized runtime state for one service.",
+    )
+    runtime_parser.add_argument(
+        "identifier",
+        help="Stable managed-service identifier.",
+    )
+    runtime_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Render machine-readable JSON.",
+    )
+
+    health_parser = subparsers.add_parser(
+        "health",
+        help="Show normalized health for one service.",
+    )
+    health_parser.add_argument(
+        "identifier",
+        help="Stable managed-service identifier.",
+    )
+    health_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Render machine-readable JSON.",
+    )
+
     return parser
 
 
@@ -260,6 +290,114 @@ def _command_show(
     return 0
 
 
+
+def _render_runtime_json(
+    runtime: ServiceRuntime,
+    *,
+    output: TextIO,
+) -> None:
+    json.dump(
+        runtime.to_dict(),
+        output,
+        indent=2,
+        sort_keys=True,
+    )
+    output.write("\n")
+
+
+def _render_runtime_human(
+    runtime: ServiceRuntime,
+    *,
+    output: TextIO,
+) -> None:
+    output.write("Atlas Service Runtime\n")
+    output.write("=====================\n\n")
+    output.write(f"State: {runtime.state}\n")
+    output.write(f"Docker Health: {runtime.health}\n")
+    output.write(f"Running: {'Yes' if runtime.running else 'No'}\n")
+    output.write(f"Healthy: {'Yes' if runtime.healthy else 'No'}\n")
+    output.write(f"Restart Count: {runtime.restart_count}\n")
+    output.write(f"Started: {runtime.started_at or 'None'}\n")
+    output.write(f"Finished: {runtime.finished_at or 'None'}\n")
+    output.write(
+        "Exit Code: "
+        f"{runtime.exit_code if runtime.exit_code is not None else 'None'}\n"
+    )
+    output.write(
+        f"Status Message: {runtime.status_message or 'None'}\n"
+    )
+    output.write(f"Image: {runtime.image.reference}\n")
+
+
+def _command_runtime(
+    identifier: str,
+    *,
+    service: ServiceLifecycleService,
+    as_json: bool,
+    output: TextIO,
+) -> int:
+    runtime = service.inspect_runtime(identifier)
+
+    if as_json:
+        _render_runtime_json(runtime, output=output)
+    else:
+        _render_runtime_human(runtime, output=output)
+
+    return 0
+
+
+def _render_health_json(
+    health: ServiceHealth,
+    *,
+    output: TextIO,
+) -> None:
+    json.dump(
+        health.to_dict(),
+        output,
+        indent=2,
+        sort_keys=True,
+    )
+    output.write("\n")
+
+
+def _render_health_human(
+    health: ServiceHealth,
+    *,
+    output: TextIO,
+) -> None:
+    warnings = "; ".join(health.warnings) if health.warnings else "None"
+    errors = "; ".join(health.errors) if health.errors else "None"
+
+    output.write("Atlas Service Health\n")
+    output.write("====================\n\n")
+    output.write(f"Status: {health.status.value}\n")
+    output.write(f"Score: {health.score}/100\n")
+    output.write(f"Healthy: {'Yes' if health.healthy else 'No'}\n")
+    output.write(
+        "Action Required: "
+        f"{'Yes' if health.action_required else 'No'}\n"
+    )
+    output.write(f"Warnings: {warnings}\n")
+    output.write(f"Errors: {errors}\n")
+    output.write(f"Evaluated: {health.evaluated_at}\n")
+
+
+def _command_health(
+    identifier: str,
+    *,
+    service: ServiceLifecycleService,
+    as_json: bool,
+    output: TextIO,
+) -> int:
+    health = service.inspect_health(identifier)
+
+    if as_json:
+        _render_health_json(health, output=output)
+    else:
+        _render_health_human(health, output=output)
+
+    return 0
+
 def main(
     argv: Sequence[str] | None = None,
     *,
@@ -291,6 +429,22 @@ def main(
 
         if arguments.command == "show":
             return _command_show(
+                arguments.identifier,
+                service=resolved_service,
+                as_json=arguments.as_json,
+                output=resolved_output,
+            )
+
+        if arguments.command == "runtime":
+            return _command_runtime(
+                arguments.identifier,
+                service=resolved_service,
+                as_json=arguments.as_json,
+                output=resolved_output,
+            )
+
+        if arguments.command == "health":
+            return _command_health(
                 arguments.identifier,
                 service=resolved_service,
                 as_json=arguments.as_json,

@@ -290,3 +290,133 @@ def test_global_help_registration() -> None:
         "atlas service show <identifier> [--json]"
         in result.stdout
     )
+
+def test_runtime_human_output() -> None:
+    service = Mock()
+    service.inspect_runtime.return_value = sample_runtime()
+    output = StringIO()
+
+    result = main(
+        ["runtime", "jellyfin"],
+        service=service,
+        output=output,
+    )
+
+    rendered = output.getvalue()
+
+    assert result == 0
+    assert "Atlas Service Runtime" in rendered
+    assert "State: running" in rendered
+    assert "Docker Health: healthy" in rendered
+    assert "Image: jellyfin/jellyfin:latest" in rendered
+    service.inspect_runtime.assert_called_once_with("jellyfin")
+
+
+def test_runtime_json_output() -> None:
+    service = Mock()
+    service.inspect_runtime.return_value = sample_runtime()
+    output = StringIO()
+
+    result = main(
+        ["runtime", "jellyfin", "--json"],
+        service=service,
+        output=output,
+    )
+
+    payload = json.loads(output.getvalue())
+
+    assert result == 0
+    assert payload["state"] == "running"
+    assert payload["health"] == "healthy"
+    assert payload["image"]["reference"] == (
+        "jellyfin/jellyfin:latest"
+    )
+
+
+def test_health_human_output() -> None:
+    service = Mock()
+    service.inspect_health.return_value = sample_health()
+    output = StringIO()
+
+    result = main(
+        ["health", "jellyfin"],
+        service=service,
+        output=output,
+    )
+
+    rendered = output.getvalue()
+
+    assert result == 0
+    assert "Atlas Service Health" in rendered
+    assert "Status: healthy" in rendered
+    assert "Score: 100/100" in rendered
+    assert "Warnings: None" in rendered
+    service.inspect_health.assert_called_once_with("jellyfin")
+
+
+def test_health_json_output() -> None:
+    service = Mock()
+    service.inspect_health.return_value = sample_health()
+    output = StringIO()
+
+    result = main(
+        ["health", "jellyfin", "--json"],
+        service=service,
+        output=output,
+    )
+
+    payload = json.loads(output.getvalue())
+
+    assert result == 0
+    assert payload["status"] == "healthy"
+    assert payload["score"] == 100
+    assert payload["warnings"] == []
+    assert payload["errors"] == []
+
+
+def test_runtime_help_is_active() -> None:
+    result = subprocess.run(
+        [str(ATLAS_CLI), "service", "runtime", "--help"],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "usage: atlas service runtime" in result.stdout
+    assert "--json" in result.stdout
+
+
+def test_health_help_is_active() -> None:
+    result = subprocess.run(
+        [str(ATLAS_CLI), "service", "health", "--help"],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "usage: atlas service health" in result.stdout
+    assert "--json" in result.stdout
+
+
+def test_service_help_registers_runtime_and_health() -> None:
+    result = subprocess.run(
+        [str(ATLAS_CLI), "service", "help"],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert (
+        "atlas service runtime <identifier> [--json]"
+        in result.stdout
+    )
+    assert (
+        "atlas service health <identifier> [--json]"
+        in result.stdout
+    )
