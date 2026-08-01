@@ -56,6 +56,39 @@ class DiscoveryService:
 
         return indexers
 
+    def list_categories(self) -> tuple[str, ...]:
+        """Return normalized provider categories in deterministic order."""
+
+        categories = self._provider.list_categories()
+
+        if (
+            isinstance(categories, (str, bytes))
+            or not isinstance(categories, Iterable)
+        ):
+            raise DiscoveryError(
+                "provider categories must be a collection",
+            )
+
+        normalized: set[str] = set()
+
+        for category in categories:
+            if not isinstance(category, str) or not category.strip():
+                raise DiscoveryError(
+                    "provider categories must contain non-empty strings",
+                )
+
+            normalized.add(category.strip())
+
+        return tuple(
+            sorted(
+                normalized,
+                key=lambda category: (
+                    category.casefold(),
+                    category,
+                ),
+            )
+        )
+
     def health(self) -> DiscoveryHealth:
         """Evaluate basic health for the configured discovery provider."""
 

@@ -8,7 +8,7 @@ Usage:
   atlas discovery
   atlas discovery help
   atlas discovery indexers [--json]
-  atlas discovery categories
+  atlas discovery categories [--json]
   atlas discovery applications
   atlas discovery health
   atlas discovery report
@@ -21,8 +21,8 @@ Commands:
   report         Generate a discovery report
   help           Show this help text
 
-The indexers command is connected to the read-only Prowlarr provider.
-Remaining functional subcommands will be introduced incrementally.
+The indexers and categories commands are connected to the read-only
+Prowlarr provider. Remaining subcommands will be introduced incrementally.
 HELP
 }
 
@@ -131,7 +131,12 @@ atlas_command_discovery() {
       atlas_discovery_python indexers "$@"
       ;;
 
-    categories|applications|health|report)
+    categories)
+      shift
+      atlas_discovery_python categories "$@"
+      ;;
+
+    applications|health|report)
       atlas_command_discovery_pending "$subcommand"
       ;;
 

@@ -44,6 +44,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Render machine-readable JSON.",
     )
 
+    categories_parser = subparsers.add_parser(
+        "categories",
+        help="List discovery categories.",
+    )
+    categories_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Render machine-readable JSON.",
+    )
+
     return parser
 
 
@@ -207,6 +218,67 @@ def _command_indexers(
     return 0
 
 
+def _render_categories_json(
+    categories: Sequence[str],
+    *,
+    output: TextIO,
+) -> None:
+    """Render machine-readable category output."""
+
+    json.dump(
+        list(categories),
+        output,
+        indent=2,
+        sort_keys=True,
+    )
+    output.write("\n")
+
+
+def _render_categories_human(
+    categories: Sequence[str],
+    *,
+    output: TextIO,
+) -> None:
+    """Render human-readable category output."""
+
+    output.write("Atlas Discovery Categories\n")
+    output.write("==========================\n\n")
+
+    if not categories:
+        output.write("No discovery categories were returned.\n")
+        return
+
+    for category in categories:
+        output.write(f"- {category}\n")
+
+    output.write(f"\nTotal: {len(categories)}\n")
+
+
+def _command_categories(
+    *,
+    as_json: bool,
+    output: TextIO,
+) -> int:
+    """Execute the category-list command."""
+
+    provider = _provider_from_environment()
+    service = DiscoveryService(provider)
+    categories = service.list_categories()
+
+    if as_json:
+        _render_categories_json(
+            categories,
+            output=output,
+        )
+    else:
+        _render_categories_human(
+            categories,
+            output=output,
+        )
+
+    return 0
+
+
 def main(
     argv: Sequence[str] | None = None,
     *,
@@ -221,6 +293,12 @@ def main(
     try:
         if arguments.command == "indexers":
             return _command_indexers(
+                as_json=arguments.as_json,
+                output=output,
+            )
+
+        if arguments.command == "categories":
+            return _command_categories(
                 as_json=arguments.as_json,
                 output=output,
             )

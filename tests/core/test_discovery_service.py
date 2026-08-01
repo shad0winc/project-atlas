@@ -483,3 +483,75 @@ def test_report_metadata_is_deterministic() -> None:
         "alpha",
         "zeta",
     ]
+
+def test_list_categories_normalizes_deduplicates_and_sorts() -> None:
+    provider = StubProvider(
+        categories=[
+            " TV ",
+            "Anime",
+            "tv",
+            "Anime",
+            "Movies",
+        ],
+    )
+    service = DiscoveryService(provider)
+
+    assert service.list_categories() == (
+        "Anime",
+        "Movies",
+        "TV",
+        "tv",
+    )
+
+
+@pytest.mark.parametrize(
+    "categories",
+    [
+        "TV",
+        b"TV",
+        None,
+        42,
+    ],
+)
+def test_list_categories_requires_collection(
+    categories: object,
+) -> None:
+    provider = StubProvider(
+        categories=categories,  # type: ignore[arg-type]
+    )
+    service = DiscoveryService(provider)
+
+    with pytest.raises(
+        DiscoveryError,
+        match="provider categories must be a collection",
+    ):
+        service.list_categories()
+
+
+@pytest.mark.parametrize(
+    "category",
+    [
+        "",
+        "   ",
+        None,
+        42,
+    ],
+)
+def test_list_categories_requires_non_empty_strings(
+    category: object,
+) -> None:
+    provider = StubProvider(
+        categories=[
+            "TV",
+            category,
+        ],  # type: ignore[list-item]
+    )
+    service = DiscoveryService(provider)
+
+    with pytest.raises(
+        DiscoveryError,
+        match=(
+            "provider categories must contain non-empty strings"
+        ),
+    ):
+        service.list_categories()
