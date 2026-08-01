@@ -1020,3 +1020,176 @@ scripts/dev/atlas-dev test
 The command remains a thin adapter around the standalone contract-test runner.
 This preserves a reusable low-level execution boundary while keeping
 `atlas-dev` as the stable developer-facing entry point.
+
+---
+
+# 2026-08-01
+
+## M-018 — Atlas Infrastructure Management: Service Lifecycle Foundation
+
+### Objective
+
+Create a safe, observable, provider-independent infrastructure-management
+foundation that can power the Atlas CLI, API, scheduler, and Admin Portal
+without exposing raw Docker or shell execution to user-facing interfaces.
+
+### Architecture
+
+Atlas now uses the following read-only dependency flow:
+
+```text
+CLI / API / Admin Portal / Scheduler
+                |
+                v
+    ServiceLifecycleService
+                |
+                v
+    ServiceLifecycleProvider
+                |
+                v
+      DockerComposeProvider
+                |
+                v
+          Docker Compose
+```
+
+ADR 0010 defines the Service Lifecycle domain, provider boundary, command
+safety boundary, guarded lifecycle requirements, Admin Portal responsibilities,
+responsive administration expectations, testing requirements, and relationship
+to the existing Portal and domain architecture ADRs.
+
+### Completed — Domain Foundation
+
+- Added immutable `ManagedService` identity contracts.
+- Added normalized `ServiceImage` contracts.
+- Added normalized `ServiceRuntime` contracts.
+- Added `ServiceHealthStatus` and `ServiceHealth` contracts.
+- Normalized service identifiers, optional text, child collections, image
+  references, health details, and timestamps.
+- Added stable `to_dict()` serialization for every public domain model.
+- Exported all public contracts through `atlas.service_lifecycle`.
+- Added comprehensive model contract tests.
+
+### Completed — Provider and Orchestration Layers
+
+- Added the provider-independent `ServiceLifecycleProvider` interface.
+- Added `ServiceLifecycleService` as the validation and orchestration boundary.
+- Enforced deterministic managed-service ordering.
+- Rejected duplicate service identifiers.
+- Normalized requested service identifiers before provider calls.
+- Preserved known domain failures and translated unexpected provider failures
+  into stable `ServiceLifecycleError` messages.
+- Added dedicated provider and service-layer contract tests.
+
+### Completed — Read-Only Docker Compose Provider
+
+- Added the `DockerComposeProvider` foundation.
+- Discovered 15 configured Atlas-managed Compose services from normalized
+  Compose configuration.
+- Inspected individual managed-service identities.
+- Normalized running, stopped, restarting, and failed runtime states.
+- Inspected configured and running image references, repositories, tags,
+  digests when available, and image IDs.
+- Reported restart counts, timestamps, exit codes, status messages, and service
+  dependencies.
+- Evaluated Docker health state into Atlas health status, score, warnings,
+  errors, and action-required signals.
+- Preserved a strict read-only boundary throughout provider development.
+
+### Completed — Service Lifecycle CLI
+
+Added the following public commands:
+
+```bash
+atlas service list [--json]
+atlas service show <identifier> [--json]
+atlas service runtime <identifier> [--json]
+atlas service health <identifier> [--json]
+```
+
+Preserved the existing plural command as a compatibility alias:
+
+```bash
+atlas services [--json]
+```
+
+The compatibility command now uses normalized Service Lifecycle models instead
+of exposing raw `docker compose ps` output.
+
+### Live Validation
+
+- Verified managed-service discovery across all 15 configured services.
+- Verified combined identity, runtime, image, and health output for Jellyfin.
+- Verified Sonarr health as degraded with score 85 when no Docker health check
+  is configured.
+- Verified Jellyfin and Gluetun health as healthy with score 100.
+- Verified qBittorrent dependency normalization through Gluetun.
+- Verified human-readable and JSON output for list, show, runtime, and health
+  commands.
+- Confirmed that no start, stop, restart, pull, remove, or update operation was
+  introduced.
+
+### Test Baseline
+
+- Focused Service Lifecycle CLI contracts: 17 passed.
+- Complete Core regression suite: 1,379 passed.
+- Core subtests: 104 passed.
+- Python compilation passed.
+- Bash syntax validation passed.
+- Git whitespace validation passed.
+
+### Engineering Workflow Decision
+
+Project Atlas will use guarded full-file heredoc rewrites for future code and
+documentation changes whenever practical.
+
+Each change must:
+
+1. Back up every affected existing file.
+2. Write complete verified content to a temporary file.
+3. Validate syntax before installation.
+4. Install atomically.
+5. Run focused tests.
+6. Run the full regression suite.
+7. Perform live validation when applicable.
+8. Review the Git diff.
+9. Commit and push as a focused engineering increment.
+
+This replaces fragile search-and-replace installers that can fail when valid
+code formatting or structure evolves.
+
+### Current Scope
+
+The next M-018 increment is aggregate infrastructure health:
+
+```bash
+atlas service health
+atlas service health --json
+```
+
+This must preserve the existing single-service forms and add overall score,
+status counts, per-service results, combined warnings and errors, and an
+evaluation timestamp.
+
+### Remaining M-018 Scope
+
+- Aggregate infrastructure health.
+- Update-availability inspection.
+- Maintenance history and lifecycle audit events.
+- Dependency graph and service diagnostics.
+- Guarded lifecycle planning and authorization boundaries.
+- Admin Portal service overview, detail, health, history, failure, rollback,
+  phone, and tablet experiences.
+
+### Deferred Scope
+
+Mutating lifecycle commands remain deferred until Atlas has administrator
+authorization, allow-listed identifiers, dry-run planning, operation locking,
+pre-update capture, post-update health validation, dependency-aware ordering,
+rollback, and audit history.
+
+### Result
+
+Atlas now owns a normalized infrastructure domain instead of relying on direct
+Docker helper commands. The same validated contracts can power the CLI today
+and the API, scheduler, and responsive Admin Portal in future increments.

@@ -198,35 +198,36 @@ for Atlas-managed infrastructure.
 ### Service Lifecycle Foundation
 
 - [x] Define Service Lifecycle domain architecture
-- [ ] Add normalized managed-service models
-- [ ] Add service image and runtime-state models
-- [ ] Add service health models
+- [x] Add normalized managed-service models
+- [x] Add service image and runtime-state models
+- [x] Add service health models
 - [ ] Add update-plan and update-result models
 - [ ] Add maintenance-event models
-- [ ] Add provider-independent service contracts
-- [ ] Add dedicated domain tests
-- [ ] Export public contracts through the package `__init__.py`
+- [x] Add provider-independent service contracts
+- [x] Add provider-independent orchestration service
+- [x] Add dedicated domain tests
+- [x] Export public contracts through the package `__init__.py`
 
 ### Docker Compose Provider
 
-- [ ] Discover Atlas-managed Compose services
-- [ ] Normalize container runtime state
-- [ ] Normalize Docker health status
-- [ ] Inspect configured and running images
-- [ ] Inspect image identifiers and digests
-- [ ] Report container uptime and restart counts
-- [ ] Report service dependencies
-- [ ] Distinguish running, stopped, restarting, and failed services
-- [ ] Preserve read-only behavior during the discovery phase
+- [x] Discover Atlas-managed Compose services
+- [x] Normalize container runtime state
+- [x] Normalize Docker health status
+- [x] Inspect configured and running images
+- [x] Inspect image identifiers and digests when available
+- [x] Report container timestamps and restart counts
+- [x] Report service dependencies
+- [x] Distinguish running, stopped, restarting, and failed services
+- [x] Preserve read-only behavior during the discovery phase
 
 ### Service Health and Reporting
 
-- [ ] Add managed-service listing
-- [ ] Add individual service inspection
+- [x] Add managed-service listing
+- [x] Add individual service inspection
 - [ ] Add aggregate infrastructure health
 - [ ] Add update-availability inspection
-- [ ] Add human-readable reports
-- [ ] Add machine-readable JSON reports
+- [x] Add human-readable reports
+- [x] Add machine-readable JSON reports
 - [ ] Add maintenance history
 - [ ] Add audit events for lifecycle operations
 
@@ -247,15 +248,18 @@ for Atlas-managed infrastructure.
 
 ### CLI and API
 
-- [ ] Add `atlas service list`
-- [ ] Add `atlas service inspect <service>`
-- [ ] Add `atlas service health`
+- [x] Add `atlas service list [--json]`
+- [x] Preserve `atlas services [--json]` as a compatibility alias
+- [x] Add `atlas service show <service> [--json]`
+- [x] Add `atlas service runtime <service> [--json]`
+- [x] Add `atlas service health <service> [--json]`
+- [ ] Add aggregate `atlas service health [--json]`
 - [ ] Add `atlas service updates`
 - [ ] Add `atlas service history`
 - [ ] Add `atlas service update <service> --dry-run`
 - [ ] Add guarded lifecycle API endpoints
 - [ ] Add lifecycle API authorization tests
-- [ ] Add lifecycle CLI contract tests
+- [x] Add lifecycle CLI contract tests
 
 ### Admin Portal Integration
 

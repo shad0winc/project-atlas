@@ -4,6 +4,47 @@ All notable changes to Project Atlas are documented in this file.
 
 ## [Unreleased]
 
+### Service Lifecycle
+
+#### Added
+
+- Service Lifecycle domain architecture documented in ADR 0010.
+- Immutable `ManagedService`, `ServiceImage`, `ServiceRuntime`,
+  `ServiceHealth`, and `ServiceHealthStatus` contracts with normalization,
+  validation, serialization, package exports, and dedicated Core tests.
+- Provider-independent `ServiceLifecycleProvider` contract and
+  `ServiceLifecycleService` orchestration layer.
+- Read-only `DockerComposeProvider` support for configured-service discovery,
+  individual service inspection, normalized runtime state, image identity,
+  restart counts, dependency reporting, and health evaluation.
+- `atlas service list [--json]` for normalized managed-service discovery.
+- `atlas service show <identifier> [--json]` for combined identity, runtime,
+  image, and health inspection.
+- `atlas service runtime <identifier> [--json]` for focused runtime reporting.
+- `atlas service health <identifier> [--json]` for focused health reporting.
+- Backward-compatible `atlas services [--json]` alias backed by the Service
+  Lifecycle domain instead of raw `docker compose ps` output.
+- Responsive phone and tablet administration requirements added to the M-018
+  Admin Portal roadmap.
+
+#### Changed
+
+- Adopted guarded full-file heredoc rewrites for future Project Atlas changes
+  after incremental text-patch installers proved too sensitive to normal code
+  evolution.
+- Service Lifecycle development remains read-only first; start, stop, restart,
+  pull, update, and rollback operations remain intentionally deferred until
+  authorization, planning, locking, validation, and audit boundaries exist.
+
+#### Validation
+
+- Validated live read-only discovery across 15 Docker Compose services.
+- Validated live identity, runtime, image, and health output for Jellyfin,
+  Sonarr, qBittorrent, Gluetun, and other Atlas-managed services.
+- Verified 17 focused Service Lifecycle CLI contracts.
+- Verified the complete Core regression suite with 1,379 passing tests and
+  104 passing subtests.
+
 ### Added
 
 - Media Library Detail domain model.
