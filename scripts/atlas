@@ -53,6 +53,7 @@ source "$ATLAS_CLI_ROOT/commands/invite.sh"
 source "$ATLAS_CLI_ROOT/commands/favorite.sh"
 source "$ATLAS_CLI_ROOT/commands/retention.sh"
 source "$ATLAS_CLI_ROOT/commands/cleanup.sh"
+source "$ATLAS_CLI_ROOT/commands/discovery.sh"
 
 atlas_initialize
 
@@ -117,6 +118,10 @@ case "$command" in
 
   cleanup)
     atlas_command_cleanup "${@:2}"
+    ;;
+
+  discovery)
+    atlas_command_discovery "${@:2}"
     ;;
 
   module)

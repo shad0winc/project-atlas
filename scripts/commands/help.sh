@@ -87,6 +87,7 @@ Intelligence
   atlas ari history [--json]
   atlas ari growth [--json]
   atlas ari forecast [--json]
+  atlas discovery [help|indexers|categories|applications|health|report]
   atlas retention evaluate <provider> <item-id> [--json]
   atlas cleanup evaluate <provider> <item-id> [--json]
   atlas cleanup scan <provider> [--page-size N] [--json]
