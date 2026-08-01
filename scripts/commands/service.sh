@@ -8,9 +8,11 @@ Usage:
   atlas service
   atlas service help
   atlas service list [--json]
+  atlas service show <identifier> [--json]
 
 Commands:
   list    List configured Atlas-managed services
+  show    Show identity, runtime, image, and health for one service
   help    Show this help text
 
 The Service Lifecycle CLI is read-only.
@@ -29,10 +31,17 @@ atlas_command_service() {
     help|-h|--help)
       atlas_command_service_help
       ;;
+
     list)
       shift
       atlas_service_python list "$@"
       ;;
+
+    show)
+      shift
+      atlas_service_python show "$@"
+      ;;
+
     *)
       printf 'Unknown service command: %s\n' "$subcommand" >&2
       printf 'Run: atlas service help\n' >&2

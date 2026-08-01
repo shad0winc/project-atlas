@@ -1,3 +1,5 @@
+"""Contract tests for the Atlas Service Lifecycle CLI."""
+
 from __future__ import annotations
 
 import json
@@ -6,8 +8,16 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import Mock
 
-from atlas.service_lifecycle import ManagedService, ServiceLifecycleError
+from atlas.service_lifecycle import (
+    ManagedService,
+    ServiceHealth,
+    ServiceHealthStatus,
+    ServiceImage,
+    ServiceLifecycleError,
+    ServiceRuntime,
+)
 from atlas.service_lifecycle_cli import main
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ATLAS_CLI = PROJECT_ROOT / "scripts" / "atlas"
@@ -26,8 +36,35 @@ def sample_services() -> tuple[ManagedService, ...]:
             name="Qbittorrent",
             provider="docker-compose",
             container_name="qbittorrent",
-            dependencies=("gluetun",),
+            dependencies=(
+                "gluetun",
+            ),
         ),
+    )
+
+
+def sample_runtime() -> ServiceRuntime:
+    return ServiceRuntime(
+        state="running",
+        health="healthy",
+        image=ServiceImage(
+            reference="jellyfin/jellyfin:latest",
+            repository="jellyfin/jellyfin",
+            tag="latest",
+            image_id="sha256:" + ("a" * 64),
+        ),
+        restart_count=0,
+        started_at="2026-08-01T12:00:00Z",
+        exit_code=0,
+        status_message="running",
+    )
+
+
+def sample_health() -> ServiceHealth:
+    return ServiceHealth(
+        status=ServiceHealthStatus.HEALTHY,
+        score=100,
+        evaluated_at="2026-08-01T12:05:00Z",
     )
 
 
@@ -36,7 +73,13 @@ def test_list_human_output() -> None:
     service.list_services.return_value = sample_services()
     output = StringIO()
 
-    result = main(["list"], service=service, output=output)
+    result = main(
+        [
+            "list",
+        ],
+        service=service,
+        output=output,
+    )
 
     assert result == 0
     assert "Atlas Managed Services" in output.getvalue()
@@ -49,11 +92,21 @@ def test_list_json_output() -> None:
     service.list_services.return_value = sample_services()
     output = StringIO()
 
-    result = main(["list", "--json"], service=service, output=output)
+    result = main(
+        [
+            "list",
+            "--json",
+        ],
+        service=service,
+        output=output,
+    )
     payload = json.loads(output.getvalue())
 
     assert result == 0
-    assert [item["identifier"] for item in payload] == [
+    assert [
+        item["identifier"]
+        for item in payload
+    ] == [
         "jellyfin",
         "qbittorrent",
     ]
@@ -61,18 +114,110 @@ def test_list_json_output() -> None:
 
 def test_list_error_output() -> None:
     service = Mock()
-    service.list_services.side_effect = ServiceLifecycleError("failed")
+    service.list_services.side_effect = ServiceLifecycleError(
+        "failed",
+    )
     error = StringIO()
 
-    result = main(["list"], service=service, error=error)
+    result = main(
+        [
+            "list",
+        ],
+        service=service,
+        error=error,
+    )
 
     assert result == 1
     assert "Service Lifecycle error: failed" in error.getvalue()
 
 
+def test_show_human_output() -> None:
+    service = Mock()
+    service.inspect_service.return_value = sample_services()[0]
+    service.inspect_runtime.return_value = sample_runtime()
+    service.inspect_health.return_value = sample_health()
+    output = StringIO()
+
+    result = main(
+        [
+            "show",
+            "jellyfin",
+        ],
+        service=service,
+        output=output,
+    )
+
+    rendered = output.getvalue()
+
+    assert result == 0
+    assert "Identifier: jellyfin" in rendered
+    assert "State: running" in rendered
+    assert "Reference: jellyfin/jellyfin:latest" in rendered
+    assert "Status: healthy" in rendered
+    assert "Score: 100/100" in rendered
+
+    service.inspect_service.assert_called_once_with("jellyfin")
+    service.inspect_runtime.assert_called_once_with("jellyfin")
+    service.inspect_health.assert_called_once_with("jellyfin")
+
+
+def test_show_json_output() -> None:
+    service = Mock()
+    service.inspect_service.return_value = sample_services()[0]
+    service.inspect_runtime.return_value = sample_runtime()
+    service.inspect_health.return_value = sample_health()
+    output = StringIO()
+
+    result = main(
+        [
+            "show",
+            "jellyfin",
+            "--json",
+        ],
+        service=service,
+        output=output,
+    )
+
+    payload = json.loads(output.getvalue())
+
+    assert result == 0
+    assert payload["service"]["identifier"] == "jellyfin"
+    assert payload["runtime"]["state"] == "running"
+    assert payload["runtime"]["image"]["tag"] == "latest"
+    assert payload["health"]["status"] == "healthy"
+    assert payload["health"]["score"] == 100
+
+
+def test_show_error_output() -> None:
+    service = Mock()
+    service.inspect_service.side_effect = ServiceLifecycleError(
+        "service not found",
+    )
+    error = StringIO()
+
+    result = main(
+        [
+            "show",
+            "missing",
+        ],
+        service=service,
+        error=error,
+    )
+
+    assert result == 1
+    assert (
+        "Service Lifecycle error: service not found"
+        in error.getvalue()
+    )
+
+
 def test_service_help_dispatcher() -> None:
     result = subprocess.run(
-        [str(ATLAS_CLI), "service", "help"],
+        [
+            str(ATLAS_CLI),
+            "service",
+            "help",
+        ],
         cwd=PROJECT_ROOT,
         capture_output=True,
         text=True,
@@ -81,11 +226,39 @@ def test_service_help_dispatcher() -> None:
 
     assert result.returncode == 0
     assert "Project Atlas Service Lifecycle" in result.stdout
+    assert (
+        "atlas service show <identifier> [--json]"
+        in result.stdout
+    )
+
+
+def test_show_help_is_active() -> None:
+    result = subprocess.run(
+        [
+            str(ATLAS_CLI),
+            "service",
+            "show",
+            "--help",
+        ],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert "usage: atlas service show" in result.stdout
+    assert "--json" in result.stdout
 
 
 def test_unknown_service_command() -> None:
     result = subprocess.run(
-        [str(ATLAS_CLI), "service", "unexpected"],
+        [
+            str(ATLAS_CLI),
+            "service",
+            "unexpected",
+        ],
         cwd=PROJECT_ROOT,
         capture_output=True,
         text=True,
@@ -93,12 +266,18 @@ def test_unknown_service_command() -> None:
     )
 
     assert result.returncode == 2
-    assert "Unknown service command: unexpected" in result.stderr
+    assert (
+        "Unknown service command: unexpected"
+        in result.stderr
+    )
 
 
 def test_global_help_registration() -> None:
     result = subprocess.run(
-        [str(ATLAS_CLI), "help"],
+        [
+            str(ATLAS_CLI),
+            "help",
+        ],
         cwd=PROJECT_ROOT,
         capture_output=True,
         text=True,
@@ -107,3 +286,7 @@ def test_global_help_registration() -> None:
 
     assert result.returncode == 0
     assert "atlas service list [--json]" in result.stdout
+    assert (
+        "atlas service show <identifier> [--json]"
+        in result.stdout
+    )

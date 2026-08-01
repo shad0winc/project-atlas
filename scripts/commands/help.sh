@@ -13,8 +13,9 @@ Core Commands
   atlas version
   atlas status
   atlas services [--json]
-  atlas service [help|list]
+  atlas service [help|list|show]
   atlas service list [--json]
+  atlas service show <identifier> [--json]
   atlas urls
   atlas git
   atlas test [all|core|sports]
