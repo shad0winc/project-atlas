@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import subprocess
+from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
@@ -13,7 +15,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ATLAS_CLI = PROJECT_ROOT / "scripts" / "atlas"
 
 
-def run_atlas(*arguments: str) -> subprocess.CompletedProcess[str]:
+def run_atlas(
+    *arguments: str,
+    environment: Mapping[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     """Run the Atlas CLI and capture its text output."""
 
     return subprocess.run(
@@ -22,10 +27,21 @@ def run_atlas(*arguments: str) -> subprocess.CompletedProcess[str]:
             *arguments,
         ],
         cwd=PROJECT_ROOT,
+        env=environment,
         capture_output=True,
         text=True,
         check=False,
     )
+
+
+def discovery_test_environment() -> dict[str, str]:
+    """Return non-secret configuration for parser-only CLI tests."""
+
+    environment = os.environ.copy()
+    environment["ATLAS_PROWLARR_URL"] = "http://127.0.0.1:1"
+    environment["ATLAS_PROWLARR_API_KEY"] = "test-api-key"
+
+    return environment
 
 
 def repository_state() -> tuple[str, str]:
@@ -100,7 +116,6 @@ def test_discovery_help_forms_succeed(
 @pytest.mark.parametrize(
     "subcommand",
     [
-        "indexers",
         "categories",
         "applications",
         "health",
@@ -122,6 +137,20 @@ def test_registered_subcommands_are_explicitly_pending(
         f"{subcommand}"
     ) in result.stderr
     assert "Run: atlas discovery help" in result.stderr
+
+
+def test_indexers_subcommand_help_is_active() -> None:
+    result = run_atlas(
+        "discovery",
+        "indexers",
+        "--help",
+        environment=discovery_test_environment(),
+    )
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert "usage: atlas discovery indexers" in result.stdout
+    assert "--json" in result.stdout
 
 
 def test_unknown_discovery_subcommand_returns_usage_error() -> None:
@@ -165,6 +194,7 @@ def test_discovery_dispatcher_does_not_modify_repository() -> None:
         (
             "discovery",
             "indexers",
+            "--help",
         ),
         (
             "discovery",
@@ -172,8 +202,13 @@ def test_discovery_dispatcher_does_not_modify_repository() -> None:
         ),
     ]
 
+    environment = discovery_test_environment()
+
     for arguments in commands:
-        run_atlas(*arguments)
+        run_atlas(
+            *arguments,
+            environment=environment,
+        )
 
     after = repository_state()
 

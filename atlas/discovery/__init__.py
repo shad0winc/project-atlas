@@ -8,6 +8,7 @@ to discover, evaluate, and report on media indexers and related capabilities.
 
 from .models import (
     DiscoveryCapability,
+    DiscoveryError,
     DiscoveryHealth,
     DiscoveryIndexer,
 )
@@ -18,6 +19,7 @@ from .service import DiscoveryService
 
 __all__ = [
     "DiscoveryCapability",
+    "DiscoveryError",
     "DiscoveryHealth",
     "DiscoveryIndexer",
     "DiscoveryProvider",
