@@ -12,7 +12,9 @@ Core Commands
   atlas help
   atlas version
   atlas status
-  atlas services
+  atlas services [--json]
+  atlas service [help|list]
+  atlas service list [--json]
   atlas urls
   atlas git
   atlas test [all|core|sports]

@@ -31,6 +31,7 @@ source "$ATLAS_CLI_ROOT/commands/help.sh"
 source "$ATLAS_CLI_ROOT/commands/version.sh"
 source "$ATLAS_CLI_ROOT/commands/status.sh"
 source "$ATLAS_CLI_ROOT/commands/services.sh"
+source "$ATLAS_CLI_ROOT/commands/service.sh"
 source "$ATLAS_CLI_ROOT/commands/urls.sh"
 source "$ATLAS_CLI_ROOT/commands/git.sh"
 source "$ATLAS_CLI_ROOT/commands/restart.sh"
@@ -81,7 +82,11 @@ case "$command" in
     ;;
 
   services)
-    atlas_command_services
+    atlas_command_services "${@:2}"
+    ;;
+
+  service)
+    atlas_command_service "${@:2}"
     ;;
 
   urls)
