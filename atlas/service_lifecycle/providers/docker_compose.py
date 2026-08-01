@@ -99,13 +99,51 @@ class DockerComposeProvider(ServiceLifecycleProvider):
         )
 
     def list_services(self) -> Sequence[ManagedService]:
-        """Return configured Compose services.
+        """Return configured Compose services as normalized models."""
 
-        Service discovery will be implemented in the next provider increment.
-        """
+        payload = self._run_compose_json(
+            "config",
+            "--format",
+            "json",
+        )
 
-        raise DockerComposeProviderError(
-            "Docker Compose service discovery is not implemented yet",
+        if not isinstance(payload, Mapping):
+            raise DockerComposeProviderError(
+                "Docker Compose configuration must be an object",
+            )
+
+        services = payload.get("services")
+
+        if not isinstance(services, Mapping):
+            raise DockerComposeProviderError(
+                "Docker Compose configuration must contain "
+                "a services object",
+            )
+
+        project_name = _normalize_project_name(
+            payload.get("name"),
+            fallback=self.project_directory.name,
+        )
+
+        normalized_services: list[ManagedService] = []
+
+        for raw_identifier, raw_configuration in services.items():
+            normalized_services.append(
+                _normalize_configured_service(
+                    raw_identifier,
+                    raw_configuration,
+                    project_name=project_name,
+                )
+            )
+
+        return tuple(
+            sorted(
+                normalized_services,
+                key=lambda service: (
+                    service.name.casefold(),
+                    service.identifier,
+                ),
+            )
         )
 
     def inspect_service(
@@ -233,6 +271,142 @@ class DockerComposeProvider(ServiceLifecycleProvider):
             raise DockerComposeProviderError(
                 "Docker Compose returned invalid JSON",
             ) from exc
+
+
+def _normalize_configured_service(
+    identifier: object,
+    configuration: object,
+    *,
+    project_name: str,
+) -> ManagedService:
+    if not isinstance(identifier, str) or not identifier.strip():
+        raise DockerComposeProviderError(
+            "Compose service identifiers must be non-empty strings",
+        )
+
+    normalized_identifier = identifier.strip().casefold()
+
+    if not isinstance(configuration, Mapping):
+        raise DockerComposeProviderError(
+            "Compose service configuration must be an object: "
+            f"{normalized_identifier}",
+        )
+
+    container_name = configuration.get("container_name")
+
+    if container_name is not None and (
+        not isinstance(container_name, str)
+        or not container_name.strip()
+    ):
+        raise DockerComposeProviderError(
+            "Compose container_name must be non-empty text or null: "
+            f"{normalized_identifier}",
+        )
+
+    dependencies = _normalize_compose_dependencies(
+        configuration.get("depends_on"),
+        service_identifier=normalized_identifier,
+    )
+
+    try:
+        return ManagedService(
+            identifier=normalized_identifier,
+            name=_service_display_name(
+                normalized_identifier,
+            ),
+            provider="docker-compose",
+            enabled=True,
+            compose_project=project_name,
+            container_name=(
+                None
+                if container_name is None
+                else container_name.strip()
+            ),
+            dependencies=dependencies,
+        )
+    except ServiceLifecycleError as exc:
+        raise DockerComposeProviderError(
+            "Invalid Compose service configuration: "
+            f"{normalized_identifier}: {exc}",
+        ) from exc
+
+
+def _normalize_compose_dependencies(
+    value: object,
+    *,
+    service_identifier: str,
+) -> tuple[str, ...]:
+    if value is None:
+        return ()
+
+    if isinstance(value, Mapping):
+        raw_dependencies: object = value.keys()
+    elif (
+        isinstance(value, Sequence)
+        and not isinstance(value, (str, bytes))
+    ):
+        raw_dependencies = value
+    else:
+        raise DockerComposeProviderError(
+            "Compose depends_on must be an object, "
+            "a collection, or null: "
+            f"{service_identifier}",
+        )
+
+    normalized: set[str] = set()
+
+    for dependency in raw_dependencies:
+        if (
+            not isinstance(dependency, str)
+            or not dependency.strip()
+        ):
+            raise DockerComposeProviderError(
+                "Compose dependencies must contain "
+                "non-empty service identifiers: "
+                f"{service_identifier}",
+            )
+
+        normalized.add(
+            dependency.strip().casefold(),
+        )
+
+    return tuple(sorted(normalized))
+
+
+def _normalize_project_name(
+    value: object,
+    *,
+    fallback: str,
+) -> str:
+    if value is None:
+        value = fallback
+
+    if not isinstance(value, str) or not value.strip():
+        raise DockerComposeProviderError(
+            "Compose project name must be non-empty text",
+        )
+
+    return value.strip()
+
+
+def _service_display_name(
+    identifier: str,
+) -> str:
+    words = [
+        word
+        for word in identifier.replace("_", "-").split("-")
+        if word
+    ]
+
+    if not words:
+        raise DockerComposeProviderError(
+            "Compose service identifier cannot produce a display name",
+        )
+
+    return " ".join(
+        word[:1].upper() + word[1:]
+        for word in words
+    )
 
 
 def _normalize_compose_file(

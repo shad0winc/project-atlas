@@ -667,10 +667,503 @@ def test_run_compose_json_rejects_invalid_json(
         )
 
 
+def test_list_services_normalizes_compose_configuration(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    payload = {
+        "name": "project-atlas",
+        "services": {
+            "sonarr-anime": {
+                "container_name": " sonarr-anime ",
+                "depends_on": {
+                    "prowlarr": {
+                        "condition": "service_started",
+                    },
+                    "gluetun": {
+                        "condition": "service_healthy",
+                    },
+                },
+            },
+            "prowlarr": {
+                "container_name": "prowlarr",
+            },
+        },
+    }
+
+    captured: list[tuple[str, ...]] = []
+
+    def fake_run_compose_json(
+        self: DockerComposeProvider,
+        *arguments: str,
+    ) -> object:
+        captured.append(arguments)
+        return payload
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        fake_run_compose_json,
+    )
+
+    services = provider.list_services()
+
+    assert captured == [
+        (
+            "config",
+            "--format",
+            "json",
+        ),
+    ]
+
+    assert tuple(
+        service.identifier
+        for service in services
+    ) == (
+        "prowlarr",
+        "sonarr-anime",
+    )
+
+    by_identifier = {
+        service.identifier: service
+        for service in services
+    }
+
+    sonarr = by_identifier["sonarr-anime"]
+
+    assert sonarr.name == "Sonarr Anime"
+    assert sonarr.provider == "docker-compose"
+    assert sonarr.enabled is True
+    assert sonarr.compose_project == "project-atlas"
+    assert sonarr.container_name == "sonarr-anime"
+    assert sonarr.dependencies == (
+        "gluetun",
+        "prowlarr",
+    )
+
+    prowlarr = by_identifier["prowlarr"]
+
+    assert prowlarr.name == "Prowlarr"
+    assert prowlarr.dependencies == ()
+
+
+def test_list_services_uses_project_directory_name_as_fallback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "services": {
+                "sonarr": {},
+            },
+        },
+    )
+
+    services = provider.list_services()
+
+    assert len(services) == 1
+    assert services[0].compose_project == tmp_path.name
+
+
+def test_list_services_accepts_sequence_dependencies(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "name": "atlas",
+            "services": {
+                "jellyseerr": {
+                    "depends_on": [
+                        " Sonarr ",
+                        "radarr",
+                        "sonarr",
+                    ],
+                },
+            },
+        },
+    )
+
+    services = provider.list_services()
+
+    assert services[0].dependencies == (
+        "radarr",
+        "sonarr",
+    )
+
+
+def test_list_services_sorts_by_display_name_then_identifier(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "name": "atlas",
+            "services": {
+                "sonarr-anime": {},
+                "bazarr": {},
+                "sonarr": {},
+                "radarr": {},
+            },
+        },
+    )
+
+    services = provider.list_services()
+
+    assert tuple(
+        service.identifier
+        for service in services
+    ) == (
+        "bazarr",
+        "radarr",
+        "sonarr",
+        "sonarr-anime",
+    )
+
+
+def test_list_services_supports_underscored_service_name(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "name": "atlas",
+            "services": {
+                "media_request": {},
+            },
+        },
+    )
+
+    service = provider.list_services()[0]
+
+    assert service.identifier == "media_request"
+    assert service.name == "Media Request"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        None,
+        [],
+        "services",
+        42,
+        True,
+    ],
+)
+def test_list_services_requires_configuration_object(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    payload: object,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: payload,
+    )
+
+    with pytest.raises(
+        DockerComposeProviderError,
+        match="configuration must be an object",
+    ):
+        provider.list_services()
+
+
+@pytest.mark.parametrize(
+    "services",
+    [
+        None,
+        [],
+        "sonarr",
+        42,
+        True,
+    ],
+)
+def test_list_services_requires_services_object(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    services: object,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "name": "atlas",
+            "services": services,
+        },
+    )
+
+    with pytest.raises(
+        DockerComposeProviderError,
+        match="must contain a services object",
+    ):
+        provider.list_services()
+
+
+@pytest.mark.parametrize(
+    "project_name",
+    [
+        "",
+        "   ",
+        True,
+        42,
+        object(),
+    ],
+)
+def test_list_services_requires_valid_project_name(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    project_name: object,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "name": project_name,
+            "services": {},
+        },
+    )
+
+    with pytest.raises(
+        DockerComposeProviderError,
+        match="project name must be non-empty text",
+    ):
+        provider.list_services()
+
+
+@pytest.mark.parametrize(
+    "identifier",
+    [
+        "",
+        "   ",
+        42,
+        True,
+        None,
+    ],
+)
+def test_list_services_requires_string_service_identifier(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    identifier: object,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "name": "atlas",
+            "services": {
+                identifier: {},
+            },
+        },
+    )
+
+    with pytest.raises(
+        DockerComposeProviderError,
+        match="service identifiers must be non-empty strings",
+    ):
+        provider.list_services()
+
+
+@pytest.mark.parametrize(
+    "configuration",
+    [
+        None,
+        [],
+        "configuration",
+        42,
+        True,
+    ],
+)
+def test_list_services_requires_service_configuration_object(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    configuration: object,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "name": "atlas",
+            "services": {
+                "sonarr": configuration,
+            },
+        },
+    )
+
+    with pytest.raises(
+        DockerComposeProviderError,
+        match="service configuration must be an object",
+    ):
+        provider.list_services()
+
+
+@pytest.mark.parametrize(
+    "container_name",
+    [
+        "",
+        "   ",
+        True,
+        42,
+        object(),
+    ],
+)
+def test_list_services_rejects_invalid_container_name(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    container_name: object,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "name": "atlas",
+            "services": {
+                "sonarr": {
+                    "container_name": container_name,
+                },
+            },
+        },
+    )
+
+    with pytest.raises(
+        DockerComposeProviderError,
+        match="container_name must be non-empty text or null",
+    ):
+        provider.list_services()
+
+
+@pytest.mark.parametrize(
+    "depends_on",
+    [
+        "prowlarr",
+        42,
+        True,
+        object(),
+    ],
+)
+def test_list_services_rejects_invalid_dependencies_shape(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    depends_on: object,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "name": "atlas",
+            "services": {
+                "sonarr": {
+                    "depends_on": depends_on,
+                },
+            },
+        },
+    )
+
+    with pytest.raises(
+        DockerComposeProviderError,
+        match="depends_on must be an object, a collection, or null",
+    ):
+        provider.list_services()
+
+
+@pytest.mark.parametrize(
+    "dependency",
+    [
+        "",
+        "   ",
+        None,
+        True,
+        42,
+        object(),
+    ],
+)
+def test_list_services_rejects_invalid_dependency_identifier(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    dependency: object,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "name": "atlas",
+            "services": {
+                "sonarr": {
+                    "depends_on": [
+                        dependency,
+                    ],
+                },
+            },
+        },
+    )
+
+    with pytest.raises(
+        DockerComposeProviderError,
+        match="dependencies must contain non-empty service identifiers",
+    ):
+        provider.list_services()
+
+
+def test_list_services_translates_managed_service_validation_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "name": "atlas",
+            "services": {
+                "invalid/service": {},
+            },
+        },
+    )
+
+    with pytest.raises(
+        DockerComposeProviderError,
+        match="Invalid Compose service configuration",
+    ):
+        provider.list_services()
+
+
 @pytest.mark.parametrize(
     "method_name",
     [
-        "list_services",
         "inspect_service",
         "inspect_runtime",
         "inspect_health",
