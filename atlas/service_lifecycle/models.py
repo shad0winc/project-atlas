@@ -19,6 +19,198 @@ class ServiceLifecycleError(ValueError):
 
 
 @dataclass(frozen=True)
+class ServiceImage:
+    """Normalized image identity for one managed service."""
+
+    reference: str
+    repository: str | None = None
+    tag: str | None = None
+    digest: str | None = None
+    image_id: str | None = None
+    created_at: str | None = None
+
+    def __post_init__(self) -> None:
+        reference = _required_text(
+            self.reference,
+            "reference",
+        )
+
+        repository = _optional_text(
+            self.repository,
+            "repository",
+        )
+        tag = _optional_text(
+            self.tag,
+            "tag",
+        )
+        digest = _optional_digest(
+            self.digest,
+            "digest",
+        )
+        image_id = _optional_digest(
+            self.image_id,
+            "image_id",
+        )
+
+        object.__setattr__(
+            self,
+            "reference",
+            reference,
+        )
+        object.__setattr__(
+            self,
+            "repository",
+            repository,
+        )
+        object.__setattr__(
+            self,
+            "tag",
+            tag,
+        )
+        object.__setattr__(
+            self,
+            "digest",
+            digest,
+        )
+        object.__setattr__(
+            self,
+            "image_id",
+            image_id,
+        )
+        object.__setattr__(
+            self,
+            "created_at",
+            _optional_timestamp(
+                self.created_at,
+                "created_at",
+            ),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize the normalized service-image contract."""
+
+        return {
+            "reference": self.reference,
+            "repository": self.repository,
+            "tag": self.tag,
+            "digest": self.digest,
+            "image_id": self.image_id,
+            "created_at": self.created_at,
+        }
+
+
+@dataclass(frozen=True)
+class ServiceRuntime:
+    """Normalized runtime state for one managed service."""
+
+    state: str
+    health: str
+    image: ServiceImage
+    restart_count: int = 0
+    started_at: str | None = None
+    finished_at: str | None = None
+    exit_code: int | None = None
+    status_message: str | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "state",
+            _required_service_identifier(
+                self.state,
+                "state",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "health",
+            _required_service_identifier(
+                self.health,
+                "health",
+            ),
+        )
+
+        if not isinstance(self.image, ServiceImage):
+            raise ServiceLifecycleError(
+                "image must be a ServiceImage",
+            )
+
+        if (
+            isinstance(self.restart_count, bool)
+            or not isinstance(self.restart_count, int)
+            or self.restart_count < 0
+        ):
+            raise ServiceLifecycleError(
+                "restart_count must be a non-negative integer",
+            )
+
+        object.__setattr__(
+            self,
+            "started_at",
+            _optional_timestamp(
+                self.started_at,
+                "started_at",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "finished_at",
+            _optional_timestamp(
+                self.finished_at,
+                "finished_at",
+            ),
+        )
+
+        if (
+            self.exit_code is not None
+            and (
+                isinstance(self.exit_code, bool)
+                or not isinstance(self.exit_code, int)
+            )
+        ):
+            raise ServiceLifecycleError(
+                "exit_code must be an integer or null",
+            )
+
+        object.__setattr__(
+            self,
+            "status_message",
+            _optional_text(
+                self.status_message,
+                "status_message",
+            ),
+        )
+
+    @property
+    def running(self) -> bool:
+        """Return whether the service runtime is currently running."""
+
+        return self.state == "running"
+
+    @property
+    def healthy(self) -> bool:
+        """Return whether the runtime health state is healthy."""
+
+        return self.health == "healthy"
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize the normalized service-runtime contract."""
+
+        return {
+            "state": self.state,
+            "health": self.health,
+            "running": self.running,
+            "healthy": self.healthy,
+            "image": self.image.to_dict(),
+            "restart_count": self.restart_count,
+            "started_at": self.started_at,
+            "finished_at": self.finished_at,
+            "exit_code": self.exit_code,
+            "status_message": self.status_message,
+        }
+
+
+@dataclass(frozen=True)
 class ManagedService:
     """Provider-independent identity for one Atlas-managed service."""
 
@@ -128,6 +320,39 @@ class ManagedService:
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
+
+
+def _optional_digest(
+    value: object,
+    field_name: str,
+) -> str | None:
+    if value is None:
+        return None
+
+    normalized = _required_text(
+        value,
+        field_name,
+    ).casefold()
+
+    if not normalized.startswith("sha256:"):
+        raise ServiceLifecycleError(
+            f"{field_name} must use the sha256 algorithm",
+        )
+
+    digest_value = normalized.removeprefix("sha256:")
+
+    if (
+        len(digest_value) != 64
+        or any(
+            character not in "0123456789abcdef"
+            for character in digest_value
+        )
+    ):
+        raise ServiceLifecycleError(
+            f"{field_name} must contain a valid sha256 digest",
+        )
+
+    return normalized
 
 
 def _required_service_identifier(
