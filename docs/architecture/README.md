@@ -1,0 +1,87 @@
+# Project Atlas Architecture
+
+This directory contains stable architecture documents for mature Project Atlas
+subsystems. These documents explain how a subsystem is structured, which
+contracts it owns, why its boundaries exist, and how future interfaces should
+consume it.
+
+Architecture documents are living specifications. They are intentionally
+separate from sprint history, release notes, and future planning.
+
+## Documentation Responsibilities
+
+- `ROADMAP.md` describes planned and remaining work.
+- `CHANGELOG.md` records user-visible and operator-visible changes.
+- `docs/BUILD_LOG.md` records implementation history and validation evidence.
+- `docs/architecture/*.md` describes stable subsystem design and contracts.
+- `docs/ADR/` records architectural decisions and their rationale.
+- `docs/EDR/` records engineering decisions and implementation constraints.
+
+## Atlas Structure
+
+```text
+Project Atlas
+├── Core domains
+│   ├── Identity and authorization
+│   ├── Service Lifecycle
+│   ├── Health and observability
+│   ├── Policy, retention, and cleanup
+│   ├── Scheduler and events
+│   └── Module platform
+├── Providers and adapters
+│   ├── Docker Compose
+│   ├── Jellyfin
+│   └── Future provider implementations
+└── Interfaces
+    ├── Atlas CLI
+    ├── Atlas API
+    └── Atlas Portal
+```
+
+Core domains own normalized contracts and business rules. Providers translate
+external systems into those contracts. Interfaces consume the service layer and
+must not bypass it to assemble provider-specific commands or duplicate domain
+logic.
+
+## Current Architecture Documents
+
+- [Service Lifecycle](SERVICE_LIFECYCLE.md)
+- [Portal](PORTAL.md)
+
+Additional subsystem documents should be added only when their design is mature
+enough to serve as a stable implementation and integration reference.
+
+## Relationship to ADRs and EDRs
+
+Architecture documents describe the current system. ADRs explain major design
+choices. EDRs capture focused engineering constraints, implementation patterns,
+or operational contracts. Architecture documents should link to relevant ADRs
+and EDRs when those records are required to understand a boundary, but should not
+copy their full history.
+
+## Standard Engineering Workflow
+
+Project Atlas milestones use this sequence:
+
+1. Review the repository state and current contracts.
+2. Design the smallest coherent feature increment.
+3. Implement complete guarded source rewrites.
+4. Run focused validation.
+5. Run the full regression suite.
+6. Perform live validation when applicable.
+7. Update roadmap, changelog, and build history.
+8. Update stable architecture documentation.
+9. Review the complete diff and rollback path.
+10. Commit and push.
+
+## Engineering Principles
+
+- Simplicity over complexity.
+- Reliability over novelty.
+- Observability before automation.
+- Automation before repetitive manual intervention.
+- Documentation as a first-class feature.
+- Modular architecture and reusable Core services.
+- Optional feature modules.
+- User-first operation and presentation.
+- Backups, verification, and rollback paths for production changes.

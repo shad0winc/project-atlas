@@ -12,12 +12,14 @@ Usage:
   atlas service runtime <identifier> [--json]
   atlas service health [--json]
   atlas service health <identifier> [--json]
+  atlas service summary [--json]
 
 Commands:
   list       List configured Atlas-managed services
   show       Show identity, runtime, image, and health for one service
   runtime    Show normalized runtime state for one service
   health     Show aggregate health or health for one service
+  summary    Show concise infrastructure runtime and health totals
   help       Show this help text
 
 The Service Lifecycle CLI is read-only.
@@ -55,6 +57,11 @@ atlas_command_service() {
     health)
       shift
       atlas_service_python health "$@"
+      ;;
+
+    summary)
+      shift
+      atlas_service_python summary "$@"
       ;;
 
     *)

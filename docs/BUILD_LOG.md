@@ -1269,3 +1269,91 @@ Service Lifecycle orchestration layer and CLI. This contract provides the
 foundation for Infrastructure Summary, Service Dependency Graph, Service Doctor,
 Update Availability, Maintenance History, future Atlas API endpoints, and the
 Administration Portal while preserving observability before automation.
+
+---
+
+# 2026-08-01
+
+## M-018.8 — Infrastructure Summary and Architecture Documentation
+
+### Objective
+
+Establish a normalized infrastructure-summary contract for Service Lifecycle and
+create permanent subsystem architecture documentation without introducing Docker
+mutations or provider-specific presentation logic.
+
+### Completed
+
+- Added immutable `ServiceRuntimeEntry` runtime-report entries.
+- Added immutable `InfrastructureSummary` reporting with normalized serialization.
+- Added provider and Compose-project reporting.
+- Added total, enabled, and disabled service counts.
+- Added running, stopped, restarting, failed, and unknown runtime counts.
+- Reused aggregate health counts, score, status, and attention reporting.
+- Added `ServiceLifecycleService.inspect_summary()`.
+- Reused one deterministic managed-service inventory for runtime and health
+  orchestration.
+- Added `atlas service summary` human-readable reporting.
+- Added `atlas service summary --json` machine-readable reporting.
+- Preserved every existing Service Lifecycle command and compatibility alias.
+- Added `docs/architecture/README.md` as the architecture-documentation entry point.
+- Added `docs/architecture/SERVICE_LIFECYCLE.md` as the canonical subsystem
+  specification.
+- Preserved `docs/architecture/PORTAL.md` without modification.
+
+### Engineering Decisions
+
+- Summary business rules remain in the provider-independent service layer.
+- The CLI performs argument handling and rendering only.
+- Providers remain unaware of CLI, JSON, API, and Portal presentation concerns.
+- Runtime and health report identities must match exactly.
+- Runtime states are normalized into running, stopped, restarting, failed, or
+  unknown summary categories.
+- Architecture documents describe stable design and contracts rather than sprint
+  history or release notes.
+- Project Atlas milestones now follow design, source implementation, focused
+  validation, full regression, live validation, documentation, architecture
+  review, commit, and push.
+
+### Verification
+
+- Guarded SHA-256 source verification passed.
+- Timestamped rollback backup created successfully.
+- Python compilation passed.
+- Bash syntax validation passed.
+- `git diff --check` passed.
+- Focused Service Lifecycle service and CLI tests passed: 76.
+- Service Lifecycle regression suite passed: 540.
+- Atlas Core regression suite passed: 648.
+- Sports integration suites passed: 5.
+- Service Lifecycle help and summary command registration passed.
+
+### Live Validation
+
+- Provider: `docker-compose`.
+- Compose project: `project-atlas`.
+- Managed services: 15.
+- Enabled services: 15.
+- Disabled services: 0.
+- Running services: 15.
+- Stopped services: 0.
+- Restarting services: 0.
+- Failed services: 0.
+- Unknown runtime services: 0.
+- Healthy services: 4.
+- Degraded services: 11.
+- Unhealthy services: 0.
+- Unknown health services: 0.
+- Overall score: 89/100.
+- Overall status: Degraded.
+- Services requiring attention: 11.
+- Existing aggregate health, individual Jellyfin health, service listing, and help
+  commands remained operational.
+
+### Result
+
+Atlas now exposes a canonical infrastructure-summary contract suitable for the
+CLI, future Atlas API endpoints, the Administration Portal, Service Doctor,
+Service Dependency Graph, update discovery, and maintenance history. Service
+Lifecycle remains fully read-only and provider-independent while its architecture
+is now documented as a stable living specification.

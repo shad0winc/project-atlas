@@ -516,6 +516,136 @@ def test_inspect_health_report_empty_inventory_is_unknown(
     assert report.attention == ()
 
 
+
+def test_inspect_summary_aggregates_runtime_and_health(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service, provider = make_service()
+    provider.services = [
+        ManagedService(
+            identifier="sonarr",
+            name="Sonarr",
+            provider="docker-compose",
+            compose_project="project-atlas",
+        ),
+        ManagedService(
+            identifier="bazarr",
+            name="Bazarr",
+            provider="docker-compose",
+            compose_project="project-atlas",
+            enabled=False,
+        ),
+    ]
+    runtime_by_identifier = {
+        "bazarr": ServiceRuntime(
+            state="exited",
+            health="unknown",
+            image=ServiceImage(reference="bazarr:latest"),
+            exit_code=0,
+        ),
+        "sonarr": ServiceRuntime(
+            state="running",
+            health="healthy",
+            image=ServiceImage(reference="sonarr:latest"),
+            exit_code=0,
+        ),
+    }
+    health_by_identifier = {
+        "bazarr": ServiceHealth(
+            status=ServiceHealthStatus.DEGRADED,
+            score=80,
+            warnings=("Stopped",),
+        ),
+        "sonarr": ServiceHealth(
+            status=ServiceHealthStatus.HEALTHY,
+            score=100,
+        ),
+    }
+
+    def inspect_runtime(identifier: str):
+        provider.calls.append(("inspect_runtime", identifier))
+        return runtime_by_identifier[identifier]
+
+    def inspect_health(identifier: str):
+        provider.calls.append(("inspect_health", identifier))
+        return health_by_identifier[identifier]
+
+    provider.inspect_runtime = inspect_runtime  # type: ignore[method-assign]
+    provider.inspect_health = inspect_health  # type: ignore[method-assign]
+    monkeypatch.setattr(
+        "atlas.service_lifecycle.service._utc_now",
+        lambda: "2026-08-01T22:00:00Z",
+    )
+
+    summary = service.inspect_summary()
+
+    assert summary.provider == "docker-compose"
+    assert summary.compose_project == "project-atlas"
+    assert summary.enabled_counts == {"enabled": 1, "disabled": 1}
+    assert summary.runtime_counts == {
+        "running": 1,
+        "stopped": 1,
+        "restarting": 0,
+        "failed": 0,
+        "unknown": 0,
+    }
+    assert summary.health.score == 90
+    assert summary.health.status == "healthy"
+    assert summary.evaluated_at == "2026-08-01T22:00:00Z"
+    assert summary.to_dict()["total_services"] == 2
+    assert provider.calls == [
+        ("list_services", None),
+        ("inspect_runtime", "bazarr"),
+        ("inspect_runtime", "sonarr"),
+        ("inspect_health", "bazarr"),
+        ("inspect_health", "sonarr"),
+    ]
+
+
+def test_inspect_summary_empty_inventory_is_explicit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service, provider = make_service()
+    provider.services = ()
+    monkeypatch.setattr(
+        "atlas.service_lifecycle.service._utc_now",
+        lambda: "2026-08-01T22:00:00Z",
+    )
+
+    summary = service.inspect_summary()
+
+    assert summary.provider == "unknown"
+    assert summary.compose_project is None
+    assert summary.runtime_counts == {
+        "running": 0,
+        "stopped": 0,
+        "restarting": 0,
+        "failed": 0,
+        "unknown": 0,
+    }
+    assert summary.health.status == "unknown"
+    assert summary.health.score == 0
+
+
+def test_runtime_entry_classifies_nonzero_exit_as_failed() -> None:
+    from atlas.service_lifecycle.service import ServiceRuntimeEntry
+
+    entry = ServiceRuntimeEntry(
+        service=ManagedService(
+            identifier="sonarr",
+            name="Sonarr",
+            provider="stub",
+        ),
+        runtime=ServiceRuntime(
+            state="exited",
+            health="unknown",
+            image=ServiceImage(reference="sonarr:latest"),
+            exit_code=1,
+        ),
+    )
+
+    assert entry.category == "failed"
+
 def test_service_package_export() -> None:
     from atlas import service_lifecycle
 

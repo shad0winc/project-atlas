@@ -18,7 +18,10 @@ from atlas.service_lifecycle import (
     ServiceLifecycleService,
     ServiceRuntime,
 )
-from atlas.service_lifecycle.service import InfrastructureHealthReport
+from atlas.service_lifecycle.service import (
+    InfrastructureHealthReport,
+    InfrastructureSummary,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -86,6 +89,17 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     health_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Render machine-readable JSON.",
+    )
+
+    summary_parser = subparsers.add_parser(
+        "summary",
+        help="Show a concise infrastructure runtime and health summary.",
+    )
+    summary_parser.add_argument(
         "--json",
         action="store_true",
         dest="as_json",
@@ -482,6 +496,81 @@ def _command_health(
 
     return 0
 
+
+def _render_summary_json(
+    summary: InfrastructureSummary,
+    *,
+    output: TextIO,
+) -> None:
+    json.dump(
+        summary.to_dict(),
+        output,
+        indent=2,
+        sort_keys=True,
+    )
+    output.write("\n")
+
+
+def _render_summary_human(
+    summary: InfrastructureSummary,
+    *,
+    output: TextIO,
+) -> None:
+    runtime = summary.runtime_counts
+    health = summary.health.counts
+    service_counts = summary.enabled_counts
+
+    output.write("Atlas Infrastructure Summary\n")
+    output.write("============================\n\n")
+    output.write(f"Provider:        {summary.provider}\n")
+    output.write(
+        f"Compose Project: {summary.compose_project or 'None'}\n"
+    )
+
+    output.write("\nServices\n")
+    output.write("--------\n")
+    output.write(f"Total:       {len(summary.services)}\n")
+    output.write(f"Enabled:     {service_counts['enabled']}\n")
+    output.write(f"Disabled:    {service_counts['disabled']}\n")
+
+    output.write("\nRuntime\n")
+    output.write("-------\n")
+    output.write(f"Running:     {runtime['running']}\n")
+    output.write(f"Stopped:     {runtime['stopped']}\n")
+    output.write(f"Restarting:  {runtime['restarting']}\n")
+    output.write(f"Failed:      {runtime['failed']}\n")
+    output.write(f"Unknown:     {runtime['unknown']}\n")
+
+    output.write("\nHealth\n")
+    output.write("------\n")
+    output.write(f"Healthy:     {health['healthy']}\n")
+    output.write(f"Degraded:    {health['degraded']}\n")
+    output.write(f"Unhealthy:   {health['unhealthy']}\n")
+    output.write(f"Unknown:     {health['unknown']}\n")
+    output.write(f"\nOverall Score: {summary.health.score}/100\n")
+    output.write(f"Status: {summary.health.status.title()}\n")
+    output.write(
+        "Attention Required: "
+        f"{len(summary.health.attention)}\n"
+    )
+    output.write(f"\nEvaluated: {summary.evaluated_at}\n")
+
+
+def _command_summary(
+    *,
+    service: ServiceLifecycleService,
+    as_json: bool,
+    output: TextIO,
+) -> int:
+    summary = service.inspect_summary()
+
+    if as_json:
+        _render_summary_json(summary, output=output)
+    else:
+        _render_summary_human(summary, output=output)
+
+    return 0
+
 def main(
     argv: Sequence[str] | None = None,
     *,
@@ -530,6 +619,13 @@ def main(
         if arguments.command == "health":
             return _command_health(
                 arguments.identifier,
+                service=resolved_service,
+                as_json=arguments.as_json,
+                output=resolved_output,
+            )
+
+        if arguments.command == "summary":
+            return _command_summary(
                 service=resolved_service,
                 as_json=arguments.as_json,
                 output=resolved_output,

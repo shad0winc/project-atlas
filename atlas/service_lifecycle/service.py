@@ -145,6 +145,159 @@ class InfrastructureHealthReport:
 
 
 @dataclass(frozen=True)
+class ServiceRuntimeEntry:
+    """Pair one managed-service identity with its runtime inspection."""
+
+    service: ManagedService
+    runtime: ServiceRuntime
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.service, ManagedService):
+            raise ServiceLifecycleError(
+                "infrastructure summary entries require ManagedService identities",
+            )
+        if not isinstance(self.runtime, ServiceRuntime):
+            raise ServiceLifecycleError(
+                "infrastructure summary entries require ServiceRuntime inspections",
+            )
+
+    @property
+    def category(self) -> str:
+        state = self.runtime.state.casefold()
+
+        if state == "running":
+            return "running"
+        if state == "restarting":
+            return "restarting"
+        if state in {"dead", "failed"}:
+            return "failed"
+        if (
+            self.runtime.exit_code not in {None, 0}
+            and state not in {"running", "restarting"}
+        ):
+            return "failed"
+        if state in {"created", "exited", "paused", "removing", "stopped"}:
+            return "stopped"
+        return "unknown"
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "service": self.service.to_dict(),
+            "runtime": self.runtime.to_dict(),
+            "category": self.category,
+        }
+
+
+@dataclass(frozen=True)
+class InfrastructureSummary:
+    """Normalized operational summary for Atlas-managed infrastructure."""
+
+    runtime_entries: tuple[ServiceRuntimeEntry, ...]
+    health: InfrastructureHealthReport
+    evaluated_at: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.runtime_entries, tuple) or any(
+            not isinstance(entry, ServiceRuntimeEntry)
+            for entry in self.runtime_entries
+        ):
+            raise ServiceLifecycleError(
+                "infrastructure runtime entries must be a tuple of ServiceRuntimeEntry",
+            )
+        if not isinstance(self.health, InfrastructureHealthReport):
+            raise ServiceLifecycleError(
+                "infrastructure summary health must be InfrastructureHealthReport",
+            )
+        if not isinstance(self.evaluated_at, str) or not self.evaluated_at:
+            raise ServiceLifecycleError(
+                "infrastructure summary evaluated_at must be non-empty text",
+            )
+
+        runtime_ids = tuple(
+            entry.service.identifier
+            for entry in self.runtime_entries
+        )
+        health_ids = tuple(
+            entry.service.identifier
+            for entry in self.health.entries
+        )
+        if runtime_ids != health_ids:
+            raise ServiceLifecycleError(
+                "infrastructure summary runtime and health identities must match",
+            )
+
+    @property
+    def services(self) -> tuple[ManagedService, ...]:
+        return tuple(entry.service for entry in self.runtime_entries)
+
+    @property
+    def provider(self) -> str:
+        values = sorted({service.provider for service in self.services})
+        if not values:
+            return "unknown"
+        if len(values) == 1:
+            return values[0]
+        return "mixed"
+
+    @property
+    def compose_project(self) -> str | None:
+        values = sorted(
+            {
+                service.compose_project
+                for service in self.services
+                if service.compose_project is not None
+            }
+        )
+        if not values:
+            return None
+        if len(values) == 1:
+            return values[0]
+        return "mixed"
+
+    @property
+    def enabled_counts(self) -> dict[str, int]:
+        enabled = sum(1 for service in self.services if service.enabled)
+        return {
+            "enabled": enabled,
+            "disabled": len(self.services) - enabled,
+        }
+
+    @property
+    def runtime_counts(self) -> dict[str, int]:
+        counts = {
+            "running": 0,
+            "stopped": 0,
+            "restarting": 0,
+            "failed": 0,
+            "unknown": 0,
+        }
+        for entry in self.runtime_entries:
+            counts[entry.category] += 1
+        return counts
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "provider": self.provider,
+            "compose_project": self.compose_project,
+            "total_services": len(self.services),
+            "service_counts": self.enabled_counts,
+            "runtime_counts": self.runtime_counts,
+            "health_counts": self.health.counts,
+            "score": self.health.score,
+            "status": self.health.status,
+            "attention_required": [
+                entry.to_dict()
+                for entry in self.health.attention
+            ],
+            "services": [
+                entry.to_dict()
+                for entry in self.runtime_entries
+            ],
+            "evaluated_at": self.evaluated_at,
+        }
+
+
+@dataclass(frozen=True)
 class ServiceLifecycleService:
     """Validate and orchestrate read-only service-lifecycle operations."""
 
@@ -304,26 +457,59 @@ class ServiceLifecycleService:
     def inspect_health_report(self) -> InfrastructureHealthReport:
         """Return aggregate health for all configured managed services."""
 
+        services = self.list_services()
+        return self._build_health_report(
+            services,
+            evaluated_at=_utc_now(),
+        )
+
+    def inspect_summary(self) -> InfrastructureSummary:
+        """Return one normalized infrastructure summary."""
+
+        services = self.list_services()
+        evaluated_at = _utc_now()
+        runtime_entries = tuple(
+            ServiceRuntimeEntry(
+                service=managed_service,
+                runtime=self.inspect_runtime(managed_service.identifier),
+            )
+            for managed_service in services
+        )
+        health = self._build_health_report(
+            services,
+            evaluated_at=evaluated_at,
+        )
+
+        return InfrastructureSummary(
+            runtime_entries=runtime_entries,
+            health=health,
+            evaluated_at=evaluated_at,
+        )
+
+    def _build_health_report(
+        self,
+        services: tuple[ManagedService, ...],
+        *,
+        evaluated_at: str,
+    ) -> InfrastructureHealthReport:
         entries = tuple(
             ServiceHealthEntry(
                 service=managed_service,
                 health=self.inspect_health(managed_service.identifier),
             )
-            for managed_service in self.list_services()
+            for managed_service in services
         )
-
         score = (
             sum(entry.health.score for entry in entries) // len(entries)
             if entries
             else 0
         )
-        status = _aggregate_status(entries, score)
 
         return InfrastructureHealthReport(
             entries=entries,
             score=score,
-            status=status,
-            evaluated_at=_utc_now(),
+            status=_aggregate_status(entries, score),
+            evaluated_at=evaluated_at,
         )
 
 

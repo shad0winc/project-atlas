@@ -18,7 +18,9 @@ from atlas.service_lifecycle import (
 )
 from atlas.service_lifecycle.service import (
     InfrastructureHealthReport,
+    InfrastructureSummary,
     ServiceHealthEntry,
+    ServiceRuntimeEntry,
 )
 from atlas.service_lifecycle_cli import main
 
@@ -94,6 +96,31 @@ def sample_health_report() -> InfrastructureHealthReport:
         ),
         score=90,
         status="healthy",
+        evaluated_at="2026-08-01T12:05:00Z",
+    )
+
+
+def sample_summary() -> InfrastructureSummary:
+    services = sample_services()
+    return InfrastructureSummary(
+        runtime_entries=(
+            ServiceRuntimeEntry(
+                service=services[0],
+                runtime=sample_runtime(),
+            ),
+            ServiceRuntimeEntry(
+                service=services[1],
+                runtime=ServiceRuntime(
+                    state="exited",
+                    health="unknown",
+                    image=ServiceImage(
+                        reference="qbittorrent:latest",
+                    ),
+                    exit_code=0,
+                ),
+            ),
+        ),
+        health=sample_health_report(),
         evaluated_at="2026-08-01T12:05:00Z",
     )
 
@@ -260,6 +287,7 @@ def test_service_help_dispatcher() -> None:
         "atlas service show <identifier> [--json]"
         in result.stdout
     )
+    assert "atlas service summary [--json]" in result.stdout
 
 
 def test_show_help_is_active() -> None:
@@ -465,6 +493,79 @@ def test_aggregate_health_json_output() -> None:
     service.inspect_health.assert_not_called()
 
 
+
+def test_summary_human_output() -> None:
+    service = Mock()
+    service.inspect_summary.return_value = sample_summary()
+    output = StringIO()
+
+    result = main(
+        ["summary"],
+        service=service,
+        output=output,
+    )
+
+    rendered = output.getvalue()
+
+    assert result == 0
+    assert "Atlas Infrastructure Summary" in rendered
+    assert "Provider:        docker-compose" in rendered
+    assert "Total:       2" in rendered
+    assert "Running:     1" in rendered
+    assert "Stopped:     1" in rendered
+    assert "Healthy:     1" in rendered
+    assert "Degraded:    1" in rendered
+    assert "Overall Score: 90/100" in rendered
+    assert "Attention Required: 1" in rendered
+    service.inspect_summary.assert_called_once_with()
+
+
+def test_summary_json_output() -> None:
+    service = Mock()
+    service.inspect_summary.return_value = sample_summary()
+    output = StringIO()
+
+    result = main(
+        ["summary", "--json"],
+        service=service,
+        output=output,
+    )
+
+    payload = json.loads(output.getvalue())
+
+    assert result == 0
+    assert payload["provider"] == "docker-compose"
+    assert payload["total_services"] == 2
+    assert payload["service_counts"] == {
+        "enabled": 2,
+        "disabled": 0,
+    }
+    assert payload["runtime_counts"] == {
+        "running": 1,
+        "stopped": 1,
+        "restarting": 0,
+        "failed": 0,
+        "unknown": 0,
+    }
+    assert payload["health_counts"]["degraded"] == 1
+    assert payload["score"] == 90
+    assert payload["status"] == "healthy"
+    service.inspect_summary.assert_called_once_with()
+
+
+def test_summary_help_is_active() -> None:
+    result = subprocess.run(
+        [str(ATLAS_CLI), "service", "summary", "--help"],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "usage: atlas service summary" in result.stdout
+    assert "--json" in result.stdout
+
 def test_runtime_help_is_active() -> None:
     result = subprocess.run(
         [str(ATLAS_CLI), "service", "runtime", "--help"],
@@ -493,7 +594,7 @@ def test_health_help_is_active() -> None:
     assert "--json" in result.stdout
 
 
-def test_service_help_registers_runtime_and_health() -> None:
+def test_service_help_registers_runtime_health_and_summary() -> None:
     result = subprocess.run(
         [str(ATLAS_CLI), "service", "help"],
         cwd=PROJECT_ROOT,
@@ -512,3 +613,4 @@ def test_service_help_registers_runtime_and_health() -> None:
         "atlas service health <identifier> [--json]"
         in result.stdout
     )
+    assert "atlas service summary [--json]" in result.stdout

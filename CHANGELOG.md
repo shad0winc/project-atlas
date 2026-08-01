@@ -25,6 +25,10 @@ All notable changes to Project Atlas are documented in this file.
 - `atlas service health [--json]` for provider-independent aggregate infrastructure health reporting.
 - Aggregate infrastructure scoring, status counts, services requiring attention, warnings, errors, and evaluation timestamps.
 - Human-readable infrastructure health dashboard and normalized JSON contract for automation and future API and Portal consumers.
+- Immutable `ServiceRuntimeEntry` and `InfrastructureSummary` report contracts.
+- `atlas service summary [--json]` for provider-independent runtime, enablement,
+  health, score, status, attention, provider, Compose project, and timestamp totals.
+- Canonical subsystem architecture documentation under `docs/architecture/`.
 - Backward-compatible `atlas services [--json]` alias backed by the Service
   Lifecycle domain instead of raw `docker compose ps` output.
 - Responsive phone and tablet administration requirements added to the M-018
@@ -42,6 +46,11 @@ All notable changes to Project Atlas are documented in this file.
   existing per-service health inspection without changing the provider contract.
 - Aggregate evaluation is owned by `ServiceLifecycleService`; the CLI renders the
   normalized report and does not implement health business rules.
+- Infrastructure summary orchestration is owned by `ServiceLifecycleService`,
+  reuses one managed-service inventory, and keeps provider and rendering concerns
+  separated.
+- Formalized subsystem architecture documents as stable design specifications,
+  distinct from roadmap planning, changelog release notes, and build history.
 
 #### Validation
 
@@ -60,6 +69,13 @@ All notable changes to Project Atlas are documented in this file.
   services, and no aggregate errors.
 - Confirmed that 11 running services were degraded only because no Docker health
   check is configured.
+- Verified 76 focused infrastructure-summary service and CLI tests.
+- Verified 540 Service Lifecycle regression tests.
+- Re-verified the full Atlas Core suite with 648 passing tests and five passing
+  Sports integration suites.
+- Live-validated the infrastructure summary across 15 enabled services: 15 running,
+  zero stopped, restarting, failed, or unknown; score 89/100; status Degraded; and
+  11 services requiring attention because Docker health checks are not configured.
 
 ### Added
 

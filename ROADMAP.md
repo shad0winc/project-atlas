@@ -225,6 +225,9 @@ for Atlas-managed infrastructure.
 - [x] Add managed-service listing
 - [x] Add individual service inspection
 - [x] Add aggregate infrastructure health
+- [x] Add normalized infrastructure summary
+- [ ] Add service doctor diagnostics
+- [ ] Add service dependency graph
 - [ ] Add update-availability inspection
 - [x] Add human-readable reports
 - [x] Add machine-readable JSON reports
@@ -254,6 +257,9 @@ for Atlas-managed infrastructure.
 - [x] Add `atlas service runtime <service> [--json]`
 - [x] Add `atlas service health <service> [--json]`
 - [x] Add aggregate `atlas service health [--json]`
+- [x] Add `atlas service summary [--json]`
+- [ ] Add `atlas service doctor [--json]`
+- [ ] Add `atlas service graph [--json]`
 - [ ] Add `atlas service updates`
 - [ ] Add `atlas service history`
 - [ ] Add `atlas service update <service> --dry-run`
@@ -868,6 +874,9 @@ The following capabilities must not delay the v1.0 release:
 - Observability before automation
 - Automation before repetitive manual intervention
 - Documentation as a first-class feature
+- Maintain stable subsystem architecture documents for mature domains
+- Use design, implementation, focused validation, full regression, live validation,
+  documentation, architecture review, commit, and push as the standard sprint flow
 - Stable user experience over continuous production changes
 - Test changes before production deployment
 - Back up before production maintenance
