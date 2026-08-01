@@ -11,6 +11,7 @@ import pytest
 from atlas.service_lifecycle import (
     DockerComposeProvider,
     DockerComposeProviderError,
+    ManagedService,
     ServiceLifecycleProvider,
 )
 
@@ -1161,10 +1162,230 @@ def test_list_services_translates_managed_service_validation_error(
         provider.list_services()
 
 
+
+def test_inspect_service_normalizes_requested_identifier(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "list_services",
+        lambda self: (
+            ManagedService(
+                identifier="sonarr-anime",
+                name="Sonarr Anime",
+                provider="docker-compose",
+                compose_project="atlas",
+                container_name="sonarr-anime",
+                dependencies=(
+                    "prowlarr",
+                ),
+            ),
+        ),
+    )
+
+    service = provider.inspect_service(
+        "  SONARR-ANIME  ",
+    )
+
+    assert service.identifier == "sonarr-anime"
+    assert service.name == "Sonarr Anime"
+    assert service.container_name == "sonarr-anime"
+    assert service.dependencies == (
+        "prowlarr",
+    )
+
+
+def test_inspect_service_reuses_list_services(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+    calls: list[str] = []
+
+    service = ManagedService(
+        identifier="sonarr",
+        name="Sonarr",
+        provider="docker-compose",
+    )
+
+    def fake_list_services(
+        self: DockerComposeProvider,
+    ) -> tuple[ManagedService, ...]:
+        calls.append("list_services")
+        return (
+            service,
+        )
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "list_services",
+        fake_list_services,
+    )
+
+    result = provider.inspect_service("sonarr")
+
+    assert result is service
+    assert calls == [
+        "list_services",
+    ]
+
+
+def test_inspect_service_returns_exact_matching_service(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    sonarr = ManagedService(
+        identifier="sonarr",
+        name="Sonarr",
+        provider="docker-compose",
+    )
+    sonarr_anime = ManagedService(
+        identifier="sonarr-anime",
+        name="Sonarr Anime",
+        provider="docker-compose",
+    )
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "list_services",
+        lambda self: (
+            sonarr,
+            sonarr_anime,
+        ),
+    )
+
+    assert provider.inspect_service("sonarr") is sonarr
+    assert (
+        provider.inspect_service("sonarr-anime")
+        is sonarr_anime
+    )
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "",
+        "   ",
+        None,
+        True,
+        42,
+        object(),
+    ],
+)
+def test_inspect_service_requires_non_empty_text_identifier(
+    tmp_path: Path,
+    value: object,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    with pytest.raises(
+        DockerComposeProviderError,
+        match="service identifier must be non-empty text",
+    ):
+        provider.inspect_service(
+            value,  # type: ignore[arg-type]
+        )
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "-sonarr",
+        "sonarr-",
+        ".sonarr",
+        "sonarr.",
+        "son arr",
+        "sonarr/api",
+        "sonarr:latest",
+        "sonarr@atlas",
+    ],
+)
+def test_inspect_service_rejects_malformed_identifier(
+    tmp_path: Path,
+    value: str,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    with pytest.raises(
+        DockerComposeProviderError,
+        match="invalid service identifier",
+    ):
+        provider.inspect_service(value)
+
+
+def test_inspect_service_reports_unknown_service(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "list_services",
+        lambda self: (
+            ManagedService(
+                identifier="sonarr",
+                name="Sonarr",
+                provider="docker-compose",
+            ),
+        ),
+    )
+
+    with pytest.raises(
+        DockerComposeProviderError,
+        match=(
+            "Docker Compose service was not found: prowlarr"
+        ),
+    ):
+        provider.inspect_service(
+            "  PROWLARR  ",
+        )
+
+
+def test_inspect_service_returns_managed_service_contract(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    expected = ManagedService(
+        identifier="qbittorrent",
+        name="Qbittorrent",
+        provider="docker-compose",
+        compose_project="atlas",
+        container_name="qbittorrent",
+        dependencies=(
+            "gluetun",
+        ),
+    )
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "list_services",
+        lambda self: (
+            expected,
+        ),
+    )
+
+    result = provider.inspect_service(
+        "qbittorrent",
+    )
+
+    assert result is expected
+    assert isinstance(
+        result,
+        ManagedService,
+    )
+
+
 @pytest.mark.parametrize(
     "method_name",
     [
-        "inspect_service",
         "inspect_runtime",
         "inspect_health",
     ],

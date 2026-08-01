@@ -150,10 +150,19 @@ class DockerComposeProvider(ServiceLifecycleProvider):
         self,
         identifier: str,
     ) -> ManagedService:
-        """Return one configured Compose service."""
+        """Return one configured Compose service by stable identifier."""
+
+        normalized_identifier = _normalize_requested_identifier(
+            identifier,
+        )
+
+        for service in self.list_services():
+            if service.identifier == normalized_identifier:
+                return service
 
         raise DockerComposeProviderError(
-            "Docker Compose service inspection is not implemented yet",
+            "Docker Compose service was not found: "
+            f"{normalized_identifier}",
         )
 
     def inspect_runtime(
@@ -271,6 +280,30 @@ class DockerComposeProvider(ServiceLifecycleProvider):
             raise DockerComposeProviderError(
                 "Docker Compose returned invalid JSON",
             ) from exc
+
+
+def _normalize_requested_identifier(
+    value: object,
+) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise DockerComposeProviderError(
+            "service identifier must be non-empty text",
+        )
+
+    normalized = value.strip().casefold()
+
+    try:
+        probe = ManagedService(
+            identifier=normalized,
+            name="Service",
+            provider="docker-compose",
+        )
+    except ServiceLifecycleError as exc:
+        raise DockerComposeProviderError(
+            f"invalid service identifier: {normalized}: {exc}",
+        ) from exc
+
+    return probe.identifier
 
 
 def _normalize_configured_service(
