@@ -13,6 +13,7 @@ from atlas.discovery import (
     DiscoveryError,
     DiscoveryHealth,
     DiscoveryIndexer,
+    DiscoveryReport,
     DiscoveryService,
 )
 from atlas.discovery.providers import (
@@ -72,6 +73,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Evaluate discovery health.",
     )
     health_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Render machine-readable JSON.",
+    )
+
+    report_parser = subparsers.add_parser(
+        "report",
+        help="Generate a discovery report.",
+    )
+    report_parser.add_argument(
         "--json",
         action="store_true",
         dest="as_json",
@@ -455,6 +467,152 @@ def _command_health(
     return 0 if health.healthy else 1
 
 
+def _render_report_json(
+    report: DiscoveryReport,
+    *,
+    output: TextIO,
+) -> None:
+    """Render machine-readable Discovery report output."""
+
+    json.dump(
+        report.to_dict(),
+        output,
+        indent=2,
+        sort_keys=True,
+    )
+    output.write("\n")
+
+
+def _render_report_human(
+    report: DiscoveryReport,
+    *,
+    output: TextIO,
+) -> None:
+    """Render human-readable Discovery report output."""
+
+    output.write("Atlas Discovery Report\n")
+    output.write("======================\n\n")
+
+    output.write(f"Indexers: {report.indexer_count}\n")
+    output.write(f"Warnings: {report.warning_count}\n")
+    output.write(f"Errors: {report.error_count}\n")
+
+    metadata = report.metadata
+
+    if metadata:
+        output.write("\nSummary\n")
+        output.write("-------\n")
+
+        preferred_keys = (
+            "enabled_indexer_count",
+            "disabled_indexer_count",
+            "capabilities",
+            "categories",
+            "tags",
+        )
+
+        rendered_keys: set[str] = set()
+
+        for key in preferred_keys:
+            if key not in metadata:
+                continue
+
+            _render_report_metadata_value(
+                key,
+                metadata[key],
+                output=output,
+            )
+            rendered_keys.add(key)
+
+        for key in sorted(
+            (
+                metadata_key
+                for metadata_key in metadata
+                if metadata_key not in rendered_keys
+                and metadata_key != "health"
+            ),
+            key=lambda value: (
+                str(value).casefold(),
+                str(value),
+            ),
+        ):
+            _render_report_metadata_value(
+                str(key),
+                metadata[key],
+                output=output,
+            )
+
+    health_payload = metadata.get("health")
+
+    if isinstance(health_payload, dict):
+        output.write("\nHealth\n")
+        output.write("------\n")
+        output.write(
+            "Status: "
+            f"{'Healthy' if health_payload.get('healthy') else 'Unhealthy'}\n"
+        )
+        output.write(
+            f"Score: {health_payload.get('score', 'unknown')}/100\n"
+        )
+
+        warnings = health_payload.get("warnings", [])
+        errors = health_payload.get("errors", [])
+
+        output.write(
+            "Health Warnings: "
+            f"{len(warnings) if isinstance(warnings, list) else 'unknown'}\n"
+        )
+        output.write(
+            "Health Errors: "
+            f"{len(errors) if isinstance(errors, list) else 'unknown'}\n"
+        )
+
+
+def _render_report_metadata_value(
+    key: str,
+    value: object,
+    *,
+    output: TextIO,
+) -> None:
+    """Render one Discovery report metadata value."""
+
+    label = key.replace("_", " ").title()
+
+    if isinstance(value, list):
+        rendered = ", ".join(str(item) for item in value) or "-"
+    elif isinstance(value, tuple):
+        rendered = ", ".join(str(item) for item in value) or "-"
+    else:
+        rendered = str(value)
+
+    output.write(f"{label}: {rendered}\n")
+
+
+def _command_report(
+    *,
+    as_json: bool,
+    output: TextIO,
+) -> int:
+    """Execute the Discovery report command."""
+
+    provider = _provider_from_environment()
+    service = DiscoveryService(provider)
+    report = service.report()
+
+    if as_json:
+        _render_report_json(
+            report,
+            output=output,
+        )
+    else:
+        _render_report_human(
+            report,
+            output=output,
+        )
+
+    return 0 if report.error_count == 0 else 1
+
+
 def main(
     argv: Sequence[str] | None = None,
     *,
@@ -487,6 +645,12 @@ def main(
 
         if arguments.command == "health":
             return _command_health(
+                as_json=arguments.as_json,
+                output=output,
+            )
+
+        if arguments.command == "report":
+            return _command_report(
                 as_json=arguments.as_json,
                 output=output,
             )

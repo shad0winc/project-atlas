@@ -113,27 +113,19 @@ def test_discovery_help_forms_succeed(
     assert "atlas discovery report" in result.stdout
 
 
-@pytest.mark.parametrize(
-    "subcommand",
-    [
-        "report",
-    ],
-)
-def test_registered_subcommands_are_explicitly_pending(
-    subcommand: str,
-) -> None:
+
+def test_report_subcommand_help_is_active() -> None:
     result = run_atlas(
         "discovery",
-        subcommand,
+        "report",
+        "--help",
+        environment=discovery_test_environment(),
     )
 
-    assert result.returncode == 2
-    assert result.stdout == ""
-    assert (
-        "Discovery subcommand is not implemented yet: "
-        f"{subcommand}"
-    ) in result.stderr
-    assert "Run: atlas discovery help" in result.stderr
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert "usage: atlas discovery report" in result.stdout
+    assert "--json" in result.stdout
 
 
 def test_health_subcommand_help_is_active() -> None:
@@ -248,6 +240,11 @@ def test_discovery_dispatcher_does_not_modify_repository() -> None:
         (
             "discovery",
             "health",
+            "--help",
+        ),
+        (
+            "discovery",
+            "report",
             "--help",
         ),
         (

@@ -11,7 +11,7 @@ Usage:
   atlas discovery categories [--json]
   atlas discovery applications [--json]
   atlas discovery health [--json]
-  atlas discovery report
+  atlas discovery report [--json]
 
 Commands:
   indexers       List configured discovery indexers
@@ -21,8 +21,7 @@ Commands:
   report         Generate a discovery report
   help           Show this help text
 
-The indexers, categories, applications, and health commands are connected
-to the read-only Prowlarr provider. The report command remains pending.
+All Discovery commands are connected to the read-only Prowlarr provider.
 HELP
 }
 
@@ -147,7 +146,8 @@ atlas_command_discovery() {
       ;;
 
     report)
-      atlas_command_discovery_pending "$subcommand"
+      shift
+      atlas_discovery_python report "$@"
       ;;
 
     *)
