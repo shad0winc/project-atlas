@@ -188,6 +188,92 @@ core services rather than implementing separate platform foundations.
 
 # v1.0 Release Milestones
 
+## M-018 — Atlas Infrastructure Management
+
+**Status:** In progress
+
+**Goal:** Provide a safe, observable, and reusable service-lifecycle platform
+for Atlas-managed infrastructure.
+
+### Service Lifecycle Foundation
+
+- [x] Define Service Lifecycle domain architecture
+- [ ] Add normalized managed-service models
+- [ ] Add service image and runtime-state models
+- [ ] Add service health models
+- [ ] Add update-plan and update-result models
+- [ ] Add maintenance-event models
+- [ ] Add provider-independent service contracts
+- [ ] Add dedicated domain tests
+- [ ] Export public contracts through the package `__init__.py`
+
+### Docker Compose Provider
+
+- [ ] Discover Atlas-managed Compose services
+- [ ] Normalize container runtime state
+- [ ] Normalize Docker health status
+- [ ] Inspect configured and running images
+- [ ] Inspect image identifiers and digests
+- [ ] Report container uptime and restart counts
+- [ ] Report service dependencies
+- [ ] Distinguish running, stopped, restarting, and failed services
+- [ ] Preserve read-only behavior during the discovery phase
+
+### Service Health and Reporting
+
+- [ ] Add managed-service listing
+- [ ] Add individual service inspection
+- [ ] Add aggregate infrastructure health
+- [ ] Add update-availability inspection
+- [ ] Add human-readable reports
+- [ ] Add machine-readable JSON reports
+- [ ] Add maintenance history
+- [ ] Add audit events for lifecycle operations
+
+### Guarded Lifecycle Operations
+
+- [ ] Add administrator authorization requirements
+- [ ] Add allow-listed service identifiers
+- [ ] Add update dry-run planning
+- [ ] Add guarded single-service updates
+- [ ] Add service restart controls
+- [ ] Add pre-update state capture
+- [ ] Add post-update health validation
+- [ ] Add dependency-aware update ordering
+- [ ] Add operation locking
+- [ ] Add failed-update rollback
+- [ ] Add bulk-update planning
+- [ ] Add scheduled maintenance-window support
+
+### CLI and API
+
+- [ ] Add `atlas service list`
+- [ ] Add `atlas service inspect <service>`
+- [ ] Add `atlas service health`
+- [ ] Add `atlas service updates`
+- [ ] Add `atlas service history`
+- [ ] Add `atlas service update <service> --dry-run`
+- [ ] Add guarded lifecycle API endpoints
+- [ ] Add lifecycle API authorization tests
+- [ ] Add lifecycle CLI contract tests
+
+### Admin Portal Integration
+
+- [ ] Add managed-service overview
+- [ ] Add service health cards
+- [ ] Add update-availability indicators
+- [ ] Add service detail views
+- [ ] Add restart confirmation workflow
+- [ ] Add guarded update confirmation workflow
+- [ ] Add maintenance-history view
+- [ ] Add failure and rollback reporting
+- [ ] Add responsive phone and tablet administration layouts
+- [ ] Add touch-friendly lifecycle controls
+- [ ] Add mobile-safe service cards and tables
+- [ ] Evaluate Progressive Web App support after responsive validation
+
+---
+
 ## M-019 — Atlas Portal and API
 
 **Status:** In progress
