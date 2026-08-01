@@ -400,6 +400,122 @@ def test_service_translates_unexpected_provider_failure(
     )
 
 
+def test_inspect_health_report_aggregates_services(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service, provider = make_service()
+    provider.services = [
+        ManagedService(
+            identifier="sonarr",
+            name="Sonarr",
+            provider="stub",
+        ),
+        ManagedService(
+            identifier="bazarr",
+            name="Bazarr",
+            provider="stub",
+        ),
+    ]
+    health_by_identifier = {
+        "bazarr": ServiceHealth(
+            status=ServiceHealthStatus.DEGRADED,
+            score=80,
+            warnings=("No Docker health check configured",),
+        ),
+        "sonarr": ServiceHealth(
+            status=ServiceHealthStatus.HEALTHY,
+            score=100,
+        ),
+    }
+
+    def inspect_health(identifier: str):
+        provider.calls.append(("inspect_health", identifier))
+        return health_by_identifier[identifier]
+
+    provider.inspect_health = inspect_health  # type: ignore[method-assign]
+    monkeypatch.setattr(
+        "atlas.service_lifecycle.service._utc_now",
+        lambda: "2026-08-01T20:30:00Z",
+    )
+
+    report = service.inspect_health_report()
+
+    assert report.score == 90
+    assert report.status == "healthy"
+    assert report.counts == {
+        "healthy": 1,
+        "degraded": 1,
+        "unhealthy": 0,
+        "unknown": 0,
+    }
+    assert tuple(
+        entry.service.identifier
+        for entry in report.entries
+    ) == ("bazarr", "sonarr")
+    assert tuple(
+        entry.service.identifier
+        for entry in report.attention
+    ) == ("bazarr",)
+    assert report.warnings == (
+        "bazarr: No Docker health check configured",
+    )
+    assert report.errors == ()
+    assert report.evaluated_at == "2026-08-01T20:30:00Z"
+    assert provider.calls == [
+        ("list_services", None),
+        ("inspect_health", "bazarr"),
+        ("inspect_health", "sonarr"),
+    ]
+
+
+def test_inspect_health_report_errors_force_unhealthy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service, provider = make_service()
+    provider.services = [provider.service]
+    provider.health = ServiceHealth(
+        status=ServiceHealthStatus.DEGRADED,
+        score=95,
+        errors=("Container restart loop detected",),
+    )
+    monkeypatch.setattr(
+        "atlas.service_lifecycle.service._utc_now",
+        lambda: "2026-08-01T20:30:00Z",
+    )
+
+    report = service.inspect_health_report()
+
+    assert report.score == 95
+    assert report.status == "unhealthy"
+    assert report.errors == (
+        "sonarr: Container restart loop detected",
+    )
+
+
+def test_inspect_health_report_empty_inventory_is_unknown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service, provider = make_service()
+    provider.services = ()
+    monkeypatch.setattr(
+        "atlas.service_lifecycle.service._utc_now",
+        lambda: "2026-08-01T20:30:00Z",
+    )
+
+    report = service.inspect_health_report()
+
+    assert report.score == 0
+    assert report.status == "unknown"
+    assert report.counts == {
+        "healthy": 0,
+        "degraded": 0,
+        "unhealthy": 0,
+        "unknown": 0,
+    }
+    assert report.entries == ()
+    assert report.attention == ()
+
+
 def test_service_package_export() -> None:
     from atlas import service_lifecycle
 

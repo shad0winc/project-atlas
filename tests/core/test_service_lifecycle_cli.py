@@ -16,6 +16,10 @@ from atlas.service_lifecycle import (
     ServiceLifecycleError,
     ServiceRuntime,
 )
+from atlas.service_lifecycle.service import (
+    InfrastructureHealthReport,
+    ServiceHealthEntry,
+)
 from atlas.service_lifecycle_cli import main
 
 
@@ -64,6 +68,32 @@ def sample_health() -> ServiceHealth:
     return ServiceHealth(
         status=ServiceHealthStatus.HEALTHY,
         score=100,
+        evaluated_at="2026-08-01T12:05:00Z",
+    )
+
+
+def sample_health_report() -> InfrastructureHealthReport:
+    services = sample_services()
+    return InfrastructureHealthReport(
+        entries=(
+            ServiceHealthEntry(
+                service=services[0],
+                health=sample_health(),
+            ),
+            ServiceHealthEntry(
+                service=services[1],
+                health=ServiceHealth(
+                    status=ServiceHealthStatus.DEGRADED,
+                    score=80,
+                    warnings=(
+                        "No Docker health check configured",
+                    ),
+                    evaluated_at="2026-08-01T12:05:00Z",
+                ),
+            ),
+        ),
+        score=90,
+        status="healthy",
         evaluated_at="2026-08-01T12:05:00Z",
     )
 
@@ -374,6 +404,67 @@ def test_health_json_output() -> None:
     assert payload["errors"] == []
 
 
+def test_aggregate_health_human_output() -> None:
+    service = Mock()
+    service.inspect_health_report.return_value = sample_health_report()
+    output = StringIO()
+
+    result = main(
+        ["health"],
+        service=service,
+        output=output,
+    )
+
+    rendered = output.getvalue()
+
+    assert result == 0
+    assert "Atlas Infrastructure Health" in rendered
+    assert "Overall Score: 90/100" in rendered
+    assert "Status: Healthy" in rendered
+    assert "Healthy:     1" in rendered
+    assert "Degraded:    1" in rendered
+    assert "- qbittorrent" in rendered
+    assert "No Docker health check configured" in rendered
+    assert "Evaluated: 2026-08-01T12:05:00Z" in rendered
+    service.inspect_health_report.assert_called_once_with()
+    service.inspect_health.assert_not_called()
+
+
+def test_aggregate_health_json_output() -> None:
+    service = Mock()
+    service.inspect_health_report.return_value = sample_health_report()
+    output = StringIO()
+
+    result = main(
+        ["health", "--json"],
+        service=service,
+        output=output,
+    )
+
+    payload = json.loads(output.getvalue())
+
+    assert result == 0
+    assert payload["status"] == "healthy"
+    assert payload["score"] == 90
+    assert payload["total_services"] == 2
+    assert payload["counts"] == {
+        "healthy": 1,
+        "degraded": 1,
+        "unhealthy": 0,
+        "unknown": 0,
+    }
+    assert [
+        entry["service"]["identifier"]
+        for entry in payload["attention_required"]
+    ] == ["qbittorrent"]
+    assert payload["warnings"] == [
+        "qbittorrent: No Docker health check configured",
+    ]
+    assert len(payload["services"]) == 2
+    service.inspect_health_report.assert_called_once_with()
+    service.inspect_health.assert_not_called()
+
+
 def test_runtime_help_is_active() -> None:
     result = subprocess.run(
         [str(ATLAS_CLI), "service", "runtime", "--help"],
@@ -416,6 +507,7 @@ def test_service_help_registers_runtime_and_health() -> None:
         "atlas service runtime <identifier> [--json]"
         in result.stdout
     )
+    assert "atlas service health [--json]" in result.stdout
     assert (
         "atlas service health <identifier> [--json]"
         in result.stdout

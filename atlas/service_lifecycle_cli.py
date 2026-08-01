@@ -18,6 +18,7 @@ from atlas.service_lifecycle import (
     ServiceLifecycleService,
     ServiceRuntime,
 )
+from atlas.service_lifecycle.service import InfrastructureHealthReport
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -74,11 +75,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     health_parser = subparsers.add_parser(
         "health",
-        help="Show normalized health for one service.",
+        help="Show aggregate infrastructure health or health for one service.",
     )
     health_parser.add_argument(
         "identifier",
-        help="Stable managed-service identifier.",
+        nargs="?",
+        help=(
+            "Optional stable managed-service identifier. "
+            "Omit it for aggregate infrastructure health."
+        ),
     )
     health_parser.add_argument(
         "--json",
@@ -382,13 +387,92 @@ def _render_health_human(
     output.write(f"Evaluated: {health.evaluated_at}\n")
 
 
+def _render_health_report_json(
+    report: InfrastructureHealthReport,
+    *,
+    output: TextIO,
+) -> None:
+    json.dump(
+        report.to_dict(),
+        output,
+        indent=2,
+        sort_keys=True,
+    )
+    output.write("\n")
+
+
+def _render_health_report_human(
+    report: InfrastructureHealthReport,
+    *,
+    output: TextIO,
+) -> None:
+    counts = report.counts
+
+    output.write("Atlas Infrastructure Health\n")
+    output.write("===========================\n\n")
+    output.write(f"Overall Score: {report.score}/100\n")
+    output.write(f"Status: {report.status.title()}\n")
+
+    output.write("\nServices\n")
+    output.write("--------\n")
+    output.write(f"Total:       {len(report.entries)}\n")
+    output.write(f"Healthy:     {counts['healthy']}\n")
+    output.write(f"Degraded:    {counts['degraded']}\n")
+    output.write(f"Unhealthy:   {counts['unhealthy']}\n")
+    output.write(f"Unknown:     {counts['unknown']}\n")
+
+    output.write("\nAttention Required\n")
+    output.write("------------------\n")
+    if not report.attention:
+        output.write("None\n")
+    else:
+        for entry in report.attention:
+            output.write(f"- {entry.service.identifier}\n")
+            messages = (
+                tuple(entry.health.errors)
+                + tuple(entry.health.warnings)
+            )
+            if not messages:
+                messages = (
+                    f"Health status is {entry.health.status.value}",
+                )
+            for message in messages:
+                output.write(f"    - {message}\n")
+
+    output.write("\nWarnings\n")
+    output.write("--------\n")
+    if report.warnings:
+        for warning in report.warnings:
+            output.write(f"- {warning}\n")
+    else:
+        output.write("None\n")
+
+    output.write("\nErrors\n")
+    output.write("------\n")
+    if report.errors:
+        for error in report.errors:
+            output.write(f"- {error}\n")
+    else:
+        output.write("None\n")
+
+    output.write(f"\nEvaluated: {report.evaluated_at}\n")
+
+
 def _command_health(
-    identifier: str,
+    identifier: str | None,
     *,
     service: ServiceLifecycleService,
     as_json: bool,
     output: TextIO,
 ) -> int:
+    if identifier is None:
+        report = service.inspect_health_report()
+        if as_json:
+            _render_health_report_json(report, output=output)
+        else:
+            _render_health_report_human(report, output=output)
+        return 0
+
     health = service.inspect_health(identifier)
 
     if as_json:

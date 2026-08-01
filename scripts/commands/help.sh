@@ -17,6 +17,7 @@ Core Commands
   atlas service list [--json]
   atlas service show <identifier> [--json]
   atlas service runtime <identifier> [--json]
+  atlas service health [--json]
   atlas service health <identifier> [--json]
   atlas urls
   atlas git

@@ -10,13 +10,14 @@ Usage:
   atlas service list [--json]
   atlas service show <identifier> [--json]
   atlas service runtime <identifier> [--json]
+  atlas service health [--json]
   atlas service health <identifier> [--json]
 
 Commands:
   list       List configured Atlas-managed services
   show       Show identity, runtime, image, and health for one service
   runtime    Show normalized runtime state for one service
-  health     Show normalized health for one service
+  health     Show aggregate health or health for one service
   help       Show this help text
 
 The Service Lifecycle CLI is read-only.
