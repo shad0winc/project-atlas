@@ -6,6 +6,8 @@ import pytest
 
 from atlas.service_lifecycle import (
     ManagedService,
+    ServiceHealth,
+    ServiceHealthStatus,
     ServiceImage,
     ServiceLifecycleError,
     ServiceRuntime,
@@ -1000,3 +1002,454 @@ def test_service_lifecycle_package_exports_runtime_contracts() -> None:
 
     assert service_lifecycle.ServiceImage is ServiceImage
     assert service_lifecycle.ServiceRuntime is ServiceRuntime
+
+def test_service_health_status_values_are_stable() -> None:
+    assert tuple(
+        status.value
+        for status in ServiceHealthStatus
+    ) == (
+        "healthy",
+        "degraded",
+        "unhealthy",
+        "unavailable",
+        "unknown",
+    )
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (
+            ServiceHealthStatus.HEALTHY,
+            ServiceHealthStatus.HEALTHY,
+        ),
+        (
+            " Healthy ",
+            ServiceHealthStatus.HEALTHY,
+        ),
+        (
+            "DEGRADED",
+            ServiceHealthStatus.DEGRADED,
+        ),
+        (
+            "unhealthy",
+            ServiceHealthStatus.UNHEALTHY,
+        ),
+        (
+            "Unavailable",
+            ServiceHealthStatus.UNAVAILABLE,
+        ),
+        (
+            "unknown",
+            ServiceHealthStatus.UNKNOWN,
+        ),
+    ],
+)
+def test_service_health_normalizes_status(
+    value: object,
+    expected: ServiceHealthStatus,
+) -> None:
+    health = ServiceHealth(
+        status=value,  # type: ignore[arg-type]
+    )
+
+    assert health.status is expected
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "",
+        "   ",
+        None,
+        True,
+        42,
+        object(),
+        "starting",
+        "failed",
+    ],
+)
+def test_service_health_rejects_invalid_status(
+    value: object,
+) -> None:
+    with pytest.raises(
+        ServiceLifecycleError,
+        match="status",
+    ):
+        ServiceHealth(
+            status=value,  # type: ignore[arg-type]
+        )
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        0,
+        1,
+        50,
+        99,
+        100,
+    ],
+)
+def test_service_health_accepts_valid_score(
+    value: int,
+) -> None:
+    health = ServiceHealth(
+        status="healthy",
+        score=value,
+    )
+
+    assert health.score == value
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        -1,
+        101,
+        True,
+        None,
+        1.5,
+        "100",
+        object(),
+    ],
+)
+def test_service_health_rejects_invalid_score(
+    value: object,
+) -> None:
+    with pytest.raises(
+        ServiceLifecycleError,
+        match=(
+            "score must be an integer between 0 and 100"
+        ),
+    ):
+        ServiceHealth(
+            status="healthy",
+            score=value,  # type: ignore[arg-type]
+        )
+
+
+def test_service_health_normalizes_contract() -> None:
+    health = ServiceHealth(
+        status=" Degraded ",
+        score=85,
+        warnings=[
+            "Update available",
+            " Restart recommended ",
+            "Update available",
+        ],
+        errors=[
+            "API timeout",
+            " API timeout ",
+        ],
+        details={
+            "restart_count": 2,
+            "container_state": "running",
+        },
+        evaluated_at="2026-08-01T10:30:00-04:00",
+    )
+
+    assert health.status is ServiceHealthStatus.DEGRADED
+    assert health.score == 85
+    assert health.warnings == (
+        "Restart recommended",
+        "Update available",
+    )
+    assert health.errors == (
+        "API timeout",
+    )
+    assert health.details == {
+        "restart_count": 2,
+        "container_state": "running",
+    }
+    assert health.evaluated_at == "2026-08-01T14:30:00Z"
+    assert health.healthy is False
+    assert health.action_required is True
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "warnings",
+        "errors",
+    ],
+)
+@pytest.mark.parametrize(
+    "value",
+    [
+        "warning",
+        b"warning",
+        42,
+        True,
+        object(),
+    ],
+)
+def test_service_health_requires_text_collection(
+    field_name: str,
+    value: object,
+) -> None:
+    with pytest.raises(
+        ServiceLifecycleError,
+        match=rf"{field_name} must be a collection",
+    ):
+        ServiceHealth(
+            status="healthy",
+            **{
+                field_name: value,
+            },
+        )
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "warnings",
+        "errors",
+    ],
+)
+@pytest.mark.parametrize(
+    "value",
+    [
+        "",
+        "   ",
+        None,
+        True,
+        42,
+        object(),
+    ],
+)
+def test_service_health_rejects_invalid_collection_value(
+    field_name: str,
+    value: object,
+) -> None:
+    with pytest.raises(
+        ServiceLifecycleError,
+        match=rf"{field_name} value is required",
+    ):
+        ServiceHealth(
+            status="healthy",
+            **{
+                field_name: [
+                    value,
+                ],
+            },
+        )
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        None,
+        "details",
+        42,
+        True,
+        object(),
+    ],
+)
+def test_service_health_requires_details_mapping(
+    value: object,
+) -> None:
+    with pytest.raises(
+        ServiceLifecycleError,
+        match="details must be an object",
+    ):
+        ServiceHealth(
+            status="healthy",
+            details=value,  # type: ignore[arg-type]
+        )
+
+
+def test_service_health_copies_details_mapping() -> None:
+    details = {
+        "restart_count": 1,
+    }
+
+    health = ServiceHealth(
+        status="healthy",
+        details=details,
+    )
+
+    details["restart_count"] = 9
+
+    assert health.details == {
+        "restart_count": 1,
+    }
+
+
+@pytest.mark.parametrize(
+    ("status", "errors", "expected"),
+    [
+        (
+            ServiceHealthStatus.HEALTHY,
+            (),
+            True,
+        ),
+        (
+            ServiceHealthStatus.HEALTHY,
+            ("Failure",),
+            False,
+        ),
+        (
+            ServiceHealthStatus.DEGRADED,
+            (),
+            False,
+        ),
+        (
+            ServiceHealthStatus.UNHEALTHY,
+            (),
+            False,
+        ),
+        (
+            ServiceHealthStatus.UNAVAILABLE,
+            (),
+            False,
+        ),
+        (
+            ServiceHealthStatus.UNKNOWN,
+            (),
+            False,
+        ),
+    ],
+)
+def test_service_health_healthy_property(
+    status: ServiceHealthStatus,
+    errors: tuple[str, ...],
+    expected: bool,
+) -> None:
+    health = ServiceHealth(
+        status=status,
+        errors=errors,
+    )
+
+    assert health.healthy is expected
+
+
+@pytest.mark.parametrize(
+    ("status", "errors", "expected"),
+    [
+        (
+            ServiceHealthStatus.HEALTHY,
+            (),
+            False,
+        ),
+        (
+            ServiceHealthStatus.HEALTHY,
+            ("Failure",),
+            True,
+        ),
+        (
+            ServiceHealthStatus.DEGRADED,
+            (),
+            True,
+        ),
+        (
+            ServiceHealthStatus.UNHEALTHY,
+            (),
+            True,
+        ),
+        (
+            ServiceHealthStatus.UNAVAILABLE,
+            (),
+            True,
+        ),
+        (
+            ServiceHealthStatus.UNKNOWN,
+            (),
+            False,
+        ),
+    ],
+)
+def test_service_health_action_required_property(
+    status: ServiceHealthStatus,
+    errors: tuple[str, ...],
+    expected: bool,
+) -> None:
+    health = ServiceHealth(
+        status=status,
+        errors=errors,
+    )
+
+    assert health.action_required is expected
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "",
+        "   ",
+        None,
+        True,
+        42,
+        object(),
+        "2026-08-01",
+        "not-a-timestamp",
+    ],
+)
+def test_service_health_rejects_invalid_evaluated_at(
+    value: object,
+) -> None:
+    with pytest.raises(
+        ServiceLifecycleError,
+        match="evaluated_at",
+    ):
+        ServiceHealth(
+            status="healthy",
+            evaluated_at=value,  # type: ignore[arg-type]
+        )
+
+
+def test_service_health_defaults_evaluated_at_to_utc() -> None:
+    health = ServiceHealth(
+        status="healthy",
+    )
+
+    assert health.evaluated_at.endswith("Z")
+
+
+def test_service_health_is_immutable() -> None:
+    health = ServiceHealth(
+        status="healthy",
+    )
+
+    with pytest.raises(FrozenInstanceError):
+        health.score = 50  # type: ignore[misc]
+
+
+def test_service_health_serializes_normalized_contract() -> None:
+    health = ServiceHealth(
+        status="degraded",
+        score=80,
+        warnings=[
+            "Update available",
+        ],
+        errors=[],
+        details={
+            "restart_count": 2,
+        },
+        evaluated_at="2026-08-01T10:30:00-04:00",
+    )
+
+    assert health.to_dict() == {
+        "status": "degraded",
+        "score": 80,
+        "healthy": False,
+        "action_required": True,
+        "warnings": [
+            "Update available",
+        ],
+        "errors": [],
+        "details": {
+            "restart_count": 2,
+        },
+        "evaluated_at": "2026-08-01T14:30:00Z",
+    }
+
+
+def test_service_lifecycle_package_exports_health_contracts() -> None:
+    from atlas import service_lifecycle
+
+    assert service_lifecycle.ServiceHealth is ServiceHealth
+    assert (
+        service_lifecycle.ServiceHealthStatus
+        is ServiceHealthStatus
+    )

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
-from dataclasses import dataclass
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from enum import Enum
 import re
 from typing import Any
 
@@ -16,6 +17,120 @@ _SERVICE_IDENTIFIER_PATTERN = re.compile(
 
 class ServiceLifecycleError(ValueError):
     """Raised when a Service Lifecycle model contains invalid data."""
+
+
+class ServiceHealthStatus(str, Enum):
+    """Normalized health states for Atlas-managed services."""
+
+    HEALTHY = "healthy"
+    DEGRADED = "degraded"
+    UNHEALTHY = "unhealthy"
+    UNAVAILABLE = "unavailable"
+    UNKNOWN = "unknown"
+
+
+@dataclass(frozen=True)
+class ServiceHealth:
+    """Normalized health evaluation for one managed service."""
+
+    status: ServiceHealthStatus
+    score: int = 100
+    warnings: tuple[str, ...] = ()
+    errors: tuple[str, ...] = ()
+    details: Mapping[str, Any] = field(default_factory=dict)
+    evaluated_at: str = field(default_factory=lambda: _now_timestamp())
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "status",
+            _normalize_health_status(
+                self.status,
+                "status",
+            ),
+        )
+
+        if (
+            isinstance(self.score, bool)
+            or not isinstance(self.score, int)
+            or not 0 <= self.score <= 100
+        ):
+            raise ServiceLifecycleError(
+                "score must be an integer between 0 and 100",
+            )
+
+        object.__setattr__(
+            self,
+            "warnings",
+            _normalize_text_collection(
+                self.warnings,
+                "warnings",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "errors",
+            _normalize_text_collection(
+                self.errors,
+                "errors",
+            ),
+        )
+
+        if not isinstance(self.details, Mapping):
+            raise ServiceLifecycleError(
+                "details must be an object",
+            )
+
+        object.__setattr__(
+            self,
+            "details",
+            dict(self.details),
+        )
+        object.__setattr__(
+            self,
+            "evaluated_at",
+            _required_timestamp(
+                self.evaluated_at,
+                "evaluated_at",
+            ),
+        )
+
+    @property
+    def healthy(self) -> bool:
+        """Return whether the evaluation is explicitly healthy."""
+
+        return (
+            self.status is ServiceHealthStatus.HEALTHY
+            and not self.errors
+        )
+
+    @property
+    def action_required(self) -> bool:
+        """Return whether the health result requires intervention."""
+
+        return (
+            self.status
+            in {
+                ServiceHealthStatus.DEGRADED,
+                ServiceHealthStatus.UNHEALTHY,
+                ServiceHealthStatus.UNAVAILABLE,
+            }
+            or bool(self.errors)
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize the normalized service-health contract."""
+
+        return {
+            "status": self.status.value,
+            "score": self.score,
+            "healthy": self.healthy,
+            "action_required": self.action_required,
+            "warnings": list(self.warnings),
+            "errors": list(self.errors),
+            "details": dict(self.details),
+            "evaluated_at": self.evaluated_at,
+        }
 
 
 @dataclass(frozen=True)
@@ -322,6 +437,59 @@ class ManagedService:
         }
 
 
+def _normalize_health_status(
+    value: object,
+    field_name: str,
+) -> ServiceHealthStatus:
+    if isinstance(value, ServiceHealthStatus):
+        return value
+
+    if not isinstance(value, str) or not value.strip():
+        raise ServiceLifecycleError(
+            f"{field_name} is required",
+        )
+
+    normalized = value.strip().casefold()
+
+    try:
+        return ServiceHealthStatus(normalized)
+    except ValueError as exc:
+        allowed = ", ".join(
+            status.value
+            for status in ServiceHealthStatus
+        )
+
+        raise ServiceLifecycleError(
+            f"{field_name} must be one of: {allowed}",
+        ) from exc
+
+
+def _normalize_text_collection(
+    values: object,
+    field_name: str,
+) -> tuple[str, ...]:
+    if values is None:
+        return ()
+
+    if (
+        isinstance(values, (str, bytes))
+        or not isinstance(values, Iterable)
+    ):
+        raise ServiceLifecycleError(
+            f"{field_name} must be a collection",
+        )
+
+    normalized = {
+        _required_text(
+            value,
+            f"{field_name} value",
+        )
+        for value in values
+    }
+
+    return tuple(sorted(normalized))
+
+
 def _optional_digest(
     value: object,
     field_name: str,
@@ -433,6 +601,23 @@ def _normalize_service_identifiers(
     return tuple(sorted(normalized))
 
 
+def _required_timestamp(
+    value: object,
+    field_name: str,
+) -> str:
+    normalized = _optional_timestamp(
+        value,
+        field_name,
+    )
+
+    if normalized is None:
+        raise ServiceLifecycleError(
+            f"{field_name} is required",
+        )
+
+    return normalized
+
+
 def _optional_timestamp(
     value: object,
     field_name: str,
@@ -464,6 +649,14 @@ def _optional_timestamp(
     return (
         parsed
         .astimezone(timezone.utc)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+
+def _now_timestamp() -> str:
+    return (
+        datetime.now(timezone.utc)
         .isoformat()
         .replace("+00:00", "Z")
     )

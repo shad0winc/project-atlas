@@ -7,6 +7,8 @@ infrastructure services.
 
 from .models import (
     ManagedService,
+    ServiceHealth,
+    ServiceHealthStatus,
     ServiceImage,
     ServiceLifecycleError,
     ServiceRuntime,
@@ -14,6 +16,8 @@ from .models import (
 
 __all__ = [
     "ManagedService",
+    "ServiceHealth",
+    "ServiceHealthStatus",
     "ServiceImage",
     "ServiceLifecycleError",
     "ServiceRuntime",
