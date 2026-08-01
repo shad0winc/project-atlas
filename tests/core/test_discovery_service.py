@@ -555,3 +555,73 @@ def test_list_categories_requires_non_empty_strings(
         ),
     ):
         service.list_categories()
+
+def test_list_applications_normalizes_deduplicates_and_sorts() -> None:
+    provider = StubProvider(
+        applications=[
+            " Sonarr ",
+            "Radarr",
+            "sonarr",
+            "Radarr",
+        ],
+    )
+    service = DiscoveryService(provider)
+
+    assert service.list_applications() == (
+        "Radarr",
+        "Sonarr",
+        "sonarr",
+    )
+
+
+@pytest.mark.parametrize(
+    "applications",
+    [
+        "Sonarr",
+        b"Sonarr",
+        None,
+        42,
+    ],
+)
+def test_list_applications_requires_collection(
+    applications: object,
+) -> None:
+    provider = StubProvider(
+        applications=applications,  # type: ignore[arg-type]
+    )
+    service = DiscoveryService(provider)
+
+    with pytest.raises(
+        DiscoveryError,
+        match="provider applications must be a collection",
+    ):
+        service.list_applications()
+
+
+@pytest.mark.parametrize(
+    "application",
+    [
+        "",
+        "   ",
+        None,
+        42,
+    ],
+)
+def test_list_applications_requires_non_empty_strings(
+    application: object,
+) -> None:
+    provider = StubProvider(
+        applications=[
+            "Sonarr",
+            application,
+        ],  # type: ignore[list-item]
+    )
+    service = DiscoveryService(provider)
+
+    with pytest.raises(
+        DiscoveryError,
+        match=(
+            "provider applications must contain non-empty strings"
+        ),
+    ):
+        service.list_applications()

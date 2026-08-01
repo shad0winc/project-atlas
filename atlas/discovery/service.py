@@ -89,6 +89,43 @@ class DiscoveryService:
             )
         )
 
+    def list_applications(self) -> tuple[str, ...]:
+        """Return normalized provider applications in deterministic order."""
+
+        applications = self._provider.list_applications()
+
+        if (
+            isinstance(applications, (str, bytes))
+            or not isinstance(applications, Iterable)
+        ):
+            raise DiscoveryError(
+                "provider applications must be a collection",
+            )
+
+        normalized: set[str] = set()
+
+        for application in applications:
+            if (
+                not isinstance(application, str)
+                or not application.strip()
+            ):
+                raise DiscoveryError(
+                    "provider applications must contain "
+                    "non-empty strings",
+                )
+
+            normalized.add(application.strip())
+
+        return tuple(
+            sorted(
+                normalized,
+                key=lambda application: (
+                    application.casefold(),
+                    application,
+                ),
+            )
+        )
+
     def health(self) -> DiscoveryHealth:
         """Evaluate basic health for the configured discovery provider."""
 

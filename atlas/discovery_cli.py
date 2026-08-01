@@ -55,6 +55,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Render machine-readable JSON.",
     )
 
+    applications_parser = subparsers.add_parser(
+        "applications",
+        help="List connected discovery applications.",
+    )
+    applications_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Render machine-readable JSON.",
+    )
+
     return parser
 
 
@@ -279,6 +290,69 @@ def _command_categories(
     return 0
 
 
+def _render_applications_json(
+    applications: Sequence[str],
+    *,
+    output: TextIO,
+) -> None:
+    """Render machine-readable application output."""
+
+    json.dump(
+        list(applications),
+        output,
+        indent=2,
+        sort_keys=True,
+    )
+    output.write("\n")
+
+
+def _render_applications_human(
+    applications: Sequence[str],
+    *,
+    output: TextIO,
+) -> None:
+    """Render human-readable application output."""
+
+    output.write("Atlas Discovery Applications\n")
+    output.write("============================\n\n")
+
+    if not applications:
+        output.write(
+            "No discovery applications were returned.\n"
+        )
+        return
+
+    for application in applications:
+        output.write(f"- {application}\n")
+
+    output.write(f"\nTotal: {len(applications)}\n")
+
+
+def _command_applications(
+    *,
+    as_json: bool,
+    output: TextIO,
+) -> int:
+    """Execute the application-list command."""
+
+    provider = _provider_from_environment()
+    service = DiscoveryService(provider)
+    applications = service.list_applications()
+
+    if as_json:
+        _render_applications_json(
+            applications,
+            output=output,
+        )
+    else:
+        _render_applications_human(
+            applications,
+            output=output,
+        )
+
+    return 0
+
+
 def main(
     argv: Sequence[str] | None = None,
     *,
@@ -299,6 +373,12 @@ def main(
 
         if arguments.command == "categories":
             return _command_categories(
+                as_json=arguments.as_json,
+                output=output,
+            )
+
+        if arguments.command == "applications":
+            return _command_applications(
                 as_json=arguments.as_json,
                 output=output,
             )
