@@ -12,6 +12,7 @@ from typing import Any
 from atlas.service_lifecycle.models import (
     ManagedService,
     ServiceHealth,
+    ServiceImage,
     ServiceLifecycleError,
     ServiceRuntime,
 )
@@ -169,10 +170,22 @@ class DockerComposeProvider(ServiceLifecycleProvider):
         self,
         identifier: str,
     ) -> ServiceRuntime:
-        """Return one service's runtime state."""
+        """Return normalized live runtime state for one service."""
 
-        raise DockerComposeProviderError(
-            "Docker Compose runtime inspection is not implemented yet",
+        service = self.inspect_service(identifier)
+
+        container_identifier = self._resolve_container_identifier(
+            service,
+        )
+
+        payload = self._run_docker_json(
+            "inspect",
+            container_identifier,
+        )
+
+        return _normalize_runtime_payload(
+            payload,
+            service_identifier=service.identifier,
         )
 
     def inspect_health(
@@ -184,6 +197,135 @@ class DockerComposeProvider(ServiceLifecycleProvider):
         raise DockerComposeProviderError(
             "Docker Compose health inspection is not implemented yet",
         )
+
+    def _resolve_container_identifier(
+        self,
+        service: ManagedService,
+    ) -> str:
+        """Resolve one configured service to a Docker container ID."""
+
+        if not isinstance(service, ManagedService):
+            raise DockerComposeProviderError(
+                "service must be a ManagedService",
+            )
+
+        result = self._run_compose(
+            "ps",
+            "--all",
+            "--quiet",
+            service.identifier,
+        )
+
+        identifiers = tuple(
+            line.strip()
+            for line in result.stdout.splitlines()
+            if line.strip()
+        )
+
+        if not identifiers:
+            raise DockerComposeProviderError(
+                "Docker Compose container was not found: "
+                f"{service.identifier}",
+            )
+
+        if len(identifiers) != 1:
+            raise DockerComposeProviderError(
+                "Docker Compose returned multiple containers: "
+                f"{service.identifier}",
+            )
+
+        return identifiers[0]
+
+    def _build_docker_command(
+        self,
+        *arguments: str,
+    ) -> tuple[str, ...]:
+        """Build one fixed Docker argument list."""
+
+        normalized_arguments = tuple(
+            _required_argument(argument)
+            for argument in arguments
+        )
+
+        return (
+            "docker",
+            *normalized_arguments,
+        )
+
+    def _run_docker(
+        self,
+        *arguments: str,
+    ) -> subprocess.CompletedProcess[str]:
+        """Execute one read-only Docker command safely."""
+
+        command = self._build_docker_command(
+            *arguments,
+        )
+
+        try:
+            result = subprocess.run(
+                command,
+                cwd=self.project_directory,
+                env=(
+                    None
+                    if self.environment is None
+                    else dict(self.environment)
+                ),
+                capture_output=True,
+                text=True,
+                check=False,
+                shell=False,
+                timeout=self.timeout,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise DockerComposeProviderError(
+                "Docker inspection timed out",
+            ) from exc
+        except FileNotFoundError as exc:
+            raise DockerComposeProviderError(
+                "Docker executable was not found",
+            ) from exc
+        except OSError as exc:
+            raise DockerComposeProviderError(
+                "Docker inspection could not be started",
+            ) from exc
+
+        if result.returncode != 0:
+            diagnostic = _safe_diagnostic(
+                result.stderr,
+                result.stdout,
+            )
+
+            message = "Docker inspection failed"
+
+            if diagnostic:
+                message = f"{message}: {diagnostic}"
+
+            raise DockerComposeProviderError(message)
+
+        return result
+
+    def _run_docker_json(
+        self,
+        *arguments: str,
+    ) -> Any:
+        """Execute Docker and decode one JSON response."""
+
+        result = self._run_docker(
+            *arguments,
+        )
+
+        if not result.stdout.strip():
+            raise DockerComposeProviderError(
+                "Docker returned an empty JSON response",
+            )
+
+        try:
+            return loads(result.stdout)
+        except JSONDecodeError as exc:
+            raise DockerComposeProviderError(
+                "Docker returned invalid JSON",
+            ) from exc
 
     def _build_compose_command(
         self,
@@ -280,6 +422,245 @@ class DockerComposeProvider(ServiceLifecycleProvider):
             raise DockerComposeProviderError(
                 "Docker Compose returned invalid JSON",
             ) from exc
+
+
+def _normalize_runtime_payload(
+    payload: object,
+    *,
+    service_identifier: str,
+) -> ServiceRuntime:
+    if (
+        not isinstance(payload, Sequence)
+        or isinstance(payload, (str, bytes))
+    ):
+        raise DockerComposeProviderError(
+            "Docker inspect response must be a collection",
+        )
+
+    if len(payload) != 1:
+        raise DockerComposeProviderError(
+            "Docker inspect response must contain exactly one object",
+        )
+
+    container = payload[0]
+
+    if not isinstance(container, Mapping):
+        raise DockerComposeProviderError(
+            "Docker inspect container must be an object",
+        )
+
+    state = container.get("State")
+    configuration = container.get("Config")
+
+    if not isinstance(state, Mapping):
+        raise DockerComposeProviderError(
+            "Docker inspect response must contain a State object",
+        )
+
+    if not isinstance(configuration, Mapping):
+        raise DockerComposeProviderError(
+            "Docker inspect response must contain a Config object",
+        )
+
+    image_reference = configuration.get("Image")
+
+    if not isinstance(image_reference, str) or not image_reference.strip():
+        raise DockerComposeProviderError(
+            "Docker inspect Config.Image must be non-empty text",
+        )
+
+    image_id = container.get("Image")
+
+    if image_id is not None and (
+        not isinstance(image_id, str)
+        or not image_id.strip()
+    ):
+        raise DockerComposeProviderError(
+            "Docker inspect Image must be non-empty text or null",
+        )
+
+    repository, tag, digest = _split_image_reference(
+        image_reference.strip(),
+    )
+
+    runtime_state = _normalize_runtime_state(
+        state,
+    )
+    health_state = _normalize_runtime_health(
+        state,
+    )
+    restart_count = container.get(
+        "RestartCount",
+        0,
+    )
+    exit_code = state.get("ExitCode")
+
+    if exit_code is None:
+        normalized_exit_code = None
+    elif isinstance(exit_code, bool) or not isinstance(exit_code, int):
+        raise DockerComposeProviderError(
+            "Docker inspect State.ExitCode must be an integer or null",
+        )
+    else:
+        normalized_exit_code = exit_code
+
+    status_message = _docker_status_message(
+        state,
+        runtime_state=runtime_state,
+    )
+
+    try:
+        image = ServiceImage(
+            reference=image_reference,
+            repository=repository,
+            tag=tag,
+            digest=digest,
+            image_id=(
+                None
+                if image_id is None
+                else image_id.strip()
+            ),
+        )
+
+        return ServiceRuntime(
+            state=runtime_state,
+            health=health_state,
+            image=image,
+            restart_count=restart_count,
+            started_at=_normalize_docker_timestamp(
+                state.get("StartedAt"),
+            ),
+            finished_at=_normalize_docker_timestamp(
+                state.get("FinishedAt"),
+            ),
+            exit_code=normalized_exit_code,
+            status_message=status_message,
+        )
+    except ServiceLifecycleError as exc:
+        raise DockerComposeProviderError(
+            "Invalid Docker runtime state: "
+            f"{service_identifier}: {exc}",
+        ) from exc
+
+
+def _normalize_runtime_state(
+    state: Mapping[str, Any],
+) -> str:
+    if state.get("Dead") is True:
+        return "dead"
+
+    if state.get("Restarting") is True:
+        return "restarting"
+
+    if state.get("Paused") is True:
+        return "paused"
+
+    value = state.get("Status")
+
+    if not isinstance(value, str) or not value.strip():
+        raise DockerComposeProviderError(
+            "Docker inspect State.Status must be non-empty text",
+        )
+
+    return value.strip().casefold()
+
+
+def _normalize_runtime_health(
+    state: Mapping[str, Any],
+) -> str:
+    health = state.get("Health")
+
+    if health is None:
+        return "unknown"
+
+    if not isinstance(health, Mapping):
+        raise DockerComposeProviderError(
+            "Docker inspect State.Health must be an object or null",
+        )
+
+    value = health.get("Status")
+
+    if not isinstance(value, str) or not value.strip():
+        raise DockerComposeProviderError(
+            "Docker inspect State.Health.Status "
+            "must be non-empty text",
+        )
+
+    return value.strip().casefold()
+
+
+def _normalize_docker_timestamp(
+    value: object,
+) -> str | None:
+    if value is None:
+        return None
+
+    if not isinstance(value, str):
+        raise DockerComposeProviderError(
+            "Docker timestamps must be text or null",
+        )
+
+    normalized = value.strip()
+
+    if not normalized:
+        return None
+
+    if normalized.startswith("0001-01-01T00:00:00"):
+        return None
+
+    return normalized
+
+
+def _docker_status_message(
+    state: Mapping[str, Any],
+    *,
+    runtime_state: str,
+) -> str:
+    error = state.get("Error")
+
+    if isinstance(error, str) and error.strip():
+        return error.strip()
+
+    return runtime_state
+
+
+def _split_image_reference(
+    reference: str,
+) -> tuple[str, str | None, str | None]:
+    if "@sha256:" in reference:
+        repository, raw_digest = reference.rsplit(
+            "@",
+            1,
+        )
+
+        return (
+            repository,
+            None,
+            raw_digest,
+        )
+
+    final_segment = reference.rsplit(
+        "/",
+        1,
+    )[-1]
+
+    if ":" not in final_segment:
+        return (
+            reference,
+            None,
+            None,
+        )
+
+    repository, tag = reference.rsplit(
+        ":",
+        1,
+    )
+
+    return (
+        repository,
+        tag,
+        None,
+    )
 
 
 def _normalize_requested_identifier(
