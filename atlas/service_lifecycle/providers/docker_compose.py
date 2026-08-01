@@ -12,6 +12,7 @@ from typing import Any
 from atlas.service_lifecycle.models import (
     ManagedService,
     ServiceHealth,
+    ServiceHealthStatus,
     ServiceImage,
     ServiceLifecycleError,
     ServiceRuntime,
@@ -192,10 +193,44 @@ class DockerComposeProvider(ServiceLifecycleProvider):
         self,
         identifier: str,
     ) -> ServiceHealth:
-        """Return one service's normalized health evaluation."""
+        """Return normalized health for one configured service."""
 
-        raise DockerComposeProviderError(
-            "Docker Compose health inspection is not implemented yet",
+        normalized_identifier = _normalize_requested_identifier(
+            identifier,
+        )
+
+        try:
+            runtime = self.inspect_runtime(
+                normalized_identifier,
+            )
+        except DockerComposeProviderError as exc:
+            message = str(exc)
+
+            if message.startswith(
+                "Docker Compose container was not found:"
+            ):
+                return ServiceHealth(
+                    status=ServiceHealthStatus.UNAVAILABLE,
+                    score=0,
+                    errors=(
+                        "Container is not available",
+                    ),
+                    details={
+                        "service_identifier": normalized_identifier,
+                        "runtime_state": "unavailable",
+                        "docker_health": "unknown",
+                        "restart_count": None,
+                        "image_reference": None,
+                        "exit_code": None,
+                        "status_message": message,
+                    },
+                )
+
+            raise
+
+        return _health_from_runtime(
+            runtime,
+            service_identifier=normalized_identifier,
         )
 
     def _resolve_container_identifier(
@@ -422,6 +457,133 @@ class DockerComposeProvider(ServiceLifecycleProvider):
             raise DockerComposeProviderError(
                 "Docker Compose returned invalid JSON",
             ) from exc
+
+
+def _health_from_runtime(
+    runtime: ServiceRuntime,
+    *,
+    service_identifier: str,
+) -> ServiceHealth:
+    if not isinstance(runtime, ServiceRuntime):
+        raise DockerComposeProviderError(
+            "runtime must be a ServiceRuntime",
+        )
+
+    status = ServiceHealthStatus.UNKNOWN
+    score = 50
+    warnings: list[str] = []
+    errors: list[str] = []
+
+    if runtime.state == "running":
+        if runtime.health == "healthy":
+            status = ServiceHealthStatus.HEALTHY
+            score = 100
+
+        elif runtime.health == "starting":
+            status = ServiceHealthStatus.DEGRADED
+            score = 70
+            warnings.append(
+                "Docker health check is still starting",
+            )
+
+        elif runtime.health == "unhealthy":
+            status = ServiceHealthStatus.UNHEALTHY
+            score = 25
+            errors.append(
+                "Docker reported the container as unhealthy",
+            )
+
+        elif runtime.health == "unknown":
+            status = ServiceHealthStatus.DEGRADED
+            score = 85
+            warnings.append(
+                "No Docker health check is configured",
+            )
+
+        else:
+            status = ServiceHealthStatus.DEGRADED
+            score = 65
+            warnings.append(
+                "Docker reported an unrecognized health state: "
+                f"{runtime.health}",
+            )
+
+    elif runtime.state == "restarting":
+        status = ServiceHealthStatus.DEGRADED
+        score = 60
+        warnings.append(
+            "Container is restarting",
+        )
+
+    elif runtime.state == "paused":
+        status = ServiceHealthStatus.DEGRADED
+        score = 60
+        warnings.append(
+            "Container is paused",
+        )
+
+    elif runtime.state in {
+        "exited",
+        "dead",
+        "removing",
+    }:
+        status = ServiceHealthStatus.UNAVAILABLE
+        score = 0
+        errors.append(
+            "Container is not running",
+        )
+
+    elif runtime.state == "created":
+        status = ServiceHealthStatus.UNAVAILABLE
+        score = 10
+        errors.append(
+            "Container has been created but is not running",
+        )
+
+    else:
+        warnings.append(
+            "Container runtime state is unknown: "
+            f"{runtime.state}",
+        )
+
+    if runtime.restart_count > 0:
+        warnings.append(
+            "Container restart count is "
+            f"{runtime.restart_count}",
+        )
+
+        if status is ServiceHealthStatus.HEALTHY:
+            status = ServiceHealthStatus.DEGRADED
+            score = min(
+                score,
+                90,
+            )
+
+    details = {
+        "service_identifier": service_identifier,
+        "runtime_state": runtime.state,
+        "docker_health": runtime.health,
+        "restart_count": runtime.restart_count,
+        "image_reference": runtime.image.reference,
+        "exit_code": runtime.exit_code,
+        "status_message": runtime.status_message,
+        "started_at": runtime.started_at,
+        "finished_at": runtime.finished_at,
+    }
+
+    try:
+        return ServiceHealth(
+            status=status,
+            score=score,
+            warnings=warnings,
+            errors=errors,
+            details=details,
+        )
+    except ServiceLifecycleError as exc:
+        raise DockerComposeProviderError(
+            "Invalid Docker health state: "
+            f"{service_identifier}: {exc}",
+        ) from exc
 
 
 def _normalize_runtime_payload(

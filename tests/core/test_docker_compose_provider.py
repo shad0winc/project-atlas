@@ -12,6 +12,8 @@ from atlas.service_lifecycle import (
     DockerComposeProvider,
     DockerComposeProviderError,
     ManagedService,
+    ServiceHealth,
+    ServiceHealthStatus,
     ServiceImage,
     ServiceLifecycleProvider,
     ServiceRuntime,
@@ -2163,33 +2165,433 @@ def test_inspect_runtime_normalizes_digest_image_reference(
     assert runtime.image.digest == digest
 
 
-@pytest.mark.parametrize(
-    "method_name",
-    [
-        "inspect_health",
-    ],
-)
-def test_read_only_provider_methods_remain_explicitly_pending(
-    tmp_path: Path,
-    method_name: str,
-) -> None:
-    provider = make_provider(tmp_path)
-    method = getattr(
-        provider,
-        method_name,
+
+def make_runtime(
+    *,
+    state: str = "running",
+    health: str = "healthy",
+    restart_count: int = 0,
+    exit_code: int | None = 0,
+    status_message: str | None = "running",
+) -> ServiceRuntime:
+    return ServiceRuntime(
+        state=state,
+        health=health,
+        image=ServiceImage(
+            reference="lscr.io/linuxserver/sonarr:latest",
+        ),
+        restart_count=restart_count,
+        started_at="2026-08-01T12:00:00Z",
+        finished_at=None,
+        exit_code=exit_code,
+        status_message=status_message,
     )
 
-    arguments = (
-        ()
-        if method_name == "list_services"
-        else ("sonarr",)
+
+def test_inspect_health_maps_healthy_runtime(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "inspect_runtime",
+        lambda self, identifier: make_runtime(),
+    )
+
+    health = provider.inspect_health(" SONARR ")
+
+    assert isinstance(health, ServiceHealth)
+    assert health.status is ServiceHealthStatus.HEALTHY
+    assert health.score == 100
+    assert health.healthy is True
+    assert health.action_required is False
+    assert health.warnings == ()
+    assert health.errors == ()
+    assert health.details["service_identifier"] == "sonarr"
+    assert health.details["runtime_state"] == "running"
+    assert health.details["docker_health"] == "healthy"
+    assert health.details["restart_count"] == 0
+    assert health.details["image_reference"] == (
+        "lscr.io/linuxserver/sonarr:latest"
+    )
+
+
+@pytest.mark.parametrize(
+    (
+        "runtime",
+        "expected_status",
+        "expected_score",
+        "expected_warning",
+        "expected_error",
+    ),
+    [
+        (
+            make_runtime(
+                state="running",
+                health="unknown",
+            ),
+            ServiceHealthStatus.DEGRADED,
+            85,
+            "No Docker health check is configured",
+            None,
+        ),
+        (
+            make_runtime(
+                state="running",
+                health="starting",
+            ),
+            ServiceHealthStatus.DEGRADED,
+            70,
+            "Docker health check is still starting",
+            None,
+        ),
+        (
+            make_runtime(
+                state="running",
+                health="unhealthy",
+            ),
+            ServiceHealthStatus.UNHEALTHY,
+            25,
+            None,
+            "Docker reported the container as unhealthy",
+        ),
+        (
+            make_runtime(
+                state="restarting",
+                health="unknown",
+            ),
+            ServiceHealthStatus.DEGRADED,
+            60,
+            "Container is restarting",
+            None,
+        ),
+        (
+            make_runtime(
+                state="paused",
+                health="unknown",
+            ),
+            ServiceHealthStatus.DEGRADED,
+            60,
+            "Container is paused",
+            None,
+        ),
+        (
+            make_runtime(
+                state="exited",
+                health="unknown",
+                exit_code=1,
+            ),
+            ServiceHealthStatus.UNAVAILABLE,
+            0,
+            None,
+            "Container is not running",
+        ),
+        (
+            make_runtime(
+                state="dead",
+                health="unknown",
+                exit_code=137,
+            ),
+            ServiceHealthStatus.UNAVAILABLE,
+            0,
+            None,
+            "Container is not running",
+        ),
+        (
+            make_runtime(
+                state="removing",
+                health="unknown",
+            ),
+            ServiceHealthStatus.UNAVAILABLE,
+            0,
+            None,
+            "Container is not running",
+        ),
+        (
+            make_runtime(
+                state="created",
+                health="unknown",
+            ),
+            ServiceHealthStatus.UNAVAILABLE,
+            10,
+            None,
+            "Container has been created but is not running",
+        ),
+    ],
+)
+def test_inspect_health_maps_runtime_states(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    runtime: ServiceRuntime,
+    expected_status: ServiceHealthStatus,
+    expected_score: int,
+    expected_warning: str | None,
+    expected_error: str | None,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "inspect_runtime",
+        lambda self, identifier: runtime,
+    )
+
+    health = provider.inspect_health("sonarr")
+
+    assert health.status is expected_status
+    assert health.score == expected_score
+
+    if expected_warning is None:
+        assert health.warnings == ()
+    else:
+        assert expected_warning in health.warnings
+
+    if expected_error is None:
+        assert health.errors == ()
+    else:
+        assert expected_error in health.errors
+
+
+def test_inspect_health_maps_unrecognized_running_health(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "inspect_runtime",
+        lambda self, identifier: make_runtime(
+            health="mystery",
+        ),
+    )
+
+    health = provider.inspect_health("sonarr")
+
+    assert health.status is ServiceHealthStatus.DEGRADED
+    assert health.score == 65
+    assert health.warnings == (
+        "Docker reported an unrecognized health state: mystery",
+    )
+
+
+def test_inspect_health_maps_unknown_runtime_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "inspect_runtime",
+        lambda self, identifier: make_runtime(
+            state="unknown-state",
+            health="unknown",
+        ),
+    )
+
+    health = provider.inspect_health("sonarr")
+
+    assert health.status is ServiceHealthStatus.UNKNOWN
+    assert health.score == 50
+    assert health.warnings == (
+        "Container runtime state is unknown: unknown-state",
+    )
+
+
+def test_inspect_health_degrades_healthy_runtime_with_restarts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "inspect_runtime",
+        lambda self, identifier: make_runtime(
+            restart_count=3,
+        ),
+    )
+
+    health = provider.inspect_health("sonarr")
+
+    assert health.status is ServiceHealthStatus.DEGRADED
+    assert health.score == 90
+    assert health.warnings == (
+        "Container restart count is 3",
+    )
+
+
+def test_inspect_health_preserves_existing_degraded_score_with_restarts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "inspect_runtime",
+        lambda self, identifier: make_runtime(
+            health="unknown",
+            restart_count=2,
+        ),
+    )
+
+    health = provider.inspect_health("sonarr")
+
+    assert health.status is ServiceHealthStatus.DEGRADED
+    assert health.score == 85
+    assert health.warnings == (
+        "Container restart count is 2",
+        "No Docker health check is configured",
+    )
+
+
+def test_inspect_health_maps_missing_container_to_unavailable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    def fake_inspect_runtime(
+        self: DockerComposeProvider,
+        identifier: str,
+    ) -> ServiceRuntime:
+        raise DockerComposeProviderError(
+            "Docker Compose container was not found: sonarr",
+        )
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "inspect_runtime",
+        fake_inspect_runtime,
+    )
+
+    health = provider.inspect_health("sonarr")
+
+    assert health.status is ServiceHealthStatus.UNAVAILABLE
+    assert health.score == 0
+    assert health.warnings == ()
+    assert health.errors == (
+        "Container is not available",
+    )
+    assert health.details["service_identifier"] == "sonarr"
+    assert health.details["runtime_state"] == "unavailable"
+    assert health.details["restart_count"] is None
+    assert health.details["image_reference"] is None
+    assert health.details["status_message"] == (
+        "Docker Compose container was not found: sonarr"
+    )
+
+
+def test_inspect_health_reraises_unrelated_provider_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    def fake_inspect_runtime(
+        self: DockerComposeProvider,
+        identifier: str,
+    ) -> ServiceRuntime:
+        raise DockerComposeProviderError(
+            "Docker inspection timed out",
+        )
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "inspect_runtime",
+        fake_inspect_runtime,
     )
 
     with pytest.raises(
         DockerComposeProviderError,
-        match="not implemented yet",
+        match="Docker inspection timed out",
     ):
-        method(*arguments)
+        provider.inspect_health("sonarr")
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "",
+        "   ",
+        None,
+        True,
+        42,
+        object(),
+    ],
+)
+def test_inspect_health_requires_valid_service_identifier(
+    tmp_path: Path,
+    value: object,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    with pytest.raises(
+        DockerComposeProviderError,
+        match="service identifier must be non-empty text",
+    ):
+        provider.inspect_health(
+            value,  # type: ignore[arg-type]
+        )
+
+
+def test_health_from_runtime_requires_runtime_contract() -> None:
+    from atlas.service_lifecycle.providers.docker_compose import (
+        _health_from_runtime,
+    )
+
+    with pytest.raises(
+        DockerComposeProviderError,
+        match="runtime must be a ServiceRuntime",
+    ):
+        _health_from_runtime(
+            "running",  # type: ignore[arg-type]
+            service_identifier="sonarr",
+        )
+
+
+def test_inspect_health_serializes_complete_details(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    runtime = ServiceRuntime(
+        state="exited",
+        health="unknown",
+        image=ServiceImage(
+            reference="sonarr:latest",
+        ),
+        restart_count=4,
+        started_at="2026-08-01T12:00:00Z",
+        finished_at="2026-08-01T13:00:00Z",
+        exit_code=1,
+        status_message="process exited",
+    )
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "inspect_runtime",
+        lambda self, identifier: runtime,
+    )
+
+    health = provider.inspect_health("sonarr")
+
+    assert health.details == {
+        "service_identifier": "sonarr",
+        "runtime_state": "exited",
+        "docker_health": "unknown",
+        "restart_count": 4,
+        "image_reference": "sonarr:latest",
+        "exit_code": 1,
+        "status_message": "process exited",
+        "started_at": "2026-08-01T12:00:00Z",
+        "finished_at": "2026-08-01T13:00:00Z",
+    }
 
 
 def test_package_exports_docker_compose_provider() -> None:
