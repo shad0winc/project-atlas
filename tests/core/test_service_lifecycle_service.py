@@ -1,0 +1,409 @@
+"""Contract tests for ServiceLifecycleService."""
+
+from __future__ import annotations
+
+from dataclasses import FrozenInstanceError
+
+import pytest
+
+from atlas.service_lifecycle import (
+    ManagedService,
+    ServiceHealth,
+    ServiceHealthStatus,
+    ServiceImage,
+    ServiceLifecycleError,
+    ServiceLifecycleProvider,
+    ServiceLifecycleService,
+    ServiceRuntime,
+)
+
+
+class StubProvider(ServiceLifecycleProvider):
+    """Configurable provider for service-layer contracts."""
+
+    def __init__(self) -> None:
+        self.services: object = ()
+        self.service: object = ManagedService(
+            identifier="sonarr",
+            name="Sonarr",
+            provider="stub",
+        )
+        self.runtime: object = ServiceRuntime(
+            state="running",
+            health="healthy",
+            image=ServiceImage(
+                reference="sonarr:latest",
+            ),
+        )
+        self.health: object = ServiceHealth(
+            status=ServiceHealthStatus.HEALTHY,
+        )
+        self.failure: Exception | None = None
+        self.calls: list[tuple[str, str | None]] = []
+
+    def _raise_failure(self) -> None:
+        if self.failure is not None:
+            raise self.failure
+
+    def list_services(self):
+        self.calls.append(("list_services", None))
+        self._raise_failure()
+        return self.services
+
+    def inspect_service(self, identifier: str):
+        self.calls.append(("inspect_service", identifier))
+        self._raise_failure()
+        return self.service
+
+    def inspect_runtime(self, identifier: str):
+        self.calls.append(("inspect_runtime", identifier))
+        self._raise_failure()
+        return self.runtime
+
+    def inspect_health(self, identifier: str):
+        self.calls.append(("inspect_health", identifier))
+        self._raise_failure()
+        return self.health
+
+
+def make_service() -> tuple[ServiceLifecycleService, StubProvider]:
+    provider = StubProvider()
+
+    return (
+        ServiceLifecycleService(provider),
+        provider,
+    )
+
+
+def test_service_requires_provider_contract() -> None:
+    with pytest.raises(
+        ServiceLifecycleError,
+        match="provider must implement ServiceLifecycleProvider",
+    ):
+        ServiceLifecycleService(
+            provider=object(),  # type: ignore[arg-type]
+        )
+
+
+def test_service_is_immutable() -> None:
+    service, provider = make_service()
+
+    with pytest.raises(FrozenInstanceError):
+        service.provider = provider  # type: ignore[misc]
+
+
+def test_list_services_validates_sorts_and_returns_tuple() -> None:
+    service, provider = make_service()
+
+    provider.services = [
+        ManagedService(
+            identifier="sonarr",
+            name="Sonarr",
+            provider="stub",
+        ),
+        ManagedService(
+            identifier="bazarr",
+            name="Bazarr",
+            provider="stub",
+        ),
+        ManagedService(
+            identifier="radarr",
+            name="Radarr",
+            provider="stub",
+        ),
+    ]
+
+    result = service.list_services()
+
+    assert isinstance(result, tuple)
+    assert tuple(item.identifier for item in result) == (
+        "bazarr",
+        "radarr",
+        "sonarr",
+    )
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "sonarr",
+        b"sonarr",
+        None,
+        42,
+        True,
+        object(),
+    ],
+)
+def test_list_services_requires_collection(
+    value: object,
+) -> None:
+    service, provider = make_service()
+    provider.services = value
+
+    with pytest.raises(
+        ServiceLifecycleError,
+        match="provider services must be a collection",
+    ):
+        service.list_services()
+
+
+def test_list_services_requires_managed_service_children() -> None:
+    service, provider = make_service()
+    provider.services = [
+        "sonarr",
+    ]
+
+    with pytest.raises(
+        ServiceLifecycleError,
+        match="must contain ManagedService objects",
+    ):
+        service.list_services()
+
+
+def test_list_services_rejects_duplicate_identifiers() -> None:
+    service, provider = make_service()
+    provider.services = [
+        ManagedService(
+            identifier="sonarr",
+            name="Sonarr",
+            provider="stub",
+        ),
+        ManagedService(
+            identifier="sonarr",
+            name="Sonarr Duplicate",
+            provider="stub",
+        ),
+    ]
+
+    with pytest.raises(
+        ServiceLifecycleError,
+        match="duplicate service identifier: sonarr",
+    ):
+        service.list_services()
+
+
+@pytest.mark.parametrize(
+    ("method_name", "expected_call"),
+    [
+        (
+            "inspect_service",
+            "inspect_service",
+        ),
+        (
+            "inspect_runtime",
+            "inspect_runtime",
+        ),
+        (
+            "inspect_health",
+            "inspect_health",
+        ),
+    ],
+)
+def test_inspection_methods_normalize_identifier(
+    method_name: str,
+    expected_call: str,
+) -> None:
+    service, provider = make_service()
+    method = getattr(service, method_name)
+
+    method("  SONARR  ")
+
+    assert provider.calls == [
+        (
+            expected_call,
+            "sonarr",
+        ),
+    ]
+
+
+@pytest.mark.parametrize(
+    "method_name",
+    [
+        "inspect_service",
+        "inspect_runtime",
+        "inspect_health",
+    ],
+)
+@pytest.mark.parametrize(
+    "value",
+    [
+        "",
+        "   ",
+        None,
+        True,
+        42,
+        object(),
+    ],
+)
+def test_inspection_methods_require_identifier(
+    method_name: str,
+    value: object,
+) -> None:
+    service, _ = make_service()
+    method = getattr(service, method_name)
+
+    with pytest.raises(
+        ServiceLifecycleError,
+        match="service identifier must be non-empty text",
+    ):
+        method(value)
+
+
+@pytest.mark.parametrize(
+    "method_name",
+    [
+        "inspect_service",
+        "inspect_runtime",
+        "inspect_health",
+    ],
+)
+def test_inspection_methods_reject_malformed_identifier(
+    method_name: str,
+) -> None:
+    service, _ = make_service()
+    method = getattr(service, method_name)
+
+    with pytest.raises(
+        ServiceLifecycleError,
+        match="invalid service identifier",
+    ):
+        method("sonarr/api")
+
+
+def test_inspect_service_requires_managed_service_result() -> None:
+    service, provider = make_service()
+    provider.service = "sonarr"
+
+    with pytest.raises(
+        ServiceLifecycleError,
+        match="must return ManagedService",
+    ):
+        service.inspect_service("sonarr")
+
+
+def test_inspect_service_requires_matching_identity() -> None:
+    service, provider = make_service()
+    provider.service = ManagedService(
+        identifier="radarr",
+        name="Radarr",
+        provider="stub",
+    )
+
+    with pytest.raises(
+        ServiceLifecycleError,
+        match=(
+            "expected sonarr, received radarr"
+        ),
+    ):
+        service.inspect_service("sonarr")
+
+
+def test_inspect_runtime_requires_runtime_result() -> None:
+    service, provider = make_service()
+    provider.runtime = "running"
+
+    with pytest.raises(
+        ServiceLifecycleError,
+        match="must return ServiceRuntime",
+    ):
+        service.inspect_runtime("sonarr")
+
+
+def test_inspect_health_requires_health_result() -> None:
+    service, provider = make_service()
+    provider.health = "healthy"
+
+    with pytest.raises(
+        ServiceLifecycleError,
+        match="must return ServiceHealth",
+    ):
+        service.inspect_health("sonarr")
+
+
+@pytest.mark.parametrize(
+    "method_name",
+    [
+        "list_services",
+        "inspect_service",
+        "inspect_runtime",
+        "inspect_health",
+    ],
+)
+def test_service_preserves_known_domain_errors(
+    method_name: str,
+) -> None:
+    service, provider = make_service()
+    provider.failure = ServiceLifecycleError(
+        "known provider failure",
+    )
+    method = getattr(service, method_name)
+
+    arguments = (
+        ()
+        if method_name == "list_services"
+        else ("sonarr",)
+    )
+
+    with pytest.raises(
+        ServiceLifecycleError,
+        match="known provider failure",
+    ):
+        method(*arguments)
+
+
+@pytest.mark.parametrize(
+    ("method_name", "expected_message"),
+    [
+        (
+            "list_services",
+            "service provider failed to list services",
+        ),
+        (
+            "inspect_service",
+            "service provider failed to inspect service: sonarr",
+        ),
+        (
+            "inspect_runtime",
+            "service provider failed to inspect runtime: sonarr",
+        ),
+        (
+            "inspect_health",
+            "service provider failed to inspect health: sonarr",
+        ),
+    ],
+)
+def test_service_translates_unexpected_provider_failure(
+    method_name: str,
+    expected_message: str,
+) -> None:
+    service, provider = make_service()
+    provider.failure = RuntimeError(
+        "unexpected",
+    )
+    method = getattr(service, method_name)
+
+    arguments = (
+        ()
+        if method_name == "list_services"
+        else ("sonarr",)
+    )
+
+    with pytest.raises(
+        ServiceLifecycleError,
+        match=expected_message,
+    ) as exc_info:
+        method(*arguments)
+
+    assert isinstance(
+        exc_info.value.__cause__,
+        RuntimeError,
+    )
+
+
+def test_service_package_export() -> None:
+    from atlas import service_lifecycle
+
+    assert (
+        service_lifecycle.ServiceLifecycleService
+        is ServiceLifecycleService
+    )

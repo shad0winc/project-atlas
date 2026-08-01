@@ -14,6 +14,7 @@ from .models import (
     ServiceRuntime,
 )
 from .provider import ServiceLifecycleProvider
+from .service import ServiceLifecycleService
 from .providers import (
     DockerComposeProvider,
     DockerComposeProviderError,
@@ -28,5 +29,6 @@ __all__ = [
     "ServiceImage",
     "ServiceLifecycleError",
     "ServiceLifecycleProvider",
+    "ServiceLifecycleService",
     "ServiceRuntime",
 ]
