@@ -9,8 +9,10 @@ from .base import (
     BaseDiscoveryProvider,
     DiscoveryProviderError,
 )
+from .prowlarr import ProwlarrDiscoveryProvider
 
 __all__ = [
     "BaseDiscoveryProvider",
     "DiscoveryProviderError",
+    "ProwlarrDiscoveryProvider",
 ]
