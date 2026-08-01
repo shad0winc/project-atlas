@@ -1193,3 +1193,79 @@ rollback, and audit history.
 Atlas now owns a normalized infrastructure domain instead of relying on direct
 Docker helper commands. The same validated contracts can power the CLI today
 and the API, scheduler, and responsive Admin Portal in future increments.
+
+---
+
+# 2026-08-01
+
+## M-018.7 — Aggregate Infrastructure Health
+
+### Objective
+
+Introduce provider-independent aggregate infrastructure health reporting while
+preserving the existing per-service inspection workflow and the read-only Service
+Lifecycle boundary.
+
+### Completed
+
+- Added aggregate infrastructure health evaluation to `ServiceLifecycleService`.
+- Added conservative aggregate scoring from normalized per-service health scores.
+- Added overall Healthy, Degraded, Unhealthy, and Unknown classification.
+- Added service counts by health status.
+- Added deterministic services-requiring-attention reporting.
+- Added aggregate warning and error reporting.
+- Added normalized evaluation timestamps and JSON serialization.
+- Added `atlas service health` for human-readable aggregate reporting.
+- Added `atlas service health --json` for machine-readable aggregate reporting.
+- Preserved `atlas service health <identifier> [--json]`.
+- Preserved provider independence; no Docker Compose provider changes were required.
+- Preserved the read-only guarantee with no start, stop, restart, pull, update, or
+  other Docker mutation operations.
+
+### Engineering Decisions
+
+- Aggregate business rules remain in the Service Lifecycle orchestration layer.
+- The CLI is limited to argument handling and rendering normalized reports.
+- An empty managed-service inventory produces an explicit Unknown report.
+- Aggregate errors force an Unhealthy result.
+- The aggregate score uses the conservative integer average of individual service
+  scores.
+- Services remain visible under Attention Required when warnings, errors, or a
+  non-Healthy status are present.
+
+### Verification
+
+- Guarded SHA-256 source verification passed.
+- Timestamped rollback backup created successfully.
+- Python compilation passed.
+- Bash syntax validation passed.
+- `git diff --check` passed.
+- Focused aggregate-health service and CLI tests passed: 70.
+- Service Lifecycle regression suite passed: 534.
+- Atlas Core regression suite passed: 648.
+- Sports integration suites passed: 5.
+- Service Lifecycle help and command registration validation passed.
+
+### Live Validation
+
+- Validated against the production Docker Compose stack.
+- Managed services discovered: 15.
+- Overall score: 89/100.
+- Overall status: Degraded.
+- Healthy services: 4.
+- Degraded services: 11.
+- Unhealthy services: 0.
+- Unknown services: 0.
+- Aggregate errors: 0.
+- The 11 degraded services were running and were reported for attention because no
+  Docker health check was configured.
+- Individual Jellyfin health remained Healthy at 100/100 with no warnings or
+  errors.
+
+### Result
+
+Atlas now has a canonical aggregate infrastructure health contract shared by the
+Service Lifecycle orchestration layer and CLI. This contract provides the
+foundation for Infrastructure Summary, Service Dependency Graph, Service Doctor,
+Update Availability, Maintenance History, future Atlas API endpoints, and the
+Administration Portal while preserving observability before automation.

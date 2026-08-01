@@ -22,6 +22,9 @@ All notable changes to Project Atlas are documented in this file.
   image, and health inspection.
 - `atlas service runtime <identifier> [--json]` for focused runtime reporting.
 - `atlas service health <identifier> [--json]` for focused health reporting.
+- `atlas service health [--json]` for provider-independent aggregate infrastructure health reporting.
+- Aggregate infrastructure scoring, status counts, services requiring attention, warnings, errors, and evaluation timestamps.
+- Human-readable infrastructure health dashboard and normalized JSON contract for automation and future API and Portal consumers.
 - Backward-compatible `atlas services [--json]` alias backed by the Service
   Lifecycle domain instead of raw `docker compose ps` output.
 - Responsive phone and tablet administration requirements added to the M-018
@@ -35,6 +38,10 @@ All notable changes to Project Atlas are documented in this file.
 - Service Lifecycle development remains read-only first; start, stop, restart,
   pull, update, and rollback operations remain intentionally deferred until
   authorization, planning, locking, validation, and audit boundaries exist.
+- `atlas service health` now supports both aggregate infrastructure reporting and
+  existing per-service health inspection without changing the provider contract.
+- Aggregate evaluation is owned by `ServiceLifecycleService`; the CLI renders the
+  normalized report and does not implement health business rules.
 
 #### Validation
 
@@ -44,6 +51,15 @@ All notable changes to Project Atlas are documented in this file.
 - Verified 17 focused Service Lifecycle CLI contracts.
 - Verified the complete Core regression suite with 1,379 passing tests and
   104 passing subtests.
+- Verified 70 focused aggregate-health service and CLI tests.
+- Verified 534 Service Lifecycle regression tests.
+- Verified the current Atlas Core regression suite with 648 passing tests and
+  five passing Sports integration suites.
+- Live-validated aggregate reporting across 15 managed services with an overall
+  score of 89/100, a Degraded status, zero unhealthy services, zero unknown
+  services, and no aggregate errors.
+- Confirmed that 11 running services were degraded only because no Docker health
+  check is configured.
 
 ### Added
 

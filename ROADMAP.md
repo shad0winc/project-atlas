@@ -224,7 +224,7 @@ for Atlas-managed infrastructure.
 
 - [x] Add managed-service listing
 - [x] Add individual service inspection
-- [ ] Add aggregate infrastructure health
+- [x] Add aggregate infrastructure health
 - [ ] Add update-availability inspection
 - [x] Add human-readable reports
 - [x] Add machine-readable JSON reports
@@ -253,7 +253,7 @@ for Atlas-managed infrastructure.
 - [x] Add `atlas service show <service> [--json]`
 - [x] Add `atlas service runtime <service> [--json]`
 - [x] Add `atlas service health <service> [--json]`
-- [ ] Add aggregate `atlas service health [--json]`
+- [x] Add aggregate `atlas service health [--json]`
 - [ ] Add `atlas service updates`
 - [ ] Add `atlas service history`
 - [ ] Add `atlas service update <service> --dry-run`
