@@ -35,8 +35,7 @@ The following focused documents will be added incrementally:
 - [x] [`DOCUMENTATION_STANDARD.md`](DOCUMENTATION_STANDARD.md)
 - [x] [`ADR_POLICY.md`](ADR_POLICY.md)
 - [ ] `RELEASE_POLICY.md`
-- [ ] `VERSIONING.md`
-- [ ] `CONTRIBUTING.md`
+- [x] [`VERSIONING_AND_CONTRIBUTING.md`](VERSIONING_AND_CONTRIBUTING.md)
 
 Until those documents are completed, the current
 [`ENGINEERING_GUIDE.md`](../ENGINEERING_GUIDE.md) and

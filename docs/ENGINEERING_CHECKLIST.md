@@ -113,3 +113,10 @@ For applicable sprints:
 - [ ] ADR context, decision, rationale, alternatives, and consequences are complete.
 - [ ] ADR status and related links are correct.
 - [ ] Implementation matches accepted or implemented ADRs.
+
+## Versioning and Contribution Review
+
+- [ ] The branch and commit scope have one primary objective.
+- [ ] Commit messages follow the Atlas convention.
+- [ ] Compatibility, deprecation, and release impact were reviewed.
+- [ ] Staged changes pass repository validation before commit.

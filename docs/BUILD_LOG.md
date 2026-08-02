@@ -1889,3 +1889,26 @@ from the existing governance and engineering documentation.
 - Local Markdown-link validation.
 - Living-document marker validation.
 - `git diff --check`.
+
+---
+
+# 2026-08-02
+
+## M-021.8 — Versioning and Contributing
+
+### Completed
+
+- Added the permanent Atlas Versioning and Contributing Standard.
+- Formalized Semantic Versioning, release types, branch strategy, commit
+  conventions, staging, review, merge, compatibility, deprecation, dependency,
+  revert, emergency, security, and release-impact requirements.
+- Linked the standard from governance and engineering documentation.
+- Added contribution review gates to the Engineering Checklist.
+- Marked Versioning and Contributing guidance complete in the Roadmap.
+
+### Validation
+
+- Required-section validation.
+- Local Markdown-link validation.
+- Living-document marker validation.
+- `git diff --check`.

@@ -222,3 +222,9 @@ The permanent coding conventions are defined in
 
 The canonical Architecture Decision Record requirements are defined in
 [`governance/ADR_POLICY.md`](governance/ADR_POLICY.md).
+
+## Versioning and Contributing
+
+The canonical Atlas versioning, branching, commit, review, compatibility,
+deprecation, and contribution requirements are defined in
+[`governance/VERSIONING_AND_CONTRIBUTING.md`](governance/VERSIONING_AND_CONTRIBUTING.md).
