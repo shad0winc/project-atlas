@@ -167,6 +167,194 @@ def test_requests_without_provider_request_id_can_repeat(
     assert repository.list() == (first, second)
 
 
+def test_replace_updates_existing_request(
+    repository: JsonMediaRequestRepository,
+) -> None:
+    original = make_request()
+    replacement = make_request(
+        status="approved",
+        updated_at="2026-08-02T20:30:00Z",
+    )
+    repository.save(original)
+
+    assert repository.replace(replacement) == replacement
+    assert repository.get("request-001") == replacement
+
+
+def test_replace_requires_media_request(
+    repository: JsonMediaRequestRepository,
+) -> None:
+    with pytest.raises(
+        MediaRequestRepositoryError,
+        match="request must be a MediaRequest",
+    ):
+        repository.replace(object())  # type: ignore[arg-type]
+
+
+def test_replace_rejects_missing_request(
+    repository: JsonMediaRequestRepository,
+) -> None:
+    with pytest.raises(
+        MediaRequestRepositoryError,
+        match="not found",
+    ):
+        repository.replace(make_request())
+
+
+def test_replace_preserves_unrelated_requests(
+    repository: JsonMediaRequestRepository,
+) -> None:
+    first = make_request()
+    second = make_request(
+        request_id="request-002",
+        provider_request_id="provider-request-002",
+        provider_media_id="tmdb:603",
+        title="The Matrix",
+    )
+    updated_first = make_request(
+        status="searching",
+        updated_at="2026-08-02T20:30:00Z",
+    )
+
+    repository.save(first)
+    repository.save(second)
+    repository.replace(updated_first)
+
+    assert repository.list() == (
+        updated_first,
+        second,
+    )
+
+
+def test_replace_allows_existing_provider_identity_for_same_request(
+    repository: JsonMediaRequestRepository,
+) -> None:
+    original = make_request()
+    replacement = make_request(
+        status="downloading",
+        updated_at="2026-08-02T20:30:00Z",
+    )
+    repository.save(original)
+
+    assert repository.replace(replacement) == replacement
+
+
+def test_replace_rejects_provider_request_collision(
+    repository: JsonMediaRequestRepository,
+) -> None:
+    first = make_request()
+    second = make_request(
+        request_id="request-002",
+        provider_request_id="provider-request-002",
+        provider_media_id="tmdb:603",
+    )
+    collision = make_request(
+        request_id="request-002",
+        provider_request_id="provider-request-001",
+        provider_media_id="tmdb:603",
+        updated_at="2026-08-02T20:30:00Z",
+    )
+
+    repository.save(first)
+    repository.save(second)
+
+    with pytest.raises(
+        MediaRequestRepositoryError,
+        match="provider request already exists",
+    ):
+        repository.replace(collision)
+
+    assert repository.get("request-002") == second
+
+
+def test_replace_can_transition_request_to_available(
+    repository: JsonMediaRequestRepository,
+) -> None:
+    original = make_request()
+    available = make_request(
+        status="available",
+        updated_at="2026-08-02T21:00:00Z",
+        available_at="2026-08-02T21:00:00Z",
+    )
+    repository.save(original)
+
+    repository.replace(available)
+
+    stored = repository.get("request-001")
+    assert stored.status is MediaRequestStatus.AVAILABLE
+    assert stored.available_at == "2026-08-02T21:00:00Z"
+    assert stored.terminal is True
+
+
+def test_replace_uses_shared_atomic_json_helper(
+    repository: JsonMediaRequestRepository,
+) -> None:
+    original = make_request()
+    replacement = make_request(
+        status="approved",
+        updated_at="2026-08-02T20:30:00Z",
+    )
+    repository.save(original)
+
+    with patch(
+        "atlas.media_requests.repository.write_json_atomic",
+    ) as writer:
+        repository.replace(replacement)
+
+    writer.assert_called_once()
+    destination, payload = writer.call_args.args
+    assert destination == repository.registry_file
+    assert payload["requests"]["request-001"] == replacement.to_dict()
+
+
+def test_replace_preserves_deterministic_registry_order(
+    repository: JsonMediaRequestRepository,
+) -> None:
+    repository.save(
+        make_request(
+            request_id="request-z",
+            provider_request_id="provider-z",
+        )
+    )
+    repository.save(
+        make_request(
+            request_id="request-a",
+            provider_request_id="provider-a",
+        )
+    )
+    repository.replace(
+        make_request(
+            request_id="request-z",
+            provider_request_id="provider-z",
+            status="approved",
+            updated_at="2026-08-02T20:30:00Z",
+        )
+    )
+
+    raw = repository.registry_file.read_text(encoding="utf-8")
+    assert raw.index('"request-a"') < raw.index('"request-z"')
+
+
+def test_replace_rejects_corrupt_registry_without_overwrite(
+    repository: JsonMediaRequestRepository,
+) -> None:
+    repository.initialize()
+    repository.registry_file.write_text(
+        "{invalid",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        MediaRequestRepositoryError,
+        match="invalid JSON",
+    ):
+        repository.replace(make_request())
+
+    assert repository.registry_file.read_text(
+        encoding="utf-8"
+    ) == "{invalid"
+
+
 def test_get_rejects_missing_request(
     repository: JsonMediaRequestRepository,
 ) -> None:

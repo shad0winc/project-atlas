@@ -83,6 +83,44 @@ class JsonMediaRequestRepository:
 
         return request
 
+    def replace(self, request: MediaRequest) -> MediaRequest:
+        """Atomically replace one existing request."""
+
+        if not isinstance(request, MediaRequest):
+            raise MediaRequestRepositoryError(
+                "request must be a MediaRequest",
+            )
+
+        document = self._load_document()
+        requests = dict(document["requests"])
+
+        if request.request_id not in requests:
+            raise MediaRequestRepositoryError(
+                f"media request not found: {request.request_id}",
+            )
+
+        if request.provider_request_id is not None:
+            duplicate = self._find_provider_request_in_records(
+                requests,
+                request.provider,
+                request.provider_request_id,
+                exclude_request_id=request.request_id,
+            )
+            if duplicate is not None:
+                raise MediaRequestRepositoryError(
+                    "provider request already exists: "
+                    f"{request.provider}:{request.provider_request_id}",
+                )
+
+        requests[request.request_id] = request.to_dict()
+
+        write_json_atomic(
+            self.registry_file,
+            self._document(requests),
+        )
+
+        return request
+
     def get(self, request_id: object) -> MediaRequest:
         """Return one request by normalized request identity."""
 
@@ -309,8 +347,12 @@ class JsonMediaRequestRepository:
         records: Mapping[str, Mapping[str, Any]],
         provider: str,
         provider_request_id: str,
+        *,
+        exclude_request_id: str | None = None,
     ) -> MediaRequest | None:
         for request_id, payload in records.items():
+            if request_id == exclude_request_id:
+                continue
             request = self._request_from_payload(
                 payload,
                 expected_request_id=request_id,
