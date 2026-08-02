@@ -93,9 +93,20 @@ The template records:
 - rollback guidance;
 - approval and supporting references.
 
-### `RELEASE_NOTES_TEMPLATE.md`
+### [`RELEASE_NOTES_TEMPLATE.md`](RELEASE_NOTES_TEMPLATE.md)
 
-Provides the standard structure for release notes and announcements.
+Provides the user-facing template for Atlas release notes and announcements.
+
+The template records:
+
+- release overview and highlights;
+- new features and improvements;
+- significant bug fixes;
+- breaking changes;
+- upgrade instructions;
+- known issues and deprecations;
+- acknowledgements and support information;
+- supporting release references.
 
 ## Release Certification Records
 

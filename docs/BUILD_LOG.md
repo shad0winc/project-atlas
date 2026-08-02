@@ -2059,3 +2059,32 @@ future Atlas releases consistently.
 - Duplicate-section validation.
 - Local Markdown-link validation.
 - `git diff --check`.
+
+---
+
+# 2026-08-02
+
+## M-022.1.6 — Atlas Release Notes Template
+
+### Objective
+
+Create the permanent user-facing release-notes template used to communicate
+Atlas releases clearly and consistently.
+
+### Completed
+
+- Added `docs/releases/RELEASE_NOTES_TEMPLATE.md`.
+- Added release overview and highlight sections.
+- Added feature, improvement, and bug-fix records.
+- Added breaking-change and upgrade guidance.
+- Added known-issue and deprecation records.
+- Added acknowledgement and support sections.
+- Added supporting references and completion requirements.
+- Linked the template from the Release Documentation index.
+
+### Validation
+
+- Required-heading validation.
+- Duplicate-section validation.
+- Local Markdown-link validation.
+- `git diff --check`.

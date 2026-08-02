@@ -11,6 +11,7 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Documentation
 
+- Added the Atlas Release Notes Template covering release highlights, features, improvements, fixes, breaking changes, upgrades, known issues, deprecations, acknowledgements, and support information.
 - Added the reusable Atlas Release Template covering release scope, features, fixes, compatibility, validation, metrics, rollback guidance, and approval.
 - Added the Atlas User Acceptance Certification guide covering critical end-user and administrator journeys, accessibility, responsiveness, performance, failure handling, defect classification, and approval.
 - Added the permanent Atlas Release Checklist documenting the engineering, operational, documentation, security, recovery, certification, packaging, publication, and post-release validation requirements.
