@@ -11,6 +11,7 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Documentation
 
+- Added the Atlas Release Policy defining release readiness, validation, certification, approval, publication, maintenance, and end-of-life requirements.
 - Added the Atlas Versioning and Contributing Standard defining semantic versioning, branches, commits, review, compatibility, deprecation, and merge requirements.
 - Added the Atlas ADR Policy governance document defining architectural decision criteria, lifecycle, status, structure, review, and validation.
 - Added the Atlas Documentation Standard governance document defining architecture, API, CLI, operational, governance, release, and living-document requirements.

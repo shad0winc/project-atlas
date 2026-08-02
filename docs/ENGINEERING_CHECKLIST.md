@@ -120,3 +120,10 @@ For applicable sprints:
 - [ ] Commit messages follow the Atlas convention.
 - [ ] Compatibility, deprecation, and release impact were reviewed.
 - [ ] Staged changes pass repository validation before commit.
+
+## Release Policy Review
+
+- [ ] Release type, version, and scope are correct.
+- [ ] Testing, runtime, compatibility, security, and documentation gates passed.
+- [ ] Rollback or recovery and known limitations are documented.
+- [ ] Certification, approval, publication, and repository checks are complete.

@@ -34,7 +34,7 @@ The following focused documents will be added incrementally:
 - [x] [`TESTING_STANDARD.md`](TESTING_STANDARD.md)
 - [x] [`DOCUMENTATION_STANDARD.md`](DOCUMENTATION_STANDARD.md)
 - [x] [`ADR_POLICY.md`](ADR_POLICY.md)
-- [ ] `RELEASE_POLICY.md`
+- [x] [`RELEASE_POLICY.md`](RELEASE_POLICY.md)
 - [x] [`VERSIONING_AND_CONTRIBUTING.md`](VERSIONING_AND_CONTRIBUTING.md)
 
 Until those documents are completed, the current

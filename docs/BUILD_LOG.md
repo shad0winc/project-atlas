@@ -1912,3 +1912,27 @@ from the existing governance and engineering documentation.
 - Local Markdown-link validation.
 - Living-document marker validation.
 - `git diff --check`.
+
+---
+
+# 2026-08-02
+
+## M-021.9 — Release Policy
+
+### Completed
+
+- Added the permanent Atlas Release Policy.
+- Formalized release types, readiness gates, validation, compatibility,
+  migration, security, performance, rollback, certification, approval,
+  publication, maintenance, support, and end-of-life requirements.
+- Added a canonical release certification checklist.
+- Linked the Release Policy from governance and engineering documentation.
+- Added release review gates to the Engineering Checklist.
+- Marked Release Policy complete in the Roadmap.
+
+### Validation
+
+- Required-section validation.
+- Local Markdown-link validation.
+- Living-document marker validation.
+- `git diff --check`.

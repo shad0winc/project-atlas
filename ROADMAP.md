@@ -907,7 +907,7 @@ release-certification standards for Project Atlas.
 - [x] Testing Standard
 - [x] Documentation Standard
 - [x] ADR Policy
-- [ ] Release Policy
+- [x] Release Policy
 - [x] Versioning and Contributing guidance
 - [ ] Release Certification framework
 - [ ] M-018 Service Lifecycle certification

@@ -228,3 +228,8 @@ The canonical Architecture Decision Record requirements are defined in
 The canonical Atlas versioning, branching, commit, review, compatibility,
 deprecation, and contribution requirements are defined in
 [`governance/VERSIONING_AND_CONTRIBUTING.md`](governance/VERSIONING_AND_CONTRIBUTING.md).
+
+## Release Policy
+
+The canonical Atlas release-readiness and certification requirements are
+defined in [`governance/RELEASE_POLICY.md`](governance/RELEASE_POLICY.md).
