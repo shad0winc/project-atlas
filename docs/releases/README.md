@@ -34,7 +34,7 @@ requirements.
 
 ## Release Documentation
 
-### `V1_RELEASE_PLAN.md`
+### [`V1_RELEASE_PLAN.md`](V1_RELEASE_PLAN.md)
 
 Defines the contractual scope and execution plan for Atlas v1.0.
 

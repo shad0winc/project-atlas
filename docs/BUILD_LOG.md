@@ -1936,3 +1936,33 @@ from the existing governance and engineering documentation.
 - Local Markdown-link validation.
 - Living-document marker validation.
 - `git diff --check`.
+
+---
+
+# 2026-08-02
+
+## M-022.1.2 — Atlas v1.0 Release Plan
+
+### Objective
+
+Establish the authoritative release contract governing all remaining work
+required to publish Project Atlas v1.0.0.
+
+### Completed
+
+- Added `docs/releases/V1_RELEASE_PLAN.md`.
+- Defined the Atlas v1.0 product vision and approved scope.
+- Defined explicit non-goals and deferred post-v1.0 capabilities.
+- Locked the release blockers and acceptance criteria.
+- Added the release validation matrix.
+- Established User Experience Certification as a release gate.
+- Defined critical end-user and administrator journeys.
+- Defined the approved execution sequence through v1.0.0.
+- Linked the release plan from the Release Documentation index.
+
+### Validation
+
+- Required-heading validation.
+- Duplicate-section validation.
+- Local Markdown-link validation.
+- `git diff --check`.
