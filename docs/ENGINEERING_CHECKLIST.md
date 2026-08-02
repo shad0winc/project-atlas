@@ -75,3 +75,10 @@ For applicable sprints:
 - [ ] Governance and release requirements have been reviewed.
 - [ ] Repository documentation remains the authoritative record.
 - [ ] Deferred improvements are recorded outside the active sprint scope.
+
+## Engineering Charter Review
+
+- [ ] The sprint preserves the Atlas Engineering Charter.
+- [ ] Scope remained locked after approval unless a concrete blocker or defect required change.
+- [ ] The repository is the authoritative record of durable decisions.
+- [ ] The sprint leaves the repository more maintainable than it found it.

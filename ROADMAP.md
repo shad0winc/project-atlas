@@ -901,7 +901,7 @@ release-certification standards for Project Atlas.
 ### Planned Work
 
 - [x] M-021.1 — Governance Foundation
-- [ ] Engineering Charter
+- [x] Engineering Charter
 - [ ] Development Workflow
 - [ ] Coding Standards
 - [ ] Testing Standard

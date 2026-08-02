@@ -11,6 +11,7 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Documentation
 
+- Added the Project Atlas Engineering Charter, formalizing the project's mission, engineering principles, repository philosophy, subsystem standards, development lifecycle, and definition of done.
 - Established the Atlas Governance, engineering-specification, and release-certification documentation foundations.
 - Completed Service Lifecycle architecture, CLI, and Python API documentation, including compatibility paths, JSON contracts, Administration Portal integration, and the v1.0 read-only boundary.
 

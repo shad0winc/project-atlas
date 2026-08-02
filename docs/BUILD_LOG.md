@@ -1753,3 +1753,33 @@ Governance, and release certification without changing runtime behavior.
 - Living-document reference validation.
 - Executable-source diff validation.
 - `git diff --check`.
+
+---
+
+# 2026-08-02
+
+## M-021.2 — Engineering Charter
+
+### Objective
+
+Create the permanent engineering constitution for Project Atlas and link it
+from the existing governance and engineering documentation.
+
+### Completed
+
+- Added `docs/governance/ENGINEERING_CHARTER.md`.
+- Formalized the Atlas mission and platform vision.
+- Formalized the core engineering principles.
+- Formalized the repository-as-source-of-truth philosophy.
+- Formalized subsystem independence and public-contract expectations.
+- Formalized the engineering lifecycle and definition of done.
+- Added Charter review gates to the Engineering Checklist.
+- Linked the Charter from the Governance index and Engineering Guide.
+
+### Validation
+
+- Documentation existence validation.
+- Local Markdown-link validation.
+- Required Charter-section validation.
+- Living-document marker validation.
+- `git diff --check`.

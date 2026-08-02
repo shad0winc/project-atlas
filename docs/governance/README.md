@@ -29,7 +29,7 @@ Atlas Governance is built on these established fundamentals:
 The following focused documents will be added incrementally:
 
 ```text
-ENGINEERING_CHARTER.md
+[`ENGINEERING_CHARTER.md`](ENGINEERING_CHARTER.md)
 DEVELOPMENT_WORKFLOW.md
 CODING_STANDARDS.md
 TESTING_STANDARD.md
