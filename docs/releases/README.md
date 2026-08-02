@@ -78,9 +78,20 @@ The document validates:
 - performance, failure, and recovery behavior;
 - defect classification and release approval.
 
-### `RELEASE_TEMPLATE.md`
+### [`RELEASE_TEMPLATE.md`](RELEASE_TEMPLATE.md)
 
-Provides the standard planning and certification structure for future releases.
+Provides the reusable planning and certification structure for future Atlas
+releases.
+
+The template records:
+
+- release identity and scope;
+- features, improvements, and bug fixes;
+- breaking changes and known limitations;
+- upgrade and compatibility requirements;
+- validation evidence and release metrics;
+- rollback guidance;
+- approval and supporting references.
 
 ### `RELEASE_NOTES_TEMPLATE.md`
 

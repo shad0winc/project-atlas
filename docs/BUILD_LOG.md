@@ -2030,3 +2030,32 @@ supportable experiences for end users and administrators.
 - Administrator journey validation.
 - Local Markdown-link validation.
 - `git diff --check`.
+
+---
+
+# 2026-08-02
+
+## M-022.1.5 — Atlas Release Template
+
+### Objective
+
+Create the reusable release-record template used to document and certify
+future Atlas releases consistently.
+
+### Completed
+
+- Added `docs/releases/RELEASE_TEMPLATE.md`.
+- Added release identification and scope fields.
+- Added feature, improvement, bug-fix, and breaking-change records.
+- Added known-limitation and upgrade guidance.
+- Added validation, compatibility, and release-metric records.
+- Added rollback guidance and approval fields.
+- Added permanent references and completion requirements.
+- Linked the template from the Release Documentation index.
+
+### Validation
+
+- Required-heading validation.
+- Duplicate-section validation.
+- Local Markdown-link validation.
+- `git diff --check`.
