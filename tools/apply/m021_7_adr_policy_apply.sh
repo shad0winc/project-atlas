@@ -395,7 +395,7 @@ Use this structure:
 ```markdown
 # ADR-XXXX — Decision Title
 
-**Status:** Proposed  
+**Status:** Proposed
 **Date:** YYYY-MM-DD
 
 ## Context
