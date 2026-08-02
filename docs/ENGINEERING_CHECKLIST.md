@@ -92,3 +92,10 @@ For applicable sprints:
 
 - [ ] Public contracts follow Atlas coding standards.
 - [ ] New code preserves compatibility or documents migration.
+
+## Testing Standard Review
+
+- [ ] Focused tests cover the approved behavior.
+- [ ] Regression testing was run when required.
+- [ ] Runtime validation was performed when applicable.
+- [ ] Compatibility and repository validation passed.

@@ -904,7 +904,7 @@ release-certification standards for Project Atlas.
 - [x] Engineering Charter
 - [x] Development Workflow
 - [x] Coding Standards
-- [ ] Testing Standard
+- [x] Testing Standard
 - [ ] Documentation Standard
 - [ ] ADR Policy
 - [ ] Release Policy

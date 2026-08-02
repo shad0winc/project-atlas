@@ -1820,3 +1820,25 @@ from the existing governance and engineering documentation.
 - Link validation.
 - Required section validation.
 - `git diff --check`.
+
+---
+
+# 2026-08-02
+
+## M-021.5 — Testing Standard
+
+### Completed
+
+- Added the permanent Atlas Testing Standard.
+- Formalized unit, model, service, provider, CLI, contract, integration,
+  regression, runtime, compatibility, and release-audit validation.
+- Linked the Testing Standard from governance and engineering documentation.
+- Added testing review gates to the Engineering Checklist.
+- Marked the Testing Standard complete in the Roadmap.
+
+### Validation
+
+- Required-section validation.
+- Local Markdown-link validation.
+- Living-document marker validation.
+- `git diff --check`.
