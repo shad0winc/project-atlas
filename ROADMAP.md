@@ -909,9 +909,9 @@ release-certification standards for Project Atlas.
 - [x] ADR Policy
 - [x] Release Policy
 - [x] Versioning and Contributing guidance
-- [ ] Release Certification framework
-- [ ] M-018 Service Lifecycle certification
-- [ ] Governance audit
+- [x] Release Certification framework
+- [x] M-018 Service Lifecycle certification
+- [x] Governance audit
 
 Governance is a permanent project capability. Completion of M-021 establishes
 the initial standards; later milestones continue to operate under them.
