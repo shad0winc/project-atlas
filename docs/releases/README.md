@@ -58,17 +58,25 @@ The checklist covers:
 - post-release validation;
 - release approval.
 
-### `USER_ACCEPTANCE.md`
+### [`USER_ACCEPTANCE.md`](USER_ACCEPTANCE.md)
 
-Defines end-to-end validation from the end-user and administrator perspectives.
+Defines the permanent User Acceptance Certification process for Atlas releases.
 
-User experience is a release gate. Critical end-user workflows include
-invitation, account creation, sign-in, Portal access, media discovery, requests,
-favorites, protected-media behavior, playback, and sign-out.
+The document validates:
 
-Critical administrator workflows include sign-in, invitation management, user
-and role management, request review, routine media operations, system and
-service health, and routine administration without direct backend access.
+- invitation and onboarding;
+- account creation;
+- sign-in, navigation, and sign-out;
+- media discovery and search;
+- request submission and status;
+- favorites and protected-media behavior;
+- Jellyfin playback handoff;
+- administrator invitations, users, requests, and media operations;
+- health and module visibility;
+- routine administration without CLI access;
+- accessibility and responsiveness;
+- performance, failure, and recovery behavior;
+- defect classification and release approval.
 
 ### `RELEASE_TEMPLATE.md`
 

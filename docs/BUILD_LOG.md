@@ -1995,3 +1995,38 @@ Establish the permanent release checklist used to certify all Atlas releases.
 - Local Markdown link validation completed.
 - Checklist item validation completed.
 - `git diff --check` passed.
+
+---
+
+# 2026-08-02
+
+## M-022.1.4 — Atlas User Acceptance
+
+### Objective
+
+Establish the permanent User Acceptance Certification process used to verify
+that Atlas releases provide complete, understandable, reliable, and
+supportable experiences for end users and administrators.
+
+### Completed
+
+- Added `docs/releases/USER_ACCEPTANCE.md`.
+- Defined invitation, registration, authentication, and Portal journeys.
+- Defined media discovery, search, request, status, favorites, protection,
+  playback, and sign-out journeys.
+- Defined administrator invitation, user, request, media, health, module, and
+  routine-operation journeys.
+- Added accessibility and responsive-experience validation.
+- Added performance, failure, and recovery validation.
+- Defined acceptance defect severity and recording requirements.
+- Added certification summary and approval records.
+- Linked User Acceptance from the Release Documentation index.
+
+### Validation
+
+- Required-heading validation.
+- Duplicate-section validation.
+- End-user journey validation.
+- Administrator journey validation.
+- Local Markdown-link validation.
+- `git diff --check`.
