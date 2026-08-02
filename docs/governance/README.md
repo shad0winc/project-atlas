@@ -30,7 +30,7 @@ The following focused documents will be added incrementally:
 
 - [x] [`ENGINEERING_CHARTER.md`](ENGINEERING_CHARTER.md)
 - [x] [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md)
-- [ ] `CODING_STANDARDS.md`
+- [x] [`CODING_STANDARDS.md`](CODING_STANDARDS.md)
 - [ ] `TESTING_STANDARD.md`
 - [ ] `DOCUMENTATION_STANDARD.md`
 - [ ] `ADR_POLICY.md`

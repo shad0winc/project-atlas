@@ -1801,3 +1801,22 @@ from the existing governance and engineering documentation.
 - Markdown validation.
 - Link validation.
 - `git diff --check`.
+
+---
+
+# 2026-08-02
+
+## M-021.4 — Coding Standards
+
+### Completed
+
+- Added the permanent Coding Standards document.
+- Linked governance and engineering documentation.
+- Added coding standards review gates.
+
+### Validation
+
+- Markdown validation.
+- Link validation.
+- Required section validation.
+- `git diff --check`.

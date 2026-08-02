@@ -11,6 +11,7 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Documentation
 
+- Added the Atlas Coding Standards governance document defining permanent coding conventions.
 - Added the Atlas Development Workflow governance document defining the canonical engineering sprint lifecycle.
 - Added the Project Atlas Engineering Charter, formalizing the project's mission, engineering principles, repository philosophy, subsystem standards, development lifecycle, and definition of done.
 - Established the Atlas Governance, engineering-specification, and release-certification documentation foundations.

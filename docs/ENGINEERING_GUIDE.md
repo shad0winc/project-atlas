@@ -212,3 +212,8 @@ the repository.
 
 The canonical Atlas engineering workflow is documented in
 [`governance/DEVELOPMENT_WORKFLOW.md`](governance/DEVELOPMENT_WORKFLOW.md).
+
+## Coding Standards
+
+The permanent coding conventions are defined in
+[`governance/CODING_STANDARDS.md`](governance/CODING_STANDARDS.md).

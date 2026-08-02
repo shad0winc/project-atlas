@@ -87,3 +87,8 @@ For applicable sprints:
 
 - [ ] Sprint followed the approved workflow.
 - [ ] Scope changes were deferred unless required by a blocker or defect.
+
+## Coding Standards Review
+
+- [ ] Public contracts follow Atlas coding standards.
+- [ ] New code preserves compatibility or documents migration.
