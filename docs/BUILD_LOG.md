@@ -2088,3 +2088,49 @@ Atlas releases clearly and consistently.
 - Duplicate-section validation.
 - Local Markdown-link validation.
 - `git diff --check`.
+
+---
+
+# 2026-08-02
+
+## M-023.1.1 — Media Request Domain Model
+
+### Objective
+
+Establish the immutable, normalized request contract that will support Atlas
+media requests, provider integration, lifecycle reconciliation, Portal APIs,
+and user-aware notifications.
+
+### Completed
+
+- Added `atlas/media_requests/models.py`.
+- Added `MediaRequestType`.
+- Added `MediaRequestStatus`.
+- Added immutable `MediaRequest`.
+- Added normalized request, user, provider, and media identities.
+- Added title, year, and season validation.
+- Added UTC timestamp normalization.
+- Added lifecycle consistency checks.
+- Added `terminal` and `active` properties.
+- Added deterministic `to_dict()` serialization.
+- Added package exports through `atlas/media_requests/__init__.py`.
+- Added dedicated contract tests.
+
+### Boundaries
+
+This sprint intentionally did not add:
+
+- request persistence;
+- Jellyseerr integration;
+- request services;
+- event publication;
+- notification delivery;
+- API routes;
+- Portal functionality;
+- Discord preferences.
+
+### Validation
+
+- 85 focused tests passed.
+- Package compilation passed.
+- `git diff --check` passed.

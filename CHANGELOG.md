@@ -30,6 +30,7 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Added
 
+- Added the normalized Media Request domain model with request ownership, provider identity, lifecycle state, timestamp validation, serialization, package exports, and dedicated contract tests.
 - Read-only `atlas service history` CLI for global and service-specific Maintenance History, with human-readable and canonical JSON output.
 - Read-only `ServiceMaintenanceHistoryService` with validated global and service-specific history, concrete empty provider defaults, identity enforcement, compatibility exports, and dedicated tests.
 - Immutable Service Lifecycle maintenance-history contracts: `MaintenanceAction`, `MaintenanceResult`, `MaintenanceRecord`, and `MaintenanceReport`, with normalized timestamps, deterministic ordering, aggregation, serialization, public exports, and dedicated tests.
