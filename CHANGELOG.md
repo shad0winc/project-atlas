@@ -11,6 +11,7 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Documentation
 
+- Added the Atlas Documentation Standard governance document defining architecture, API, CLI, operational, governance, release, and living-document requirements.
 - Added the Atlas Testing Standard governance document defining automated, runtime, compatibility, repository, and release-audit validation requirements.
 - Added the Atlas Coding Standards governance document defining permanent coding conventions.
 - Added the Atlas Development Workflow governance document defining the canonical engineering sprint lifecycle.

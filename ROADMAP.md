@@ -905,7 +905,7 @@ release-certification standards for Project Atlas.
 - [x] Development Workflow
 - [x] Coding Standards
 - [x] Testing Standard
-- [ ] Documentation Standard
+- [x] Documentation Standard
 - [ ] ADR Policy
 - [ ] Release Policy
 - [ ] Versioning and Contributing guidance

@@ -99,3 +99,10 @@ For applicable sprints:
 - [ ] Regression testing was run when required.
 - [ ] Runtime validation was performed when applicable.
 - [ ] Compatibility and repository validation passed.
+
+## Documentation Standard Review
+
+- [ ] Public behavior and architecture are documented where applicable.
+- [ ] API, CLI, operational, compatibility, and safety documentation are current.
+- [ ] Build Log, Changelog, and Roadmap updates are complete where required.
+- [ ] Local links, examples, and repository formatting validate successfully.
