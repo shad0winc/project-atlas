@@ -106,3 +106,10 @@ For applicable sprints:
 - [ ] API, CLI, operational, compatibility, and safety documentation are current.
 - [ ] Build Log, Changelog, and Roadmap updates are complete where required.
 - [ ] Local links, examples, and repository formatting validate successfully.
+
+## ADR Policy Review
+
+- [ ] Architectural decisions reference an existing ADR or create a new one.
+- [ ] ADR context, decision, rationale, alternatives, and consequences are complete.
+- [ ] ADR status and related links are correct.
+- [ ] Implementation matches accepted or implemented ADRs.

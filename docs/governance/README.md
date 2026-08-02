@@ -33,7 +33,7 @@ The following focused documents will be added incrementally:
 - [x] [`CODING_STANDARDS.md`](CODING_STANDARDS.md)
 - [x] [`TESTING_STANDARD.md`](TESTING_STANDARD.md)
 - [x] [`DOCUMENTATION_STANDARD.md`](DOCUMENTATION_STANDARD.md)
-- [ ] `ADR_POLICY.md`
+- [x] [`ADR_POLICY.md`](ADR_POLICY.md)
 - [ ] `RELEASE_POLICY.md`
 - [ ] `VERSIONING.md`
 - [ ] `CONTRIBUTING.md`

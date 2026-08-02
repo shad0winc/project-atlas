@@ -1865,3 +1865,27 @@ from the existing governance and engineering documentation.
 - Local Markdown-link validation.
 - Living-document marker validation.
 - `git diff --check`.
+
+---
+
+# 2026-08-02
+
+## M-021.7 — ADR Policy
+
+### Completed
+
+- Added the permanent Atlas ADR Policy.
+- Formalized ADR criteria, lifecycle, statuses, required sections, review,
+  approval, implementation, supersession, deprecation, archival, and validation.
+- Defined relationships among ADRs, specifications, architecture, governance,
+  and release documentation.
+- Linked the ADR Policy from governance and engineering documentation.
+- Added ADR review gates to the Engineering Checklist.
+- Marked the ADR Policy complete in the Roadmap.
+
+### Validation
+
+- Required-section validation.
+- Local Markdown-link validation.
+- Living-document marker validation.
+- `git diff --check`.

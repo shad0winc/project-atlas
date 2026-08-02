@@ -906,7 +906,7 @@ release-certification standards for Project Atlas.
 - [x] Coding Standards
 - [x] Testing Standard
 - [x] Documentation Standard
-- [ ] ADR Policy
+- [x] ADR Policy
 - [ ] Release Policy
 - [ ] Versioning and Contributing guidance
 - [ ] Release Certification framework

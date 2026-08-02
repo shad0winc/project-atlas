@@ -217,3 +217,8 @@ The canonical Atlas engineering workflow is documented in
 
 The permanent coding conventions are defined in
 [`governance/CODING_STANDARDS.md`](governance/CODING_STANDARDS.md).
+
+## ADR Policy
+
+The canonical Architecture Decision Record requirements are defined in
+[`governance/ADR_POLICY.md`](governance/ADR_POLICY.md).
