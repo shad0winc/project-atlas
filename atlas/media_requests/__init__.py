@@ -6,10 +6,18 @@ from .models import (
     MediaRequestStatus,
     MediaRequestType,
 )
+from .repository import (
+    JsonMediaRequestRepository,
+    MediaRequestRepositoryError,
+    SCHEMA_VERSION,
+)
 
 __all__ = [
+    "JsonMediaRequestRepository",
     "MediaRequest",
     "MediaRequestError",
+    "MediaRequestRepositoryError",
     "MediaRequestStatus",
     "MediaRequestType",
+    "SCHEMA_VERSION",
 ]

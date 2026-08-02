@@ -2134,3 +2134,58 @@ This sprint intentionally did not add:
 - 85 focused tests passed.
 - Package compilation passed.
 - `git diff --check` passed.
+
+---
+
+# 2026-08-02
+
+## M-023.1.2 — Media Request Repository
+
+### Objective
+
+Establish the durable persistence boundary for Atlas media requests without
+introducing provider, lifecycle, event, notification, API, or Portal behavior.
+
+### Completed
+
+- Added `atlas/media_requests/repository.py`.
+- Added `JsonMediaRequestRepository`.
+- Added `MediaRequestRepositoryError`.
+- Added schema-versioned JSON persistence.
+- Reused the shared `atlas.atomic.write_json_atomic` helper.
+- Added repository initialization.
+- Added request creation through `save()`.
+- Added request retrieval through `get()`.
+- Added deterministic chronological listing.
+- Added per-user request listing.
+- Added provider-request lookup.
+- Added request deletion.
+- Added duplicate request-ID protection.
+- Added duplicate provider-request protection.
+- Added domain-model reconstruction on reads.
+- Added registry-key and record-identity consistency validation.
+- Added derived-field consistency validation.
+- Added corruption-safe error handling.
+- Added deterministic registry key ordering.
+- Exported repository contracts through `atlas/media_requests/__init__.py`.
+- Added dedicated repository contract tests.
+
+### Boundaries
+
+This sprint intentionally did not add:
+
+- Jellyseerr integration;
+- sports request integration;
+- request lifecycle services;
+- request status reconciliation;
+- event publication;
+- Discord delivery;
+- user notification preferences;
+- API routes;
+- Portal functionality.
+
+### Validation
+
+- 130 combined media-request model and repository tests passed.
+- Package compilation passed.
+- `git diff --check` passed.
