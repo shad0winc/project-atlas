@@ -6,6 +6,17 @@ from .models import (
     MediaRequestStatus,
     MediaRequestType,
 )
+from .provider import (
+    MediaRequestProvider,
+    MediaRequestProviderError,
+    MediaRequestProviderOperationError,
+    ProviderCapabilities,
+    ProviderEventContext,
+    ProviderHealth,
+    ProviderHealthStatus,
+    ProviderStatusResult,
+    ProviderSubmissionResult,
+)
 from .repository import (
     JsonMediaRequestRepository,
     MediaRequestRepositoryError,
@@ -16,8 +27,17 @@ __all__ = [
     "JsonMediaRequestRepository",
     "MediaRequest",
     "MediaRequestError",
+    "MediaRequestProvider",
+    "MediaRequestProviderError",
+    "MediaRequestProviderOperationError",
     "MediaRequestRepositoryError",
     "MediaRequestStatus",
     "MediaRequestType",
+    "ProviderCapabilities",
+    "ProviderEventContext",
+    "ProviderHealth",
+    "ProviderHealthStatus",
+    "ProviderStatusResult",
+    "ProviderSubmissionResult",
     "SCHEMA_VERSION",
 ]

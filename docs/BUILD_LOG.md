@@ -2189,3 +2189,68 @@ This sprint intentionally did not add:
 - 130 combined media-request model and repository tests passed.
 - Package compilation passed.
 - `git diff --check` passed.
+
+---
+
+# 2026-08-02
+
+## M-023.1.3 — Media Request Provider Contract
+
+### Objective
+
+Establish the provider-independent boundary that future Jellyseerr, sports, and
+other request providers must implement.
+
+### Completed
+
+- Added `atlas/media_requests/provider.py`.
+- Added abstract `MediaRequestProvider`.
+- Added `MediaRequestProviderError`.
+- Added `MediaRequestProviderOperationError`.
+- Added normalized `ProviderCapabilities`.
+- Added normalized `ProviderEventContext`.
+- Added normalized `ProviderSubmissionResult`.
+- Added normalized `ProviderStatusResult`.
+- Added normalized `ProviderHealth`.
+- Added `ProviderHealthStatus`.
+- Added media-type capability discovery.
+- Added normalized provider and provider-request identities.
+- Added UTC timestamp normalization.
+- Added lifecycle consistency validation.
+- Added available and failed result requirements.
+- Added deterministic serialization.
+- Added immutable provider contract models.
+- Exported provider contracts through `atlas/media_requests/__init__.py`.
+- Added dedicated provider contract tests.
+
+### Architectural Boundary
+
+The provider event context contains provider-neutral lifecycle metadata only.
+
+It does not:
+
+- publish Atlas events;
+- contain Discord-specific configuration;
+- mutate request persistence;
+- call provider APIs;
+- expose Portal routes.
+
+### Boundaries
+
+This sprint intentionally did not add:
+
+- Jellyseerr API calls;
+- sports provider implementation;
+- HTTP transport;
+- repository mutation;
+- request lifecycle services;
+- event publication;
+- Discord notification delivery;
+- API routes;
+- Portal functionality.
+
+### Validation
+
+- 178 combined media-request tests passed.
+- Package compilation passed.
+- `git diff --check` passed.
