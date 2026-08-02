@@ -1783,3 +1783,21 @@ from the existing governance and engineering documentation.
 - Required Charter-section validation.
 - Living-document marker validation.
 - `git diff --check`.
+
+---
+
+# 2026-08-02
+
+## M-021.3 — Development Workflow
+
+### Completed
+
+- Added the permanent Atlas Development Workflow.
+- Linked governance and engineering documentation.
+- Added workflow review checklist.
+
+### Validation
+
+- Markdown validation.
+- Link validation.
+- `git diff --check`.

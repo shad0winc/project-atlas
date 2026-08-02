@@ -28,17 +28,15 @@ Atlas Governance is built on these established fundamentals:
 
 The following focused documents will be added incrementally:
 
-```text
-[`ENGINEERING_CHARTER.md`](ENGINEERING_CHARTER.md)
-DEVELOPMENT_WORKFLOW.md
-CODING_STANDARDS.md
-TESTING_STANDARD.md
-DOCUMENTATION_STANDARD.md
-ADR_POLICY.md
-RELEASE_POLICY.md
-VERSIONING.md
-CONTRIBUTING.md
-```
+- [x] [`ENGINEERING_CHARTER.md`](ENGINEERING_CHARTER.md)
+- [x] [`DEVELOPMENT_WORKFLOW.md`](DEVELOPMENT_WORKFLOW.md)
+- [ ] `CODING_STANDARDS.md`
+- [ ] `TESTING_STANDARD.md`
+- [ ] `DOCUMENTATION_STANDARD.md`
+- [ ] `ADR_POLICY.md`
+- [ ] `RELEASE_POLICY.md`
+- [ ] `VERSIONING.md`
+- [ ] `CONTRIBUTING.md`
 
 Until those documents are completed, the current
 [`ENGINEERING_GUIDE.md`](../ENGINEERING_GUIDE.md) and

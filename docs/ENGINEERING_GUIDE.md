@@ -207,3 +207,8 @@ sign-off is maintained under [`releases/`](releases/README.md).
 The repository is the source of truth. Conversations are engineering sessions;
 decisions, specifications, implementation records, and certification belong in
 the repository.
+
+## Development Workflow
+
+The canonical Atlas engineering workflow is documented in
+[`governance/DEVELOPMENT_WORKFLOW.md`](governance/DEVELOPMENT_WORKFLOW.md).

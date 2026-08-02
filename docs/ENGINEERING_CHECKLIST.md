@@ -82,3 +82,8 @@ For applicable sprints:
 - [ ] Scope remained locked after approval unless a concrete blocker or defect required change.
 - [ ] The repository is the authoritative record of durable decisions.
 - [ ] The sprint leaves the repository more maintainable than it found it.
+
+## Development Workflow Review
+
+- [ ] Sprint followed the approved workflow.
+- [ ] Scope changes were deferred unless required by a blocker or defect.

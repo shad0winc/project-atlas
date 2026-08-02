@@ -902,7 +902,7 @@ release-certification standards for Project Atlas.
 
 - [x] M-021.1 — Governance Foundation
 - [x] Engineering Charter
-- [ ] Development Workflow
+- [x] Development Workflow
 - [ ] Coding Standards
 - [ ] Testing Standard
 - [ ] Documentation Standard
