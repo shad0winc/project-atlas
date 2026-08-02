@@ -1966,3 +1966,32 @@ required to publish Project Atlas v1.0.0.
 - Duplicate-section validation.
 - Local Markdown-link validation.
 - `git diff --check`.
+
+---
+
+## M-022.1.3 — Atlas Release Checklist
+
+### Objective
+
+Establish the permanent release checklist used to certify all Atlas releases.
+
+### Completed
+
+- Added `docs/releases/RELEASE_CHECKLIST.md`.
+- Defined engineering readiness validation.
+- Defined repository readiness validation.
+- Defined runtime and operational validation.
+- Defined documentation and security review.
+- Defined backup and recovery validation.
+- Defined user and administrator experience certification.
+- Defined release packaging and publication gates.
+- Defined post-release validation requirements.
+- Added the permanent release approval record.
+
+### Validation
+
+- Section validation completed.
+- Duplicate heading validation completed.
+- Local Markdown link validation completed.
+- Checklist item validation completed.
+- `git diff --check` passed.

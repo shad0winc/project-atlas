@@ -11,6 +11,8 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Documentation
 
+- Added the permanent Atlas Release Checklist documenting the engineering, operational, documentation, security, recovery, certification, packaging, publication, and post-release validation requirements.
+
 - Established the Atlas v1.0 Release Plan, locking product scope, release blockers, acceptance criteria, user-experience certification, and the execution sequence to v1.0.0.
 - Added the Atlas Release Policy defining release readiness, validation, certification, approval, publication, maintenance, and end-of-life requirements.
 - Added the Atlas Versioning and Contributing Standard defining semantic versioning, branches, commits, review, compatibility, deprecation, and merge requirements.

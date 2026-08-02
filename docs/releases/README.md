@@ -38,10 +38,25 @@ requirements.
 
 Defines the contractual scope and execution plan for Atlas v1.0.
 
-### `RELEASE_CHECKLIST.md`
+### [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md)
 
-Defines the engineering and operational gates that must pass before release
-certification.
+Defines the permanent engineering release gate used for every Atlas release.
+
+The checklist covers:
+
+- engineering readiness;
+- repository readiness;
+- runtime validation;
+- operational readiness;
+- documentation readiness;
+- security review;
+- backup and recovery validation;
+- user experience certification;
+- administrator experience certification;
+- release packaging;
+- publication readiness;
+- post-release validation;
+- release approval.
 
 ### `USER_ACCEPTANCE.md`
 
