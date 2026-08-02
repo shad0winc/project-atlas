@@ -30,6 +30,7 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Added
 
+- Added the provider-agnostic Media Request service coordinating request creation, submission, status refresh, cancellation, lifecycle validation, repository updates, provider capabilities, package exports, and dedicated contract tests.
 - Added the provider-independent Media Request contract with normalized provider capabilities, lifecycle results, health status, event context, abstract operations, package exports, and dedicated contract tests.
 - Added the durable Media Request repository with schema-versioned JSON persistence, atomic writes, duplicate protection, deterministic listing, user and provider lookups, deletion, corruption detection, package exports, and dedicated contract tests.
 - Added the normalized Media Request domain model with request ownership, provider identity, lifecycle state, timestamp validation, serialization, package exports, and dedicated contract tests.

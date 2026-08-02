@@ -2254,3 +2254,64 @@ This sprint intentionally did not add:
 - 178 combined media-request tests passed.
 - Package compilation passed.
 - `git diff --check` passed.
+
+---
+
+# 2026-08-02
+
+## M-023.1.4B — Media Request Service
+
+### Objective
+
+Establish the provider-agnostic orchestration layer coordinating Atlas media
+request models, durable persistence, and provider contracts.
+
+### Completed
+
+- Added `atlas/media_requests/service.py`.
+- Added `MediaRequestService`.
+- Added `MediaRequestServiceError`.
+- Added deterministic provider registration.
+- Added duplicate provider-name protection.
+- Added request creation and persistence.
+- Added provider capability validation.
+- Added media-type support validation.
+- Added provider request submission.
+- Added provider status synchronization.
+- Added provider-side cancellation.
+- Added immutable lifecycle updates through repository `replace()`.
+- Added provider-name consistency validation.
+- Added provider-request identity consistency validation.
+- Added lifecycle transition enforcement.
+- Added duplicate-submission protection.
+- Added repository and provider error translation.
+- Added request retrieval and deterministic listing.
+- Added per-user request listing.
+- Added provider-request lookup.
+- Exported service contracts through `atlas/media_requests/__init__.py`.
+- Added dedicated mocked service contract tests.
+
+### Architectural Boundary
+
+The service coordinates only the existing request domain, repository, and
+provider contracts.
+
+It does not contain provider-specific implementation or delivery behavior.
+
+### Boundaries
+
+This sprint intentionally did not add:
+
+- Jellyseerr HTTP integration;
+- sports provider implementation;
+- event publication;
+- Discord notification delivery;
+- user notification preferences;
+- REST or Portal API routes;
+- Portal functionality.
+
+### Validation
+
+- 227 combined media-request tests passed.
+- Package compilation passed.
+- `git diff --check` passed.

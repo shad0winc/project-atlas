@@ -22,6 +22,10 @@ from .repository import (
     MediaRequestRepositoryError,
     SCHEMA_VERSION,
 )
+from .service import (
+    MediaRequestService,
+    MediaRequestServiceError,
+)
 
 __all__ = [
     "JsonMediaRequestRepository",
@@ -31,6 +35,8 @@ __all__ = [
     "MediaRequestProviderError",
     "MediaRequestProviderOperationError",
     "MediaRequestRepositoryError",
+    "MediaRequestService",
+    "MediaRequestServiceError",
     "MediaRequestStatus",
     "MediaRequestType",
     "ProviderCapabilities",
