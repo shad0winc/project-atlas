@@ -1,30 +1,118 @@
-# Atlas Release Certification
+# Atlas Release Documentation
+
+## Purpose
+
+This directory contains the canonical release engineering and release
+certification documentation for Project Atlas.
+
+Where the Governance Library defines how Atlas is engineered, the Release
+Library defines how Atlas is planned, prepared, validated, certified, and
+delivered.
+
+Release documents are permanent repository records. They preserve release
+scope, validation evidence, compatibility expectations, known limitations, and
+approval status for Atlas subsystems and product releases.
+
+## Release Philosophy
+
+Atlas releases follow the engineering principles established by the Governance
+Library.
+
+Release decisions prioritize:
+
+- stability over novelty;
+- reliability over convenience;
+- simplicity over unnecessary complexity;
+- documentation before release;
+- validation before publication;
+- the repository as the source of truth;
+- user experience as a release requirement.
+
+A release is complete only when engineering, operations, documentation,
+certification, and user experience have satisfied the applicable release
+requirements.
+
+## Release Documentation
+
+### `V1_RELEASE_PLAN.md`
+
+Defines the contractual scope and execution plan for Atlas v1.0.
+
+### `RELEASE_CHECKLIST.md`
+
+Defines the engineering and operational gates that must pass before release
+certification.
+
+### `USER_ACCEPTANCE.md`
+
+Defines end-to-end validation from the end-user and administrator perspectives.
+
+User experience is a release gate. Critical end-user workflows include
+invitation, account creation, sign-in, Portal access, media discovery, requests,
+favorites, protected-media behavior, playback, and sign-out.
+
+Critical administrator workflows include sign-in, invitation management, user
+and role management, request review, routine media operations, system and
+service health, and routine administration without direct backend access.
+
+### `RELEASE_TEMPLATE.md`
+
+Provides the standard planning and certification structure for future releases.
+
+### `RELEASE_NOTES_TEMPLATE.md`
+
+Provides the standard structure for release notes and announcements.
+
+## Release Certification Records
 
 Release certification is the permanent engineering sign-off for an Atlas
 subsystem or product release.
 
-A certification records:
+A certification records applicable scope, architecture, public interfaces,
+testing, runtime validation, documentation coverage, compatibility guarantees,
+migration requirements, repository health, known limitations, rollback or
+recovery expectations, integration guidance, certification result, and
+approval.
 
-- delivered scope;
-- architecture and public interfaces;
-- testing and runtime validation;
-- documentation coverage;
-- compatibility guarantees;
-- repository health;
-- known intentional limitations;
-- integration guidance;
-- certification result.
+Certification summarizes completed evidence. It does not replace tests, runtime
+validation, documentation, audits, or repository review.
+
+## Release Workflow
+
+1. Define and approve release scope.
+2. Implement the approved requirements.
+3. Complete focused and regression validation.
+4. Validate supported runtime behavior.
+5. Complete operational and recovery validation.
+6. Complete user and administrator acceptance.
+7. Finalize documentation and release notes.
+8. Complete release certification.
+9. Review the release commit and version.
+10. Publish and perform post-release validation.
 
 ## Relationship to Other Records
 
-- `ROADMAP.md` defines planned and completed milestones.
-- `CHANGELOG.md` records notable user- and developer-visible changes.
-- `docs/BUILD_LOG.md` records chronological implementation history.
-- Audit artifacts contain detailed validation evidence.
-- Release certifications summarize the approved result as a permanent,
-  version-controlled record.
+- [`../../ROADMAP.md`](../../ROADMAP.md) defines planned, active, deferred, and
+  completed milestones.
+- [`../../CHANGELOG.md`](../../CHANGELOG.md) records notable changes.
+- [`../BUILD_LOG.md`](../BUILD_LOG.md) records implementation and validation
+  history.
+- [`../governance/README.md`](../governance/README.md) defines how Atlas is
+  engineered.
+- [`../specifications/README.md`](../specifications/README.md) records approved
+  sprint intent and scope.
 
-## Planned Files
+## Certification Boundary
+
+Certification is evidence-based.
+
+A certification must not claim validation that was not actually performed.
+Known limitations must be explicit, and release-blocking failures must not be
+reclassified solely to permit publication.
+
+## Current Release Records
+
+Existing or planned release records may include:
 
 ```text
 TEMPLATE.md
@@ -32,12 +120,9 @@ RC_M018_SERVICE_LIFECYCLE.md
 RC_V1_0.md
 ```
 
-Future certification documents must be based on completed validation evidence.
-Certification does not replace tests, runtime validation, documentation, or
-repository review.
+## Relationship to Governance
 
-## Certification Boundary
+The Release Library builds upon the Governance Library.
 
-A subsystem is not certified merely because implementation is complete.
-Certification requires the applicable engineering gates, including tests,
-runtime validation, documentation, repository audit, review, commit, and push.
+Governance defines how Atlas is engineered. Release documentation defines how
+Atlas is delivered.
