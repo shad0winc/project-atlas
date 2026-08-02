@@ -1,0 +1,17 @@
+{
+  "counts": {
+    "failed": 0,
+    "partial": 0,
+    "skipped": 0,
+    "success": 0,
+    "unknown": 0
+  },
+  "generated_at": "2026-08-02T02:41:53.392475Z",
+  "latest_failure": null,
+  "latest_record": null,
+  "latest_success": null,
+  "provider": "unknown",
+  "records": [],
+  "requires_attention": false,
+  "total_records": 0
+}

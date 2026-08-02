@@ -1414,3 +1414,342 @@ operational condition.
 - Service Lifecycle regression suite.
 - Real `atlas service doctor --json` execution.
 - `git diff --check`.
+
+---
+
+# 2026-08-02
+
+## M-018.20 — Update Discovery Domain Contracts
+
+### Objective
+
+Establish normalized, provider-independent contracts for read-only service image
+update discovery before adding provider, registry, CLI, API, or Portal behavior.
+
+### Completed
+
+- Added `UpdateStatus`.
+- Added normalized `ImageReference` parsing and serialization.
+- Added `ServiceUpdate` with child-contract and update-state validation.
+- Added deterministic `UpdateReport` aggregation, counts, attention items, and
+  serialization.
+- Exported all contracts through `atlas.service_lifecycle`.
+- Added dedicated Core model tests.
+- Documented the read-only boundary and future shared CLI/API/Portal contract.
+
+### Validation
+
+- Python compilation.
+- Focused update-model tests.
+- Existing Service Lifecycle model and Doctor-model regression tests.
+- Public import validation.
+- `git diff --check`.
+
+---
+
+# 2026-08-02
+
+## M-018.21 — Local Update Metadata Provider
+
+### Objective
+
+Expose locally verifiable service image metadata through the provider boundary
+without registry access, image pulls, or update-availability claims.
+
+### Completed
+
+- Added `inspect_update()` to `ServiceLifecycleProvider`.
+- Implemented local Docker Compose update metadata discovery.
+- Reported mutable `latest` tags without claiming an available update.
+- Reported pinned tags and digest references as unknown pending registry comparison.
+- Corrected digest-only image references so null tags do not become `latest`.
+- Added provider, Docker Compose, and image-contract tests.
+
+### Validation
+
+- Python compilation.
+- Provider abstraction tests.
+- Docker Compose provider tests.
+- Update-model and Service Lifecycle regression tests.
+- `git diff --check`.
+
+---
+
+# 2026-08-02
+
+## M-018.21.5 — Repository Engineering Tooling
+
+### Objective
+
+Establish a permanent repository layout and canonical guidance for Atlas
+engineering utilities while removing disposable helper scripts from the
+repository root.
+
+### Completed
+
+- Added the `tools/` hierarchy for apply, maintenance, migration, release, and
+  archived tooling.
+- Added directory-specific safety and lifecycle guidance.
+- Added `docs/ENGINEERING_GUIDE.md`.
+- Linked the engineering checklist to the canonical guide.
+- Archived completed root-level M-018.21 helper scripts outside the working tree.
+- Preserved all in-progress Update Discovery source, tests, and documentation.
+
+### Validation
+
+- Verified the active development branch.
+- Verified required Update Discovery files.
+- Confirmed tracked files were not moved during cleanup.
+- Checked documentation links and repository whitespace.
+
+---
+
+# 2026-08-02
+
+## M-018.22 — Update Discovery Service
+
+### Objective
+
+Add the provider-independent orchestration layer for validated single-service
+and platform-wide read-only update discovery.
+
+### Completed
+
+- Added immutable `ServiceUpdateService`.
+- Added validated `inspect_update()`.
+- Added deterministic `inspect_updates()` aggregation.
+- Reused `ServiceLifecycleService` inventory and identity validation.
+- Enforced provider result type, identifier, and service-name contracts.
+- Preserved known domain errors and translated unexpected provider failures.
+- Exported the service through `atlas.service_lifecycle`.
+- Added dedicated orchestration tests.
+- Documented the service boundary for future CLI, API, and Admin Portal use.
+
+### Validation
+
+- Python compilation.
+- Update-service focused tests.
+- Update-model, provider, service, Doctor, and CLI regressions.
+- Public import validation.
+- `git diff --check`.
+
+---
+
+# 2026-08-02
+
+## M-018.23 — Service Updates CLI
+
+### Objective
+
+Expose provider-independent, read-only Update Discovery through the Atlas CLI
+without duplicating service or provider logic.
+
+### Completed
+
+- Added `atlas service updates`.
+- Added `atlas service updates --json`.
+- Added concise human-readable update summaries.
+- Serialized canonical `UpdateReport` JSON without transformation.
+- Registered shell dispatch and service/global help.
+- Added human, JSON, empty-inventory, error, and help tests.
+- Documented the CLI boundary for future API and Admin Portal consumers.
+
+### Validation
+
+- Python compilation.
+- Shell syntax validation.
+- Focused Update Discovery and CLI tests.
+- Service Lifecycle regression tests.
+- Real human CLI execution.
+- Real JSON CLI execution and parsing.
+- `git diff --check`.
+
+---
+
+# 2026-08-02
+
+## M-018.24 — Maintenance History Domain Models
+
+### Objective
+
+Establish immutable, provider-independent contracts for Service Lifecycle
+maintenance history before adding persistence, service orchestration, CLI, API,
+Portal, scheduler, or maintenance execution.
+
+### Completed
+
+- Added `MaintenanceAction`.
+- Added `MaintenanceResult`.
+- Added normalized `MaintenanceRecord`.
+- Added deterministic `MaintenanceReport`.
+- Added duration, success, failure, attention, count, and latest-record helpers.
+- Exported all contracts through `atlas.service_lifecycle`.
+- Added dedicated Core tests.
+- Documented the strict read-only boundary and future extension points.
+
+### Validation
+
+- Python compilation.
+- Public import validation.
+- Focused maintenance-model tests.
+- Existing Service Lifecycle model regression tests.
+- `git diff --check`.
+
+---
+
+# 2026-08-02
+
+## M-018.24.5 — Service Layer Package Refactor
+
+### Objective
+
+Organize Service Lifecycle service implementations under a dedicated package
+before adding Maintenance History orchestration, without changing public
+behavior or breaking existing imports.
+
+### Completed
+
+- Added `atlas.service_lifecycle.services`.
+- Moved the lifecycle implementation to `services/lifecycle.py`.
+- Moved Service Doctor to `services/doctor.py`.
+- Moved Update Discovery orchestration to `services/updates.py`.
+- Preserved `service.py`, `doctor.py`, and `update.py` as compatibility shims.
+- Updated top-level package exports to use the canonical services package.
+- Added explicit public and legacy import compatibility tests.
+- Archived completed apply helpers outside the working tree.
+- Documented the package structure and unchanged read-only boundary.
+
+### Validation
+
+- Python compilation.
+- Canonical and legacy import validation.
+- Full Service Lifecycle regression.
+- Real Service Doctor and Service Updates CLI smoke tests.
+- Shell syntax validation.
+- `git diff --check`.
+
+---
+
+# 2026-08-02
+
+## M-018.25 — Maintenance History Service
+
+### Objective
+
+Add the provider-independent, read-only orchestration layer for global and
+service-specific Maintenance History without persistence or execution.
+
+### Completed
+
+- Added `ServiceMaintenanceHistoryService`.
+- Added validated `inspect_history()`.
+- Added validated `inspect_service_history()`.
+- Added concrete empty-history provider defaults.
+- Preserved compatibility for existing providers and test doubles.
+- Enforced report, service identifier, and service-name contracts.
+- Added canonical, package, and legacy compatibility exports.
+- Added dedicated Core tests.
+- Documented the future persistence boundary.
+
+### Validation
+
+- Python compilation.
+- Public and legacy import validation.
+- Maintenance service and model tests.
+- Full Service Lifecycle regression.
+- Service Doctor and Service Updates CLI smoke tests.
+- `git diff --check`.
+
+---
+
+# 2026-08-02
+
+## M-018.26 — Maintenance History CLI
+
+### Objective
+
+Expose global and service-specific read-only Maintenance History through the
+Atlas CLI without duplicating service logic or enabling maintenance execution.
+
+### Completed
+
+- Added `atlas service history`.
+- Added `atlas service history <identifier>`.
+- Added JSON variants for both scopes.
+- Added human-readable result counts and ordered record output.
+- Serialized canonical `MaintenanceReport` JSON directly.
+- Registered service and global help.
+- Added global, service-specific, JSON, empty-history, error, and help tests.
+- Documented the empty-provider behavior and read-only boundary.
+
+### Validation
+
+- Python compilation.
+- Shell syntax validation.
+- Focused Maintenance History and CLI tests.
+- Full Service Lifecycle regression.
+- Live global history human and JSON commands.
+- Live service-specific history human and JSON commands.
+- JSON contract validation.
+- `git diff --check`.
+
+---
+
+# 2026-08-02
+
+## M-018.27 — Service Lifecycle Documentation Completion
+
+### Objective
+
+Complete the architecture, CLI, and Python API documentation for the read-only
+Service Lifecycle subsystem before final subsystem validation.
+
+### Completed
+
+- Added the complete Service Lifecycle CLI reference.
+- Added the public Python API reference.
+- Documented canonical models, services, and provider contracts.
+- Documented legacy compatibility module aliases.
+- Documented JSON contracts and error behavior.
+- Documented Administration Portal integration boundaries.
+- Documented the post-v1.0 maintenance workflow boundary.
+- Added Service Lifecycle links to the architecture index.
+- Added a documentation map to the architecture document.
+- Archived the completed M-018.26 apply helper.
+
+### Validation
+
+- Verified all referenced documentation files exist.
+- Verified public API exports.
+- Verified documented CLI commands are registered.
+- Verified Markdown links.
+- Ran `git diff --check`.
+
+---
+
+# 2026-08-02
+
+## M-021.1 — Governance Foundation
+
+### Objective
+
+Establish permanent repository locations for engineering specifications, Atlas
+Governance, and release certification without changing runtime behavior.
+
+### Completed
+
+- Added the engineering-specification index.
+- Added the M-021.1 Governance Foundation specification.
+- Added the Atlas Governance index.
+- Added the Release Certification index.
+- Linked governance, specifications, and releases from the Engineering Guide.
+- Added governance review gates to the Engineering Checklist.
+- Added M-021 Atlas Governance to the Roadmap.
+
+### Validation
+
+- Documentation structure validation.
+- Local Markdown-link validation.
+- Living-document reference validation.
+- Executable-source diff validation.
+- `git diff --check`.

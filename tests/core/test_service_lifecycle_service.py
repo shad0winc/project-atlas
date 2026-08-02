@@ -15,6 +15,9 @@ from atlas.service_lifecycle import (
     ServiceLifecycleProvider,
     ServiceLifecycleService,
     ServiceRuntime,
+    ImageReference,
+    ServiceUpdate,
+    UpdateStatus,
 )
 
 
@@ -64,6 +67,35 @@ class StubProvider(ServiceLifecycleProvider):
         self.calls.append(("inspect_health", identifier))
         self._raise_failure()
         return self.health
+
+    def inspect_update(
+        self,
+        identifier: str,
+    ) -> ServiceUpdate:
+        self.calls.append(("inspect_update", identifier))
+
+        if self.failure_method == "inspect_update":
+            raise self.failure
+
+        service = next(
+            (
+                service
+                for service in self.services_result
+                if service.identifier == identifier
+            ),
+            None,
+        )
+        if service is None:
+            raise LookupError(identifier)
+
+        return ServiceUpdate(
+            service_identifier=service.identifier,
+            service_name=service.name,
+            current_image=ImageReference.parse(
+                "example/service:stable"
+            ),
+            status=UpdateStatus.UNKNOWN,
+        )
 
 
 def make_service() -> tuple[ServiceLifecycleService, StubProvider]:

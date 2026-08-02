@@ -1,0 +1,3008 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 8a7e8f1d..b3842013 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -9,8 +9,20 @@ All notable changes to Project Atlas are documented in this file.
+ - Prevented Service Doctor from double-counting a missing Docker health check as both an observability warning and a degraded-health warning.
+ 
+ 
++### Documentation
++
++- Completed Service Lifecycle architecture, CLI, and Python API documentation, including compatibility paths, JSON contracts, Administration Portal integration, and the v1.0 read-only boundary.
++
+ ### Added
+ 
++- Read-only `atlas service history` CLI for global and service-specific Maintenance History, with human-readable and canonical JSON output.
++- Read-only `ServiceMaintenanceHistoryService` with validated global and service-specific history, concrete empty provider defaults, identity enforcement, compatibility exports, and dedicated tests.
++- Immutable Service Lifecycle maintenance-history contracts: `MaintenanceAction`, `MaintenanceResult`, `MaintenanceRecord`, and `MaintenanceReport`, with normalized timestamps, deterministic ordering, aggregation, serialization, public exports, and dedicated tests.
++- Read-only `atlas service updates` CLI with human-readable and canonical JSON output backed by `ServiceUpdateService`.
++- Provider-independent `ServiceUpdateService` orchestration with validated single-service inspection, deterministic platform reports, identity enforcement, and provider error translation.
++- Permanent Atlas engineering tooling layout under `tools/` and a canonical engineering guide covering architecture, testing, documentation, cleanup, commit, and release standards.
++- Read-only Service Lifecycle provider update metadata through `inspect_update()`, with conservative local-only classification and correct digest-pinned image handling.
++- Immutable Service Lifecycle update-discovery contracts: `UpdateStatus`, `ImageReference`, `ServiceUpdate`, and `UpdateReport`, with normalization, validation, deterministic serialization, public exports, and dedicated tests.
+ - Read-only `atlas service doctor` diagnostics in human-readable and JSON formats.
+ - Canonical Service Doctor CLI contract shared with future API and Admin Portal integrations.
+ 
+@@ -48,6 +60,7 @@ All notable changes to Project Atlas are documented in this file.
+ 
+ #### Changed
+ 
++- Backward-compatible Service Lifecycle service-package refactor, moving lifecycle, Doctor, and Update Discovery implementations under `atlas.service_lifecycle.services` while preserving legacy imports.
+ - Adopted guarded full-file heredoc rewrites for future Project Atlas changes
+   after incremental text-patch installers proved too sensitive to normal code
+   evolution.
+diff --git a/atlas/service_lifecycle/__init__.py b/atlas/service_lifecycle/__init__.py
+index ba7ca5d6..97d6e5bf 100644
+--- a/atlas/service_lifecycle/__init__.py
++++ b/atlas/service_lifecycle/__init__.py
+@@ -5,6 +5,12 @@ contracts for discovering, inspecting, and safely managing Atlas-operated
+ infrastructure services.
+ """
+ 
++from .maintenance_models import (
++    MaintenanceAction,
++    MaintenanceRecord,
++    MaintenanceReport,
++    MaintenanceResult,
++)
+ from .models import (
+     ManagedService,
+     ServiceHealth,
+@@ -19,20 +25,39 @@ from .doctor_models import (
+     DoctorReport,
+     DoctorSeverity,
+ )
+-from .doctor import ServiceDoctor
++from .update_models import (
++    ImageReference,
++    ServiceUpdate,
++    UpdateReport,
++    UpdateStatus,
++)
++from .services import (
++    ServiceDoctor,
++    ServiceLifecycleService,
++    ServiceMaintenanceHistoryService,
++    ServiceUpdateService,
++)
+ from .provider import ServiceLifecycleProvider
+-from .service import ServiceLifecycleService
+ from .providers import (
+     DockerComposeProvider,
+     DockerComposeProviderError,
+ )
+ 
+ __all__ = [
++    "MaintenanceAction",
++    "MaintenanceRecord",
++    "MaintenanceReport",
++    "MaintenanceResult",
+     "DoctorCategory",
+     "DoctorFinding",
+     "DoctorReport",
+     "DoctorSeverity",
+     "ServiceDoctor",
++    "ImageReference",
++    "ServiceUpdate",
++    "ServiceUpdateService",
++    "UpdateReport",
++    "UpdateStatus",
+     "DockerComposeProvider",
+     "DockerComposeProviderError",
+     "ManagedService",
+@@ -42,5 +67,6 @@ __all__ = [
+     "ServiceLifecycleError",
+     "ServiceLifecycleProvider",
+     "ServiceLifecycleService",
++    "ServiceMaintenanceHistoryService",
+     "ServiceRuntime",
+ ]
+diff --git a/atlas/service_lifecycle/doctor.py b/atlas/service_lifecycle/doctor.py
+index a26fced6..3de366df 100644
+--- a/atlas/service_lifecycle/doctor.py
++++ b/atlas/service_lifecycle/doctor.py
+@@ -1,408 +1,14 @@
+-"""Read-only diagnostic evaluation for Atlas Service Lifecycle."""
++"""Compatibility alias for the Service Doctor implementation.
+ 
+-from __future__ import annotations
+-
+-from dataclasses import dataclass
+-from datetime import UTC, datetime
+-
+-from .doctor_models import (
+-    DoctorCategory,
+-    DoctorFinding,
+-    DoctorReport,
+-    DoctorSeverity,
+-)
+-from .models import (
+-    ManagedService,
+-    ServiceHealth,
+-    ServiceHealthStatus,
+-    ServiceLifecycleError,
+-    ServiceRuntime,
+-)
+-from .service import ServiceLifecycleService
+-
+-
+-_RESTART_WARNING_THRESHOLD = 5
+-_RESTART_ERROR_THRESHOLD = 10
+-_MISSING_HEALTH_STATES = {
+-    "none",
+-    "unknown",
+-    "unavailable",
+-    "starting",
+-}
+-_STOPPED_STATES = {
+-    "created",
+-    "dead",
+-    "exited",
+-    "failed",
+-    "paused",
+-    "removing",
+-    "stopped",
+-}
+-
+-
+-@dataclass(frozen=True)
+-class ServiceDoctor:
+-    """Evaluate explainable, read-only infrastructure diagnostics."""
+-
+-    lifecycle: ServiceLifecycleService
+-
+-    def __post_init__(self) -> None:
+-        if not isinstance(self.lifecycle, ServiceLifecycleService):
+-            raise ServiceLifecycleError(
+-                "lifecycle must be ServiceLifecycleService",
+-            )
+-
+-    def diagnose(self) -> DoctorReport:
+-        """Return one deterministic diagnostic report for managed services."""
+-
+-        services = self.lifecycle.list_services()
+-        evaluated_at = _utc_now()
+-        runtimes = {
+-            service.identifier: self.lifecycle.inspect_runtime(
+-                service.identifier,
+-            )
+-            for service in services
+-        }
+-        health = {
+-            service.identifier: self.lifecycle.inspect_health(
+-                service.identifier,
+-            )
+-            for service in services
+-        }
+-
+-        findings: list[DoctorFinding] = []
+-        by_identifier = {
+-            service.identifier: service
+-            for service in services
+-        }
+-
+-        for service in services:
+-            runtime = runtimes[service.identifier]
+-            service_health = health[service.identifier]
+-            findings.extend(
+-                self._evaluate_service(
+-                    service,
+-                    runtime,
+-                    service_health,
+-                    evaluated_at=evaluated_at,
+-                )
+-            )
+-            findings.extend(
+-                self._evaluate_dependencies(
+-                    service,
+-                    by_identifier,
+-                    runtimes,
+-                    evaluated_at=evaluated_at,
+-                )
+-            )
+-
+-        provider = _provider_name(services)
+-        return DoctorReport(
+-            findings=tuple(findings),
+-            provider=provider,
+-            evaluated_at=evaluated_at,
+-        )
+-
+-    def _evaluate_service(
+-        self,
+-        service: ManagedService,
+-        runtime: ServiceRuntime,
+-        health: ServiceHealth,
+-        *,
+-        evaluated_at: str,
+-    ) -> tuple[DoctorFinding, ...]:
+-        findings: list[DoctorFinding] = []
+-        state = runtime.state.casefold()
+-        runtime_health = runtime.health.casefold()
+-
+-        if service.enabled and state in _STOPPED_STATES:
+-            severity = (
+-                DoctorSeverity.CRITICAL
+-                if state in {"dead", "failed"}
+-                else DoctorSeverity.ERROR
+-            )
+-            findings.append(
+-                _finding(
+-                    service,
+-                    severity=severity,
+-                    category=DoctorCategory.RUNTIME,
+-                    code="runtime-stopped",
+-                    message=(
+-                        f"Enabled service {service.name} is not running "
+-                        f"(state: {state})."
+-                    ),
+-                    details={
+-                        "state": state,
+-                        "exit_code": runtime.exit_code,
+-                        "status_message": runtime.status_message,
+-                    },
+-                    created_at=evaluated_at,
+-                )
+-            )
+-
+-        if service.enabled and state == "restarting":
+-            findings.append(
+-                _finding(
+-                    service,
+-                    severity=DoctorSeverity.ERROR,
+-                    category=DoctorCategory.RUNTIME,
+-                    code="runtime-restarting",
+-                    message=(
+-                        f"Enabled service {service.name} is currently restarting."
+-                    ),
+-                    details={
+-                        "state": state,
+-                        "restart_count": runtime.restart_count,
+-                    },
+-                    created_at=evaluated_at,
+-                )
+-            )
+-
+-        if runtime.restart_count >= _RESTART_WARNING_THRESHOLD:
+-            severity = (
+-                DoctorSeverity.ERROR
+-                if runtime.restart_count >= _RESTART_ERROR_THRESHOLD
+-                else DoctorSeverity.WARNING
+-            )
+-            findings.append(
+-                _finding(
+-                    service,
+-                    severity=severity,
+-                    category=DoctorCategory.RUNTIME,
+-                    code="restart-loop",
+-                    message=(
+-                        f"Service {service.name} has restarted "
+-                        f"{runtime.restart_count} times."
+-                    ),
+-                    details={
+-                        "restart_count": runtime.restart_count,
+-                        "warning_threshold": _RESTART_WARNING_THRESHOLD,
+-                        "error_threshold": _RESTART_ERROR_THRESHOLD,
+-                    },
+-                    created_at=evaluated_at,
+-                )
+-            )
++The canonical implementation lives in
++:mod:`atlas.service_lifecycle.services.doctor`.
++"""
+ 
+-        if service.enabled and state == "running" and runtime_health in _MISSING_HEALTH_STATES:
+-            findings.append(
+-                _finding(
+-                    service,
+-                    severity=DoctorSeverity.WARNING,
+-                    category=DoctorCategory.OBSERVABILITY,
+-                    code="healthcheck-missing",
+-                    message=(
+-                        f"Running service {service.name} does not expose a "
+-                        "conclusive runtime health check."
+-                    ),
+-                    details={
+-                        "runtime_health": runtime_health,
+-                    },
+-                    created_at=evaluated_at,
+-                )
+-            )
+-
+-        missing_healthcheck_only = _is_missing_healthcheck_only(
+-            health,
+-            runtime_health=runtime_health,
+-        )
+-
+-        if (
+-            health.status is not ServiceHealthStatus.HEALTHY
+-            and not missing_healthcheck_only
+-        ):
+-            severity = _health_severity(health.status)
+-            findings.append(
+-                _finding(
+-                    service,
+-                    severity=severity,
+-                    category=DoctorCategory.HEALTH,
+-                    code="health-degraded",
+-                    message=(
+-                        f"Service {service.name} health is "
+-                        f"{health.status.value} (score: {health.score})."
+-                    ),
+-                    details={
+-                        "status": health.status.value,
+-                        "score": health.score,
+-                        "warnings": list(health.warnings),
+-                        "errors": list(health.errors),
+-                    },
+-                    created_at=evaluated_at,
+-                )
+-            )
+-        elif (health.warnings or health.errors) and not missing_healthcheck_only:
+-            findings.append(
+-                _finding(
+-                    service,
+-                    severity=(
+-                        DoctorSeverity.ERROR
+-                        if health.errors
+-                        else DoctorSeverity.WARNING
+-                    ),
+-                    category=DoctorCategory.HEALTH,
+-                    code="health-messages",
+-                    message=(
+-                        f"Service {service.name} reported health messages "
+-                        "that require review."
+-                    ),
+-                    details={
+-                        "warnings": list(health.warnings),
+-                        "errors": list(health.errors),
+-                    },
+-                    created_at=evaluated_at,
+-                )
+-            )
+-
+-        if not service.enabled and state in {"running", "restarting"}:
+-            findings.append(
+-                _finding(
+-                    service,
+-                    severity=DoctorSeverity.WARNING,
+-                    category=DoctorCategory.CONFIGURATION,
+-                    code="disabled-service-running",
+-                    message=(
+-                        f"Disabled service {service.name} is still {state}."
+-                    ),
+-                    details={
+-                        "enabled": service.enabled,
+-                        "state": state,
+-                    },
+-                    created_at=evaluated_at,
+-                )
+-            )
+-
+-        if service.enabled and runtime.image.tag == "latest":
+-            findings.append(
+-                _finding(
+-                    service,
+-                    severity=DoctorSeverity.INFO,
+-                    category=DoctorCategory.CONFIGURATION,
+-                    code="image-tag-latest",
+-                    message=(
+-                        f"Service {service.name} uses the mutable latest image tag."
+-                    ),
+-                    details={
+-                        "image": runtime.image.reference,
+-                        "tag": runtime.image.tag,
+-                    },
+-                    created_at=evaluated_at,
+-                )
+-            )
+-
+-        return tuple(findings)
+-
+-    def _evaluate_dependencies(
+-        self,
+-        service: ManagedService,
+-        services: dict[str, ManagedService],
+-        runtimes: dict[str, ServiceRuntime],
+-        *,
+-        evaluated_at: str,
+-    ) -> tuple[DoctorFinding, ...]:
+-        findings: list[DoctorFinding] = []
+-
+-        for dependency_identifier in service.dependencies:
+-            dependency = services.get(dependency_identifier)
+-            if dependency is None:
+-                findings.append(
+-                    _finding(
+-                        service,
+-                        severity=DoctorSeverity.ERROR,
+-                        category=DoctorCategory.DEPENDENCY,
+-                        code=f"dependency-missing-{dependency_identifier}",
+-                        message=(
+-                            f"Service {service.name} declares unknown dependency "
+-                            f"{dependency_identifier}."
+-                        ),
+-                        details={
+-                            "dependency": dependency_identifier,
+-                        },
+-                        created_at=evaluated_at,
+-                    )
+-                )
+-                continue
+-
+-            dependency_runtime = runtimes[dependency.identifier]
+-            if service.enabled and dependency_runtime.state.casefold() != "running":
+-                findings.append(
+-                    _finding(
+-                        service,
+-                        severity=DoctorSeverity.ERROR,
+-                        category=DoctorCategory.DEPENDENCY,
+-                        code=f"dependency-not-running-{dependency.identifier}",
+-                        message=(
+-                            f"Service {service.name} depends on "
+-                            f"{dependency.name}, which is not running."
+-                        ),
+-                        details={
+-                            "dependency": dependency.identifier,
+-                            "dependency_state": dependency_runtime.state,
+-                        },
+-                        created_at=evaluated_at,
+-                    )
+-                )
+-
+-        return tuple(findings)
+-
+-
+-def _finding(
+-    service: ManagedService,
+-    *,
+-    severity: DoctorSeverity,
+-    category: DoctorCategory,
+-    code: str,
+-    message: str,
+-    details: dict[str, object],
+-    created_at: str,
+-) -> DoctorFinding:
+-    return DoctorFinding(
+-        identifier=f"{service.identifier}.{code}",
+-        severity=severity,
+-        category=category,
+-        code=code,
+-        message=message,
+-        service_identifier=service.identifier,
+-        details=details,
+-        created_at=created_at,
+-    )
+-
+-
+-def _is_missing_healthcheck_only(
+-    health: ServiceHealth,
+-    *,
+-    runtime_health: str,
+-) -> bool:
+-    """Return whether health degradation only reflects absent observability."""
+-
+-    if runtime_health not in _MISSING_HEALTH_STATES:
+-        return False
+-    if health.errors:
+-        return False
+-    if not health.warnings:
+-        return False
+-
+-    normalized = {warning.strip().casefold() for warning in health.warnings}
+-    return normalized == {"no docker health check is configured"}
+-
+-
+-def _health_severity(status: ServiceHealthStatus) -> DoctorSeverity:
+-    if status is ServiceHealthStatus.UNAVAILABLE:
+-        return DoctorSeverity.CRITICAL
+-    if status is ServiceHealthStatus.UNHEALTHY:
+-        return DoctorSeverity.ERROR
+-    if status is ServiceHealthStatus.DEGRADED:
+-        return DoctorSeverity.WARNING
+-    return DoctorSeverity.INFO
++from __future__ import annotations
+ 
++import sys
+ 
+-def _provider_name(services: tuple[ManagedService, ...]) -> str:
+-    providers = sorted({service.provider for service in services})
+-    if not providers:
+-        return "unknown"
+-    if len(providers) == 1:
+-        return providers[0]
+-    return "mixed"
++from .services import doctor as _canonical_module
+ 
+ 
+-def _utc_now() -> str:
+-    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
++sys.modules[__name__] = _canonical_module
+diff --git a/atlas/service_lifecycle/provider.py b/atlas/service_lifecycle/provider.py
+index 63ed8eee..321e95e1 100644
+--- a/atlas/service_lifecycle/provider.py
++++ b/atlas/service_lifecycle/provider.py
+@@ -5,11 +5,9 @@ from __future__ import annotations
+ from abc import ABC, abstractmethod
+ from collections.abc import Sequence
+ 
+-from .models import (
+-    ManagedService,
+-    ServiceHealth,
+-    ServiceRuntime,
+-)
++from .models import ManagedService, ServiceHealth, ServiceRuntime
++from .update_models import ServiceUpdate
++from .maintenance_models import MaintenanceReport
+ 
+ 
+ class ServiceLifecycleProvider(ABC):
+@@ -20,22 +18,44 @@ class ServiceLifecycleProvider(ABC):
+         """Return all Atlas-managed services known to the provider."""
+ 
+     @abstractmethod
+-    def inspect_service(
+-        self,
+-        identifier: str,
+-    ) -> ManagedService:
++    def inspect_service(self, identifier: str) -> ManagedService:
+         """Return normalized identity information for one service."""
+ 
+     @abstractmethod
+-    def inspect_runtime(
+-        self,
+-        identifier: str,
+-    ) -> ServiceRuntime:
++    def inspect_runtime(self, identifier: str) -> ServiceRuntime:
+         """Return normalized runtime state for one service."""
+ 
+     @abstractmethod
+-    def inspect_health(
++    def inspect_health(self, identifier: str) -> ServiceHealth:
++        """Return normalized health information for one service."""
++
++    @abstractmethod
++    def inspect_update(self, identifier: str) -> ServiceUpdate:
++        """Return locally verifiable read-only update metadata."""
++
++    def inspect_history(self) -> MaintenanceReport:
++        """Return read-only maintenance history for all services.
++
++        Providers without persistence return a valid empty report.
++        """
++
++        return MaintenanceReport(
++            records=(),
++            provider="unknown",
++        )
++
++    def inspect_service_history(
+         self,
+         identifier: str,
+-    ) -> ServiceHealth:
+-        """Return normalized health information for one service."""
++    ) -> MaintenanceReport:
++        """Return read-only maintenance history for one service.
++
++        Providers without persistence validate service identity and
++        return a valid empty report.
++        """
++
++        service = self.inspect_service(identifier)
++        return MaintenanceReport(
++            records=(),
++            provider=service.provider,
++        )
+diff --git a/atlas/service_lifecycle/providers/docker_compose.py b/atlas/service_lifecycle/providers/docker_compose.py
+index 1fff82ca..059e0cc7 100644
+--- a/atlas/service_lifecycle/providers/docker_compose.py
++++ b/atlas/service_lifecycle/providers/docker_compose.py
+@@ -18,6 +18,11 @@ from atlas.service_lifecycle.models import (
+     ServiceRuntime,
+ )
+ from atlas.service_lifecycle.provider import ServiceLifecycleProvider
++from atlas.service_lifecycle.update_models import (
++    ImageReference,
++    ServiceUpdate,
++    UpdateStatus,
++)
+ 
+ 
+ class DockerComposeProviderError(ServiceLifecycleError):
+@@ -233,6 +238,44 @@ class DockerComposeProvider(ServiceLifecycleProvider):
+             service_identifier=normalized_identifier,
+         )
+ 
++    def inspect_update(
++        self,
++        identifier: str,
++    ) -> ServiceUpdate:
++        """Return locally verifiable image update metadata."""
++
++        service = self.inspect_service(identifier)
++        runtime = self.inspect_runtime(service.identifier)
++        current_image = _update_image_from_runtime(runtime)
++
++        if current_image.is_mutable:
++            status = UpdateStatus.MUTABLE_TAG
++            reason = (
++                "The configured image uses the mutable latest tag; "
++                "registry comparison has not been performed."
++            )
++        else:
++            status = UpdateStatus.UNKNOWN
++            reason = (
++                "The local image identity is known, but no registry "
++                "comparison has been performed."
++            )
++
++        return ServiceUpdate(
++            service_identifier=service.identifier,
++            service_name=service.name,
++            current_image=current_image,
++            status=status,
++            reason=reason,
++            details={
++                "source": "local-docker",
++                "registry_comparison": False,
++                "configured_reference": runtime.image.reference,
++                "local_image_id": runtime.image.image_id,
++                "local_image_created_at": runtime.image.created_at,
++            },
++        )
++
+     def _resolve_container_identifier(
+         self,
+         service: ManagedService,
+@@ -586,6 +629,40 @@ def _health_from_runtime(
+         ) from exc
+ 
+ 
++def _update_image_from_runtime(
++    runtime: ServiceRuntime,
++) -> ImageReference:
++    """Convert normalized runtime image identity to update identity."""
++
++    if not isinstance(runtime, ServiceRuntime):
++        raise DockerComposeProviderError(
++            "runtime must be a ServiceRuntime",
++        )
++
++    image = runtime.image
++    if image.repository is None:
++        try:
++            return ImageReference.parse(image.reference)
++        except ServiceLifecycleError as exc:
++            raise DockerComposeProviderError(
++                "Docker runtime image reference is invalid: "
++                f"{exc}",
++            ) from exc
++
++    try:
++        return ImageReference(
++            repository=image.repository,
++            tag=image.tag,
++            digest=image.digest,
++            raw_reference=image.reference,
++        )
++    except ServiceLifecycleError as exc:
++        raise DockerComposeProviderError(
++            "Docker runtime image identity is invalid: "
++            f"{exc}",
++        ) from exc
++
++
+ def _normalize_runtime_payload(
+     payload: object,
+     *,
+diff --git a/atlas/service_lifecycle/service.py b/atlas/service_lifecycle/service.py
+index c3b07d32..e9351b1c 100644
+--- a/atlas/service_lifecycle/service.py
++++ b/atlas/service_lifecycle/service.py
+@@ -1,807 +1,18 @@
+-"""Provider-independent orchestration for Atlas Service Lifecycle."""
++"""Compatibility alias for Service Lifecycle orchestration.
+ 
+-from __future__ import annotations
+-
+-from collections.abc import Sequence
+-from dataclasses import dataclass
+-from datetime import UTC, datetime
+-
+-from .models import (
+-    ManagedService,
+-    ServiceHealth,
+-    ServiceLifecycleError,
+-    ServiceRuntime,
+-)
+-from .provider import ServiceLifecycleProvider
+-
+-
+-@dataclass(frozen=True)
+-class ServiceHealthEntry:
+-    """Pair one managed-service identity with its health evaluation."""
+-
+-    service: ManagedService
+-    health: ServiceHealth
+-
+-    def __post_init__(self) -> None:
+-        if not isinstance(self.service, ManagedService):
+-            raise ServiceLifecycleError(
+-                "aggregate health entries require ManagedService identities",
+-            )
+-        if not isinstance(self.health, ServiceHealth):
+-            raise ServiceLifecycleError(
+-                "aggregate health entries require ServiceHealth evaluations",
+-            )
+-
+-    @property
+-    def requires_attention(self) -> bool:
+-        return (
+-            self.health.action_required
+-            or bool(self.health.warnings)
+-            or bool(self.health.errors)
+-            or self.health.status.value != "healthy"
+-        )
+-
+-    def to_dict(self) -> dict[str, object]:
+-        return {
+-            "service": self.service.to_dict(),
+-            "health": self.health.to_dict(),
+-            "requires_attention": self.requires_attention,
+-        }
+-
+-
+-@dataclass(frozen=True)
+-class InfrastructureHealthReport:
+-    """Normalized aggregate health for all Atlas-managed services."""
+-
+-    entries: tuple[ServiceHealthEntry, ...]
+-    score: int
+-    status: str
+-    evaluated_at: str
+-
+-    def __post_init__(self) -> None:
+-        if not isinstance(self.entries, tuple) or any(
+-            not isinstance(entry, ServiceHealthEntry)
+-            for entry in self.entries
+-        ):
+-            raise ServiceLifecycleError(
+-                "aggregate health entries must be a tuple of ServiceHealthEntry",
+-            )
+-        if not isinstance(self.score, int) or isinstance(self.score, bool):
+-            raise ServiceLifecycleError(
+-                "aggregate health score must be an integer",
+-            )
+-        if not 0 <= self.score <= 100:
+-            raise ServiceLifecycleError(
+-                "aggregate health score must be between 0 and 100",
+-            )
+-        if self.status not in {
+-            "healthy",
+-            "degraded",
+-            "unhealthy",
+-            "unknown",
+-        }:
+-            raise ServiceLifecycleError(
+-                "aggregate health status is invalid",
+-            )
+-        if not isinstance(self.evaluated_at, str) or not self.evaluated_at:
+-            raise ServiceLifecycleError(
+-                "aggregate health evaluated_at must be non-empty text",
+-            )
+-
+-    @property
+-    def counts(self) -> dict[str, int]:
+-        counts = {
+-            "healthy": 0,
+-            "degraded": 0,
+-            "unhealthy": 0,
+-            "unknown": 0,
+-        }
+-        for entry in self.entries:
+-            counts[entry.health.status.value] += 1
+-        return counts
+-
+-    @property
+-    def attention(self) -> tuple[ServiceHealthEntry, ...]:
+-        return tuple(
+-            entry
+-            for entry in self.entries
+-            if entry.requires_attention
+-        )
+-
+-    @property
+-    def warnings(self) -> tuple[str, ...]:
+-        return tuple(
+-            f"{entry.service.identifier}: {warning}"
+-            for entry in self.entries
+-            for warning in entry.health.warnings
+-        )
+-
+-    @property
+-    def errors(self) -> tuple[str, ...]:
+-        return tuple(
+-            f"{entry.service.identifier}: {error}"
+-            for entry in self.entries
+-            for error in entry.health.errors
+-        )
+-
+-    def to_dict(self) -> dict[str, object]:
+-        return {
+-            "status": self.status,
+-            "score": self.score,
+-            "total_services": len(self.entries),
+-            "counts": self.counts,
+-            "attention_required": [
+-                entry.to_dict()
+-                for entry in self.attention
+-            ],
+-            "warnings": list(self.warnings),
+-            "errors": list(self.errors),
+-            "services": [
+-                entry.to_dict()
+-                for entry in self.entries
+-            ],
+-            "evaluated_at": self.evaluated_at,
+-        }
+-
+-
+-@dataclass(frozen=True)
+-class ServiceRuntimeEntry:
+-    """Pair one managed-service identity with its runtime inspection."""
+-
+-    service: ManagedService
+-    runtime: ServiceRuntime
+-
+-    def __post_init__(self) -> None:
+-        if not isinstance(self.service, ManagedService):
+-            raise ServiceLifecycleError(
+-                "infrastructure summary entries require ManagedService identities",
+-            )
+-        if not isinstance(self.runtime, ServiceRuntime):
+-            raise ServiceLifecycleError(
+-                "infrastructure summary entries require ServiceRuntime inspections",
+-            )
+-
+-    @property
+-    def category(self) -> str:
+-        state = self.runtime.state.casefold()
+-
+-        if state == "running":
+-            return "running"
+-        if state == "restarting":
+-            return "restarting"
+-        if state in {"dead", "failed"}:
+-            return "failed"
+-        if (
+-            self.runtime.exit_code not in {None, 0}
+-            and state not in {"running", "restarting"}
+-        ):
+-            return "failed"
+-        if state in {"created", "exited", "paused", "removing", "stopped"}:
+-            return "stopped"
+-        return "unknown"
+-
+-    def to_dict(self) -> dict[str, object]:
+-        return {
+-            "service": self.service.to_dict(),
+-            "runtime": self.runtime.to_dict(),
+-            "category": self.category,
+-        }
+-
+-
+-@dataclass(frozen=True)
+-class InfrastructureSummary:
+-    """Normalized operational summary for Atlas-managed infrastructure."""
+-
+-    runtime_entries: tuple[ServiceRuntimeEntry, ...]
+-    health: InfrastructureHealthReport
+-    evaluated_at: str
+-
+-    def __post_init__(self) -> None:
+-        if not isinstance(self.runtime_entries, tuple) or any(
+-            not isinstance(entry, ServiceRuntimeEntry)
+-            for entry in self.runtime_entries
+-        ):
+-            raise ServiceLifecycleError(
+-                "infrastructure runtime entries must be a tuple of ServiceRuntimeEntry",
+-            )
+-        if not isinstance(self.health, InfrastructureHealthReport):
+-            raise ServiceLifecycleError(
+-                "infrastructure summary health must be InfrastructureHealthReport",
+-            )
+-        if not isinstance(self.evaluated_at, str) or not self.evaluated_at:
+-            raise ServiceLifecycleError(
+-                "infrastructure summary evaluated_at must be non-empty text",
+-            )
+-
+-        runtime_ids = tuple(
+-            entry.service.identifier
+-            for entry in self.runtime_entries
+-        )
+-        health_ids = tuple(
+-            entry.service.identifier
+-            for entry in self.health.entries
+-        )
+-        if runtime_ids != health_ids:
+-            raise ServiceLifecycleError(
+-                "infrastructure summary runtime and health identities must match",
+-            )
+-
+-    @property
+-    def services(self) -> tuple[ManagedService, ...]:
+-        return tuple(entry.service for entry in self.runtime_entries)
+-
+-    @property
+-    def provider(self) -> str:
+-        values = sorted({service.provider for service in self.services})
+-        if not values:
+-            return "unknown"
+-        if len(values) == 1:
+-            return values[0]
+-        return "mixed"
+-
+-    @property
+-    def compose_project(self) -> str | None:
+-        values = sorted(
+-            {
+-                service.compose_project
+-                for service in self.services
+-                if service.compose_project is not None
+-            }
+-        )
+-        if not values:
+-            return None
+-        if len(values) == 1:
+-            return values[0]
+-        return "mixed"
+-
+-    @property
+-    def enabled_counts(self) -> dict[str, int]:
+-        enabled = sum(1 for service in self.services if service.enabled)
+-        return {
+-            "enabled": enabled,
+-            "disabled": len(self.services) - enabled,
+-        }
+-
+-    @property
+-    def runtime_counts(self) -> dict[str, int]:
+-        counts = {
+-            "running": 0,
+-            "stopped": 0,
+-            "restarting": 0,
+-            "failed": 0,
+-            "unknown": 0,
+-        }
+-        for entry in self.runtime_entries:
+-            counts[entry.category] += 1
+-        return counts
+-
+-    def to_dict(self) -> dict[str, object]:
+-        return {
+-            "provider": self.provider,
+-            "compose_project": self.compose_project,
+-            "total_services": len(self.services),
+-            "service_counts": self.enabled_counts,
+-            "runtime_counts": self.runtime_counts,
+-            "health_counts": self.health.counts,
+-            "score": self.health.score,
+-            "status": self.health.status,
+-            "attention_required": [
+-                entry.to_dict()
+-                for entry in self.health.attention
+-            ],
+-            "services": [
+-                entry.to_dict()
+-                for entry in self.runtime_entries
+-            ],
+-            "evaluated_at": self.evaluated_at,
+-        }
+-
+-
+-@dataclass(frozen=True)
+-class ServiceDependencyNode:
+-    """Normalized dependency relationships for one managed service."""
+-
+-    service: ManagedService
+-    dependencies: tuple[ManagedService, ...] = ()
+-    dependents: tuple[ManagedService, ...] = ()
+-    unresolved_dependencies: tuple[str, ...] = ()
+-
+-    def __post_init__(self) -> None:
+-        if not isinstance(self.service, ManagedService):
+-            raise ServiceLifecycleError(
+-                "dependency graph nodes require ManagedService identities",
+-            )
+-        if not isinstance(self.dependencies, tuple) or any(
+-            not isinstance(item, ManagedService)
+-            for item in self.dependencies
+-        ):
+-            raise ServiceLifecycleError(
+-                "dependency graph dependencies must be a tuple of ManagedService",
+-            )
+-        if not isinstance(self.dependents, tuple) or any(
+-            not isinstance(item, ManagedService)
+-            for item in self.dependents
+-        ):
+-            raise ServiceLifecycleError(
+-                "dependency graph dependents must be a tuple of ManagedService",
+-            )
+-        if not isinstance(self.unresolved_dependencies, tuple) or any(
+-            not isinstance(item, str) or not item
+-            for item in self.unresolved_dependencies
+-        ):
+-            raise ServiceLifecycleError(
+-                "unresolved dependencies must be a tuple of identifiers",
+-            )
+-
+-        dependency_ids = tuple(item.identifier for item in self.dependencies)
+-        dependent_ids = tuple(item.identifier for item in self.dependents)
+-
+-        if len(dependency_ids) != len(set(dependency_ids)):
+-            raise ServiceLifecycleError(
+-                "dependency graph node contains duplicate dependencies",
+-            )
+-        if len(dependent_ids) != len(set(dependent_ids)):
+-            raise ServiceLifecycleError(
+-                "dependency graph node contains duplicate dependents",
+-            )
+-        if len(self.unresolved_dependencies) != len(
+-            set(self.unresolved_dependencies)
+-        ):
+-            raise ServiceLifecycleError(
+-                "dependency graph node contains duplicate unresolved dependencies",
+-            )
+-        if self.service.identifier in {
+-            *dependency_ids,
+-            *dependent_ids,
+-            *self.unresolved_dependencies,
+-        }:
+-            raise ServiceLifecycleError(
+-                "dependency graph nodes cannot reference themselves",
+-            )
+-
+-    @property
+-    def connected(self) -> bool:
+-        return bool(
+-            self.dependencies
+-            or self.dependents
+-            or self.unresolved_dependencies
+-        )
+-
+-    def to_dict(self) -> dict[str, object]:
+-        return {
+-            "service": self.service.to_dict(),
+-            "dependencies": [
+-                item.to_dict()
+-                for item in self.dependencies
+-            ],
+-            "dependents": [
+-                item.to_dict()
+-                for item in self.dependents
+-            ],
+-            "unresolved_dependencies": list(self.unresolved_dependencies),
+-            "connected": self.connected,
+-        }
+-
+-
+-@dataclass(frozen=True)
+-class InfrastructureDependencyGraph:
+-    """Normalized dependency graph for all Atlas-managed services."""
+-
+-    nodes: tuple[ServiceDependencyNode, ...]
+-    evaluated_at: str
+-
+-    def __post_init__(self) -> None:
+-        if not isinstance(self.nodes, tuple) or any(
+-            not isinstance(node, ServiceDependencyNode)
+-            for node in self.nodes
+-        ):
+-            raise ServiceLifecycleError(
+-                "infrastructure graph nodes must be ServiceDependencyNode objects",
+-            )
+-        if not isinstance(self.evaluated_at, str) or not self.evaluated_at:
+-            raise ServiceLifecycleError(
+-                "infrastructure graph evaluated_at must be non-empty text",
+-            )
+-
+-        identifiers = tuple(node.service.identifier for node in self.nodes)
+-        if len(identifiers) != len(set(identifiers)):
+-            raise ServiceLifecycleError(
+-                "infrastructure graph contains duplicate service identifiers",
+-            )
+-
+-        known = set(identifiers)
+-        for node in self.nodes:
+-            for dependency in node.dependencies:
+-                if dependency.identifier not in known:
+-                    raise ServiceLifecycleError(
+-                        "resolved graph dependency is not a graph service",
+-                    )
+-            for dependent in node.dependents:
+-                if dependent.identifier not in known:
+-                    raise ServiceLifecycleError(
+-                        "resolved graph dependent is not a graph service",
+-                    )
+-            if known.intersection(node.unresolved_dependencies):
+-                raise ServiceLifecycleError(
+-                    "unresolved graph dependencies must not reference known services",
+-                )
+-
+-    @property
+-    def services(self) -> tuple[ManagedService, ...]:
+-        return tuple(node.service for node in self.nodes)
+-
+-    @property
+-    def provider(self) -> str:
+-        values = sorted({service.provider for service in self.services})
+-        if not values:
+-            return "unknown"
+-        if len(values) == 1:
+-            return values[0]
+-        return "mixed"
++The canonical implementation lives in
++:mod:`atlas.service_lifecycle.services.lifecycle`.
+ 
+-    @property
+-    def compose_project(self) -> str | None:
+-        values = sorted(
+-            {
+-                service.compose_project
+-                for service in self.services
+-                if service.compose_project is not None
+-            }
+-        )
+-        if not values:
+-            return None
+-        if len(values) == 1:
+-            return values[0]
+-        return "mixed"
+-
+-    @property
+-    def roots(self) -> tuple[ServiceDependencyNode, ...]:
+-        return tuple(node for node in self.nodes if node.dependents)
+-
+-    @property
+-    def standalone(self) -> tuple[ServiceDependencyNode, ...]:
+-        return tuple(node for node in self.nodes if not node.connected)
+-
+-    @property
+-    def unresolved(self) -> tuple[ServiceDependencyNode, ...]:
+-        return tuple(
+-            node
+-            for node in self.nodes
+-            if node.unresolved_dependencies
+-        )
+-
+-    @property
+-    def edge_count(self) -> int:
+-        return sum(len(node.dependencies) for node in self.nodes)
+-
+-    def node(self, identifier: str) -> ServiceDependencyNode:
+-        normalized = _normalize_identifier(identifier)
+-        for node in self.nodes:
+-            if node.service.identifier == normalized:
+-                return node
+-        raise ServiceLifecycleError(
+-            f"service is not present in dependency graph: {normalized}",
+-        )
+-
+-    def to_dict(self) -> dict[str, object]:
+-        return {
+-            "provider": self.provider,
+-            "compose_project": self.compose_project,
+-            "total_services": len(self.nodes),
+-            "total_edges": self.edge_count,
+-            "roots": [node.to_dict() for node in self.roots],
+-            "standalone": [
+-                node.service.to_dict()
+-                for node in self.standalone
+-            ],
+-            "unresolved": [node.to_dict() for node in self.unresolved],
+-            "nodes": [node.to_dict() for node in self.nodes],
+-            "evaluated_at": self.evaluated_at,
+-        }
+-
+-
+-@dataclass(frozen=True)
+-class ServiceLifecycleService:
+-    """Validate and orchestrate read-only service-lifecycle operations."""
+-
+-    provider: ServiceLifecycleProvider
+-
+-    def __post_init__(self) -> None:
+-        if not isinstance(
+-            self.provider,
+-            ServiceLifecycleProvider,
+-        ):
+-            raise ServiceLifecycleError(
+-                "provider must implement ServiceLifecycleProvider",
+-            )
+-
+-    def list_services(self) -> tuple[ManagedService, ...]:
+-        """Return validated services in deterministic order."""
+-
+-        try:
+-            services = self.provider.list_services()
+-        except ServiceLifecycleError:
+-            raise
+-        except Exception as exc:
+-            raise ServiceLifecycleError(
+-                "service provider failed to list services",
+-            ) from exc
+-
+-        if (
+-            isinstance(services, (str, bytes))
+-            or not isinstance(services, Sequence)
+-        ):
+-            raise ServiceLifecycleError(
+-                "provider services must be a collection",
+-            )
+-
+-        normalized: list[ManagedService] = []
+-        identifiers: set[str] = set()
+-
+-        for service in services:
+-            if not isinstance(service, ManagedService):
+-                raise ServiceLifecycleError(
+-                    "provider services must contain ManagedService objects",
+-                )
+-
+-            if service.identifier in identifiers:
+-                raise ServiceLifecycleError(
+-                    "provider returned duplicate service identifier: "
+-                    f"{service.identifier}",
+-                )
+-
+-            identifiers.add(service.identifier)
+-            normalized.append(service)
+-
+-        return tuple(
+-            sorted(
+-                normalized,
+-                key=lambda service: (
+-                    service.name.casefold(),
+-                    service.identifier,
+-                ),
+-            )
+-        )
+-
+-    def inspect_service(
+-        self,
+-        identifier: str,
+-    ) -> ManagedService:
+-        """Return one validated managed-service identity."""
+-
+-        normalized_identifier = _normalize_identifier(
+-            identifier,
+-        )
+-
+-        try:
+-            service = self.provider.inspect_service(
+-                normalized_identifier,
+-            )
+-        except ServiceLifecycleError:
+-            raise
+-        except Exception as exc:
+-            raise ServiceLifecycleError(
+-                "service provider failed to inspect service: "
+-                f"{normalized_identifier}",
+-            ) from exc
+-
+-        if not isinstance(service, ManagedService):
+-            raise ServiceLifecycleError(
+-                "provider service inspection must return ManagedService",
+-            )
+-
+-        if service.identifier != normalized_identifier:
+-            raise ServiceLifecycleError(
+-                "provider returned mismatched service identifier: "
+-                f"expected {normalized_identifier}, "
+-                f"received {service.identifier}",
+-            )
+-
+-        return service
+-
+-    def inspect_runtime(
+-        self,
+-        identifier: str,
+-    ) -> ServiceRuntime:
+-        """Return one validated service runtime."""
+-
+-        normalized_identifier = _normalize_identifier(
+-            identifier,
+-        )
+-
+-        try:
+-            runtime = self.provider.inspect_runtime(
+-                normalized_identifier,
+-            )
+-        except ServiceLifecycleError:
+-            raise
+-        except Exception as exc:
+-            raise ServiceLifecycleError(
+-                "service provider failed to inspect runtime: "
+-                f"{normalized_identifier}",
+-            ) from exc
+-
+-        if not isinstance(runtime, ServiceRuntime):
+-            raise ServiceLifecycleError(
+-                "provider runtime inspection must return ServiceRuntime",
+-            )
+-
+-        return runtime
+-
+-    def inspect_health(
+-        self,
+-        identifier: str,
+-    ) -> ServiceHealth:
+-        """Return one validated service-health evaluation."""
+-
+-        normalized_identifier = _normalize_identifier(
+-            identifier,
+-        )
+-
+-        try:
+-            health = self.provider.inspect_health(
+-                normalized_identifier,
+-            )
+-        except ServiceLifecycleError:
+-            raise
+-        except Exception as exc:
+-            raise ServiceLifecycleError(
+-                "service provider failed to inspect health: "
+-                f"{normalized_identifier}",
+-            ) from exc
+-
+-        if not isinstance(health, ServiceHealth):
+-            raise ServiceLifecycleError(
+-                "provider health inspection must return ServiceHealth",
+-            )
+-
+-        return health
+-
+-    def inspect_health_report(self) -> InfrastructureHealthReport:
+-        """Return aggregate health for all configured managed services."""
+-
+-        services = self.list_services()
+-        return self._build_health_report(
+-            services,
+-            evaluated_at=_utc_now(),
+-        )
+-
+-    def inspect_summary(self) -> InfrastructureSummary:
+-        """Return one normalized infrastructure summary."""
+-
+-        services = self.list_services()
+-        evaluated_at = _utc_now()
+-        runtime_entries = tuple(
+-            ServiceRuntimeEntry(
+-                service=managed_service,
+-                runtime=self.inspect_runtime(managed_service.identifier),
+-            )
+-            for managed_service in services
+-        )
+-        health = self._build_health_report(
+-            services,
+-            evaluated_at=evaluated_at,
+-        )
+-
+-        return InfrastructureSummary(
+-            runtime_entries=runtime_entries,
+-            health=health,
+-            evaluated_at=evaluated_at,
+-        )
+-
+-    def inspect_graph(self) -> InfrastructureDependencyGraph:
+-        """Return the normalized managed-service dependency graph."""
+-
+-        services = self.list_services()
+-        by_identifier = {service.identifier: service for service in services}
+-        dependents: dict[str, list[ManagedService]] = {
+-            service.identifier: []
+-            for service in services
+-        }
+-
+-        for managed_service in services:
+-            for dependency_identifier in managed_service.dependencies:
+-                dependency = by_identifier.get(dependency_identifier)
+-                if dependency is not None:
+-                    dependents[dependency.identifier].append(managed_service)
+-
+-        nodes = tuple(
+-            ServiceDependencyNode(
+-                service=managed_service,
+-                dependencies=tuple(
+-                    by_identifier[dependency_identifier]
+-                    for dependency_identifier in managed_service.dependencies
+-                    if dependency_identifier in by_identifier
+-                ),
+-                dependents=tuple(
+-                    sorted(
+-                        dependents[managed_service.identifier],
+-                        key=lambda service: (
+-                            service.name.casefold(),
+-                            service.identifier,
+-                        ),
+-                    )
+-                ),
+-                unresolved_dependencies=tuple(
+-                    dependency_identifier
+-                    for dependency_identifier in managed_service.dependencies
+-                    if dependency_identifier not in by_identifier
+-                ),
+-            )
+-            for managed_service in services
+-        )
+-
+-        return InfrastructureDependencyGraph(
+-            nodes=nodes,
+-            evaluated_at=_utc_now(),
+-        )
+-
+-
+-    def _build_health_report(
+-        self,
+-        services: tuple[ManagedService, ...],
+-        *,
+-        evaluated_at: str,
+-    ) -> InfrastructureHealthReport:
+-        entries = tuple(
+-            ServiceHealthEntry(
+-                service=managed_service,
+-                health=self.inspect_health(managed_service.identifier),
+-            )
+-            for managed_service in services
+-        )
+-        score = (
+-            sum(entry.health.score for entry in entries) // len(entries)
+-            if entries
+-            else 0
+-        )
+-
+-        return InfrastructureHealthReport(
+-            entries=entries,
+-            score=score,
+-            status=_aggregate_status(entries, score),
+-            evaluated_at=evaluated_at,
+-        )
+-
+-
+-def _aggregate_status(
+-    entries: tuple[ServiceHealthEntry, ...],
+-    score: int,
+-) -> str:
+-    if not entries:
+-        return "unknown"
+-    if any(entry.health.errors for entry in entries):
+-        return "unhealthy"
+-    if score >= 90:
+-        return "healthy"
+-    if score >= 70:
+-        return "degraded"
+-    return "unhealthy"
+-
+-
+-def _utc_now() -> str:
+-    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
++This legacy module path resolves to the canonical module object so imports,
++private test hooks, monkeypatch targets, and module-level state remain fully
++compatible during the incremental package migration.
++"""
+ 
++from __future__ import annotations
+ 
+-def _normalize_identifier(
+-    value: object,
+-) -> str:
+-    if not isinstance(value, str) or not value.strip():
+-        raise ServiceLifecycleError(
+-            "service identifier must be non-empty text",
+-        )
++import sys
+ 
+-    normalized = value.strip().casefold()
++from .services import lifecycle as _canonical_module
+ 
+-    try:
+-        probe = ManagedService(
+-            identifier=normalized,
+-            name="Service",
+-            provider="service-lifecycle",
+-        )
+-    except ServiceLifecycleError as exc:
+-        raise ServiceLifecycleError(
+-            f"invalid service identifier: {normalized}: {exc}",
+-        ) from exc
+ 
+-    return probe.identifier
++sys.modules[__name__] = _canonical_module
+diff --git a/atlas/service_lifecycle_cli.py b/atlas/service_lifecycle_cli.py
+index 5913fb6e..fc23dc22 100644
+--- a/atlas/service_lifecycle_cli.py
++++ b/atlas/service_lifecycle_cli.py
+@@ -20,6 +20,10 @@ from atlas.service_lifecycle import (
+     ServiceLifecycleService,
+     ServiceDoctor,
+     ServiceRuntime,
++    ServiceUpdateService,
++    UpdateReport,
++    MaintenanceReport,
++    ServiceMaintenanceHistoryService,
+ )
+ from atlas.service_lifecycle.service import (
+     InfrastructureDependencyGraph,
+@@ -132,6 +136,33 @@ def build_parser() -> argparse.ArgumentParser:
+         help="Render machine-readable JSON.",
+     )
+ 
++    updates_parser = subparsers.add_parser(
++        "updates",
++        help="Show read-only service image update metadata.",
++    )
++    updates_parser.add_argument(
++        "--json",
++        action="store_true",
++        dest="as_json",
++        help="Render machine-readable JSON.",
++    )
++
++    history_parser = subparsers.add_parser(
++        "history",
++        help="Show read-only service maintenance history.",
++    )
++    history_parser.add_argument(
++        "identifier",
++        nargs="?",
++        help="Optional managed-service identifier.",
++    )
++    history_parser.add_argument(
++        "--json",
++        action="store_true",
++        dest="as_json",
++        help="Render machine-readable JSON.",
++    )
++
+     return parser
+ 
+ 
+@@ -759,6 +790,196 @@ def _command_doctor(
+     return 0
+ 
+ 
++
++
++def _render_updates_json(
++    report: UpdateReport,
++    *,
++    output: TextIO,
++) -> None:
++    json.dump(
++        report.to_dict(),
++        output,
++        indent=2,
++        sort_keys=True,
++    )
++    output.write("\n")
++
++
++def _render_updates_human(
++    report: UpdateReport,
++    *,
++    output: TextIO,
++) -> None:
++    counts = report.counts
++
++    output.write("Atlas Service Updates\n")
++    output.write("=====================\n\n")
++    output.write(f"Provider: {report.provider}\n")
++    output.write(f"Status: {report.status.replace('-', ' ').title()}\n")
++    output.write(
++        "Attention Required: "
++        f"{'Yes' if report.requires_attention else 'No'}\n"
++    )
++    output.write(f"Services Evaluated: {len(report.updates)}\n")
++
++    output.write("\nCounts\n")
++    output.write("------\n")
++    output.write(f"Updates Available: {counts['update-available']}\n")
++    output.write(f"Mutable Tags:      {counts['mutable-tag']}\n")
++    output.write(f"Unknown:           {counts['unknown']}\n")
++    output.write(f"Unsupported:       {counts['unsupported']}\n")
++    output.write(f"Current:           {counts['current']}\n")
++
++    if report.attention:
++        output.write("\nAttention\n")
++        output.write("---------\n")
++        for update in report.attention:
++            output.write(
++                f"- [{update.service_identifier}] "
++                f"{update.service_name}: {update.status.value}\n"
++            )
++            if update.reason:
++                output.write(f"  {update.reason}\n")
++    else:
++        output.write("\nNo update items require attention.\n")
++
++    output.write("\nAll Services\n")
++    output.write("------------\n")
++    if report.updates:
++        for update in report.updates:
++            output.write(
++                f"- [{update.service_identifier}] "
++                f"{update.status.value} "
++                f"({update.current_image.canonical_reference})\n"
++            )
++    else:
++        output.write("None\n")
++
++    output.write(f"\nEvaluated: {report.evaluated_at}\n")
++
++
++def _command_updates(
++    *,
++    service: ServiceLifecycleService,
++    as_json: bool,
++    output: TextIO,
++) -> int:
++    report = ServiceUpdateService(service).inspect_updates()
++
++    if as_json:
++        _render_updates_json(report, output=output)
++    else:
++        _render_updates_human(report, output=output)
++
++    return 0
++
++
++def _render_history_json(
++    report: MaintenanceReport,
++    *,
++    output: TextIO,
++) -> None:
++    json.dump(
++        report.to_dict(),
++        output,
++        indent=2,
++        sort_keys=True,
++    )
++    output.write("\n")
++
++
++def _render_history_human(
++    report: MaintenanceReport,
++    *,
++    identifier: str | None,
++    output: TextIO,
++) -> None:
++    counts = report.counts
++
++    output.write("Atlas Service Maintenance History\n")
++    output.write("=================================\n\n")
++    output.write(f"Provider: {report.provider}\n")
++    output.write(
++        "Scope: "
++        + (
++            f"Service [{identifier}]"
++            if identifier is not None
++            else "All Managed Services"
++        )
++        + "\n"
++    )
++    output.write(f"Records: {len(report.records)}\n")
++    output.write(
++        "Attention Required: "
++        f"{'Yes' if report.requires_attention else 'No'}\n"
++    )
++
++    output.write("\nResults\n")
++    output.write("-------\n")
++    output.write(f"Success: {counts['success']}\n")
++    output.write(f"Failed:  {counts['failed']}\n")
++    output.write(f"Partial: {counts['partial']}\n")
++    output.write(f"Skipped: {counts['skipped']}\n")
++    output.write(f"Unknown: {counts['unknown']}\n")
++
++    output.write("\nHistory\n")
++    output.write("-------\n")
++    if not report.records:
++        output.write("No maintenance history is available.\n")
++    else:
++        for record in report.records:
++            output.write(
++                f"- {record.started_at} "
++                f"[{record.service_identifier}] "
++                f"{record.action.value}: "
++                f"{record.result.value}\n"
++            )
++            if record.summary:
++                output.write(f"  {record.summary}\n")
++            if record.completed_at is not None:
++                output.write(
++                    f"  Completed: {record.completed_at}"
++                )
++                if record.duration_seconds is not None:
++                    output.write(
++                        f" ({record.duration_seconds:.3f}s)"
++                    )
++                output.write("\n")
++
++    output.write(f"\nGenerated: {report.generated_at}\n")
++
++
++def _command_history(
++    *,
++    service: ServiceLifecycleService,
++    identifier: str | None,
++    as_json: bool,
++    output: TextIO,
++) -> int:
++    history_service = ServiceMaintenanceHistoryService(service)
++
++    if identifier is None:
++        report = history_service.inspect_history()
++        normalized_identifier = None
++    else:
++        managed_service = service.inspect_service(identifier)
++        normalized_identifier = managed_service.identifier
++        report = history_service.inspect_service_history(
++            normalized_identifier,
++        )
++
++    if as_json:
++        _render_history_json(report, output=output)
++    else:
++        _render_history_human(
++            report,
++            identifier=normalized_identifier,
++            output=output,
++        )
++
++    return 0
++
+ def main(
+     argv: Sequence[str] | None = None,
+     *,
+@@ -832,6 +1053,21 @@ def main(
+                 as_json=arguments.as_json,
+                 output=resolved_output,
+             )
++
++        if arguments.command == "updates":
++            return _command_updates(
++                service=resolved_service,
++                as_json=arguments.as_json,
++                output=resolved_output,
++            )
++
++        if arguments.command == "history":
++            return _command_history(
++                service=resolved_service,
++                identifier=arguments.identifier,
++                as_json=arguments.as_json,
++                output=resolved_output,
++            )
+     except ServiceLifecycleError as exc:
+         resolved_error.write(
+             f"Service Lifecycle error: {exc}\n"
+diff --git a/docs/BUILD_LOG.md b/docs/BUILD_LOG.md
+index daef3960..e25922d5 100644
+--- a/docs/BUILD_LOG.md
++++ b/docs/BUILD_LOG.md
+@@ -1414,3 +1414,313 @@ operational condition.
+ - Service Lifecycle regression suite.
+ - Real `atlas service doctor --json` execution.
+ - `git diff --check`.
++
++---
++
++# 2026-08-02
++
++## M-018.20 — Update Discovery Domain Contracts
++
++### Objective
++
++Establish normalized, provider-independent contracts for read-only service image
++update discovery before adding provider, registry, CLI, API, or Portal behavior.
++
++### Completed
++
++- Added `UpdateStatus`.
++- Added normalized `ImageReference` parsing and serialization.
++- Added `ServiceUpdate` with child-contract and update-state validation.
++- Added deterministic `UpdateReport` aggregation, counts, attention items, and
++  serialization.
++- Exported all contracts through `atlas.service_lifecycle`.
++- Added dedicated Core model tests.
++- Documented the read-only boundary and future shared CLI/API/Portal contract.
++
++### Validation
++
++- Python compilation.
++- Focused update-model tests.
++- Existing Service Lifecycle model and Doctor-model regression tests.
++- Public import validation.
++- `git diff --check`.
++
++---
++
++# 2026-08-02
++
++## M-018.21 — Local Update Metadata Provider
++
++### Objective
++
++Expose locally verifiable service image metadata through the provider boundary
++without registry access, image pulls, or update-availability claims.
++
++### Completed
++
++- Added `inspect_update()` to `ServiceLifecycleProvider`.
++- Implemented local Docker Compose update metadata discovery.
++- Reported mutable `latest` tags without claiming an available update.
++- Reported pinned tags and digest references as unknown pending registry comparison.
++- Corrected digest-only image references so null tags do not become `latest`.
++- Added provider, Docker Compose, and image-contract tests.
++
++### Validation
++
++- Python compilation.
++- Provider abstraction tests.
++- Docker Compose provider tests.
++- Update-model and Service Lifecycle regression tests.
++- `git diff --check`.
++
++---
++
++# 2026-08-02
++
++## M-018.21.5 — Repository Engineering Tooling
++
++### Objective
++
++Establish a permanent repository layout and canonical guidance for Atlas
++engineering utilities while removing disposable helper scripts from the
++repository root.
++
++### Completed
++
++- Added the `tools/` hierarchy for apply, maintenance, migration, release, and
++  archived tooling.
++- Added directory-specific safety and lifecycle guidance.
++- Added `docs/ENGINEERING_GUIDE.md`.
++- Linked the engineering checklist to the canonical guide.
++- Archived completed root-level M-018.21 helper scripts outside the working tree.
++- Preserved all in-progress Update Discovery source, tests, and documentation.
++
++### Validation
++
++- Verified the active development branch.
++- Verified required Update Discovery files.
++- Confirmed tracked files were not moved during cleanup.
++- Checked documentation links and repository whitespace.
++
++---
++
++# 2026-08-02
++
++## M-018.22 — Update Discovery Service
++
++### Objective
++
++Add the provider-independent orchestration layer for validated single-service
++and platform-wide read-only update discovery.
++
++### Completed
++
++- Added immutable `ServiceUpdateService`.
++- Added validated `inspect_update()`.
++- Added deterministic `inspect_updates()` aggregation.
++- Reused `ServiceLifecycleService` inventory and identity validation.
++- Enforced provider result type, identifier, and service-name contracts.
++- Preserved known domain errors and translated unexpected provider failures.
++- Exported the service through `atlas.service_lifecycle`.
++- Added dedicated orchestration tests.
++- Documented the service boundary for future CLI, API, and Admin Portal use.
++
++### Validation
++
++- Python compilation.
++- Update-service focused tests.
++- Update-model, provider, service, Doctor, and CLI regressions.
++- Public import validation.
++- `git diff --check`.
++
++---
++
++# 2026-08-02
++
++## M-018.23 — Service Updates CLI
++
++### Objective
++
++Expose provider-independent, read-only Update Discovery through the Atlas CLI
++without duplicating service or provider logic.
++
++### Completed
++
++- Added `atlas service updates`.
++- Added `atlas service updates --json`.
++- Added concise human-readable update summaries.
++- Serialized canonical `UpdateReport` JSON without transformation.
++- Registered shell dispatch and service/global help.
++- Added human, JSON, empty-inventory, error, and help tests.
++- Documented the CLI boundary for future API and Admin Portal consumers.
++
++### Validation
++
++- Python compilation.
++- Shell syntax validation.
++- Focused Update Discovery and CLI tests.
++- Service Lifecycle regression tests.
++- Real human CLI execution.
++- Real JSON CLI execution and parsing.
++- `git diff --check`.
++
++---
++
++# 2026-08-02
++
++## M-018.24 — Maintenance History Domain Models
++
++### Objective
++
++Establish immutable, provider-independent contracts for Service Lifecycle
++maintenance history before adding persistence, service orchestration, CLI, API,
++Portal, scheduler, or maintenance execution.
++
++### Completed
++
++- Added `MaintenanceAction`.
++- Added `MaintenanceResult`.
++- Added normalized `MaintenanceRecord`.
++- Added deterministic `MaintenanceReport`.
++- Added duration, success, failure, attention, count, and latest-record helpers.
++- Exported all contracts through `atlas.service_lifecycle`.
++- Added dedicated Core tests.
++- Documented the strict read-only boundary and future extension points.
++
++### Validation
++
++- Python compilation.
++- Public import validation.
++- Focused maintenance-model tests.
++- Existing Service Lifecycle model regression tests.
++- `git diff --check`.
++
++---
++
++# 2026-08-02
++
++## M-018.24.5 — Service Layer Package Refactor
++
++### Objective
++
++Organize Service Lifecycle service implementations under a dedicated package
++before adding Maintenance History orchestration, without changing public
++behavior or breaking existing imports.
++
++### Completed
++
++- Added `atlas.service_lifecycle.services`.
++- Moved the lifecycle implementation to `services/lifecycle.py`.
++- Moved Service Doctor to `services/doctor.py`.
++- Moved Update Discovery orchestration to `services/updates.py`.
++- Preserved `service.py`, `doctor.py`, and `update.py` as compatibility shims.
++- Updated top-level package exports to use the canonical services package.
++- Added explicit public and legacy import compatibility tests.
++- Archived completed apply helpers outside the working tree.
++- Documented the package structure and unchanged read-only boundary.
++
++### Validation
++
++- Python compilation.
++- Canonical and legacy import validation.
++- Full Service Lifecycle regression.
++- Real Service Doctor and Service Updates CLI smoke tests.
++- Shell syntax validation.
++- `git diff --check`.
++
++---
++
++# 2026-08-02
++
++## M-018.25 — Maintenance History Service
++
++### Objective
++
++Add the provider-independent, read-only orchestration layer for global and
++service-specific Maintenance History without persistence or execution.
++
++### Completed
++
++- Added `ServiceMaintenanceHistoryService`.
++- Added validated `inspect_history()`.
++- Added validated `inspect_service_history()`.
++- Added concrete empty-history provider defaults.
++- Preserved compatibility for existing providers and test doubles.
++- Enforced report, service identifier, and service-name contracts.
++- Added canonical, package, and legacy compatibility exports.
++- Added dedicated Core tests.
++- Documented the future persistence boundary.
++
++### Validation
++
++- Python compilation.
++- Public and legacy import validation.
++- Maintenance service and model tests.
++- Full Service Lifecycle regression.
++- Service Doctor and Service Updates CLI smoke tests.
++- `git diff --check`.
++
++---
++
++# 2026-08-02
++
++## M-018.26 — Maintenance History CLI
++
++### Objective
++
++Expose global and service-specific read-only Maintenance History through the
++Atlas CLI without duplicating service logic or enabling maintenance execution.
++
++### Completed
++
++- Added `atlas service history`.
++- Added `atlas service history <identifier>`.
++- Added JSON variants for both scopes.
++- Added human-readable result counts and ordered record output.
++- Serialized canonical `MaintenanceReport` JSON directly.
++- Registered service and global help.
++- Added global, service-specific, JSON, empty-history, error, and help tests.
++- Documented the empty-provider behavior and read-only boundary.
++
++### Validation
++
++- Python compilation.
++- Shell syntax validation.
++- Focused Maintenance History and CLI tests.
++- Full Service Lifecycle regression.
++- Live global history human and JSON commands.
++- Live service-specific history human and JSON commands.
++- JSON contract validation.
++- `git diff --check`.
++
++---
++
++# 2026-08-02
++
++## M-018.27 — Service Lifecycle Documentation Completion
++
++### Objective
++
++Complete the architecture, CLI, and Python API documentation for the read-only
++Service Lifecycle subsystem before final subsystem validation.
++
++### Completed
++
++- Added the complete Service Lifecycle CLI reference.
++- Added the public Python API reference.
++- Documented canonical models, services, and provider contracts.
++- Documented legacy compatibility module aliases.
++- Documented JSON contracts and error behavior.
++- Documented Administration Portal integration boundaries.
++- Documented the post-v1.0 maintenance workflow boundary.
++- Added Service Lifecycle links to the architecture index.
++- Added a documentation map to the architecture document.
++- Archived the completed M-018.26 apply helper.
++
++### Validation
++
++- Verified all referenced documentation files exist.
++- Verified public API exports.
++- Verified documented CLI commands are registered.
++- Verified Markdown links.
++- Ran `git diff --check`.
+diff --git a/docs/ENGINEERING_CHECKLIST.md b/docs/ENGINEERING_CHECKLIST.md
+index 4dc311bb..d8c90338 100644
+--- a/docs/ENGINEERING_CHECKLIST.md
++++ b/docs/ENGINEERING_CHECKLIST.md
+@@ -1,5 +1,7 @@
+ # Atlas Engineering Sprint Checklist
+ 
++For engineering principles, repository layout, and workflow standards, see [`ENGINEERING_GUIDE.md`](ENGINEERING_GUIDE.md).
++
+ This checklist is the standard completion contract for Project Atlas engineering
+ sprints. A sprint is not complete until every applicable item has been reviewed.
+ 
+diff --git a/docs/architecture/README.md b/docs/architecture/README.md
+index 274e3b3f..cd419d25 100644
+--- a/docs/architecture/README.md
++++ b/docs/architecture/README.md
+@@ -85,3 +85,8 @@ Project Atlas milestones use this sequence:
+ - Optional feature modules.
+ - User-first operation and presentation.
+ - Backups, verification, and rollback paths for production changes.
++## Service Lifecycle
++
++- [Architecture](SERVICE_LIFECYCLE.md)
++- [CLI reference](../cli/SERVICE_LIFECYCLE.md)
++- [Python API reference](../api/SERVICE_LIFECYCLE.md)
+diff --git a/docs/architecture/SERVICE_LIFECYCLE.md b/docs/architecture/SERVICE_LIFECYCLE.md
+index 685f9202..636bce1f 100644
+--- a/docs/architecture/SERVICE_LIFECYCLE.md
++++ b/docs/architecture/SERVICE_LIFECYCLE.md
+@@ -384,3 +384,210 @@ without a Docker health check produces the observability finding
+ normalized health report is degraded solely because that health check is absent.
+ Additional health warnings or errors continue to produce an independent health
+ finding.
++
++## Update Discovery Contracts
++
++Update Discovery begins with provider-independent, immutable domain contracts.
++`ImageReference` normalizes repository, tag, digest, raw reference, canonical
++reference, and mutable-tag identity. `ServiceUpdate` represents one managed
++service's read-only update evaluation, while `UpdateReport` provides deterministic
++status counts, attention items, ordering, and serialization for future CLI, API,
++and Administration Portal consumers.
++
++The initial contract statuses are:
++
++```text
++current
++update-available
++mutable-tag
++unknown
++unsupported
++```
++
++M-018.20 introduces models only. It does not query registries, pull images,
++restart services, recreate containers, or otherwise mutate Docker.
++
++### Local provider update metadata
++
++`ServiceLifecycleProvider.inspect_update()` returns one normalized
++`ServiceUpdate`. The Docker Compose implementation reuses normalized service and
++runtime image identity and remains conservative:
++
++- `latest` is reported as `mutable-tag`;
++- pinned tags and digest-pinned references are `unknown` until registry comparison;
++- `update-available` is never emitted from local metadata alone;
++- no registry request, pull, restart, recreation, or Docker mutation occurs.
++
++Digest-only references retain a null tag and are never classified as mutable.
++
++### Update discovery service
++
++`ServiceUpdateService` is the provider-independent orchestration layer for
++update discovery. It depends on `ServiceLifecycleService`, reuses its validated
++managed-service inventory, invokes `inspect_update()` through the provider
++boundary, and validates every returned `ServiceUpdate`.
++
++The service enforces:
++
++- normalized requested service identity;
++- `ServiceUpdate` child contracts;
++- matching service identifiers and names;
++- preservation of known Atlas domain errors;
++- translation of unexpected provider failures;
++- deterministic `UpdateReport` aggregation;
++- explicit `unknown` and `mixed` provider summaries.
++
++The service contains no registry, Docker, CLI, API, or Portal presentation logic.
++It remains fully read-only.
++
++### Update discovery CLI
++
++The read-only Update Discovery service is exposed through:
++
++```text
++atlas service updates
++atlas service updates --json
++```
++
++Human output summarizes provider identity, aggregate status, counts, attention
++items, and every evaluated service. JSON output serializes `UpdateReport`
++directly and is the canonical contract for future API and Administration Portal
++consumers.
++
++The CLI performs argument parsing and presentation only. It does not implement
++update evaluation, contact registries, pull images, or mutate Docker.
++
++## Maintenance History Contracts
++
++Maintenance History begins with immutable, provider-independent records and
++reports. `MaintenanceRecord` represents one observation or maintenance event,
++including normalized service identity, action, result, provider, timestamps,
++duration, summary, and structured details.
++
++`MaintenanceReport` provides deterministic newest-first ordering, result counts,
++latest-record summaries, and canonical serialization for future CLI, API,
++Administration Portal, persistence, scheduling, and post-v1.0 maintenance-engine
++consumers.
++
++The v1.0 contracts understand both read-only actions and future write actions,
++but this sprint does not execute maintenance, persist records, schedule work, or
++mutate Docker.
++
++## Service Implementation Package
++
++Service Lifecycle orchestration implementations are organized under:
++
++```text
++atlas/service_lifecycle/services/
++├── lifecycle.py
++├── doctor.py
++└── updates.py
++```
++
++The package-level public API remains unchanged:
++
++```python
++from atlas.service_lifecycle import (
++    ServiceDoctor,
++    ServiceLifecycleService,
++    ServiceUpdateService,
++)
++```
++
++The previous internal module paths (`service.py`, `doctor.py`, and `update.py`)
++remain as compatibility shims. This preserves existing integrations while making
++future service additions, including Maintenance History, easier to organize.
++
++M-018.24.5 is a structural refactor only. It does not change Service Lifecycle
++behavior, provider contracts, CLI output, Docker interaction, or the read-only
++v1.0 safety boundary.
++
++### Maintenance history service
++
++`ServiceMaintenanceHistoryService` is the provider-independent, read-only
++orchestration layer for Maintenance History. It validates provider reports,
++normalizes requested service identity through `ServiceLifecycleService`,
++preserves known Atlas errors, translates unexpected provider failures, and
++enforces service identifier and name consistency for service-specific history.
++
++`ServiceLifecycleProvider` supplies concrete empty-history defaults. This keeps
++existing providers and test doubles backward compatible while establishing the
++future persistence boundary.
++
++M-018.25 does not persist records, create maintenance events, schedule work, or
++mutate Docker.
++
++### Maintenance history CLI
++
++The read-only Maintenance History service is exposed through:
++
++```text
++atlas service history
++atlas service history <identifier>
++atlas service history --json
++atlas service history <identifier> --json
++```
++
++Human output summarizes scope, provider, result counts, attention state, and
++ordered maintenance records. JSON output serializes `MaintenanceReport`
++directly and remains the canonical contract for future API and Administration
++Portal consumers.
++
++Until a persistence provider is introduced, the live provider returns valid
++empty reports. The CLI does not create records, perform maintenance, schedule
++work, or mutate Docker.
++
++## Documentation Map
++
++Service Lifecycle documentation is split by audience:
++
++- Architecture and design: [`SERVICE_LIFECYCLE.md`](SERVICE_LIFECYCLE.md)
++- CLI reference: [`../cli/SERVICE_LIFECYCLE.md`](../cli/SERVICE_LIFECYCLE.md)
++- Python API reference: [`../api/SERVICE_LIFECYCLE.md`](../api/SERVICE_LIFECYCLE.md)
++- Engineering standards: [`../ENGINEERING_GUIDE.md`](../ENGINEERING_GUIDE.md)
++- Sprint checklist: [`../ENGINEERING_CHECKLIST.md`](../ENGINEERING_CHECKLIST.md)
++
++## Administration Portal Integration
++
++The Administration Portal should consume the same normalized service layer used
++by the CLI.
++
++Supported v1.0 Portal surfaces may include:
++
++- service inventory;
++- runtime and health overview;
++- aggregate health;
++- dependency relationships;
++- Service Doctor diagnostics;
++- Update Discovery;
++- Maintenance History.
++
++The Portal must not call Docker directly or duplicate Service Lifecycle business
++logic. API and Portal adapters should serialize the existing report contracts.
++
++## Post-v1.0 Extension Boundary
++
++Future write operations should extend the existing service and provider
++abstractions rather than bypassing them.
++
++The intended maintenance workflow is:
++
++```text
++Validate
++↓
++Backup
++↓
++Pull Image
++↓
++Recreate
++↓
++Health Validation
++↓
++Dependency Validation
++↓
++Record Maintenance
++↓
++Rollback if required
++```
++
++Those operations remain outside the v1.0 read-only boundary.
+diff --git a/scripts/commands/help.sh b/scripts/commands/help.sh
+index 9d4a1d27..192cea66 100755
+--- a/scripts/commands/help.sh
++++ b/scripts/commands/help.sh
+@@ -22,6 +22,8 @@ Core Commands
+   atlas service summary [--json]
+   atlas service graph [--json]
+   atlas service doctor [--json]
++  atlas service updates [--json]
++  atlas service history [<identifier>] [--json]
+   atlas urls
+   atlas git
+   atlas test [all|core|sports]
+diff --git a/scripts/commands/service.sh b/scripts/commands/service.sh
+index 3a74d6d6..e8499121 100755
+--- a/scripts/commands/service.sh
++++ b/scripts/commands/service.sh
+@@ -15,6 +15,8 @@ Usage:
+   atlas service summary [--json]
+   atlas service graph [--json]
+   atlas service doctor [--json]
++  atlas service updates [--json]
++  atlas service history [<identifier>] [--json]
+ 
+ Commands:
+   list       List configured Atlas-managed services
+@@ -24,6 +26,8 @@ Commands:
+   summary    Show concise infrastructure runtime and health totals
+   graph      Show managed-service dependency relationships
+   doctor     Run read-only diagnostics for managed services
++  updates    Show read-only service image update metadata
++  history    Show read-only service maintenance history
+   help       Show this help text
+ 
+ The Service Lifecycle CLI is read-only.
+@@ -77,6 +81,14 @@ atlas_command_service() {
+       shift
+       atlas_service_python doctor "$@"
+       ;;
++    updates)
++      shift
++      atlas_service_python updates "$@"
++      ;;
++    history)
++      shift
++      atlas_service_python history "$@"
++      ;;
+ 
+     *)
+       printf 'Unknown service command: %s\n' "$subcommand" >&2
+diff --git a/tests/core/test_docker_compose_provider.py b/tests/core/test_docker_compose_provider.py
+index 93960332..110dd52c 100644
+--- a/tests/core/test_docker_compose_provider.py
++++ b/tests/core/test_docker_compose_provider.py
+@@ -17,6 +17,7 @@ from atlas.service_lifecycle import (
+     ServiceImage,
+     ServiceLifecycleProvider,
+     ServiceRuntime,
++    UpdateStatus,
+ )
+ 
+ 
+@@ -2605,3 +2606,92 @@ def test_package_exports_docker_compose_provider() -> None:
+         service_lifecycle.DockerComposeProviderError
+         is DockerComposeProviderError
+     )
++
++
++def test_inspect_update_reports_mutable_tag_without_registry_claim(
++    tmp_path: Path,
++    monkeypatch: pytest.MonkeyPatch,
++) -> None:
++    provider = make_provider(tmp_path)
++    service = ManagedService(
++        identifier="sonarr",
++        name="Sonarr",
++        provider="docker-compose",
++    )
++    runtime = ServiceRuntime(
++        state="running",
++        health="healthy",
++        image=ServiceImage(
++            reference="lscr.io/linuxserver/sonarr:latest",
++            repository="lscr.io/linuxserver/sonarr",
++            tag="latest",
++            image_id="sha256:" + ("a" * 64),
++        ),
++    )
++    monkeypatch.setattr(DockerComposeProvider, "inspect_service", lambda self, identifier: service)
++    monkeypatch.setattr(DockerComposeProvider, "inspect_runtime", lambda self, identifier: runtime)
++
++    update = provider.inspect_update(" SONARR ")
++
++    assert update.status is UpdateStatus.MUTABLE_TAG
++    assert update.current_image.is_mutable is True
++    assert update.available_image is None
++    assert update.details["source"] == "local-docker"
++    assert update.details["registry_comparison"] is False
++
++
++def test_inspect_update_reports_unknown_for_pinned_tag(
++    tmp_path: Path,
++    monkeypatch: pytest.MonkeyPatch,
++) -> None:
++    provider = make_provider(tmp_path)
++    service = ManagedService(identifier="sonarr", name="Sonarr", provider="docker-compose")
++    runtime = ServiceRuntime(
++        state="running",
++        health="healthy",
++        image=ServiceImage(
++            reference="lscr.io/linuxserver/sonarr:4.0.15",
++            repository="lscr.io/linuxserver/sonarr",
++            tag="4.0.15",
++            image_id="sha256:" + ("a" * 64),
++        ),
++    )
++    monkeypatch.setattr(DockerComposeProvider, "inspect_service", lambda self, identifier: service)
++    monkeypatch.setattr(DockerComposeProvider, "inspect_runtime", lambda self, identifier: runtime)
++
++    update = provider.inspect_update("sonarr")
++
++    assert update.status is UpdateStatus.UNKNOWN
++    assert update.requires_attention is False
++    assert update.current_image.tag == "4.0.15"
++    assert update.available_image is None
++
++
++def test_inspect_update_preserves_digest_pinned_identity(
++    tmp_path: Path,
++    monkeypatch: pytest.MonkeyPatch,
++) -> None:
++    provider = make_provider(tmp_path)
++    digest = "sha256:" + ("b" * 64)
++    service = ManagedService(identifier="sonarr", name="Sonarr", provider="docker-compose")
++    runtime = ServiceRuntime(
++        state="running",
++        health="healthy",
++        image=ServiceImage(
++            reference=f"registry.example/team/sonarr@{digest}",
++            repository="registry.example/team/sonarr",
++            tag=None,
++            digest=digest,
++            image_id="sha256:" + ("a" * 64),
++        ),
++    )
++    monkeypatch.setattr(DockerComposeProvider, "inspect_service", lambda self, identifier: service)
++    monkeypatch.setattr(DockerComposeProvider, "inspect_runtime", lambda self, identifier: runtime)
++
++    update = provider.inspect_update("sonarr")
++
++    assert update.status is UpdateStatus.UNKNOWN
++    assert update.current_image.tag is None
++    assert update.current_image.digest == digest
++    assert update.current_image.is_mutable is False
++    assert update.current_image.canonical_reference == f"registry.example/team/sonarr@{digest}"
+diff --git a/tests/core/test_service_lifecycle_cli.py b/tests/core/test_service_lifecycle_cli.py
+index 00823c74..d99bac2f 100644
+--- a/tests/core/test_service_lifecycle_cli.py
++++ b/tests/core/test_service_lifecycle_cli.py
+@@ -19,6 +19,14 @@ from atlas.service_lifecycle import (
+     ServiceImage,
+     ServiceLifecycleError,
+     ServiceRuntime,
++    ImageReference,
++    ServiceUpdate,
++    UpdateReport,
++    UpdateStatus,
++    MaintenanceAction,
++    MaintenanceRecord,
++    MaintenanceReport,
++    MaintenanceResult,
+ )
+ from atlas.service_lifecycle.service import (
+     InfrastructureDependencyGraph,
+@@ -847,3 +855,313 @@ def test_doctor_help_is_active() -> None:
+     assert result.stderr == ""
+     assert "usage: atlas service doctor" in result.stdout
+     assert "--json" in result.stdout
++
++
++
++def sample_update_report() -> UpdateReport:
++    mutable = ServiceUpdate(
++        service_identifier="sonarr",
++        service_name="Sonarr",
++        current_image=ImageReference.parse(
++            "lscr.io/linuxserver/sonarr:latest"
++        ),
++        status=UpdateStatus.MUTABLE_TAG,
++        reason="The configured image uses the mutable latest tag.",
++        evaluated_at="2026-08-02T02:10:00Z",
++    )
++    unknown = ServiceUpdate(
++        service_identifier="jellyfin",
++        service_name="Jellyfin",
++        current_image=ImageReference.parse(
++            "jellyfin/jellyfin:stable"
++        ),
++        status=UpdateStatus.UNKNOWN,
++        reason="Registry comparison has not been performed.",
++        evaluated_at="2026-08-02T02:10:00Z",
++    )
++    return UpdateReport(
++        updates=(unknown, mutable),
++        provider="docker-compose",
++        evaluated_at="2026-08-02T02:10:00Z",
++    )
++
++
++def test_updates_human_output() -> None:
++    service = Mock()
++    output = StringIO()
++
++    with patch(
++        "atlas.service_lifecycle_cli.ServiceUpdateService",
++    ) as update_service_class:
++        update_service_class.return_value.inspect_updates.return_value = (
++            sample_update_report()
++        )
++        result = main(["updates"], service=service, output=output)
++
++    assert result == 0
++    rendered = output.getvalue()
++    assert "Atlas Service Updates" in rendered
++    assert "Provider: docker-compose" in rendered
++    assert "Mutable Tags:      1" in rendered
++    assert "Unknown:           1" in rendered
++    assert "[sonarr] Sonarr: mutable-tag" in rendered
++    assert "[jellyfin] unknown" in rendered
++    update_service_class.assert_called_once_with(service)
++    update_service_class.return_value.inspect_updates.assert_called_once_with()
++
++
++def test_updates_json_output() -> None:
++    service = Mock()
++    output = StringIO()
++    report = sample_update_report()
++
++    with patch(
++        "atlas.service_lifecycle_cli.ServiceUpdateService",
++    ) as update_service_class:
++        update_service_class.return_value.inspect_updates.return_value = report
++        result = main(
++            ["updates", "--json"],
++            service=service,
++            output=output,
++        )
++
++    assert result == 0
++    assert json.loads(output.getvalue()) == report.to_dict()
++
++
++def test_updates_empty_inventory_output() -> None:
++    service = Mock()
++    output = StringIO()
++    report = UpdateReport(
++        updates=(),
++        provider="unknown",
++        evaluated_at="2026-08-02T02:10:00Z",
++    )
++
++    with patch(
++        "atlas.service_lifecycle_cli.ServiceUpdateService",
++    ) as update_service_class:
++        update_service_class.return_value.inspect_updates.return_value = report
++        result = main(["updates"], service=service, output=output)
++
++    assert result == 0
++    assert "Services Evaluated: 0" in output.getvalue()
++    assert "No update items require attention." in output.getvalue()
++    assert "All Services\n------------\nNone" in output.getvalue()
++
++
++def test_updates_service_error_is_rendered() -> None:
++    service = Mock()
++    output = StringIO()
++    error = StringIO()
++
++    with patch(
++        "atlas.service_lifecycle_cli.ServiceUpdateService",
++    ) as update_service_class:
++        update_service_class.return_value.inspect_updates.side_effect = (
++            ServiceLifecycleError("update inspection failed")
++        )
++        result = main(
++            ["updates"],
++            service=service,
++            output=output,
++            error=error,
++        )
++
++    assert result == 1
++    assert output.getvalue() == ""
++    assert error.getvalue() == (
++        "Service Lifecycle error: update inspection failed\n"
++    )
++
++
++def test_updates_help_is_active() -> None:
++    result = subprocess.run(
++        [str(ATLAS_CLI), "service", "updates", "--help"],
++        cwd=PROJECT_ROOT,
++        text=True,
++        capture_output=True,
++        check=False,
++    )
++
++    assert result.returncode == 0
++    assert "usage: atlas service updates" in result.stdout
++    assert "--json" in result.stdout
++
++
++def sample_maintenance_report() -> MaintenanceReport:
++    record = MaintenanceRecord(
++        service_identifier="sonarr",
++        service_name="Sonarr",
++        action=MaintenanceAction.UPDATE_CHECK,
++        result=MaintenanceResult.SUCCESS,
++        started_at="2026-08-02T03:10:00Z",
++        completed_at="2026-08-02T03:10:02Z",
++        provider="docker-compose",
++        summary="Update metadata inspected.",
++    )
++    return MaintenanceReport(
++        records=(record,),
++        provider="docker-compose",
++        generated_at="2026-08-02T03:15:00Z",
++    )
++
++
++def test_history_human_output_all_services() -> None:
++    service = Mock()
++    output = StringIO()
++    report = sample_maintenance_report()
++
++    with patch(
++        "atlas.service_lifecycle_cli."
++        "ServiceMaintenanceHistoryService",
++    ) as history_service_class:
++        history_service_class.return_value.inspect_history.return_value = (
++            report
++        )
++
++        result = main(
++            ["history"],
++            service=service,
++            output=output,
++        )
++
++    assert result == 0
++    rendered = output.getvalue()
++    assert "Atlas Service Maintenance History" in rendered
++    assert "Scope: All Managed Services" in rendered
++    assert "Records: 1" in rendered
++    assert "Success: 1" in rendered
++    assert "[sonarr] update-check: success" in rendered
++    history_service_class.assert_called_once_with(service)
++
++
++def test_history_human_output_one_service() -> None:
++    service = Mock()
++    service.inspect_service.return_value = ManagedService(
++        identifier="sonarr",
++        name="Sonarr",
++        provider="docker-compose",
++    )
++    output = StringIO()
++    report = sample_maintenance_report()
++
++    with patch(
++        "atlas.service_lifecycle_cli."
++        "ServiceMaintenanceHistoryService",
++    ) as history_service_class:
++        (
++            history_service_class
++            .return_value
++            .inspect_service_history
++            .return_value
++        ) = report
++
++        result = main(
++            ["history", " SONARR "],
++            service=service,
++            output=output,
++        )
++
++    assert result == 0
++    assert "Scope: Service [sonarr]" in output.getvalue()
++    service.inspect_service.assert_called_once_with(" SONARR ")
++    (
++        history_service_class
++        .return_value
++        .inspect_service_history
++        .assert_called_once_with("sonarr")
++    )
++
++
++def test_history_json_output() -> None:
++    service = Mock()
++    output = StringIO()
++    report = sample_maintenance_report()
++
++    with patch(
++        "atlas.service_lifecycle_cli."
++        "ServiceMaintenanceHistoryService",
++    ) as history_service_class:
++        history_service_class.return_value.inspect_history.return_value = (
++            report
++        )
++
++        result = main(
++            ["history", "--json"],
++            service=service,
++            output=output,
++        )
++
++    assert result == 0
++    assert json.loads(output.getvalue()) == report.to_dict()
++
++
++def test_history_empty_output() -> None:
++    service = Mock()
++    output = StringIO()
++    report = MaintenanceReport(
++        records=(),
++        provider="unknown",
++        generated_at="2026-08-02T03:15:00Z",
++    )
++
++    with patch(
++        "atlas.service_lifecycle_cli."
++        "ServiceMaintenanceHistoryService",
++    ) as history_service_class:
++        history_service_class.return_value.inspect_history.return_value = (
++            report
++        )
++
++        result = main(
++            ["history"],
++            service=service,
++            output=output,
++        )
++
++    assert result == 0
++    assert "Records: 0" in output.getvalue()
++    assert "No maintenance history is available." in output.getvalue()
++
++
++def test_history_service_error_is_rendered() -> None:
++    service = Mock()
++    output = StringIO()
++    error = StringIO()
++
++    with patch(
++        "atlas.service_lifecycle_cli."
++        "ServiceMaintenanceHistoryService",
++    ) as history_service_class:
++        history_service_class.return_value.inspect_history.side_effect = (
++            ServiceLifecycleError("history inspection failed")
++        )
++
++        result = main(
++            ["history"],
++            service=service,
++            output=output,
++            error=error,
++        )
++
++    assert result == 1
++    assert output.getvalue() == ""
++    assert error.getvalue() == (
++        "Service Lifecycle error: history inspection failed\n"
++    )
++
++
++def test_history_help_is_active() -> None:
++    result = subprocess.run(
++        [str(ATLAS_CLI), "service", "history", "--help"],
++        cwd=PROJECT_ROOT,
++        text=True,
++        capture_output=True,
++        check=False,
++    )
++
++    assert result.returncode == 0
++    assert "usage: atlas service history" in result.stdout
++    assert "identifier" in result.stdout
++    assert "--json" in result.stdout
+diff --git a/tests/core/test_service_lifecycle_doctor.py b/tests/core/test_service_lifecycle_doctor.py
+index caf3ee05..8c93d86f 100644
+--- a/tests/core/test_service_lifecycle_doctor.py
++++ b/tests/core/test_service_lifecycle_doctor.py
+@@ -9,6 +9,7 @@ import pytest
+ from atlas.service_lifecycle import (
+     DoctorCategory,
+     DoctorSeverity,
++    ImageReference,
+     ManagedService,
+     ServiceDoctor,
+     ServiceHealth,
+@@ -18,6 +19,8 @@ from atlas.service_lifecycle import (
+     ServiceLifecycleProvider,
+     ServiceLifecycleService,
+     ServiceRuntime,
++    ServiceUpdate,
++    UpdateStatus,
+ )
+ 
+ 
+@@ -50,6 +53,31 @@ class DoctorProvider(ServiceLifecycleProvider):
+         self.calls.append(("inspect_health", identifier))
+         return self.health[identifier]
+ 
++    def inspect_update(
++        self,
++        identifier: str,
++    ) -> ServiceUpdate:
++        self.calls.append(("inspect_update", identifier))
++
++        service = next(
++            (
++                service
++                for service in self.services
++                if service.identifier == identifier
++            ),
++            None,
++        )
++        if service is None:
++            raise LookupError(identifier)
++
++        return ServiceUpdate(
++            service_identifier=service.identifier,
++            service_name=service.name,
++            current_image=ImageReference.parse(
++                "example/service:stable"
++            ),
++            status=UpdateStatus.UNKNOWN,
++        )
+ 
+ def managed(
+     identifier: str,
+diff --git a/tests/core/test_service_lifecycle_provider.py b/tests/core/test_service_lifecycle_provider.py
+index 131c6f77..abcb83a8 100644
+--- a/tests/core/test_service_lifecycle_provider.py
++++ b/tests/core/test_service_lifecycle_provider.py
+@@ -12,6 +12,9 @@ from atlas.service_lifecycle import (
+     ServiceImage,
+     ServiceLifecycleProvider,
+     ServiceRuntime,
++    ImageReference,
++    ServiceUpdate,
++    UpdateStatus,
+ )
+ 
+ 
+@@ -35,6 +38,12 @@ class StubProvider(ServiceLifecycleProvider):
+         self.health = ServiceHealth(
+             status=ServiceHealthStatus.HEALTHY,
+         )
++        self.update = ServiceUpdate(
++            service_identifier="sonarr",
++            service_name="Sonarr",
++            current_image=ImageReference.parse("sonarr:latest"),
++            status=UpdateStatus.MUTABLE_TAG,
++        )
+ 
+     def list_services(self):
+         return (
+@@ -68,6 +77,15 @@ class StubProvider(ServiceLifecycleProvider):
+ 
+         return self.health
+ 
++    def inspect_update(
++        self,
++        identifier: str,
++    ) -> ServiceUpdate:
++        if identifier != self.service.identifier:
++            raise LookupError(identifier)
++
++        return self.update
++
+ 
+ def test_provider_contract_is_abstract_base_class() -> None:
+     assert issubclass(ServiceLifecycleProvider, ABC)
+@@ -81,6 +99,7 @@ def test_provider_contract_is_abstract_base_class() -> None:
+         "inspect_service",
+         "inspect_runtime",
+         "inspect_health",
++        "inspect_update",
+     ],
+ )
+ def test_provider_contract_declares_abstract_methods(
+@@ -147,12 +166,19 @@ def test_provider_inspects_normalized_health() -> None:
+     )
+ 
+ 
++def test_provider_inspects_normalized_update() -> None:
++    provider = StubProvider()
++
++    assert provider.inspect_update("sonarr") is provider.update
++
++
+ @pytest.mark.parametrize(
+     "method_name",
+     [
+         "inspect_service",
+         "inspect_runtime",
+         "inspect_health",
++        "inspect_update",
+     ],
+ )
+ def test_stub_provider_rejects_unknown_service(
+diff --git a/tests/core/test_service_lifecycle_service.py b/tests/core/test_service_lifecycle_service.py
+index daa824e3..c17d06e0 100644
+--- a/tests/core/test_service_lifecycle_service.py
++++ b/tests/core/test_service_lifecycle_service.py
+@@ -15,6 +15,9 @@ from atlas.service_lifecycle import (
+     ServiceLifecycleProvider,
+     ServiceLifecycleService,
+     ServiceRuntime,
++    ImageReference,
++    ServiceUpdate,
++    UpdateStatus,
+ )
+ 
+ 
+@@ -65,6 +68,35 @@ class StubProvider(ServiceLifecycleProvider):
+         self._raise_failure()
+         return self.health
+ 
++    def inspect_update(
++        self,
++        identifier: str,
++    ) -> ServiceUpdate:
++        self.calls.append(("inspect_update", identifier))
++
++        if self.failure_method == "inspect_update":
++            raise self.failure
++
++        service = next(
++            (
++                service
++                for service in self.services_result
++                if service.identifier == identifier
++            ),
++            None,
++        )
++        if service is None:
++            raise LookupError(identifier)
++
++        return ServiceUpdate(
++            service_identifier=service.identifier,
++            service_name=service.name,
++            current_image=ImageReference.parse(
++                "example/service:stable"
++            ),
++            status=UpdateStatus.UNKNOWN,
++        )
++
+ 
+ def make_service() -> tuple[ServiceLifecycleService, StubProvider]:
+     provider = StubProvider()

@@ -1,0 +1,714 @@
+{
+  "attention": [
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "lscr.io/linuxserver/bazarr:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "lscr.io/linuxserver/bazarr:latest",
+        "repository": "lscr.io/linuxserver/bazarr",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "lscr.io/linuxserver/bazarr:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:5d916d07404296ec35ee726e13e0e558f05952724cf494a7f009d913fb2b12f3",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:50.166436Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "bazarr",
+      "service_name": "Bazarr",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "amir20/dozzle:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "amir20/dozzle:latest",
+        "repository": "amir20/dozzle",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "amir20/dozzle:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:43d933ebda116990c920e054d68a1aed286ab01fd31657983c53bbdf46cc0aa8",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:50.399860Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "dozzle",
+      "service_name": "Dozzle",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "qmcgaw/gluetun:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "qmcgaw/gluetun:latest",
+        "repository": "qmcgaw/gluetun",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "qmcgaw/gluetun:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:b0ee2135e6ba52ad3f102aae9663707cd1c9531485117067a380d3b2b6dd991d",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:50.847487Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "gluetun",
+      "service_name": "Gluetun",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "ghcr.io/gethomepage/homepage:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "ghcr.io/gethomepage/homepage:latest",
+        "repository": "ghcr.io/gethomepage/homepage",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "ghcr.io/gethomepage/homepage:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:a0b71c8e757298d02560186bab9fbe3fc2d375c523a62cc1019177b37e48aa28",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:51.072253Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "homepage",
+      "service_name": "Homepage",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "jellyfin/jellyfin:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "jellyfin/jellyfin:latest",
+        "repository": "jellyfin/jellyfin",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "jellyfin/jellyfin:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:aefb67e6a7ff1debdd154a78a7bbb780fd0c873d8639210a7f6a2016ad2b35db",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:51.299158Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "jellyfin",
+      "service_name": "Jellyfin",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "fallenbagel/jellyseerr:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "fallenbagel/jellyseerr:latest",
+        "repository": "fallenbagel/jellyseerr",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "fallenbagel/jellyseerr:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:4538137bc5af902dece165f2bf73776d9cf4eafb6dd714670724af8f3eb77764",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:51.525693Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "jellyseerr",
+      "service_name": "Jellyseerr",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "ghcr.io/jorenn92/maintainerr:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "ghcr.io/jorenn92/maintainerr:latest",
+        "repository": "ghcr.io/jorenn92/maintainerr",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "ghcr.io/jorenn92/maintainerr:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:bee84707edaf589cda3d18b6813cbfe3a137b52786210c3a28190e10910c1240",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:51.751887Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "maintainerr",
+      "service_name": "Maintainerr",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "lscr.io/linuxserver/prowlarr:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "lscr.io/linuxserver/prowlarr:latest",
+        "repository": "lscr.io/linuxserver/prowlarr",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "lscr.io/linuxserver/prowlarr:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:3e9bd62ca90c97c5df75b7012e10a29f6926e62807deeddc1dc89e6e2fd141e1",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:51.978085Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "prowlarr",
+      "service_name": "Prowlarr",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "lscr.io/linuxserver/qbittorrent:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "lscr.io/linuxserver/qbittorrent:latest",
+        "repository": "lscr.io/linuxserver/qbittorrent",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "lscr.io/linuxserver/qbittorrent:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:163f3384db6cba9f68eaa83ca5f4209298b6029ba2d07b5e67562d0715baf5b9",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:52.201770Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "qbittorrent",
+      "service_name": "Qbittorrent",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "lscr.io/linuxserver/radarr:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "lscr.io/linuxserver/radarr:latest",
+        "repository": "lscr.io/linuxserver/radarr",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "lscr.io/linuxserver/radarr:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:39da107b5a9371fdaa651bd188049b863716a815385eb3a30d41071b7e1aeb33",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:52.426881Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "radarr",
+      "service_name": "Radarr",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "lscr.io/linuxserver/radarr:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "lscr.io/linuxserver/radarr:latest",
+        "repository": "lscr.io/linuxserver/radarr",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "lscr.io/linuxserver/radarr:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:39da107b5a9371fdaa651bd188049b863716a815385eb3a30d41071b7e1aeb33",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:52.651894Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "radarr-anime",
+      "service_name": "Radarr Anime",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "lscr.io/linuxserver/sonarr:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "lscr.io/linuxserver/sonarr:latest",
+        "repository": "lscr.io/linuxserver/sonarr",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "lscr.io/linuxserver/sonarr:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:633e0e66d85ce4e9172608a37d3d24e124b3e485fc0d946f533c3bb5875227e9",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:52.874638Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "sonarr",
+      "service_name": "Sonarr",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "lscr.io/linuxserver/sonarr:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "lscr.io/linuxserver/sonarr:latest",
+        "repository": "lscr.io/linuxserver/sonarr",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "lscr.io/linuxserver/sonarr:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:633e0e66d85ce4e9172608a37d3d24e124b3e485fc0d946f533c3bb5875227e9",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:53.095877Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "sonarr-anime",
+      "service_name": "Sonarr Anime",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "lscr.io/linuxserver/tautulli:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "lscr.io/linuxserver/tautulli:latest",
+        "repository": "lscr.io/linuxserver/tautulli",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "lscr.io/linuxserver/tautulli:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:fb1a686e4b676af3bd8f6e1a5a0097ee1540015768e9bbd4445e130d703a68cd",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:53.321122Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "tautulli",
+      "service_name": "Tautulli",
+      "status": "mutable-tag"
+    }
+  ],
+  "counts": {
+    "current": 0,
+    "mutable-tag": 14,
+    "unknown": 1,
+    "unsupported": 0,
+    "update-available": 0
+  },
+  "evaluated_at": "2026-08-02T02:41:53.321147Z",
+  "provider": "docker-compose",
+  "requires_attention": true,
+  "status": "attention",
+  "total_services": 15,
+  "updates": [
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "lscr.io/linuxserver/bazarr:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "lscr.io/linuxserver/bazarr:latest",
+        "repository": "lscr.io/linuxserver/bazarr",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "lscr.io/linuxserver/bazarr:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:5d916d07404296ec35ee726e13e0e558f05952724cf494a7f009d913fb2b12f3",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:50.166436Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "bazarr",
+      "service_name": "Bazarr",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "amir20/dozzle:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "amir20/dozzle:latest",
+        "repository": "amir20/dozzle",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "amir20/dozzle:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:43d933ebda116990c920e054d68a1aed286ab01fd31657983c53bbdf46cc0aa8",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:50.399860Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "dozzle",
+      "service_name": "Dozzle",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "qmcgaw/gluetun:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "qmcgaw/gluetun:latest",
+        "repository": "qmcgaw/gluetun",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "qmcgaw/gluetun:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:b0ee2135e6ba52ad3f102aae9663707cd1c9531485117067a380d3b2b6dd991d",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:50.847487Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "gluetun",
+      "service_name": "Gluetun",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "ghcr.io/gethomepage/homepage:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "ghcr.io/gethomepage/homepage:latest",
+        "repository": "ghcr.io/gethomepage/homepage",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "ghcr.io/gethomepage/homepage:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:a0b71c8e757298d02560186bab9fbe3fc2d375c523a62cc1019177b37e48aa28",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:51.072253Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "homepage",
+      "service_name": "Homepage",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "jellyfin/jellyfin:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "jellyfin/jellyfin:latest",
+        "repository": "jellyfin/jellyfin",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "jellyfin/jellyfin:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:aefb67e6a7ff1debdd154a78a7bbb780fd0c873d8639210a7f6a2016ad2b35db",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:51.299158Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "jellyfin",
+      "service_name": "Jellyfin",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "fallenbagel/jellyseerr:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "fallenbagel/jellyseerr:latest",
+        "repository": "fallenbagel/jellyseerr",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "fallenbagel/jellyseerr:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:4538137bc5af902dece165f2bf73776d9cf4eafb6dd714670724af8f3eb77764",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:51.525693Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "jellyseerr",
+      "service_name": "Jellyseerr",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "ghcr.io/jorenn92/maintainerr:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "ghcr.io/jorenn92/maintainerr:latest",
+        "repository": "ghcr.io/jorenn92/maintainerr",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "ghcr.io/jorenn92/maintainerr:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:bee84707edaf589cda3d18b6813cbfe3a137b52786210c3a28190e10910c1240",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:51.751887Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "maintainerr",
+      "service_name": "Maintainerr",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "lscr.io/linuxserver/prowlarr:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "lscr.io/linuxserver/prowlarr:latest",
+        "repository": "lscr.io/linuxserver/prowlarr",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "lscr.io/linuxserver/prowlarr:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:3e9bd62ca90c97c5df75b7012e10a29f6926e62807deeddc1dc89e6e2fd141e1",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:51.978085Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "prowlarr",
+      "service_name": "Prowlarr",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "lscr.io/linuxserver/qbittorrent:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "lscr.io/linuxserver/qbittorrent:latest",
+        "repository": "lscr.io/linuxserver/qbittorrent",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "lscr.io/linuxserver/qbittorrent:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:163f3384db6cba9f68eaa83ca5f4209298b6029ba2d07b5e67562d0715baf5b9",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:52.201770Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "qbittorrent",
+      "service_name": "Qbittorrent",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "lscr.io/linuxserver/radarr:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "lscr.io/linuxserver/radarr:latest",
+        "repository": "lscr.io/linuxserver/radarr",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "lscr.io/linuxserver/radarr:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:39da107b5a9371fdaa651bd188049b863716a815385eb3a30d41071b7e1aeb33",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:52.426881Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "radarr",
+      "service_name": "Radarr",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "lscr.io/linuxserver/radarr:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "lscr.io/linuxserver/radarr:latest",
+        "repository": "lscr.io/linuxserver/radarr",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "lscr.io/linuxserver/radarr:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:39da107b5a9371fdaa651bd188049b863716a815385eb3a30d41071b7e1aeb33",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:52.651894Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "radarr-anime",
+      "service_name": "Radarr Anime",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "lscr.io/linuxserver/sonarr:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "lscr.io/linuxserver/sonarr:latest",
+        "repository": "lscr.io/linuxserver/sonarr",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "lscr.io/linuxserver/sonarr:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:633e0e66d85ce4e9172608a37d3d24e124b3e485fc0d946f533c3bb5875227e9",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:52.874638Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "sonarr",
+      "service_name": "Sonarr",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "lscr.io/linuxserver/sonarr:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "lscr.io/linuxserver/sonarr:latest",
+        "repository": "lscr.io/linuxserver/sonarr",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "lscr.io/linuxserver/sonarr:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:633e0e66d85ce4e9172608a37d3d24e124b3e485fc0d946f533c3bb5875227e9",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:53.095877Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "sonarr-anime",
+      "service_name": "Sonarr Anime",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "lscr.io/linuxserver/tautulli:latest",
+        "digest": null,
+        "is_mutable": true,
+        "raw_reference": "lscr.io/linuxserver/tautulli:latest",
+        "repository": "lscr.io/linuxserver/tautulli",
+        "tag": "latest"
+      },
+      "details": {
+        "configured_reference": "lscr.io/linuxserver/tautulli:latest",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:fb1a686e4b676af3bd8f6e1a5a0097ee1540015768e9bbd4445e130d703a68cd",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:53.321122Z",
+      "reason": "The configured image uses the mutable latest tag; registry comparison has not been performed.",
+      "requires_attention": true,
+      "service_identifier": "tautulli",
+      "service_name": "Tautulli",
+      "status": "mutable-tag"
+    },
+    {
+      "available_image": null,
+      "current_image": {
+        "canonical_reference": "ghcr.io/flaresolverr/flaresolverr:v3.5.0",
+        "digest": null,
+        "is_mutable": false,
+        "raw_reference": "ghcr.io/flaresolverr/flaresolverr:v3.5.0",
+        "repository": "ghcr.io/flaresolverr/flaresolverr",
+        "tag": "v3.5.0"
+      },
+      "details": {
+        "configured_reference": "ghcr.io/flaresolverr/flaresolverr:v3.5.0",
+        "local_image_created_at": null,
+        "local_image_id": "sha256:139dfee1c6f89249c8d665d1333a42e8ec74ec0a86bc6bb1c8461e10d3a66a47",
+        "registry_comparison": false,
+        "source": "local-docker"
+      },
+      "evaluated_at": "2026-08-02T02:41:50.626817Z",
+      "reason": "The local image identity is known, but no registry comparison has been performed.",
+      "requires_attention": false,
+      "service_identifier": "flaresolverr",
+      "service_name": "Flaresolverr",
+      "status": "unknown"
+    }
+  ]
+}

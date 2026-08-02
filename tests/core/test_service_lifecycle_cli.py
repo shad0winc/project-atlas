@@ -19,6 +19,14 @@ from atlas.service_lifecycle import (
     ServiceImage,
     ServiceLifecycleError,
     ServiceRuntime,
+    ImageReference,
+    ServiceUpdate,
+    UpdateReport,
+    UpdateStatus,
+    MaintenanceAction,
+    MaintenanceRecord,
+    MaintenanceReport,
+    MaintenanceResult,
 )
 from atlas.service_lifecycle.service import (
     InfrastructureDependencyGraph,
@@ -846,4 +854,314 @@ def test_doctor_help_is_active() -> None:
     assert result.returncode == 0
     assert result.stderr == ""
     assert "usage: atlas service doctor" in result.stdout
+    assert "--json" in result.stdout
+
+
+
+def sample_update_report() -> UpdateReport:
+    mutable = ServiceUpdate(
+        service_identifier="sonarr",
+        service_name="Sonarr",
+        current_image=ImageReference.parse(
+            "lscr.io/linuxserver/sonarr:latest"
+        ),
+        status=UpdateStatus.MUTABLE_TAG,
+        reason="The configured image uses the mutable latest tag.",
+        evaluated_at="2026-08-02T02:10:00Z",
+    )
+    unknown = ServiceUpdate(
+        service_identifier="jellyfin",
+        service_name="Jellyfin",
+        current_image=ImageReference.parse(
+            "jellyfin/jellyfin:stable"
+        ),
+        status=UpdateStatus.UNKNOWN,
+        reason="Registry comparison has not been performed.",
+        evaluated_at="2026-08-02T02:10:00Z",
+    )
+    return UpdateReport(
+        updates=(unknown, mutable),
+        provider="docker-compose",
+        evaluated_at="2026-08-02T02:10:00Z",
+    )
+
+
+def test_updates_human_output() -> None:
+    service = Mock()
+    output = StringIO()
+
+    with patch(
+        "atlas.service_lifecycle_cli.ServiceUpdateService",
+    ) as update_service_class:
+        update_service_class.return_value.inspect_updates.return_value = (
+            sample_update_report()
+        )
+        result = main(["updates"], service=service, output=output)
+
+    assert result == 0
+    rendered = output.getvalue()
+    assert "Atlas Service Updates" in rendered
+    assert "Provider: docker-compose" in rendered
+    assert "Mutable Tags:      1" in rendered
+    assert "Unknown:           1" in rendered
+    assert "[sonarr] Sonarr: mutable-tag" in rendered
+    assert "[jellyfin] unknown" in rendered
+    update_service_class.assert_called_once_with(service)
+    update_service_class.return_value.inspect_updates.assert_called_once_with()
+
+
+def test_updates_json_output() -> None:
+    service = Mock()
+    output = StringIO()
+    report = sample_update_report()
+
+    with patch(
+        "atlas.service_lifecycle_cli.ServiceUpdateService",
+    ) as update_service_class:
+        update_service_class.return_value.inspect_updates.return_value = report
+        result = main(
+            ["updates", "--json"],
+            service=service,
+            output=output,
+        )
+
+    assert result == 0
+    assert json.loads(output.getvalue()) == report.to_dict()
+
+
+def test_updates_empty_inventory_output() -> None:
+    service = Mock()
+    output = StringIO()
+    report = UpdateReport(
+        updates=(),
+        provider="unknown",
+        evaluated_at="2026-08-02T02:10:00Z",
+    )
+
+    with patch(
+        "atlas.service_lifecycle_cli.ServiceUpdateService",
+    ) as update_service_class:
+        update_service_class.return_value.inspect_updates.return_value = report
+        result = main(["updates"], service=service, output=output)
+
+    assert result == 0
+    assert "Services Evaluated: 0" in output.getvalue()
+    assert "No update items require attention." in output.getvalue()
+    assert "All Services\n------------\nNone" in output.getvalue()
+
+
+def test_updates_service_error_is_rendered() -> None:
+    service = Mock()
+    output = StringIO()
+    error = StringIO()
+
+    with patch(
+        "atlas.service_lifecycle_cli.ServiceUpdateService",
+    ) as update_service_class:
+        update_service_class.return_value.inspect_updates.side_effect = (
+            ServiceLifecycleError("update inspection failed")
+        )
+        result = main(
+            ["updates"],
+            service=service,
+            output=output,
+            error=error,
+        )
+
+    assert result == 1
+    assert output.getvalue() == ""
+    assert error.getvalue() == (
+        "Service Lifecycle error: update inspection failed\n"
+    )
+
+
+def test_updates_help_is_active() -> None:
+    result = subprocess.run(
+        [str(ATLAS_CLI), "service", "updates", "--help"],
+        cwd=PROJECT_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "usage: atlas service updates" in result.stdout
+    assert "--json" in result.stdout
+
+
+def sample_maintenance_report() -> MaintenanceReport:
+    record = MaintenanceRecord(
+        service_identifier="sonarr",
+        service_name="Sonarr",
+        action=MaintenanceAction.UPDATE_CHECK,
+        result=MaintenanceResult.SUCCESS,
+        started_at="2026-08-02T03:10:00Z",
+        completed_at="2026-08-02T03:10:02Z",
+        provider="docker-compose",
+        summary="Update metadata inspected.",
+    )
+    return MaintenanceReport(
+        records=(record,),
+        provider="docker-compose",
+        generated_at="2026-08-02T03:15:00Z",
+    )
+
+
+def test_history_human_output_all_services() -> None:
+    service = Mock()
+    output = StringIO()
+    report = sample_maintenance_report()
+
+    with patch(
+        "atlas.service_lifecycle_cli."
+        "ServiceMaintenanceHistoryService",
+    ) as history_service_class:
+        history_service_class.return_value.inspect_history.return_value = (
+            report
+        )
+
+        result = main(
+            ["history"],
+            service=service,
+            output=output,
+        )
+
+    assert result == 0
+    rendered = output.getvalue()
+    assert "Atlas Service Maintenance History" in rendered
+    assert "Scope: All Managed Services" in rendered
+    assert "Records: 1" in rendered
+    assert "Success: 1" in rendered
+    assert "[sonarr] update-check: success" in rendered
+    history_service_class.assert_called_once_with(service)
+
+
+def test_history_human_output_one_service() -> None:
+    service = Mock()
+    service.inspect_service.return_value = ManagedService(
+        identifier="sonarr",
+        name="Sonarr",
+        provider="docker-compose",
+    )
+    output = StringIO()
+    report = sample_maintenance_report()
+
+    with patch(
+        "atlas.service_lifecycle_cli."
+        "ServiceMaintenanceHistoryService",
+    ) as history_service_class:
+        (
+            history_service_class
+            .return_value
+            .inspect_service_history
+            .return_value
+        ) = report
+
+        result = main(
+            ["history", " SONARR "],
+            service=service,
+            output=output,
+        )
+
+    assert result == 0
+    assert "Scope: Service [sonarr]" in output.getvalue()
+    service.inspect_service.assert_called_once_with(" SONARR ")
+    (
+        history_service_class
+        .return_value
+        .inspect_service_history
+        .assert_called_once_with("sonarr")
+    )
+
+
+def test_history_json_output() -> None:
+    service = Mock()
+    output = StringIO()
+    report = sample_maintenance_report()
+
+    with patch(
+        "atlas.service_lifecycle_cli."
+        "ServiceMaintenanceHistoryService",
+    ) as history_service_class:
+        history_service_class.return_value.inspect_history.return_value = (
+            report
+        )
+
+        result = main(
+            ["history", "--json"],
+            service=service,
+            output=output,
+        )
+
+    assert result == 0
+    assert json.loads(output.getvalue()) == report.to_dict()
+
+
+def test_history_empty_output() -> None:
+    service = Mock()
+    output = StringIO()
+    report = MaintenanceReport(
+        records=(),
+        provider="unknown",
+        generated_at="2026-08-02T03:15:00Z",
+    )
+
+    with patch(
+        "atlas.service_lifecycle_cli."
+        "ServiceMaintenanceHistoryService",
+    ) as history_service_class:
+        history_service_class.return_value.inspect_history.return_value = (
+            report
+        )
+
+        result = main(
+            ["history"],
+            service=service,
+            output=output,
+        )
+
+    assert result == 0
+    assert "Records: 0" in output.getvalue()
+    assert "No maintenance history is available." in output.getvalue()
+
+
+def test_history_service_error_is_rendered() -> None:
+    service = Mock()
+    output = StringIO()
+    error = StringIO()
+
+    with patch(
+        "atlas.service_lifecycle_cli."
+        "ServiceMaintenanceHistoryService",
+    ) as history_service_class:
+        history_service_class.return_value.inspect_history.side_effect = (
+            ServiceLifecycleError("history inspection failed")
+        )
+
+        result = main(
+            ["history"],
+            service=service,
+            output=output,
+            error=error,
+        )
+
+    assert result == 1
+    assert output.getvalue() == ""
+    assert error.getvalue() == (
+        "Service Lifecycle error: history inspection failed\n"
+    )
+
+
+def test_history_help_is_active() -> None:
+    result = subprocess.run(
+        [str(ATLAS_CLI), "service", "history", "--help"],
+        cwd=PROJECT_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "usage: atlas service history" in result.stdout
+    assert "identifier" in result.stdout
     assert "--json" in result.stdout

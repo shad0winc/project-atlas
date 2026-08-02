@@ -20,6 +20,10 @@ from atlas.service_lifecycle import (
     ServiceLifecycleService,
     ServiceDoctor,
     ServiceRuntime,
+    ServiceUpdateService,
+    UpdateReport,
+    MaintenanceReport,
+    ServiceMaintenanceHistoryService,
 )
 from atlas.service_lifecycle.service import (
     InfrastructureDependencyGraph,
@@ -126,6 +130,33 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run read-only diagnostics for managed services.",
     )
     doctor_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Render machine-readable JSON.",
+    )
+
+    updates_parser = subparsers.add_parser(
+        "updates",
+        help="Show read-only service image update metadata.",
+    )
+    updates_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Render machine-readable JSON.",
+    )
+
+    history_parser = subparsers.add_parser(
+        "history",
+        help="Show read-only service maintenance history.",
+    )
+    history_parser.add_argument(
+        "identifier",
+        nargs="?",
+        help="Optional managed-service identifier.",
+    )
+    history_parser.add_argument(
         "--json",
         action="store_true",
         dest="as_json",
@@ -759,6 +790,196 @@ def _command_doctor(
     return 0
 
 
+
+
+def _render_updates_json(
+    report: UpdateReport,
+    *,
+    output: TextIO,
+) -> None:
+    json.dump(
+        report.to_dict(),
+        output,
+        indent=2,
+        sort_keys=True,
+    )
+    output.write("\n")
+
+
+def _render_updates_human(
+    report: UpdateReport,
+    *,
+    output: TextIO,
+) -> None:
+    counts = report.counts
+
+    output.write("Atlas Service Updates\n")
+    output.write("=====================\n\n")
+    output.write(f"Provider: {report.provider}\n")
+    output.write(f"Status: {report.status.replace('-', ' ').title()}\n")
+    output.write(
+        "Attention Required: "
+        f"{'Yes' if report.requires_attention else 'No'}\n"
+    )
+    output.write(f"Services Evaluated: {len(report.updates)}\n")
+
+    output.write("\nCounts\n")
+    output.write("------\n")
+    output.write(f"Updates Available: {counts['update-available']}\n")
+    output.write(f"Mutable Tags:      {counts['mutable-tag']}\n")
+    output.write(f"Unknown:           {counts['unknown']}\n")
+    output.write(f"Unsupported:       {counts['unsupported']}\n")
+    output.write(f"Current:           {counts['current']}\n")
+
+    if report.attention:
+        output.write("\nAttention\n")
+        output.write("---------\n")
+        for update in report.attention:
+            output.write(
+                f"- [{update.service_identifier}] "
+                f"{update.service_name}: {update.status.value}\n"
+            )
+            if update.reason:
+                output.write(f"  {update.reason}\n")
+    else:
+        output.write("\nNo update items require attention.\n")
+
+    output.write("\nAll Services\n")
+    output.write("------------\n")
+    if report.updates:
+        for update in report.updates:
+            output.write(
+                f"- [{update.service_identifier}] "
+                f"{update.status.value} "
+                f"({update.current_image.canonical_reference})\n"
+            )
+    else:
+        output.write("None\n")
+
+    output.write(f"\nEvaluated: {report.evaluated_at}\n")
+
+
+def _command_updates(
+    *,
+    service: ServiceLifecycleService,
+    as_json: bool,
+    output: TextIO,
+) -> int:
+    report = ServiceUpdateService(service).inspect_updates()
+
+    if as_json:
+        _render_updates_json(report, output=output)
+    else:
+        _render_updates_human(report, output=output)
+
+    return 0
+
+
+def _render_history_json(
+    report: MaintenanceReport,
+    *,
+    output: TextIO,
+) -> None:
+    json.dump(
+        report.to_dict(),
+        output,
+        indent=2,
+        sort_keys=True,
+    )
+    output.write("\n")
+
+
+def _render_history_human(
+    report: MaintenanceReport,
+    *,
+    identifier: str | None,
+    output: TextIO,
+) -> None:
+    counts = report.counts
+
+    output.write("Atlas Service Maintenance History\n")
+    output.write("=================================\n\n")
+    output.write(f"Provider: {report.provider}\n")
+    output.write(
+        "Scope: "
+        + (
+            f"Service [{identifier}]"
+            if identifier is not None
+            else "All Managed Services"
+        )
+        + "\n"
+    )
+    output.write(f"Records: {len(report.records)}\n")
+    output.write(
+        "Attention Required: "
+        f"{'Yes' if report.requires_attention else 'No'}\n"
+    )
+
+    output.write("\nResults\n")
+    output.write("-------\n")
+    output.write(f"Success: {counts['success']}\n")
+    output.write(f"Failed:  {counts['failed']}\n")
+    output.write(f"Partial: {counts['partial']}\n")
+    output.write(f"Skipped: {counts['skipped']}\n")
+    output.write(f"Unknown: {counts['unknown']}\n")
+
+    output.write("\nHistory\n")
+    output.write("-------\n")
+    if not report.records:
+        output.write("No maintenance history is available.\n")
+    else:
+        for record in report.records:
+            output.write(
+                f"- {record.started_at} "
+                f"[{record.service_identifier}] "
+                f"{record.action.value}: "
+                f"{record.result.value}\n"
+            )
+            if record.summary:
+                output.write(f"  {record.summary}\n")
+            if record.completed_at is not None:
+                output.write(
+                    f"  Completed: {record.completed_at}"
+                )
+                if record.duration_seconds is not None:
+                    output.write(
+                        f" ({record.duration_seconds:.3f}s)"
+                    )
+                output.write("\n")
+
+    output.write(f"\nGenerated: {report.generated_at}\n")
+
+
+def _command_history(
+    *,
+    service: ServiceLifecycleService,
+    identifier: str | None,
+    as_json: bool,
+    output: TextIO,
+) -> int:
+    history_service = ServiceMaintenanceHistoryService(service)
+
+    if identifier is None:
+        report = history_service.inspect_history()
+        normalized_identifier = None
+    else:
+        managed_service = service.inspect_service(identifier)
+        normalized_identifier = managed_service.identifier
+        report = history_service.inspect_service_history(
+            normalized_identifier,
+        )
+
+    if as_json:
+        _render_history_json(report, output=output)
+    else:
+        _render_history_human(
+            report,
+            identifier=normalized_identifier,
+            output=output,
+        )
+
+    return 0
+
 def main(
     argv: Sequence[str] | None = None,
     *,
@@ -829,6 +1050,21 @@ def main(
         if arguments.command == "doctor":
             return _command_doctor(
                 service=resolved_service,
+                as_json=arguments.as_json,
+                output=resolved_output,
+            )
+
+        if arguments.command == "updates":
+            return _command_updates(
+                service=resolved_service,
+                as_json=arguments.as_json,
+                output=resolved_output,
+            )
+
+        if arguments.command == "history":
+            return _command_history(
+                service=resolved_service,
+                identifier=arguments.identifier,
                 as_json=arguments.as_json,
                 output=resolved_output,
             )

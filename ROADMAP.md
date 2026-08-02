@@ -888,3 +888,30 @@ The following capabilities must not delay the v1.0 release:
 - Keep modules optional
 - Keep core services reusable
 - Reserve infrastructure-breaking changes for major releases
+
+---
+
+## M-021 — Atlas Governance
+
+**Status:** In Progress
+
+**Goal:** Establish permanent, repository-owned engineering governance and
+release-certification standards for Project Atlas.
+
+### Planned Work
+
+- [x] M-021.1 — Governance Foundation
+- [ ] Engineering Charter
+- [ ] Development Workflow
+- [ ] Coding Standards
+- [ ] Testing Standard
+- [ ] Documentation Standard
+- [ ] ADR Policy
+- [ ] Release Policy
+- [ ] Versioning and Contributing guidance
+- [ ] Release Certification framework
+- [ ] M-018 Service Lifecycle certification
+- [ ] Governance audit
+
+Governance is a permanent project capability. Completion of M-021 establishes
+the initial standards; later milestones continue to operate under them.

@@ -1,0 +1,10 @@
+Atlas Service Health
+====================
+
+Status: degraded
+Score: 85/100
+Healthy: No
+Action Required: Yes
+Warnings: No Docker health check is configured
+Errors: None
+Evaluated: 2026-08-02T02:41:22.585039Z

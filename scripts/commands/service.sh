@@ -15,6 +15,8 @@ Usage:
   atlas service summary [--json]
   atlas service graph [--json]
   atlas service doctor [--json]
+  atlas service updates [--json]
+  atlas service history [<identifier>] [--json]
 
 Commands:
   list       List configured Atlas-managed services
@@ -24,6 +26,8 @@ Commands:
   summary    Show concise infrastructure runtime and health totals
   graph      Show managed-service dependency relationships
   doctor     Run read-only diagnostics for managed services
+  updates    Show read-only service image update metadata
+  history    Show read-only service maintenance history
   help       Show this help text
 
 The Service Lifecycle CLI is read-only.
@@ -76,6 +80,14 @@ atlas_command_service() {
     doctor)
       shift
       atlas_service_python doctor "$@"
+      ;;
+    updates)
+      shift
+      atlas_service_python updates "$@"
+      ;;
+    history)
+      shift
+      atlas_service_python history "$@"
       ;;
 
     *)

@@ -1,5 +1,7 @@
 # Atlas Engineering Sprint Checklist
 
+For engineering principles, repository layout, and workflow standards, see [`ENGINEERING_GUIDE.md`](ENGINEERING_GUIDE.md).
+
 This checklist is the standard completion contract for Project Atlas engineering
 sprints. A sprint is not complete until every applicable item has been reviewed.
 
@@ -64,3 +66,12 @@ Every sprint should reinforce:
 - Optional feature modules.
 - User-first experience.
 - Evolution over replacement.
+
+## Governance Foundation Gate
+
+For applicable sprints:
+
+- [ ] An engineering specification defines scope and exclusions.
+- [ ] Governance and release requirements have been reviewed.
+- [ ] Repository documentation remains the authoritative record.
+- [ ] Deferred improvements are recorded outside the active sprint scope.

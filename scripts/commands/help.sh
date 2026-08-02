@@ -22,6 +22,8 @@ Core Commands
   atlas service summary [--json]
   atlas service graph [--json]
   atlas service doctor [--json]
+  atlas service updates [--json]
+  atlas service history [<identifier>] [--json]
   atlas urls
   atlas git
   atlas test [all|core|sports]

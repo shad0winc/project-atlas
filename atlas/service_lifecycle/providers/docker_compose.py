@@ -18,6 +18,11 @@ from atlas.service_lifecycle.models import (
     ServiceRuntime,
 )
 from atlas.service_lifecycle.provider import ServiceLifecycleProvider
+from atlas.service_lifecycle.update_models import (
+    ImageReference,
+    ServiceUpdate,
+    UpdateStatus,
+)
 
 
 class DockerComposeProviderError(ServiceLifecycleError):
@@ -231,6 +236,44 @@ class DockerComposeProvider(ServiceLifecycleProvider):
         return _health_from_runtime(
             runtime,
             service_identifier=normalized_identifier,
+        )
+
+    def inspect_update(
+        self,
+        identifier: str,
+    ) -> ServiceUpdate:
+        """Return locally verifiable image update metadata."""
+
+        service = self.inspect_service(identifier)
+        runtime = self.inspect_runtime(service.identifier)
+        current_image = _update_image_from_runtime(runtime)
+
+        if current_image.is_mutable:
+            status = UpdateStatus.MUTABLE_TAG
+            reason = (
+                "The configured image uses the mutable latest tag; "
+                "registry comparison has not been performed."
+            )
+        else:
+            status = UpdateStatus.UNKNOWN
+            reason = (
+                "The local image identity is known, but no registry "
+                "comparison has been performed."
+            )
+
+        return ServiceUpdate(
+            service_identifier=service.identifier,
+            service_name=service.name,
+            current_image=current_image,
+            status=status,
+            reason=reason,
+            details={
+                "source": "local-docker",
+                "registry_comparison": False,
+                "configured_reference": runtime.image.reference,
+                "local_image_id": runtime.image.image_id,
+                "local_image_created_at": runtime.image.created_at,
+            },
         )
 
     def _resolve_container_identifier(
@@ -583,6 +626,40 @@ def _health_from_runtime(
         raise DockerComposeProviderError(
             "Invalid Docker health state: "
             f"{service_identifier}: {exc}",
+        ) from exc
+
+
+def _update_image_from_runtime(
+    runtime: ServiceRuntime,
+) -> ImageReference:
+    """Convert normalized runtime image identity to update identity."""
+
+    if not isinstance(runtime, ServiceRuntime):
+        raise DockerComposeProviderError(
+            "runtime must be a ServiceRuntime",
+        )
+
+    image = runtime.image
+    if image.repository is None:
+        try:
+            return ImageReference.parse(image.reference)
+        except ServiceLifecycleError as exc:
+            raise DockerComposeProviderError(
+                "Docker runtime image reference is invalid: "
+                f"{exc}",
+            ) from exc
+
+    try:
+        return ImageReference(
+            repository=image.repository,
+            tag=image.tag,
+            digest=image.digest,
+            raw_reference=image.reference,
+        )
+    except ServiceLifecycleError as exc:
+        raise DockerComposeProviderError(
+            "Docker runtime image identity is invalid: "
+            f"{exc}",
         ) from exc
 
 

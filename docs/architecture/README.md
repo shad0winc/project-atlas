@@ -85,3 +85,8 @@ Project Atlas milestones use this sequence:
 - Optional feature modules.
 - User-first operation and presentation.
 - Backups, verification, and rollback paths for production changes.
+## Service Lifecycle
+
+- [Architecture](SERVICE_LIFECYCLE.md)
+- [CLI reference](../cli/SERVICE_LIFECYCLE.md)
+- [Python API reference](../api/SERVICE_LIFECYCLE.md)

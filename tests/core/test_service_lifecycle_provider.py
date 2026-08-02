@@ -12,6 +12,9 @@ from atlas.service_lifecycle import (
     ServiceImage,
     ServiceLifecycleProvider,
     ServiceRuntime,
+    ImageReference,
+    ServiceUpdate,
+    UpdateStatus,
 )
 
 
@@ -34,6 +37,12 @@ class StubProvider(ServiceLifecycleProvider):
         )
         self.health = ServiceHealth(
             status=ServiceHealthStatus.HEALTHY,
+        )
+        self.update = ServiceUpdate(
+            service_identifier="sonarr",
+            service_name="Sonarr",
+            current_image=ImageReference.parse("sonarr:latest"),
+            status=UpdateStatus.MUTABLE_TAG,
         )
 
     def list_services(self):
@@ -68,6 +77,15 @@ class StubProvider(ServiceLifecycleProvider):
 
         return self.health
 
+    def inspect_update(
+        self,
+        identifier: str,
+    ) -> ServiceUpdate:
+        if identifier != self.service.identifier:
+            raise LookupError(identifier)
+
+        return self.update
+
 
 def test_provider_contract_is_abstract_base_class() -> None:
     assert issubclass(ServiceLifecycleProvider, ABC)
@@ -81,6 +99,7 @@ def test_provider_contract_is_abstract_base_class() -> None:
         "inspect_service",
         "inspect_runtime",
         "inspect_health",
+        "inspect_update",
     ],
 )
 def test_provider_contract_declares_abstract_methods(
@@ -147,12 +166,19 @@ def test_provider_inspects_normalized_health() -> None:
     )
 
 
+def test_provider_inspects_normalized_update() -> None:
+    provider = StubProvider()
+
+    assert provider.inspect_update("sonarr") is provider.update
+
+
 @pytest.mark.parametrize(
     "method_name",
     [
         "inspect_service",
         "inspect_runtime",
         "inspect_health",
+        "inspect_update",
     ],
 )
 def test_stub_provider_rejects_unknown_service(

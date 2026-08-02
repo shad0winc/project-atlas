@@ -1,0 +1,22 @@
+{
+  "action_required": true,
+  "details": {
+    "docker_health": "unknown",
+    "exit_code": 0,
+    "finished_at": "2026-07-27T01:06:18.397939Z",
+    "image_reference": "lscr.io/linuxserver/bazarr:latest",
+    "restart_count": 0,
+    "runtime_state": "running",
+    "service_identifier": "bazarr",
+    "started_at": "2026-07-27T01:07:40.971843Z",
+    "status_message": "running"
+  },
+  "errors": [],
+  "evaluated_at": "2026-08-02T02:41:39.897894Z",
+  "healthy": false,
+  "score": 85,
+  "status": "degraded",
+  "warnings": [
+    "No Docker health check is configured"
+  ]
+}

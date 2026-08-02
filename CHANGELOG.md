@@ -9,8 +9,21 @@ All notable changes to Project Atlas are documented in this file.
 - Prevented Service Doctor from double-counting a missing Docker health check as both an observability warning and a degraded-health warning.
 
 
+### Documentation
+
+- Established the Atlas Governance, engineering-specification, and release-certification documentation foundations.
+- Completed Service Lifecycle architecture, CLI, and Python API documentation, including compatibility paths, JSON contracts, Administration Portal integration, and the v1.0 read-only boundary.
+
 ### Added
 
+- Read-only `atlas service history` CLI for global and service-specific Maintenance History, with human-readable and canonical JSON output.
+- Read-only `ServiceMaintenanceHistoryService` with validated global and service-specific history, concrete empty provider defaults, identity enforcement, compatibility exports, and dedicated tests.
+- Immutable Service Lifecycle maintenance-history contracts: `MaintenanceAction`, `MaintenanceResult`, `MaintenanceRecord`, and `MaintenanceReport`, with normalized timestamps, deterministic ordering, aggregation, serialization, public exports, and dedicated tests.
+- Read-only `atlas service updates` CLI with human-readable and canonical JSON output backed by `ServiceUpdateService`.
+- Provider-independent `ServiceUpdateService` orchestration with validated single-service inspection, deterministic platform reports, identity enforcement, and provider error translation.
+- Permanent Atlas engineering tooling layout under `tools/` and a canonical engineering guide covering architecture, testing, documentation, cleanup, commit, and release standards.
+- Read-only Service Lifecycle provider update metadata through `inspect_update()`, with conservative local-only classification and correct digest-pinned image handling.
+- Immutable Service Lifecycle update-discovery contracts: `UpdateStatus`, `ImageReference`, `ServiceUpdate`, and `UpdateReport`, with normalization, validation, deterministic serialization, public exports, and dedicated tests.
 - Read-only `atlas service doctor` diagnostics in human-readable and JSON formats.
 - Canonical Service Doctor CLI contract shared with future API and Admin Portal integrations.
 
@@ -48,6 +61,7 @@ All notable changes to Project Atlas are documented in this file.
 
 #### Changed
 
+- Backward-compatible Service Lifecycle service-package refactor, moving lifecycle, Doctor, and Update Discovery implementations under `atlas.service_lifecycle.services` while preserving legacy imports.
 - Adopted guarded full-file heredoc rewrites for future Project Atlas changes
   after incremental text-patch installers proved too sensitive to normal code
   evolution.

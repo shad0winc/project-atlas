@@ -1,0 +1,20 @@
+Atlas Managed Services
+======================
+
+- bazarr | container=bazarr | dependencies=None
+- dozzle | container=dozzle | dependencies=None
+- flaresolverr | container=flaresolverr | dependencies=None
+- gluetun | container=gluetun | dependencies=None
+- homepage | container=homepage | dependencies=None
+- jellyfin | container=jellyfin | dependencies=None
+- jellyseerr | container=jellyseerr | dependencies=jellyfin, radarr, sonarr
+- maintainerr | container=maintainerr | dependencies=jellyfin, radarr, sonarr
+- prowlarr | container=prowlarr | dependencies=None
+- qbittorrent | container=qbittorrent | dependencies=gluetun
+- radarr | container=radarr | dependencies=None
+- radarr-anime | container=radarr-anime | dependencies=None
+- sonarr | container=sonarr | dependencies=None
+- sonarr-anime | container=sonarr-anime | dependencies=None
+- tautulli | container=tautulli | dependencies=jellyfin
+
+Total: 15

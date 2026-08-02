@@ -9,6 +9,7 @@ import pytest
 from atlas.service_lifecycle import (
     DoctorCategory,
     DoctorSeverity,
+    ImageReference,
     ManagedService,
     ServiceDoctor,
     ServiceHealth,
@@ -18,6 +19,8 @@ from atlas.service_lifecycle import (
     ServiceLifecycleProvider,
     ServiceLifecycleService,
     ServiceRuntime,
+    ServiceUpdate,
+    UpdateStatus,
 )
 
 
@@ -50,6 +53,31 @@ class DoctorProvider(ServiceLifecycleProvider):
         self.calls.append(("inspect_health", identifier))
         return self.health[identifier]
 
+    def inspect_update(
+        self,
+        identifier: str,
+    ) -> ServiceUpdate:
+        self.calls.append(("inspect_update", identifier))
+
+        service = next(
+            (
+                service
+                for service in self.services
+                if service.identifier == identifier
+            ),
+            None,
+        )
+        if service is None:
+            raise LookupError(identifier)
+
+        return ServiceUpdate(
+            service_identifier=service.identifier,
+            service_name=service.name,
+            current_image=ImageReference.parse(
+                "example/service:stable"
+            ),
+            status=UpdateStatus.UNKNOWN,
+        )
 
 def managed(
     identifier: str,

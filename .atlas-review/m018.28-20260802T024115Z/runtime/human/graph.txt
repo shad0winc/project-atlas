@@ -1,0 +1,41 @@
+Atlas Service Dependency Graph
+==============================
+
+Provider:        docker-compose
+Compose Project: project-atlas
+Services:        15
+Relationships:   8
+
+Dependencies
+------------
+gluetun
+└── qbittorrent
+
+jellyfin
+├── jellyseerr
+├── maintainerr
+└── tautulli
+
+radarr
+├── jellyseerr
+└── maintainerr
+
+sonarr
+├── jellyseerr
+└── maintainerr
+
+Standalone
+----------
+- bazarr
+- dozzle
+- flaresolverr
+- homepage
+- prowlarr
+- radarr-anime
+- sonarr-anime
+
+Unresolved Dependencies
+-----------------------
+None
+
+Evaluated: 2026-08-02T02:41:27.597018Z

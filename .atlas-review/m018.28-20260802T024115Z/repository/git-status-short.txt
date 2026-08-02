@@ -1,0 +1,33 @@
+ M CHANGELOG.md
+ M atlas/service_lifecycle/__init__.py
+ M atlas/service_lifecycle/doctor.py
+ M atlas/service_lifecycle/provider.py
+ M atlas/service_lifecycle/providers/docker_compose.py
+ M atlas/service_lifecycle/service.py
+ M atlas/service_lifecycle_cli.py
+ M docs/BUILD_LOG.md
+ M docs/ENGINEERING_CHECKLIST.md
+ M docs/architecture/README.md
+ M docs/architecture/SERVICE_LIFECYCLE.md
+ M scripts/commands/help.sh
+ M scripts/commands/service.sh
+ M tests/core/test_docker_compose_provider.py
+ M tests/core/test_service_lifecycle_cli.py
+ M tests/core/test_service_lifecycle_doctor.py
+ M tests/core/test_service_lifecycle_provider.py
+ M tests/core/test_service_lifecycle_service.py
+?? .atlas-review/
+?? atlas/service_lifecycle/maintenance.py
+?? atlas/service_lifecycle/maintenance_models.py
+?? atlas/service_lifecycle/services/
+?? atlas/service_lifecycle/update.py
+?? atlas/service_lifecycle/update_models.py
+?? docs/ENGINEERING_GUIDE.md
+?? docs/api/
+?? docs/cli/
+?? tests/core/test_service_lifecycle_maintenance_models.py
+?? tests/core/test_service_lifecycle_maintenance_service.py
+?? tests/core/test_service_lifecycle_services_package.py
+?? tests/core/test_service_lifecycle_update.py
+?? tests/core/test_service_lifecycle_update_models.py
+?? tools/

@@ -17,6 +17,7 @@ from atlas.service_lifecycle import (
     ServiceImage,
     ServiceLifecycleProvider,
     ServiceRuntime,
+    UpdateStatus,
 )
 
 
@@ -2605,3 +2606,92 @@ def test_package_exports_docker_compose_provider() -> None:
         service_lifecycle.DockerComposeProviderError
         is DockerComposeProviderError
     )
+
+
+def test_inspect_update_reports_mutable_tag_without_registry_claim(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+    service = ManagedService(
+        identifier="sonarr",
+        name="Sonarr",
+        provider="docker-compose",
+    )
+    runtime = ServiceRuntime(
+        state="running",
+        health="healthy",
+        image=ServiceImage(
+            reference="lscr.io/linuxserver/sonarr:latest",
+            repository="lscr.io/linuxserver/sonarr",
+            tag="latest",
+            image_id="sha256:" + ("a" * 64),
+        ),
+    )
+    monkeypatch.setattr(DockerComposeProvider, "inspect_service", lambda self, identifier: service)
+    monkeypatch.setattr(DockerComposeProvider, "inspect_runtime", lambda self, identifier: runtime)
+
+    update = provider.inspect_update(" SONARR ")
+
+    assert update.status is UpdateStatus.MUTABLE_TAG
+    assert update.current_image.is_mutable is True
+    assert update.available_image is None
+    assert update.details["source"] == "local-docker"
+    assert update.details["registry_comparison"] is False
+
+
+def test_inspect_update_reports_unknown_for_pinned_tag(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+    service = ManagedService(identifier="sonarr", name="Sonarr", provider="docker-compose")
+    runtime = ServiceRuntime(
+        state="running",
+        health="healthy",
+        image=ServiceImage(
+            reference="lscr.io/linuxserver/sonarr:4.0.15",
+            repository="lscr.io/linuxserver/sonarr",
+            tag="4.0.15",
+            image_id="sha256:" + ("a" * 64),
+        ),
+    )
+    monkeypatch.setattr(DockerComposeProvider, "inspect_service", lambda self, identifier: service)
+    monkeypatch.setattr(DockerComposeProvider, "inspect_runtime", lambda self, identifier: runtime)
+
+    update = provider.inspect_update("sonarr")
+
+    assert update.status is UpdateStatus.UNKNOWN
+    assert update.requires_attention is False
+    assert update.current_image.tag == "4.0.15"
+    assert update.available_image is None
+
+
+def test_inspect_update_preserves_digest_pinned_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+    digest = "sha256:" + ("b" * 64)
+    service = ManagedService(identifier="sonarr", name="Sonarr", provider="docker-compose")
+    runtime = ServiceRuntime(
+        state="running",
+        health="healthy",
+        image=ServiceImage(
+            reference=f"registry.example/team/sonarr@{digest}",
+            repository="registry.example/team/sonarr",
+            tag=None,
+            digest=digest,
+            image_id="sha256:" + ("a" * 64),
+        ),
+    )
+    monkeypatch.setattr(DockerComposeProvider, "inspect_service", lambda self, identifier: service)
+    monkeypatch.setattr(DockerComposeProvider, "inspect_runtime", lambda self, identifier: runtime)
+
+    update = provider.inspect_update("sonarr")
+
+    assert update.status is UpdateStatus.UNKNOWN
+    assert update.current_image.tag is None
+    assert update.current_image.digest == digest
+    assert update.current_image.is_mutable is False
+    assert update.current_image.canonical_reference == f"registry.example/team/sonarr@{digest}"
