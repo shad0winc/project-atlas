@@ -653,3 +653,137 @@ def test_service_package_export() -> None:
         service_lifecycle.ServiceLifecycleService
         is ServiceLifecycleService
     )
+
+def test_inspect_graph_builds_resolved_reverse_relationships(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service, provider = make_service()
+    provider.services = [
+        ManagedService(
+            identifier="jellyfin",
+            name="Jellyfin",
+            provider="docker-compose",
+            compose_project="project-atlas",
+        ),
+        ManagedService(
+            identifier="jellyseerr",
+            name="Jellyseerr",
+            provider="docker-compose",
+            compose_project="project-atlas",
+            dependencies=("jellyfin", "radarr"),
+        ),
+        ManagedService(
+            identifier="radarr",
+            name="Radarr",
+            provider="docker-compose",
+            compose_project="project-atlas",
+        ),
+        ManagedService(
+            identifier="bazarr",
+            name="Bazarr",
+            provider="docker-compose",
+            compose_project="project-atlas",
+        ),
+    ]
+    monkeypatch.setattr(
+        "atlas.service_lifecycle.service._utc_now",
+        lambda: "2026-08-01T23:15:00Z",
+    )
+
+    graph = service.inspect_graph()
+
+    assert graph.provider == "docker-compose"
+    assert graph.compose_project == "project-atlas"
+    assert graph.edge_count == 2
+    assert tuple(node.service.identifier for node in graph.roots) == (
+        "jellyfin",
+        "radarr",
+    )
+    assert tuple(
+        item.identifier
+        for item in graph.node("jellyfin").dependents
+    ) == ("jellyseerr",)
+    assert tuple(
+        item.identifier
+        for item in graph.node("jellyseerr").dependencies
+    ) == ("jellyfin", "radarr")
+    assert tuple(
+        node.service.identifier
+        for node in graph.standalone
+    ) == ("bazarr",)
+    assert graph.unresolved == ()
+    assert graph.evaluated_at == "2026-08-01T23:15:00Z"
+    assert provider.calls == [("list_services", None)]
+
+
+def test_inspect_graph_preserves_unresolved_dependencies(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service, provider = make_service()
+    provider.services = [
+        ManagedService(
+            identifier="qbittorrent",
+            name="Qbittorrent",
+            provider="docker-compose",
+            dependencies=("gluetun",),
+        ),
+    ]
+    monkeypatch.setattr(
+        "atlas.service_lifecycle.service._utc_now",
+        lambda: "2026-08-01T23:15:00Z",
+    )
+
+    graph = service.inspect_graph()
+
+    assert graph.edge_count == 0
+    assert graph.roots == ()
+    assert graph.standalone == ()
+    assert tuple(
+        node.service.identifier
+        for node in graph.unresolved
+    ) == ("qbittorrent",)
+    assert graph.node("qbittorrent").unresolved_dependencies == (
+        "gluetun",
+    )
+    assert graph.to_dict()["unresolved"][0][
+        "unresolved_dependencies"
+    ] == ["gluetun"]
+
+
+def test_inspect_graph_empty_inventory_is_explicit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service, provider = make_service()
+    provider.services = ()
+    monkeypatch.setattr(
+        "atlas.service_lifecycle.service._utc_now",
+        lambda: "2026-08-01T23:15:00Z",
+    )
+
+    graph = service.inspect_graph()
+
+    assert graph.provider == "unknown"
+    assert graph.compose_project is None
+    assert graph.nodes == ()
+    assert graph.roots == ()
+    assert graph.standalone == ()
+    assert graph.edge_count == 0
+
+
+def test_dependency_graph_node_rejects_self_reference() -> None:
+    from atlas.service_lifecycle.service import ServiceDependencyNode
+
+    managed_service = ManagedService(
+        identifier="sonarr",
+        name="Sonarr",
+        provider="stub",
+    )
+
+    with pytest.raises(
+        ServiceLifecycleError,
+        match="cannot reference themselves",
+    ):
+        ServiceDependencyNode(
+            service=managed_service,
+            dependencies=(managed_service,),
+        )

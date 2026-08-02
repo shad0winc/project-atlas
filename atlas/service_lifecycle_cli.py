@@ -12,13 +12,17 @@ from typing import TextIO
 
 from atlas.service_lifecycle import (
     DockerComposeProvider,
+    DoctorReport,
+    DoctorSeverity,
     ManagedService,
     ServiceHealth,
     ServiceLifecycleError,
     ServiceLifecycleService,
+    ServiceDoctor,
     ServiceRuntime,
 )
 from atlas.service_lifecycle.service import (
+    InfrastructureDependencyGraph,
     InfrastructureHealthReport,
     InfrastructureSummary,
 )
@@ -100,6 +104,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="Show a concise infrastructure runtime and health summary.",
     )
     summary_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Render machine-readable JSON.",
+    )
+
+    graph_parser = subparsers.add_parser(
+        "graph",
+        help="Show managed-service dependency relationships.",
+    )
+    graph_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Render machine-readable JSON.",
+    )
+
+    doctor_parser = subparsers.add_parser(
+        "doctor",
+        help="Run read-only diagnostics for managed services.",
+    )
+    doctor_parser.add_argument(
         "--json",
         action="store_true",
         dest="as_json",
@@ -571,6 +597,168 @@ def _command_summary(
 
     return 0
 
+
+def _render_graph_json(
+    graph: InfrastructureDependencyGraph,
+    *,
+    output: TextIO,
+) -> None:
+    json.dump(
+        graph.to_dict(),
+        output,
+        indent=2,
+        sort_keys=True,
+    )
+    output.write("\n")
+
+
+def _render_graph_human(
+    graph: InfrastructureDependencyGraph,
+    *,
+    output: TextIO,
+) -> None:
+    output.write("Atlas Service Dependency Graph\n")
+    output.write("==============================\n\n")
+    output.write(f"Provider:        {graph.provider}\n")
+    output.write(
+        f"Compose Project: {graph.compose_project or 'None'}\n"
+    )
+    output.write(f"Services:        {len(graph.nodes)}\n")
+    output.write(f"Relationships:   {graph.edge_count}\n")
+
+    output.write("\nDependencies\n")
+    output.write("------------\n")
+    if not graph.roots:
+        output.write("None\n")
+    else:
+        for node in graph.roots:
+            output.write(f"{node.service.identifier}\n")
+            for index, dependent in enumerate(node.dependents):
+                branch = "└──" if index == len(node.dependents) - 1 else "├──"
+                output.write(f"{branch} {dependent.identifier}\n")
+            output.write("\n")
+
+    output.write("Standalone\n")
+    output.write("----------\n")
+    if graph.standalone:
+        for node in graph.standalone:
+            output.write(f"- {node.service.identifier}\n")
+    else:
+        output.write("None\n")
+
+    output.write("\nUnresolved Dependencies\n")
+    output.write("-----------------------\n")
+    if graph.unresolved:
+        for node in graph.unresolved:
+            output.write(f"- {node.service.identifier}\n")
+            for dependency in node.unresolved_dependencies:
+                output.write(f"    - {dependency}\n")
+    else:
+        output.write("None\n")
+
+    output.write(f"\nEvaluated: {graph.evaluated_at}\n")
+
+
+def _command_graph(
+    *,
+    service: ServiceLifecycleService,
+    as_json: bool,
+    output: TextIO,
+) -> int:
+    graph = service.inspect_graph()
+
+    if as_json:
+        _render_graph_json(graph, output=output)
+    else:
+        _render_graph_human(graph, output=output)
+
+    return 0
+
+
+
+def _render_doctor_json(
+    report: DoctorReport,
+    *,
+    output: TextIO,
+) -> None:
+    json.dump(
+        report.to_dict(),
+        output,
+        indent=2,
+        sort_keys=True,
+    )
+    output.write("\n")
+
+
+def _render_doctor_human(
+    report: DoctorReport,
+    *,
+    output: TextIO,
+) -> None:
+    counts = report.counts
+
+    output.write("Atlas Service Doctor\n")
+    output.write("====================\n\n")
+    output.write(f"Provider: {report.provider}\n")
+    output.write(f"Status: {report.status.title()}\n")
+    output.write(
+        "Attention Required: "
+        f"{'Yes' if report.requires_attention else 'No'}\n"
+    )
+
+    output.write("\nFindings\n")
+    output.write("--------\n")
+    output.write(f"Critical: {counts['critical']}\n")
+    output.write(f"Errors:   {counts['error']}\n")
+    output.write(f"Warnings: {counts['warning']}\n")
+    output.write(f"Info:     {counts['info']}\n")
+    output.write(f"Total:    {len(report.findings)}\n")
+
+    if not report.findings:
+        output.write("\nNo diagnostic findings were reported.\n")
+    else:
+        for severity in DoctorSeverity:
+            findings = tuple(
+                finding
+                for finding in report.findings
+                if finding.severity is severity
+            )
+            if not findings:
+                continue
+
+            output.write(f"\n{severity.value.upper()}\n")
+            output.write(f"{'-' * len(severity.value)}\n")
+            for finding in findings:
+                service_identifier = (
+                    finding.service_identifier or "platform"
+                )
+                output.write(
+                    f"- [{service_identifier}] {finding.message}\n"
+                )
+                output.write(
+                    f"  Code: {finding.code}"
+                    f" | Category: {finding.category.value}\n"
+                )
+
+    output.write(f"\nEvaluated: {report.evaluated_at}\n")
+
+
+def _command_doctor(
+    *,
+    service: ServiceLifecycleService,
+    as_json: bool,
+    output: TextIO,
+) -> int:
+    report = ServiceDoctor(service).diagnose()
+
+    if as_json:
+        _render_doctor_json(report, output=output)
+    else:
+        _render_doctor_human(report, output=output)
+
+    return 0
+
+
 def main(
     argv: Sequence[str] | None = None,
     *,
@@ -626,6 +814,20 @@ def main(
 
         if arguments.command == "summary":
             return _command_summary(
+                service=resolved_service,
+                as_json=arguments.as_json,
+                output=resolved_output,
+            )
+
+        if arguments.command == "graph":
+            return _command_graph(
+                service=resolved_service,
+                as_json=arguments.as_json,
+                output=resolved_output,
+            )
+
+        if arguments.command == "doctor":
+            return _command_doctor(
                 service=resolved_service,
                 as_json=arguments.as_json,
                 output=resolved_output,

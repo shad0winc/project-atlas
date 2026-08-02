@@ -354,3 +354,33 @@ Service Lifecycle follows the Project Atlas principles:
 - User-first operation and presentation.
 - Test and validate before production changes.
 - Back up, verify, and preserve rollback paths.
+
+
+## Service Doctor
+
+Service Doctor provides provider-independent, read-only diagnostics over the
+normalized Service Lifecycle contracts. `ServiceDoctor` consumes
+`ServiceLifecycleService`; it does not call Docker or Docker Compose directly.
+
+The canonical report is `DoctorReport`, which contains deterministic
+`DoctorFinding` records grouped by severity and category. The same serialized
+contract is intended for the CLI, Atlas API, and Administration Portal.
+
+CLI commands:
+
+```text
+atlas service doctor
+atlas service doctor --json
+```
+
+The command never starts, stops, restarts, pulls, recreates, or updates a
+service. Infrastructure mutations remain outside the v1.0 Service Doctor scope.
+
+### Diagnostic deduplication
+
+Service Doctor reports one actionable finding per root cause. A running service
+without a Docker health check produces the observability finding
+`healthcheck-missing`. Atlas does not also emit `health-degraded` when the
+normalized health report is degraded solely because that health check is absent.
+Additional health warnings or errors continue to produce an independent health
+finding.

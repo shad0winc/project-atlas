@@ -298,6 +298,209 @@ class InfrastructureSummary:
 
 
 @dataclass(frozen=True)
+class ServiceDependencyNode:
+    """Normalized dependency relationships for one managed service."""
+
+    service: ManagedService
+    dependencies: tuple[ManagedService, ...] = ()
+    dependents: tuple[ManagedService, ...] = ()
+    unresolved_dependencies: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.service, ManagedService):
+            raise ServiceLifecycleError(
+                "dependency graph nodes require ManagedService identities",
+            )
+        if not isinstance(self.dependencies, tuple) or any(
+            not isinstance(item, ManagedService)
+            for item in self.dependencies
+        ):
+            raise ServiceLifecycleError(
+                "dependency graph dependencies must be a tuple of ManagedService",
+            )
+        if not isinstance(self.dependents, tuple) or any(
+            not isinstance(item, ManagedService)
+            for item in self.dependents
+        ):
+            raise ServiceLifecycleError(
+                "dependency graph dependents must be a tuple of ManagedService",
+            )
+        if not isinstance(self.unresolved_dependencies, tuple) or any(
+            not isinstance(item, str) or not item
+            for item in self.unresolved_dependencies
+        ):
+            raise ServiceLifecycleError(
+                "unresolved dependencies must be a tuple of identifiers",
+            )
+
+        dependency_ids = tuple(item.identifier for item in self.dependencies)
+        dependent_ids = tuple(item.identifier for item in self.dependents)
+
+        if len(dependency_ids) != len(set(dependency_ids)):
+            raise ServiceLifecycleError(
+                "dependency graph node contains duplicate dependencies",
+            )
+        if len(dependent_ids) != len(set(dependent_ids)):
+            raise ServiceLifecycleError(
+                "dependency graph node contains duplicate dependents",
+            )
+        if len(self.unresolved_dependencies) != len(
+            set(self.unresolved_dependencies)
+        ):
+            raise ServiceLifecycleError(
+                "dependency graph node contains duplicate unresolved dependencies",
+            )
+        if self.service.identifier in {
+            *dependency_ids,
+            *dependent_ids,
+            *self.unresolved_dependencies,
+        }:
+            raise ServiceLifecycleError(
+                "dependency graph nodes cannot reference themselves",
+            )
+
+    @property
+    def connected(self) -> bool:
+        return bool(
+            self.dependencies
+            or self.dependents
+            or self.unresolved_dependencies
+        )
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "service": self.service.to_dict(),
+            "dependencies": [
+                item.to_dict()
+                for item in self.dependencies
+            ],
+            "dependents": [
+                item.to_dict()
+                for item in self.dependents
+            ],
+            "unresolved_dependencies": list(self.unresolved_dependencies),
+            "connected": self.connected,
+        }
+
+
+@dataclass(frozen=True)
+class InfrastructureDependencyGraph:
+    """Normalized dependency graph for all Atlas-managed services."""
+
+    nodes: tuple[ServiceDependencyNode, ...]
+    evaluated_at: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.nodes, tuple) or any(
+            not isinstance(node, ServiceDependencyNode)
+            for node in self.nodes
+        ):
+            raise ServiceLifecycleError(
+                "infrastructure graph nodes must be ServiceDependencyNode objects",
+            )
+        if not isinstance(self.evaluated_at, str) or not self.evaluated_at:
+            raise ServiceLifecycleError(
+                "infrastructure graph evaluated_at must be non-empty text",
+            )
+
+        identifiers = tuple(node.service.identifier for node in self.nodes)
+        if len(identifiers) != len(set(identifiers)):
+            raise ServiceLifecycleError(
+                "infrastructure graph contains duplicate service identifiers",
+            )
+
+        known = set(identifiers)
+        for node in self.nodes:
+            for dependency in node.dependencies:
+                if dependency.identifier not in known:
+                    raise ServiceLifecycleError(
+                        "resolved graph dependency is not a graph service",
+                    )
+            for dependent in node.dependents:
+                if dependent.identifier not in known:
+                    raise ServiceLifecycleError(
+                        "resolved graph dependent is not a graph service",
+                    )
+            if known.intersection(node.unresolved_dependencies):
+                raise ServiceLifecycleError(
+                    "unresolved graph dependencies must not reference known services",
+                )
+
+    @property
+    def services(self) -> tuple[ManagedService, ...]:
+        return tuple(node.service for node in self.nodes)
+
+    @property
+    def provider(self) -> str:
+        values = sorted({service.provider for service in self.services})
+        if not values:
+            return "unknown"
+        if len(values) == 1:
+            return values[0]
+        return "mixed"
+
+    @property
+    def compose_project(self) -> str | None:
+        values = sorted(
+            {
+                service.compose_project
+                for service in self.services
+                if service.compose_project is not None
+            }
+        )
+        if not values:
+            return None
+        if len(values) == 1:
+            return values[0]
+        return "mixed"
+
+    @property
+    def roots(self) -> tuple[ServiceDependencyNode, ...]:
+        return tuple(node for node in self.nodes if node.dependents)
+
+    @property
+    def standalone(self) -> tuple[ServiceDependencyNode, ...]:
+        return tuple(node for node in self.nodes if not node.connected)
+
+    @property
+    def unresolved(self) -> tuple[ServiceDependencyNode, ...]:
+        return tuple(
+            node
+            for node in self.nodes
+            if node.unresolved_dependencies
+        )
+
+    @property
+    def edge_count(self) -> int:
+        return sum(len(node.dependencies) for node in self.nodes)
+
+    def node(self, identifier: str) -> ServiceDependencyNode:
+        normalized = _normalize_identifier(identifier)
+        for node in self.nodes:
+            if node.service.identifier == normalized:
+                return node
+        raise ServiceLifecycleError(
+            f"service is not present in dependency graph: {normalized}",
+        )
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "provider": self.provider,
+            "compose_project": self.compose_project,
+            "total_services": len(self.nodes),
+            "total_edges": self.edge_count,
+            "roots": [node.to_dict() for node in self.roots],
+            "standalone": [
+                node.service.to_dict()
+                for node in self.standalone
+            ],
+            "unresolved": [node.to_dict() for node in self.unresolved],
+            "nodes": [node.to_dict() for node in self.nodes],
+            "evaluated_at": self.evaluated_at,
+        }
+
+
+@dataclass(frozen=True)
 class ServiceLifecycleService:
     """Validate and orchestrate read-only service-lifecycle operations."""
 
@@ -485,6 +688,54 @@ class ServiceLifecycleService:
             health=health,
             evaluated_at=evaluated_at,
         )
+
+    def inspect_graph(self) -> InfrastructureDependencyGraph:
+        """Return the normalized managed-service dependency graph."""
+
+        services = self.list_services()
+        by_identifier = {service.identifier: service for service in services}
+        dependents: dict[str, list[ManagedService]] = {
+            service.identifier: []
+            for service in services
+        }
+
+        for managed_service in services:
+            for dependency_identifier in managed_service.dependencies:
+                dependency = by_identifier.get(dependency_identifier)
+                if dependency is not None:
+                    dependents[dependency.identifier].append(managed_service)
+
+        nodes = tuple(
+            ServiceDependencyNode(
+                service=managed_service,
+                dependencies=tuple(
+                    by_identifier[dependency_identifier]
+                    for dependency_identifier in managed_service.dependencies
+                    if dependency_identifier in by_identifier
+                ),
+                dependents=tuple(
+                    sorted(
+                        dependents[managed_service.identifier],
+                        key=lambda service: (
+                            service.name.casefold(),
+                            service.identifier,
+                        ),
+                    )
+                ),
+                unresolved_dependencies=tuple(
+                    dependency_identifier
+                    for dependency_identifier in managed_service.dependencies
+                    if dependency_identifier not in by_identifier
+                ),
+            )
+            for managed_service in services
+        )
+
+        return InfrastructureDependencyGraph(
+            nodes=nodes,
+            evaluated_at=_utc_now(),
+        )
+
 
     def _build_health_report(
         self,

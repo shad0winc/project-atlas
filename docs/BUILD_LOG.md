@@ -1357,3 +1357,60 @@ CLI, future Atlas API endpoints, the Administration Portal, Service Doctor,
 Service Dependency Graph, update discovery, and maintenance history. Service
 Lifecycle remains fully read-only and provider-independent while its architecture
 is now documented as a stable living specification.
+
+
+---
+
+# 2026-08-02
+
+## M-018.12 — Service Doctor CLI Integration
+
+### Objective
+
+Expose the provider-independent Service Doctor through the Atlas CLI while
+preserving the canonical `DoctorReport` JSON contract for future API and Admin
+Portal use.
+
+### Completed
+
+- Added `atlas service doctor`.
+- Added `atlas service doctor --json`.
+- Added deterministic human-readable severity grouping.
+- Registered the command in Service Lifecycle and global help.
+- Reused `ServiceDoctor` without duplicating diagnostic logic in the CLI.
+- Preserved the read-only Service Lifecycle boundary.
+
+### Validation
+
+- Python compilation.
+- Bash syntax validation.
+- Focused Service Doctor and CLI tests.
+- Service Lifecycle regression suite.
+- `git diff --check`.
+
+---
+
+# 2026-08-02
+
+## M-018.13 — Service Doctor Diagnostic Refinement
+
+### Objective
+
+Reduce diagnostic noise by ensuring one finding is emitted for each underlying
+operational condition.
+
+### Completed
+
+- Suppressed duplicate `health-degraded` findings when degradation is caused
+  solely by a missing Docker health check.
+- Preserved independent health findings when additional warnings or errors exist.
+- Added focused root-cause deduplication regression tests.
+- Added live Doctor JSON validation for duplicate missing-health-check findings.
+
+### Validation
+
+- Python compilation.
+- Focused Service Doctor tests.
+- Service Lifecycle regression suite.
+- Real `atlas service doctor --json` execution.
+- `git diff --check`.

@@ -4,6 +4,18 @@ All notable changes to Project Atlas are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Prevented Service Doctor from double-counting a missing Docker health check as both an observability warning and a degraded-health warning.
+
+
+### Added
+
+- Read-only `atlas service doctor` diagnostics in human-readable and JSON formats.
+- Canonical Service Doctor CLI contract shared with future API and Admin Portal integrations.
+
+
+
 ### Service Lifecycle
 
 #### Added

@@ -13,6 +13,13 @@ from .models import (
     ServiceLifecycleError,
     ServiceRuntime,
 )
+from .doctor_models import (
+    DoctorCategory,
+    DoctorFinding,
+    DoctorReport,
+    DoctorSeverity,
+)
+from .doctor import ServiceDoctor
 from .provider import ServiceLifecycleProvider
 from .service import ServiceLifecycleService
 from .providers import (
@@ -21,6 +28,11 @@ from .providers import (
 )
 
 __all__ = [
+    "DoctorCategory",
+    "DoctorFinding",
+    "DoctorReport",
+    "DoctorSeverity",
+    "ServiceDoctor",
     "DockerComposeProvider",
     "DockerComposeProviderError",
     "ManagedService",

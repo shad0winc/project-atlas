@@ -6,9 +6,13 @@ import json
 import subprocess
 from io import StringIO
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from atlas.service_lifecycle import (
+    DoctorCategory,
+    DoctorFinding,
+    DoctorReport,
+    DoctorSeverity,
     ManagedService,
     ServiceHealth,
     ServiceHealthStatus,
@@ -17,8 +21,10 @@ from atlas.service_lifecycle import (
     ServiceRuntime,
 )
 from atlas.service_lifecycle.service import (
+    InfrastructureDependencyGraph,
     InfrastructureHealthReport,
     InfrastructureSummary,
+    ServiceDependencyNode,
     ServiceHealthEntry,
     ServiceRuntimeEntry,
 )
@@ -122,6 +128,90 @@ def sample_summary() -> InfrastructureSummary:
         ),
         health=sample_health_report(),
         evaluated_at="2026-08-01T12:05:00Z",
+    )
+
+
+def sample_graph() -> InfrastructureDependencyGraph:
+    jellyfin = ManagedService(
+        identifier="jellyfin",
+        name="Jellyfin",
+        provider="docker-compose",
+        compose_project="project-atlas",
+    )
+    jellyseerr = ManagedService(
+        identifier="jellyseerr",
+        name="Jellyseerr",
+        provider="docker-compose",
+        compose_project="project-atlas",
+        dependencies=("jellyfin", "radarr"),
+    )
+    radarr = ManagedService(
+        identifier="radarr",
+        name="Radarr",
+        provider="docker-compose",
+        compose_project="project-atlas",
+    )
+    bazarr = ManagedService(
+        identifier="bazarr",
+        name="Bazarr",
+        provider="docker-compose",
+        compose_project="project-atlas",
+    )
+
+    return InfrastructureDependencyGraph(
+        nodes=(
+            ServiceDependencyNode(service=bazarr),
+            ServiceDependencyNode(
+                service=jellyfin,
+                dependents=(jellyseerr,),
+            ),
+            ServiceDependencyNode(
+                service=jellyseerr,
+                dependencies=(jellyfin, radarr),
+            ),
+            ServiceDependencyNode(
+                service=radarr,
+                dependents=(jellyseerr,),
+            ),
+        ),
+        evaluated_at="2026-08-01T23:15:00Z",
+    )
+
+
+def sample_doctor_report() -> DoctorReport:
+    return DoctorReport(
+        provider="docker-compose",
+        findings=(
+            DoctorFinding(
+                identifier="jellyfin.runtime-stopped",
+                severity=DoctorSeverity.ERROR,
+                category=DoctorCategory.RUNTIME,
+                code="runtime-stopped",
+                message="Service Jellyfin is not running.",
+                service_identifier="jellyfin",
+                details={"state": "exited"},
+                created_at="2026-08-02T01:00:00Z",
+            ),
+            DoctorFinding(
+                identifier="qbittorrent.missing-health-check",
+                severity=DoctorSeverity.WARNING,
+                category=DoctorCategory.OBSERVABILITY,
+                code="missing-health-check",
+                message="Service qBittorrent has no configured health check.",
+                service_identifier="qbittorrent",
+                created_at="2026-08-02T01:00:00Z",
+            ),
+            DoctorFinding(
+                identifier="homepage.mutable-image-tag",
+                severity=DoctorSeverity.INFO,
+                category=DoctorCategory.CONFIGURATION,
+                code="mutable-image-tag",
+                message="Service Homepage uses mutable image tag latest.",
+                service_identifier="homepage",
+                created_at="2026-08-02T01:00:00Z",
+            ),
+        ),
+        evaluated_at="2026-08-02T01:00:00Z",
     )
 
 
@@ -288,6 +378,7 @@ def test_service_help_dispatcher() -> None:
         in result.stdout
     )
     assert "atlas service summary [--json]" in result.stdout
+    assert "atlas service graph [--json]" in result.stdout
 
 
 def test_show_help_is_active() -> None:
@@ -594,7 +685,7 @@ def test_health_help_is_active() -> None:
     assert "--json" in result.stdout
 
 
-def test_service_help_registers_runtime_health_and_summary() -> None:
+def test_service_help_registers_reporting_commands() -> None:
     result = subprocess.run(
         [str(ATLAS_CLI), "service", "help"],
         cwd=PROJECT_ROOT,
@@ -614,3 +705,145 @@ def test_service_help_registers_runtime_health_and_summary() -> None:
         in result.stdout
     )
     assert "atlas service summary [--json]" in result.stdout
+
+def test_graph_human_output() -> None:
+    service = Mock()
+    service.inspect_graph.return_value = sample_graph()
+    output = StringIO()
+
+    result = main(
+        ["graph"],
+        service=service,
+        output=output,
+    )
+
+    rendered = output.getvalue()
+
+    assert result == 0
+    assert "Atlas Service Dependency Graph" in rendered
+    assert "Provider:        docker-compose" in rendered
+    assert "Relationships:   2" in rendered
+    assert "jellyfin" in rendered
+    assert "└── jellyseerr" in rendered
+    assert "Standalone" in rendered
+    assert "- bazarr" in rendered
+    assert "Unresolved Dependencies" in rendered
+    assert "None" in rendered
+    service.inspect_graph.assert_called_once_with()
+
+
+def test_graph_json_output() -> None:
+    service = Mock()
+    service.inspect_graph.return_value = sample_graph()
+    output = StringIO()
+
+    result = main(
+        ["graph", "--json"],
+        service=service,
+        output=output,
+    )
+
+    payload = json.loads(output.getvalue())
+
+    assert result == 0
+    assert payload["provider"] == "docker-compose"
+    assert payload["compose_project"] == "project-atlas"
+    assert payload["total_services"] == 4
+    assert payload["total_edges"] == 2
+    assert [
+        node["service"]["identifier"]
+        for node in payload["roots"]
+    ] == ["jellyfin", "radarr"]
+    assert [
+        service["identifier"]
+        for service in payload["standalone"]
+    ] == ["bazarr"]
+    assert payload["unresolved"] == []
+    service.inspect_graph.assert_called_once_with()
+
+
+def test_graph_help_is_active() -> None:
+    result = subprocess.run(
+        [str(ATLAS_CLI), "service", "graph", "--help"],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "usage: atlas service graph" in result.stdout
+    assert "--json" in result.stdout
+
+
+def test_doctor_human_output() -> None:
+    service = Mock()
+    output = StringIO()
+
+    with patch(
+        "atlas.service_lifecycle_cli.ServiceDoctor"
+    ) as doctor_class:
+        doctor_class.return_value.diagnose.return_value = (
+            sample_doctor_report()
+        )
+        result = main(
+            ["doctor"],
+            service=service,
+            output=output,
+        )
+
+    rendered = output.getvalue()
+    assert result == 0
+    assert "Atlas Service Doctor" in rendered
+    assert "Status: Unhealthy" in rendered
+    assert "Errors:   1" in rendered
+    assert "Warnings: 1" in rendered
+    assert "INFO" in rendered
+    assert "[jellyfin] Service Jellyfin is not running." in rendered
+    doctor_class.assert_called_once_with(service)
+    doctor_class.return_value.diagnose.assert_called_once_with()
+
+
+def test_doctor_json_output() -> None:
+    service = Mock()
+    output = StringIO()
+
+    with patch(
+        "atlas.service_lifecycle_cli.ServiceDoctor"
+    ) as doctor_class:
+        doctor_class.return_value.diagnose.return_value = (
+            sample_doctor_report()
+        )
+        result = main(
+            ["doctor", "--json"],
+            service=service,
+            output=output,
+        )
+
+    payload = json.loads(output.getvalue())
+    assert result == 0
+    assert payload["status"] == "unhealthy"
+    assert payload["provider"] == "docker-compose"
+    assert payload["counts"] == {
+        "critical": 0,
+        "error": 1,
+        "info": 1,
+        "warning": 1,
+    }
+    assert payload["total_findings"] == 3
+    assert payload["findings"][0]["service_identifier"] == "jellyfin"
+
+
+def test_doctor_help_is_active() -> None:
+    result = subprocess.run(
+        [str(ATLAS_CLI), "service", "doctor", "--help"],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert "usage: atlas service doctor" in result.stdout
+    assert "--json" in result.stdout

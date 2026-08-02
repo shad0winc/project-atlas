@@ -512,12 +512,14 @@ with backend services.
 
 ## M-022 — Administration and Operations
 
-**Status:** Planned for v1.0
+**Status:** Required for v1.0
 
 **Goal:** Allow Atlas administrators to operate the stable platform without
 requiring routine direct access to individual backend applications.
 
 ### Administration Portal
+
+The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be tagged until the supported administrator workflows below are implemented, authorized, tested, documented, and production-validated.
 
 - [ ] Administrative dashboard
 - [ ] User listing
@@ -680,6 +682,7 @@ Atlas v1.0 is complete when:
 - Users can manage their supported account settings.
 - Administrators can manage users, requests, Media, Sports, and health through
   Atlas.
+- The Admin Portal provides the supported v1.0 service overview, diagnostics, updates, and maintenance-history experience.
 - Routine user activity does not require direct access to backend services.
 - Updates can be tested, scheduled, backed up, verified, and rolled back.
 - Critical user journeys have automated or documented validation.

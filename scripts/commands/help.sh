@@ -13,13 +13,15 @@ Core Commands
   atlas version
   atlas status
   atlas services [--json]
-  atlas service [help|list|show|runtime|health|summary]
+  atlas service [help|list|show|runtime|health|summary|graph]
   atlas service list [--json]
   atlas service show <identifier> [--json]
   atlas service runtime <identifier> [--json]
   atlas service health [--json]
   atlas service health <identifier> [--json]
   atlas service summary [--json]
+  atlas service graph [--json]
+  atlas service doctor [--json]
   atlas urls
   atlas git
   atlas test [all|core|sports]
