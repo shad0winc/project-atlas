@@ -8,7 +8,9 @@ import sys
 from typing import TextIO
 
 from atlas.operations import (
+    FileOperationsRepository,
     OperationsReport,
+    OperationsRepository,
     OperationsService,
 )
 from atlas.operations.collectors import (
@@ -18,6 +20,10 @@ from atlas.operations.collectors import (
 
 
 OperationsServiceFactory = Callable[[], OperationsService]
+OperationsRepositoryFactory = Callable[
+    [],
+    OperationsRepository,
+]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -53,6 +59,34 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    save_parser = subparsers.add_parser(
+        "save",
+        help="Collect and persist the current Operations report",
+    )
+    save_parser.add_argument(
+        "--report-id",
+        default="operations-report",
+        help=(
+            "Report identity "
+            "(default: operations-report)"
+        ),
+    )
+    save_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Render the persisted report as JSON",
+    )
+
+    latest_parser = subparsers.add_parser(
+        "latest",
+        help="Render the latest persisted Operations report",
+    )
+    latest_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Render the persisted report as JSON",
+    )
+
     return parser
 
 
@@ -65,6 +99,12 @@ def default_service_factory() -> OperationsService:
             DockerCollector(),
         ),
     )
+
+
+def default_repository_factory() -> OperationsRepository:
+    """Construct the default Operations report repository."""
+
+    return FileOperationsRepository()
 
 
 def _status_marker(status: str) -> str:
@@ -241,11 +281,91 @@ def _run_report(
     return 0
 
 
+def _render_report(
+    report: OperationsReport,
+    *,
+    as_json: bool,
+    stdout: TextIO,
+) -> None:
+    if as_json:
+        print(report.to_json(), file=stdout)
+    else:
+        print(render_report_human(report), file=stdout)
+
+
+def _run_save(
+    args: argparse.Namespace,
+    *,
+    service_factory: OperationsServiceFactory,
+    repository_factory: OperationsRepositoryFactory,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    try:
+        service = service_factory()
+        repository = repository_factory()
+        report = service.collect(
+            report_id=args.report_id,
+        )
+        snapshot_path = repository.save(report)
+    except Exception as exc:
+        detail = str(exc).strip() or exc.__class__.__name__
+        print(
+            f"Operations save failed: {detail}",
+            file=stderr,
+        )
+        return 1
+
+    _render_report(
+        report,
+        as_json=args.json,
+        stdout=stdout,
+    )
+
+    if not args.json:
+        print(
+            f"Saved: {snapshot_path}",
+            file=stdout,
+        )
+
+    return 0
+
+
+def _run_latest(
+    args: argparse.Namespace,
+    *,
+    repository_factory: OperationsRepositoryFactory,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    try:
+        repository = repository_factory()
+        report = repository.latest()
+    except Exception as exc:
+        detail = str(exc).strip() or exc.__class__.__name__
+        print(
+            f"Operations latest failed: {detail}",
+            file=stderr,
+        )
+        return 1
+
+    _render_report(
+        report,
+        as_json=args.json,
+        stdout=stdout,
+    )
+
+    return 0
+
+
 def main(
     argv: Sequence[str] | None = None,
     *,
     service_factory: OperationsServiceFactory = (
         default_service_factory
+    ),
+    repository_factory: OperationsRepositoryFactory = (
+        default_repository_factory
     ),
     stdout: TextIO | None = None,
     stderr: TextIO | None = None,
@@ -265,6 +385,23 @@ def main(
         return _run_report(
             args,
             service_factory=service_factory,
+            stdout=output,
+            stderr=errors,
+        )
+
+    if args.command == "save":
+        return _run_save(
+            args,
+            service_factory=service_factory,
+            repository_factory=repository_factory,
+            stdout=output,
+            stderr=errors,
+        )
+
+    if args.command == "latest":
+        return _run_latest(
+            args,
+            repository_factory=repository_factory,
             stdout=output,
             stderr=errors,
         )

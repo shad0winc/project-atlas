@@ -584,8 +584,12 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 - [x] Add human-readable and JSON Operations reports
 - [x] Add the public `atlas operations report` command
 - [x] Add Python CLI and shell integration tests
-- [ ] Persist immutable Operations reports
-- [ ] Add report history and comparison
+- [x] Persist immutable Operations reports
+- [x] Add atomic `latest.json` retrieval
+- [x] Add `atlas operations save`
+- [x] Add `atlas operations latest`
+- [ ] Add report-history listing
+- [ ] Add report comparison
 - [ ] Schedule Operations report collection
 - [ ] Add Operations API routes
 - [ ] Add the Operations Portal dashboard

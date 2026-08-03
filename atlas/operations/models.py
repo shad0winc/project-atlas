@@ -205,6 +205,28 @@ class OperationFinding:
             }
         )
 
+    @classmethod
+    def from_dict(
+        cls,
+        payload: Mapping[str, Any],
+    ) -> "OperationFinding":
+        """Build a normalized finding from serialized data."""
+
+        if not isinstance(payload, Mapping):
+            raise OperationsModelError(
+                "finding payload must be an object",
+            )
+
+        return cls(
+            identifier=payload.get("identifier"),
+            name=payload.get("name"),
+            status=payload.get("status"),
+            severity=payload.get("severity"),
+            message=payload.get("message"),
+            recommendation=payload.get("recommendation"),
+            metadata=payload.get("metadata", {}),
+        )
+
     def to_dict(self) -> dict[str, Any]:
         """Serialize the normalized finding contract."""
 
@@ -336,6 +358,37 @@ class OperationsSection:
         return sum(
             finding.status is status
             for finding in self.findings
+        )
+
+    @classmethod
+    def from_dict(
+        cls,
+        payload: Mapping[str, Any],
+    ) -> "OperationsSection":
+        """Build a normalized section from serialized data."""
+
+        if not isinstance(payload, Mapping):
+            raise OperationsModelError(
+                "section payload must be an object",
+            )
+
+        raw_findings = payload.get("findings", ())
+
+        if not isinstance(raw_findings, (list, tuple)):
+            raise OperationsModelError(
+                "section findings must be a list or tuple",
+            )
+
+        findings = tuple(
+            OperationFinding.from_dict(finding)
+            for finding in raw_findings
+        )
+
+        return cls(
+            identifier=payload.get("identifier"),
+            name=payload.get("name"),
+            findings=findings,
+            description=payload.get("description"),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -600,6 +653,47 @@ class OperationsReport:
 
         raise OperationsModelError(
             "finding does not belong to this report",
+        )
+
+    @classmethod
+    def from_dict(
+        cls,
+        payload: Mapping[str, Any],
+    ) -> "OperationsReport":
+        """Build a normalized report from serialized data."""
+
+        if not isinstance(payload, Mapping):
+            raise OperationsModelError(
+                "report payload must be an object",
+            )
+
+        schema_version = payload.get("schema_version")
+
+        if schema_version != OPERATIONS_SCHEMA_VERSION:
+            raise OperationsModelError(
+                "schema_version is not supported: "
+                f"{schema_version!r}",
+            )
+
+        raw_sections = payload.get("sections", ())
+
+        if not isinstance(raw_sections, (list, tuple)):
+            raise OperationsModelError(
+                "report sections must be a list or tuple",
+            )
+
+        sections = tuple(
+            OperationsSection.from_dict(section)
+            for section in raw_sections
+        )
+
+        return cls(
+            report_id=payload.get("report_id"),
+            hostname=payload.get("hostname"),
+            atlas_version=payload.get("atlas_version"),
+            git_commit=payload.get("git_commit"),
+            sections=sections,
+            generated_at=payload.get("generated_at"),
         )
 
     def to_dict(self) -> dict[str, Any]:

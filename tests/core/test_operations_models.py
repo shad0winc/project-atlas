@@ -893,3 +893,432 @@ def test_report_serializes_qualified_attention_references() -> None:
             "identifier": "disk-threshold",
         }
     ]
+
+
+def test_operation_finding_from_dict_round_trip() -> None:
+    finding = OperationFinding(
+        identifier="system.hostname",
+        name="Hostname",
+        status="healthy",
+        severity="info",
+        message="Hostname: docker",
+        metadata={
+            "hostname": "docker",
+        },
+    )
+
+    restored = OperationFinding.from_dict(
+        finding.to_dict(),
+    )
+
+    assert restored == finding
+    assert restored.to_dict() == finding.to_dict()
+
+
+def test_operation_finding_from_dict_normalizes_inputs() -> None:
+    finding = OperationFinding.from_dict(
+        {
+            "identifier": " System_Hostname ",
+            "name": " Hostname ",
+            "status": " HEALTHY ",
+            "severity": " INFO ",
+            "message": " Hostname: Docker ",
+            "recommendation": None,
+            "metadata": {
+                "hostname": "docker",
+            },
+        }
+    )
+
+    assert finding.identifier == "system-hostname"
+    assert finding.name == "Hostname"
+    assert finding.status is OperationsStatus.HEALTHY
+    assert finding.severity is OperationsSeverity.INFO
+    assert finding.message == "Hostname: Docker"
+
+
+def test_operation_finding_from_dict_ignores_derived_fields() -> None:
+    finding = OperationFinding.from_dict(
+        {
+            "identifier": "system.hostname",
+            "name": "Hostname",
+            "status": "healthy",
+            "severity": "info",
+            "message": "Hostname: docker",
+            "metadata": {},
+            "score": 0,
+            "action_required": True,
+        }
+    )
+
+    assert finding.score == 100
+    assert finding.action_required is False
+
+
+def test_operation_finding_from_dict_rejects_non_object() -> None:
+    with pytest.raises(
+        OperationsModelError,
+        match="finding payload must be an object",
+    ):
+        OperationFinding.from_dict(
+            [],  # type: ignore[arg-type]
+        )
+
+
+def test_operation_finding_from_dict_validates_contract() -> None:
+    with pytest.raises(
+        OperationsModelError,
+        match="identifier must be text",
+    ):
+        OperationFinding.from_dict(
+            {
+                "name": "Hostname",
+                "status": "healthy",
+                "severity": "info",
+                "message": "Hostname: docker",
+            }
+        )
+
+
+def test_operations_section_from_dict_round_trip() -> None:
+    section = OperationsSection(
+        identifier="system",
+        name="System",
+        description="Host operating-system information",
+        findings=(
+            OperationFinding(
+                identifier="system.hostname",
+                name="Hostname",
+                status="healthy",
+                severity="info",
+                message="Hostname: docker",
+            ),
+        ),
+    )
+
+    restored = OperationsSection.from_dict(
+        section.to_dict(),
+    )
+
+    assert restored == section
+    assert restored.to_dict() == section.to_dict()
+
+
+def test_operations_section_from_dict_normalizes_inputs() -> None:
+    section = OperationsSection.from_dict(
+        {
+            "identifier": " SYSTEM ",
+            "name": " System ",
+            "description": " Host information ",
+            "findings": [
+                {
+                    "identifier": "system.hostname",
+                    "name": "Hostname",
+                    "status": "healthy",
+                    "severity": "info",
+                    "message": "Hostname: docker",
+                    "metadata": {},
+                },
+            ],
+        }
+    )
+
+    assert section.identifier is OperationsSectionId.SYSTEM
+    assert section.name == "System"
+    assert section.description == "Host information"
+    assert len(section.findings) == 1
+
+
+def test_operations_section_from_dict_ignores_derived_fields() -> None:
+    section = OperationsSection.from_dict(
+        {
+            "identifier": "system",
+            "name": "System",
+            "description": None,
+            "status": "critical",
+            "score": 0,
+            "finding_count": 99,
+            "status_counts": {
+                "healthy": 0,
+                "warning": 0,
+                "critical": 99,
+                "unknown": 0,
+            },
+            "attention_findings": [
+                "system.hostname",
+            ],
+            "findings": [
+                {
+                    "identifier": "system.hostname",
+                    "name": "Hostname",
+                    "status": "healthy",
+                    "severity": "info",
+                    "message": "Hostname: docker",
+                    "metadata": {},
+                    "score": 0,
+                    "action_required": True,
+                },
+            ],
+        }
+    )
+
+    assert section.status is OperationsStatus.HEALTHY
+    assert section.score == 100
+    assert section.healthy_count == 1
+    assert section.critical_count == 0
+    assert section.attention_findings == ()
+
+
+def test_operations_section_from_dict_rejects_non_object() -> None:
+    with pytest.raises(
+        OperationsModelError,
+        match="section payload must be an object",
+    ):
+        OperationsSection.from_dict(
+            [],  # type: ignore[arg-type]
+        )
+
+
+def test_operations_section_from_dict_rejects_non_list_findings() -> None:
+    with pytest.raises(
+        OperationsModelError,
+        match="section findings must be a list or tuple",
+    ):
+        OperationsSection.from_dict(
+            {
+                "identifier": "system",
+                "name": "System",
+                "findings": {},
+            }
+        )
+
+
+def test_operations_section_from_dict_validates_child_contracts() -> None:
+    with pytest.raises(
+        OperationsModelError,
+        match="finding payload must be an object",
+    ):
+        OperationsSection.from_dict(
+            {
+                "identifier": "system",
+                "name": "System",
+                "findings": [
+                    [],
+                ],
+            }
+        )
+
+
+def test_operations_section_from_dict_validates_identity() -> None:
+    with pytest.raises(
+        OperationsModelError,
+        match="identifier is not a supported Operations section",
+    ):
+        OperationsSection.from_dict(
+            {
+                "identifier": "unsupported",
+                "name": "Unsupported",
+                "findings": [],
+            }
+        )
+
+
+def test_operations_report_from_dict_round_trip() -> None:
+    report = OperationsReport(
+        report_id="nightly-operations",
+        hostname="docker",
+        atlas_version="0.9.0-rc.1",
+        git_commit="491e0a77",
+        generated_at="2026-08-03T22:00:00Z",
+        sections=(
+            OperationsSection(
+                identifier="system",
+                name="System",
+                findings=(
+                    OperationFinding(
+                        identifier="system.hostname",
+                        name="Hostname",
+                        status="healthy",
+                        severity="info",
+                        message="Hostname: docker",
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    restored = OperationsReport.from_dict(
+        report.to_dict(),
+    )
+
+    assert restored == report
+    assert restored.to_dict() == report.to_dict()
+
+
+def test_operations_report_from_dict_normalizes_inputs() -> None:
+    report = OperationsReport.from_dict(
+        {
+            "schema_version": OPERATIONS_SCHEMA_VERSION,
+            "report_id": " Nightly_Operations ",
+            "hostname": " DOCKER ",
+            "atlas_version": " 0.9.0-rc.1 ",
+            "git_commit": " 491E0A77 ",
+            "generated_at": "2026-08-03T18:00:00-04:00",
+            "sections": [],
+        }
+    )
+
+    assert report.report_id == "nightly-operations"
+    assert report.hostname == "docker"
+    assert report.atlas_version == "0.9.0-rc.1"
+    assert report.git_commit == "491e0a77"
+    assert report.generated_at == "2026-08-03T22:00:00Z"
+
+
+def test_operations_report_from_dict_ignores_derived_fields() -> None:
+    report = OperationsReport.from_dict(
+        {
+            "schema_version": OPERATIONS_SCHEMA_VERSION,
+            "report_id": "operations-report",
+            "hostname": "docker",
+            "atlas_version": "0.9.0-rc.1",
+            "git_commit": "491e0a77",
+            "generated_at": "2026-08-03T22:00:00Z",
+            "status": "critical",
+            "score": 0,
+            "summary": {
+                "status": "critical",
+                "score": 0,
+                "section_count": 99,
+                "finding_count": 99,
+            },
+            "attention_findings": [
+                {
+                    "section": "system",
+                    "identifier": "system.hostname",
+                },
+            ],
+            "sections": [
+                {
+                    "identifier": "system",
+                    "name": "System",
+                    "findings": [
+                        {
+                            "identifier": "system.hostname",
+                            "name": "Hostname",
+                            "status": "healthy",
+                            "severity": "info",
+                            "message": "Hostname: docker",
+                            "metadata": {},
+                        },
+                    ],
+                },
+            ],
+        }
+    )
+
+    assert report.status is OperationsStatus.HEALTHY
+    assert report.score == 100
+    assert report.summary.section_count == 1
+    assert report.summary.finding_count == 1
+    assert report.attention_findings == ()
+
+
+def test_operations_report_from_dict_rejects_non_object() -> None:
+    with pytest.raises(
+        OperationsModelError,
+        match="report payload must be an object",
+    ):
+        OperationsReport.from_dict(
+            [],  # type: ignore[arg-type]
+        )
+
+
+def test_operations_report_from_dict_requires_schema_version() -> None:
+    with pytest.raises(
+        OperationsModelError,
+        match="schema_version is not supported",
+    ):
+        OperationsReport.from_dict(
+            {
+                "report_id": "operations-report",
+                "hostname": "docker",
+                "atlas_version": "0.9.0-rc.1",
+                "git_commit": "491e0a77",
+                "generated_at": "2026-08-03T22:00:00Z",
+                "sections": [],
+            }
+        )
+
+
+def test_operations_report_from_dict_rejects_future_schema() -> None:
+    with pytest.raises(
+        OperationsModelError,
+        match="schema_version is not supported",
+    ):
+        OperationsReport.from_dict(
+            {
+                "schema_version": OPERATIONS_SCHEMA_VERSION + 1,
+                "report_id": "operations-report",
+                "hostname": "docker",
+                "atlas_version": "0.9.0-rc.1",
+                "git_commit": "491e0a77",
+                "generated_at": "2026-08-03T22:00:00Z",
+                "sections": [],
+            }
+        )
+
+
+def test_operations_report_from_dict_rejects_non_list_sections() -> None:
+    with pytest.raises(
+        OperationsModelError,
+        match="report sections must be a list or tuple",
+    ):
+        OperationsReport.from_dict(
+            {
+                "schema_version": OPERATIONS_SCHEMA_VERSION,
+                "report_id": "operations-report",
+                "hostname": "docker",
+                "atlas_version": "0.9.0-rc.1",
+                "git_commit": "491e0a77",
+                "generated_at": "2026-08-03T22:00:00Z",
+                "sections": {},
+            }
+        )
+
+
+def test_operations_report_from_dict_validates_child_contracts() -> None:
+    with pytest.raises(
+        OperationsModelError,
+        match="section payload must be an object",
+    ):
+        OperationsReport.from_dict(
+            {
+                "schema_version": OPERATIONS_SCHEMA_VERSION,
+                "report_id": "operations-report",
+                "hostname": "docker",
+                "atlas_version": "0.9.0-rc.1",
+                "git_commit": "491e0a77",
+                "generated_at": "2026-08-03T22:00:00Z",
+                "sections": [
+                    [],
+                ],
+            }
+        )
+
+
+def test_operations_report_from_dict_validates_report_contract() -> None:
+    with pytest.raises(
+        OperationsModelError,
+        match="report_id must be text",
+    ):
+        OperationsReport.from_dict(
+            {
+                "schema_version": OPERATIONS_SCHEMA_VERSION,
+                "hostname": "docker",
+                "atlas_version": "0.9.0-rc.1",
+                "git_commit": "491e0a77",
+                "generated_at": "2026-08-03T22:00:00Z",
+                "sections": [],
+            }
+        )

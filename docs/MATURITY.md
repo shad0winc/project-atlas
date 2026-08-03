@@ -231,22 +231,28 @@ Project Atlas prioritizes:
 
 ## Status
 
-**Implemented — CLI Complete**
+**Implemented — Persistent CLI Complete**
 
 Implemented capabilities include:
 
 - immutable Operations findings, sections, summaries, and reports;
+- schema-validated report deserialization;
 - read-only System and Docker collectors;
 - guarded Docker execution and normalized provider snapshots;
 - runtime, health, restart, OOM, exit, and governance findings;
 - deterministic aggregation and collector failure isolation;
 - automatic runtime-context discovery;
 - detailed human-readable and stable JSON reports;
-- public `atlas operations` shell integration;
-- dedicated unit, integration, regression, and live validation.
+- immutable timestamped report snapshots;
+- atomic `latest.json` persistence;
+- duplicate-snapshot protection;
+- newest-first repository history support;
+- public `atlas operations report`, `save`, and `latest` commands;
+- dedicated unit, integration, regression, corruption, atomic-write,
+  shell, and live validation.
 
-The subsystem is **Level 4 — Observable** as a standalone
-operational capability.
+The subsystem is **Level 4 — Observable** with durable report
+persistence.
 
-Persistence, history, scheduling, API exposure, and Portal
-visualization remain planned extensions.
+History listing, comparison, scheduling, API exposure, notifications,
+and Portal visualization remain planned extensions.

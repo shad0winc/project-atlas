@@ -382,3 +382,146 @@ def test_json_output_contract_is_unchanged() -> None:
 
     assert payload == operations_report().to_dict()
     assert "Atlas Operations Report" not in stdout.getvalue()
+
+
+class FakeOperationsRepository:
+    def __init__(self) -> None:
+        self.saved: list[OperationsReport] = []
+        self.latest_report = operations_report()
+
+    def save(self, report: OperationsReport):
+        from pathlib import Path
+
+        self.saved.append(report)
+        return Path(
+            "/tmp/operations/history/"
+            "2026-08-03T19-00-00Z.json"
+        )
+
+    def latest(self) -> OperationsReport:
+        return self.latest_report
+
+    def history(
+        self,
+        limit: int = 25,
+    ) -> tuple[OperationsReport, ...]:
+        return (self.latest_report,)
+
+
+def test_parser_accepts_save_command() -> None:
+    args = build_parser().parse_args(["save"])
+
+    assert args.command == "save"
+    assert args.report_id == "operations-report"
+    assert args.json is False
+
+
+def test_parser_accepts_latest_command() -> None:
+    args = build_parser().parse_args(["latest"])
+
+    assert args.command == "latest"
+    assert args.json is False
+
+
+def test_main_saves_collected_report() -> None:
+    service = FakeOperationsService()
+    repository = FakeOperationsRepository()
+    stdout = StringIO()
+
+    result = main(
+        ["save", "--report-id", "nightly"],
+        service_factory=lambda: service,
+        repository_factory=lambda: repository,
+        stdout=stdout,
+        stderr=StringIO(),
+    )
+
+    assert result == 0
+    assert service.report_ids == ["nightly"]
+    assert repository.saved == [operations_report()]
+    assert "Atlas Operations Report" in stdout.getvalue()
+    assert "Saved: /tmp/operations/history/" in stdout.getvalue()
+
+
+def test_main_saves_and_renders_json() -> None:
+    service = FakeOperationsService()
+    repository = FakeOperationsRepository()
+    stdout = StringIO()
+
+    result = main(
+        ["save", "--json"],
+        service_factory=lambda: service,
+        repository_factory=lambda: repository,
+        stdout=stdout,
+        stderr=StringIO(),
+    )
+
+    assert result == 0
+    assert json.loads(stdout.getvalue()) == (
+        operations_report().to_dict()
+    )
+
+
+def test_main_renders_latest_report() -> None:
+    repository = FakeOperationsRepository()
+    stdout = StringIO()
+
+    result = main(
+        ["latest"],
+        repository_factory=lambda: repository,
+        stdout=stdout,
+        stderr=StringIO(),
+    )
+
+    assert result == 0
+    assert "Atlas Operations Report" in stdout.getvalue()
+
+
+def test_main_renders_latest_json() -> None:
+    repository = FakeOperationsRepository()
+    stdout = StringIO()
+
+    result = main(
+        ["latest", "--json"],
+        repository_factory=lambda: repository,
+        stdout=stdout,
+        stderr=StringIO(),
+    )
+
+    assert result == 0
+    assert json.loads(stdout.getvalue()) == (
+        operations_report().to_dict()
+    )
+
+
+@pytest.mark.parametrize(
+    ("command", "message"),
+    (
+        ("save", "Operations save failed"),
+        ("latest", "Operations latest failed"),
+    ),
+)
+def test_persistence_commands_normalize_failures(
+    command: str,
+    message: str,
+) -> None:
+    class BrokenRepository(FakeOperationsRepository):
+        def save(self, report: OperationsReport):
+            raise RuntimeError("storage unavailable")
+
+        def latest(self) -> OperationsReport:
+            raise RuntimeError("storage unavailable")
+
+    stderr = StringIO()
+
+    result = main(
+        [command],
+        service_factory=FakeOperationsService,
+        repository_factory=BrokenRepository,
+        stdout=StringIO(),
+        stderr=stderr,
+    )
+
+    assert result == 1
+    assert message in stderr.getvalue()
+    assert "storage unavailable" in stderr.getvalue()

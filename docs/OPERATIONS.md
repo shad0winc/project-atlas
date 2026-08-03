@@ -189,8 +189,8 @@ provider contracts in later increments.
 
 # Atlas Operations Reports
 
-Atlas Operations provides one read-only report covering the current
-host and Docker deployment.
+Atlas Operations provides read-only live reporting and immutable report
+persistence for the current host and Docker deployment.
 
 ## Commands
 
@@ -200,16 +200,56 @@ atlas operations help
 atlas operations report
 atlas operations report --json
 atlas operations report --report-id nightly-operations
+atlas operations save
+atlas operations save --json
+atlas operations save --report-id nightly-operations
+atlas operations latest
+atlas operations latest --json
 ```
 
-Every report includes its identity, hostname, Atlas version, Git
-commit, UTC generation timestamp, status, score, summary, attention
+## Command behavior
+
+- `report` collects and renders a live report without persisting it.
+- `save` collects a live report, writes an immutable history snapshot,
+  and atomically updates `latest.json`.
+- `latest` loads and validates the most recently persisted report without
+  executing collectors.
+
+## Storage layout
+
+```text
+/mnt/storage/configs/atlas/operations/
+├── latest.json
+└── history/
+    └── <generated-at>.json
+```
+
+Historical snapshots are immutable. Atlas rejects a second save using the
+same generated timestamp instead of replacing the existing snapshot.
+
+`latest.json` is updated only after the historical snapshot is written
+successfully.
+
+## Report contract
+
+Every report includes its schema version, identity, hostname, Atlas version,
+Git commit, UTC generation timestamp, status, score, summary, attention
 references, and normalized sections.
+
+Stored reports are reconstructed through:
+
+- `OperationFinding.from_dict()`;
+- `OperationsSection.from_dict()`;
+- `OperationsReport.from_dict()`.
+
+Canonical fields are validated and normalized. Derived fields such as
+status, score, summary, counts, and attention references are recomputed
+rather than trusted from disk.
 
 ## System section
 
-The System section reports hostname, operating system, kernel, uptime,
-CPU, and memory.
+The System section reports hostname, operating system, kernel, uptime, CPU,
+and memory.
 
 ## Containers section
 
@@ -229,19 +269,22 @@ Reports end with an **Attention Required** summary.
 ## Failure isolation
 
 A failed collector does not abort the complete report. Atlas emits an
-unknown fallback section and preserves successfully collected
-sections.
+unknown fallback section and preserves successfully collected sections.
+
+Repository read failures, invalid JSON, invalid schema versions, and invalid
+domain contracts are normalized into Operations repository errors.
 
 ## JSON contract
 
-`atlas operations report --json` is the canonical machine-readable
-contract. Consumers should not parse the human renderer.
+`atlas operations report --json`, `save --json`, and `latest --json` expose
+the canonical machine-readable contract. Consumers should not parse the
+human renderer.
 
 ## Current boundaries
 
-The subsystem remains read-only and does not yet persist history,
-schedule reports, publish events, send notifications, expose API
-routes, or perform automatic remediation.
+History listing, report comparison, scheduled collection, API routes,
+notifications, Portal visualization, retention, and automatic remediation
+remain planned extensions.
 
 # Production Ingress Operations
 

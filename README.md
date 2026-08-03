@@ -489,8 +489,8 @@ See `ROADMAP.md` for the authoritative milestone definitions.
 
 ## Operations reporting
 
-Atlas includes a read-only Operations subsystem that aggregates
-host and Docker intelligence into one deterministic report.
+Atlas includes a read-only Operations subsystem that aggregates host and
+Docker intelligence into deterministic reports.
 
 ```bash
 atlas operations
@@ -498,17 +498,39 @@ atlas operations help
 atlas operations report
 atlas operations report --json
 atlas operations report --report-id nightly-operations
+atlas operations save
+atlas operations save --json
+atlas operations save --report-id nightly-operations
+atlas operations latest
+atlas operations latest --json
 ```
 
-The human report includes runtime metadata, overall health and score,
-section summaries, every finding, recommendations, and an attention
-summary.
+`report` collects a live report without persisting it.
 
-JSON output exposes the same immutable `OperationsReport` contract
-for automation and future API, scheduler, persistence, and Portal
-integrations.
+`save` collects a live report, writes an immutable timestamped JSON
+snapshot, and atomically updates `latest.json`.
 
-See `docs/OPERATIONS.md` for the complete command and report contract.
+`latest` loads and validates the most recently persisted report without
+executing the collectors again.
+
+The default storage layout is:
+
+```text
+/mnt/storage/configs/atlas/operations/
+├── latest.json
+└── history/
+    └── <generated-at>.json
+```
+
+Stored reports are reconstructed through the Operations domain models.
+Schema versions, identities, child contracts, timestamps, and canonical
+inputs are validated, while derived status, score, summary, and attention
+fields are recomputed.
+
+Historical listing, report comparison, scheduling, APIs, and Portal
+visualization remain planned extensions.
+
+See `docs/OPERATIONS.md` for the complete command and persistence contract.
 
 ## Documentation
 

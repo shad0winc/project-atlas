@@ -151,6 +151,8 @@ def test_operations_help_returns_zero(tmp_path: Path) -> None:
     assert completed.returncode == 0
     assert "Atlas Operations" in completed.stdout
     assert "atlas operations report" in completed.stdout
+    assert "atlas operations save" in completed.stdout
+    assert "atlas operations latest" in completed.stdout
     assert completed.stderr == ""
     assert not capture_path.exists()
 
@@ -269,12 +271,22 @@ def test_central_help_lists_operations(
     )
 
     assert completed.returncode == 0
-    assert "atlas operations [help|report]" in (
-        completed.stdout
+    assert (
+        "atlas operations [help|report|save|latest]"
+        in completed.stdout
     )
     assert (
         "atlas operations report "
         "[--json] [--report-id REPORT_ID]"
+        in completed.stdout
+    )
+    assert (
+        "atlas operations save "
+        "[--json] [--report-id REPORT_ID]"
+        in completed.stdout
+    )
+    assert (
+        "atlas operations latest [--json]"
         in completed.stdout
     )
 
@@ -292,3 +304,117 @@ def test_unknown_top_level_command_remains_unchanged(
         "Unknown command: not-a-command\n"
         "Run: atlas help\n"
     )
+
+
+def test_operations_save_forwards_to_python(
+    tmp_path: Path,
+) -> None:
+    completed, capture_path = run_atlas(
+        tmp_path,
+        "operations",
+        "save",
+    )
+
+    assert completed.returncode == 0
+    assert completed.stderr == ""
+    assert capture_path.read_text(
+        encoding="utf-8",
+    ).splitlines() == [
+        "-m",
+        "atlas.operations_cli",
+        "save",
+    ]
+
+
+def test_operations_save_forwards_all_options(
+    tmp_path: Path,
+) -> None:
+    completed, capture_path = run_atlas(
+        tmp_path,
+        "operations",
+        "save",
+        "--json",
+        "--report-id",
+        "nightly-operations",
+    )
+
+    assert completed.returncode == 0
+    assert completed.stderr == ""
+    assert capture_path.read_text(
+        encoding="utf-8",
+    ).splitlines() == [
+        "-m",
+        "atlas.operations_cli",
+        "save",
+        "--json",
+        "--report-id",
+        "nightly-operations",
+    ]
+
+
+def test_operations_latest_forwards_to_python(
+    tmp_path: Path,
+) -> None:
+    completed, capture_path = run_atlas(
+        tmp_path,
+        "operations",
+        "latest",
+    )
+
+    assert completed.returncode == 0
+    assert completed.stderr == ""
+    assert capture_path.read_text(
+        encoding="utf-8",
+    ).splitlines() == [
+        "-m",
+        "atlas.operations_cli",
+        "latest",
+    ]
+
+
+def test_operations_latest_forwards_json_option(
+    tmp_path: Path,
+) -> None:
+    completed, capture_path = run_atlas(
+        tmp_path,
+        "operations",
+        "latest",
+        "--json",
+    )
+
+    assert completed.returncode == 0
+    assert completed.stderr == ""
+    assert capture_path.read_text(
+        encoding="utf-8",
+    ).splitlines() == [
+        "-m",
+        "atlas.operations_cli",
+        "latest",
+        "--json",
+    ]
+
+
+def test_operations_save_preserves_python_exit_code(
+    tmp_path: Path,
+) -> None:
+    completed, _ = run_atlas(
+        tmp_path,
+        "operations",
+        "save",
+        python_status=6,
+    )
+
+    assert completed.returncode == 6
+
+
+def test_operations_latest_preserves_python_exit_code(
+    tmp_path: Path,
+) -> None:
+    completed, _ = run_atlas(
+        tmp_path,
+        "operations",
+        "latest",
+        python_status=5,
+    )
+
+    assert completed.returncode == 5

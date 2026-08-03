@@ -983,5 +983,24 @@ atlas operations report --json
 atlas operations report --report-id REPORT_ID
 ```
 
-The JSON `OperationsReport` is the future contract for persistence,
-scheduling, APIs, notifications, and the Portal.
+The JSON `OperationsReport` is now the canonical persistence contract.
+Serialized reports are reconstructed through schema-validated domain
+loaders that normalize identities, timestamps, child contracts, and
+canonical inputs while recomputing derived status, score, summary, and
+attention fields.
+
+Persistence is isolated behind `OperationsRepository` and the default
+`FileOperationsRepository` implementation.
+
+The default layout is:
+
+    /mnt/storage/configs/atlas/operations/
+    ├── latest.json
+    └── history/
+        └── <generated-at>.json
+
+Historical snapshots are immutable and written atomically. `latest.json`
+is updated only after the historical snapshot succeeds.
+
+History listing, comparison, scheduling, APIs, notifications, and the
+Portal remain future extensions of this stable contract.

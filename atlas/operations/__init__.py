@@ -6,6 +6,13 @@ from .context import (
     OperationsContextError,
     OperationsContextProvider,
 )
+from .repository import (
+    DEFAULT_OPERATIONS_DIRECTORY,
+    FileOperationsRepository,
+    OperationsReportNotFoundError,
+    OperationsRepository,
+    OperationsRepositoryError,
+)
 from .service import (
     OperationsService,
     OperationsServiceError,
@@ -23,7 +30,9 @@ from .models import (
 )
 
 __all__ = [
+    "DEFAULT_OPERATIONS_DIRECTORY",
     "OPERATIONS_SCHEMA_VERSION",
+    "FileOperationsRepository",
     "HostOperationsContextProvider",
     "OperationFinding",
     "OperationsContext",
@@ -31,6 +40,9 @@ __all__ = [
     "OperationsContextProvider",
     "OperationsModelError",
     "OperationsReport",
+    "OperationsReportNotFoundError",
+    "OperationsRepository",
+    "OperationsRepositoryError",
     "OperationsSection",
     "OperationsService",
     "OperationsServiceError",

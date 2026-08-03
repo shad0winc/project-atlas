@@ -30,6 +30,15 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Added
 
+- Added immutable Atlas Operations report persistence with schema-validated
+  deserialization, deterministic atomic JSON snapshots, duplicate-snapshot
+  protection, `latest.json`, and newest-first repository history support.
+- Added `atlas operations save` and `atlas operations latest`, including
+  human-readable and deterministic JSON output through both the Python and
+  public shell CLIs.
+- Added dedicated Operations repository, model round-trip, CLI, shell,
+  corruption, failure-isolation, and atomic-write tests.
+
 - Added the complete Atlas Operations reporting and CLI foundation,
   including deterministic aggregation, collector failure isolation,
   automatic runtime context, detailed human reports, stable JSON output,

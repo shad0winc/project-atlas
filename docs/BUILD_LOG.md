@@ -3034,3 +3034,80 @@ remain future work.
 
 Project Atlas now has a complete, deterministic, tested, and public
 Operations reporting path backed by stable human and JSON contracts.
+
+---
+
+# 2026-08-03
+
+## M-023.6A — Immutable Operations Report Persistence
+
+### Objective
+
+Add durable, immutable persistence beneath the existing Atlas Operations
+reporting contract without changing live report behavior.
+
+### Completed
+
+- Added `OperationFinding.from_dict()`.
+- Added `OperationsSection.from_dict()`.
+- Added `OperationsReport.from_dict()` with schema-version validation.
+- Added canonical-input reconstruction and derived-field recomputation.
+- Added `OperationsRepository`.
+- Added `FileOperationsRepository`.
+- Added immutable timestamped history snapshots.
+- Added deterministic atomic JSON writes.
+- Added atomic `latest.json` updates.
+- Added duplicate-snapshot rejection.
+- Added newest-first history loading with validated limits.
+- Added repository-specific missing, corruption, and contract errors.
+- Added public repository exports.
+- Added `atlas operations save`.
+- Added `atlas operations latest`.
+- Added Python and shell CLI integration.
+
+### Public interface
+
+```bash
+atlas operations report
+atlas operations report --json
+atlas operations save
+atlas operations save --json
+atlas operations save --report-id nightly-operations
+atlas operations latest
+atlas operations latest --json
+```
+
+### Storage layout
+
+```text
+/mnt/storage/configs/atlas/operations/
+├── latest.json
+└── history/
+    └── <generated-at>.json
+```
+
+### Verification
+
+- 78 Operations model tests passed.
+- 28 Operations repository tests passed.
+- 29 Operations Python CLI tests passed.
+- 15 Operations shell integration tests passed.
+- 370 complete Operations tests passed.
+- Python compilation passed.
+- Shell syntax validation passed.
+- Diff hygiene passed.
+- Live `save` and `latest` commands passed.
+- Live persisted report status was healthy with score 100.
+- Historical snapshot and `latest.json` matched the rendered JSON contract.
+
+### Boundary
+
+History listing, report comparison, scheduled collection, APIs,
+notifications, Portal visualization, and automatic remediation remain
+future work.
+
+### Result
+
+Atlas Operations now preserves validated, immutable operational snapshots
+while keeping live collection and persisted retrieval as explicit, separate
+commands.

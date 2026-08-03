@@ -7,9 +7,13 @@ Atlas Operations
 Usage:
   atlas operations help
   atlas operations report [--json] [--report-id REPORT_ID]
+  atlas operations save [--json] [--report-id REPORT_ID]
+  atlas operations latest [--json]
 
 Commands:
-  report    Collect the current Atlas Operations report
+  report    Collect the current live Operations report
+  save      Collect and persist a new Operations report
+  latest    Render the latest persisted Operations report
   help      Show this help text
 
 Options:
@@ -41,6 +45,16 @@ atlas_command_operations() {
     report)
       shift
       atlas_operations_python report "$@"
+      ;;
+
+    save)
+      shift
+      atlas_operations_python save "$@"
+      ;;
+
+    latest)
+      shift
+      atlas_operations_python latest "$@"
       ;;
 
     *)
