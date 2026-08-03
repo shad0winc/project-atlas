@@ -2732,3 +2732,97 @@ The production ingress deployment now has explicit fault-containment
 ceilings, native health monitoring, and a repeatable verification
 contract while preserving substantial capacity for future Portal and
 API growth.
+
+---
+
+# 2026-08-03
+
+## M-023.3.1B — Operations Domain Contracts
+
+### Objective
+
+Create the canonical, provider-neutral Operations domain that future
+collectors, reports, CLI commands, APIs, notifications, and Portal
+dashboards can consume without duplicating operational data contracts.
+
+### Completed
+
+- Added the `atlas.operations` package.
+- Added `OperationsStatus`.
+- Added `OperationsSeverity`.
+- Added `OperationsSectionId`.
+- Added `OperationFinding`.
+- Added `OperationsSection`.
+- Added `OperationsSummary`.
+- Added `OperationsReport`.
+- Added `OperationsModelError`.
+- Added `OPERATIONS_SCHEMA_VERSION`.
+- Added immutable dataclass contracts.
+- Added normalized text and identifier handling.
+- Added timezone-aware timestamp normalization to UTC.
+- Added hexadecimal Git commit validation.
+- Added deterministic metadata serialization.
+- Added canonical section ordering.
+- Added deterministic attention ordering by:
+  - severity;
+  - canonical section order;
+  - finding identifier.
+- Added duplicate section detection.
+- Added duplicate finding detection within sections.
+- Added global finding-identifier uniqueness enforcement.
+- Added qualified attention references containing section and finding identity.
+- Added deterministic `to_dict()` and JSON serialization.
+- Added public package exports.
+
+### Canonical Section Identities
+
+```text
+system
+containers
+services
+storage
+ingress
+media
+requests
+notifications
+retention
+cleanup
+ari
+sports
+forecast
+users
+backup
+scheduler
+```
+
+### Architectural Boundary
+
+This milestone defines domain contracts only.
+
+It does not yet:
+
+- collect live platform data;
+- modify systemd timers;
+- modify the daily health-report pipeline;
+- publish Operations events;
+- add CLI commands;
+- add API routes;
+- add Portal dashboards;
+- change Notifications behavior.
+
+### Validation
+
+- 57 focused Operations domain tests passed.
+- 376 related Health, Media Request, and Service Lifecycle tests passed.
+- Package import validation passed.
+- Python compilation passed.
+- Deterministic ordering demonstrations passed.
+- Runtime integrity demonstrations passed.
+- `git diff --check` passed.
+
+### Result
+
+Project Atlas now has a stable and deterministic Operations domain that
+can serve as the single normalized contract for collectors, reports,
+notifications, APIs, CLI output, historical snapshots, and Portal
+dashboards.

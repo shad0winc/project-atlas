@@ -30,6 +30,7 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Added
 
+- Added the canonical `atlas.operations` domain, including immutable findings, sections, summaries, and reports; schema-versioned serialization; canonical section identities; UTC timestamp and Git commit normalization; deterministic section and attention ordering; global finding uniqueness validation; package exports; and 57 focused tests.
 - Added production ingress resource governance for Caddy, Atlas API, and Atlas Portal, including memory, CPU, and PID ceilings, a native Caddy health check, and a permanent runtime verifier.
 - Integrated normalized `request.*` lifecycle events with the Notifications module, including media-type Discord routing, lifecycle-specific formatting, Ready to Watch availability notifications, severity classification, module verification, documentation, and dedicated tests.
 - Added provider-neutral Media Request lifecycle events and optional best-effort publication from the Media Request service, including created, submitted, lifecycle transition, and cancellation events, publication error observability, package exports, and dedicated tests.
