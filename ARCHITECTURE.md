@@ -986,6 +986,9 @@ atlas operations latest
 atlas operations history
 atlas operations history --json
 atlas operations history --limit LIMIT
+atlas operations compare
+atlas operations compare --json
+atlas operations compare --include-unchanged
 ```
 
 The JSON `OperationsReport` is now the canonical persistence contract.
@@ -1015,5 +1018,30 @@ Human history output intentionally summarizes report identity, generation
 time, status, and score. JSON history output wraps complete validated
 `OperationsReport` contracts with a deterministic `count` field.
 
-Report comparison, scheduling, APIs, notifications, and the Portal remain
-future extensions of this stable contract.
+Persisted reports can be compared through a pure, read-only comparison
+pipeline:
+
+```text
+FileOperationsRepository
+          |
+          v
+OperationsComparisonService
+          |
+          v
+  OperationsComparison
+       /          \
+      v            v
+Human Renderer   Stable JSON
+```
+
+The comparison service receives two validated `OperationsReport` values and
+detects added, removed, changed, and optionally unchanged findings. It does
+not read files directly, mutate reports, write snapshots, or update
+`latest.json`.
+
+`OperationsComparison` stores only canonical reports and finding changes.
+Status changes, score deltas, attention deltas, and change counts are
+derived from those canonical inputs rather than persisted independently.
+
+Scheduled collection, APIs, notifications, and the Portal remain future
+extensions of this stable contract.

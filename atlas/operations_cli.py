@@ -13,6 +13,9 @@ from atlas.operations import (
     OperationsReport,
     OperationsRepository,
     OperationsService,
+    OperationsComparisonService,
+    render_comparison_human,
+    render_comparison_json,
 )
 from atlas.operations.collectors import (
     DockerCollector,
@@ -102,6 +105,21 @@ def build_parser() -> argparse.ArgumentParser:
         "--json",
         action="store_true",
         help="Render history as deterministic JSON",
+    )
+
+    compare_parser = subparsers.add_parser(
+        "compare",
+        help="Compare the two newest persisted Operations reports",
+    )
+    compare_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Render comparison as deterministic JSON",
+    )
+    compare_parser.add_argument(
+        "--include-unchanged",
+        action="store_true",
+        help="Include unchanged findings in the comparison contract",
     )
 
     return parser
@@ -472,6 +490,55 @@ def _run_history(
     return 0
 
 
+def _run_compare(
+    args: argparse.Namespace,
+    *,
+    repository_factory: OperationsRepositoryFactory,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    try:
+        repository = repository_factory()
+        reports = repository.history(limit=2)
+
+        if len(reports) < 2:
+            print(
+                "Operations comparison failed: "
+                "at least two persisted reports are required",
+                file=stderr,
+            )
+            return 1
+
+        current = reports[0]
+        previous = reports[1]
+
+        comparison = OperationsComparisonService().compare(
+            previous,
+            current,
+            include_unchanged=args.include_unchanged,
+        )
+    except Exception as exc:
+        detail = str(exc).strip() or exc.__class__.__name__
+        print(
+            f"Operations comparison failed: {detail}",
+            file=stderr,
+        )
+        return 1
+
+    if args.json:
+        print(
+            render_comparison_json(comparison),
+            file=stdout,
+        )
+    else:
+        print(
+            render_comparison_human(comparison),
+            file=stdout,
+        )
+
+    return 0
+
+
 def main(
     argv: Sequence[str] | None = None,
     *,
@@ -522,6 +589,14 @@ def main(
 
     if args.command == "history":
         return _run_history(
+            args,
+            repository_factory=repository_factory,
+            stdout=output,
+            stderr=errors,
+        )
+
+    if args.command == "compare":
+        return _run_compare(
             args,
             repository_factory=repository_factory,
             stdout=output,

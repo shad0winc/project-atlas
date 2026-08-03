@@ -1,5 +1,18 @@
 """Public Operations domain contracts for Project Atlas."""
 
+from .comparison import (
+    OperationsChangeType,
+    OperationsComparison,
+    OperationsFindingChange,
+)
+from .comparison_rendering import (
+    render_comparison_human,
+    render_comparison_json,
+)
+from .comparison_service import (
+    OperationsComparisonService,
+    OperationsComparisonServiceError,
+)
 from .context import (
     HostOperationsContextProvider,
     OperationsContext,
@@ -35,7 +48,12 @@ __all__ = [
     "FileOperationsRepository",
     "HostOperationsContextProvider",
     "OperationFinding",
+    "OperationsChangeType",
+    "OperationsComparison",
+    "OperationsComparisonService",
+    "OperationsComparisonServiceError",
     "OperationsContext",
+    "OperationsFindingChange",
     "OperationsContextError",
     "OperationsContextProvider",
     "OperationsModelError",
@@ -50,4 +68,6 @@ __all__ = [
     "OperationsSeverity",
     "OperationsStatus",
     "OperationsSummary",
+    "render_comparison_human",
+    "render_comparison_json",
 ]

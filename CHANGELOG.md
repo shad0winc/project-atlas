@@ -30,6 +30,17 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Added
 
+- Added deterministic Atlas Operations report comparison with immutable
+  finding-change and aggregate comparison contracts, derived status, score,
+  attention, and change summaries, and validated round-trip serialization.
+- Added a pure comparison service that detects added, removed, changed, and
+  optionally unchanged findings while preserving deterministic ordering.
+- Added concise human and stable JSON comparison renderers.
+- Added `atlas operations compare`, `atlas operations compare --json`, and
+  `atlas operations compare --include-unchanged`.
+- Added focused comparison model, service, renderer, Python CLI, shell,
+  repository-failure, insufficient-history, and live read-only validation.
+
 - Added read-only Atlas Operations history inspection with newest-first
   ordering, configurable limits, concise human output, and a stable wrapped
   JSON contract.

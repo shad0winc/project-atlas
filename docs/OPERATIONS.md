@@ -208,6 +208,9 @@ atlas operations latest --json
 atlas operations history
 atlas operations history --json
 atlas operations history --limit 10
+atlas operations compare
+atlas operations compare --json
+atlas operations compare --include-unchanged
 ```
 
 ## Command behavior
@@ -220,6 +223,10 @@ atlas operations history --limit 10
 - `history` loads validated snapshots in newest-first order without
   modifying persisted files.
 - `history --limit LIMIT` restricts the maximum returned report count.
+- `compare` compares the two newest persisted reports without modifying
+  either snapshot or `latest.json`.
+- `compare --include-unchanged` includes stable findings in the serialized
+  comparison contract while human output remains difference-focused.
 
 ## Storage layout
 
@@ -252,6 +259,41 @@ JSON history output uses a stable wrapped collection contract:
 
 Reports are returned newest first. Each JSON entry is the same complete,
 validated report contract exposed by `report --json` and `latest --json`.
+
+## Report comparison
+
+`atlas operations compare` retrieves the two newest validated reports from
+the repository. The newest report is treated as the current state and the
+second-newest report is treated as the previous state.
+
+The comparison service detects:
+
+- added findings;
+- removed findings;
+- changed findings;
+- optionally unchanged findings;
+- overall status changes;
+- score deltas;
+- attention-count deltas.
+
+A finding that moves between sections is represented as one removal from
+the previous section and one addition to the current section.
+
+Human output shows report identities, timestamps, status and score changes,
+summary counts, and difference details. Unchanged findings are omitted from
+human output even when included in the comparison contract.
+
+JSON output contains four top-level fields:
+
+    {
+      "previous": { ...OperationsReport... },
+      "current": { ...OperationsReport... },
+      "summary": { ...derived comparison totals... },
+      "changes": [ ...OperationsFindingChange values... ]
+    }
+
+Comparison is deterministic and strictly read-only. It does not write new
+snapshots, update `latest.json`, or mutate either source report.
 
 ## Report contract
 
@@ -305,9 +347,8 @@ human renderer.
 
 ## Current boundaries
 
-Report comparison, scheduled collection, API routes, notifications,
-Portal visualization, retention, and automatic remediation remain planned
-extensions.
+Scheduled collection, API routes, notifications, Portal visualization,
+comparison retention, and automatic remediation remain planned extensions.
 
 # Production Ingress Operations
 

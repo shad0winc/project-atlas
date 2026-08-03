@@ -592,7 +592,12 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 - [x] Add `atlas operations history`
 - [x] Add configurable newest-first history limits
 - [x] Add human and wrapped JSON history output
-- [ ] Add report comparison
+- [x] Add immutable report-comparison contracts
+- [x] Add deterministic finding comparison
+- [x] Add human and JSON comparison renderers
+- [x] Add `atlas operations compare`
+- [x] Add optional unchanged-finding inclusion
+- [x] Validate live comparison as read-only
 - [ ] Schedule Operations report collection
 - [ ] Add Operations API routes
 - [ ] Add the Operations Portal dashboard

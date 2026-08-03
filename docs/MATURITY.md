@@ -250,13 +250,17 @@ Implemented capabilities include:
 - configurable bounded history inspection;
 - concise human-readable history output;
 - stable wrapped JSON history output;
-- public `atlas operations report`, `save`, `latest`, and `history`
-  commands;
+- immutable finding-change and aggregate comparison contracts;
+- deterministic added, removed, changed, and unchanged detection;
+- derived status, score, attention, and change summaries;
+- concise human and stable JSON comparison rendering;
+- public `atlas operations report`, `save`, `latest`, `history`, and
+  `compare` commands;
 - dedicated unit, integration, regression, corruption, atomic-write,
-  renderer, shell, and live read-only validation.
+  comparison, renderer, shell, and live read-only validation.
 
 The subsystem is **Level 4 — Observable** with durable report
 persistence.
 
-Report comparison, scheduling, API exposure, notifications, and Portal
+Scheduled collection, API exposure, notifications, and Portal
 visualization remain planned extensions.

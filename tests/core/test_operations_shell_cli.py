@@ -154,6 +154,7 @@ def test_operations_help_returns_zero(tmp_path: Path) -> None:
     assert "atlas operations save" in completed.stdout
     assert "atlas operations latest" in completed.stdout
     assert "atlas operations history" in completed.stdout
+    assert "atlas operations compare" in completed.stdout
     assert completed.stderr == ""
     assert not capture_path.exists()
 
@@ -273,7 +274,7 @@ def test_central_help_lists_operations(
 
     assert completed.returncode == 0
     assert (
-        "atlas operations [help|report|save|latest|history]"
+        "atlas operations [help|report|save|latest|history|compare]"
         in completed.stdout
     )
     assert (
@@ -292,6 +293,10 @@ def test_central_help_lists_operations(
     )
     assert (
         "atlas operations history [--limit LIMIT] [--json]"
+        in completed.stdout
+    )
+    assert (
+        "atlas operations compare [--json] [--include-unchanged]"
         in completed.stdout
     )
 
@@ -478,6 +483,63 @@ def test_operations_history_preserves_python_exit_code(
         tmp_path,
         "operations",
         "history",
+        python_status=7,
+    )
+
+    assert completed.returncode == 7
+
+
+def test_operations_compare_forwards_to_python(
+    tmp_path: Path,
+) -> None:
+    completed, capture_path = run_atlas(
+        tmp_path,
+        "operations",
+        "compare",
+    )
+
+    assert completed.returncode == 0
+    assert completed.stderr == ""
+    assert capture_path.read_text(
+        encoding="utf-8",
+    ).splitlines() == [
+        "-m",
+        "atlas.operations_cli",
+        "compare",
+    ]
+
+
+def test_operations_compare_forwards_options(
+    tmp_path: Path,
+) -> None:
+    completed, capture_path = run_atlas(
+        tmp_path,
+        "operations",
+        "compare",
+        "--json",
+        "--include-unchanged",
+    )
+
+    assert completed.returncode == 0
+    assert completed.stderr == ""
+    assert capture_path.read_text(
+        encoding="utf-8",
+    ).splitlines() == [
+        "-m",
+        "atlas.operations_cli",
+        "compare",
+        "--json",
+        "--include-unchanged",
+    ]
+
+
+def test_operations_compare_preserves_python_exit_code(
+    tmp_path: Path,
+) -> None:
+    completed, _ = run_atlas(
+        tmp_path,
+        "operations",
+        "compare",
         python_status=7,
     )
 

@@ -506,6 +506,9 @@ atlas operations latest --json
 atlas operations history
 atlas operations history --json
 atlas operations history --limit 10
+atlas operations compare
+atlas operations compare --json
+atlas operations compare --include-unchanged
 ```
 
 `report` collects a live report without persisting it.
@@ -519,6 +522,11 @@ executing the collectors again.
 `history` loads persisted reports in newest-first order without modifying
 the snapshot archive or `latest.json`. The optional `--limit` argument
 controls the maximum number of reports returned.
+
+`compare` loads the two newest persisted reports and produces a read-only,
+deterministic comparison. It detects added, removed, and changed findings,
+along with status, score, and attention deltas. Use
+`--include-unchanged` when the complete finding set is required.
 
 The default storage layout is:
 
@@ -537,7 +545,10 @@ fields are recomputed.
 Historical listing is implemented through concise human output and a
 wrapped JSON contract containing `count` and complete validated reports.
 
-Report comparison, scheduling, APIs, and Portal visualization remain
+Comparison is implemented through immutable change contracts, a pure
+comparison service, concise human output, and stable JSON serialization.
+
+Scheduled collection, APIs, notifications, and Portal visualization remain
 planned extensions.
 
 See `docs/OPERATIONS.md` for the complete command and persistence contract.

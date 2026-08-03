@@ -3181,3 +3181,92 @@ visualization, and automatic remediation remain future work.
 
 Atlas administrators can now inspect immutable operational history through
 stable human and JSON interfaces without affecting persisted state.
+
+---
+
+# 2026-08-03
+
+## M-023.7 — Operations Report Comparison
+
+### Objective
+
+Add deterministic, read-only comparison between the two newest persisted
+Atlas Operations reports.
+
+### Completed
+
+- Added `OperationsChangeType`.
+- Added immutable `OperationsFindingChange` contracts.
+- Added immutable `OperationsComparison` contracts.
+- Added canonical validation and deterministic change ordering.
+- Added derived status, score, attention, and change summaries.
+- Added validated comparison serialization and reconstruction.
+- Added the pure `OperationsComparisonService`.
+- Added detection for added, removed, changed, and unchanged findings.
+- Added section-move handling as removal plus addition.
+- Added concise human comparison rendering.
+- Added deterministic JSON comparison rendering.
+- Added `atlas operations compare`.
+- Added `atlas operations compare --json`.
+- Added `atlas operations compare --include-unchanged`.
+- Added Python CLI and public shell integration.
+
+### Public interface
+
+```bash
+atlas operations compare
+atlas operations compare --json
+atlas operations compare --include-unchanged
+```
+
+### Comparison behavior
+
+The repository returns the two newest validated reports. The newest report
+is treated as current and the second-newest report is treated as previous.
+
+Comparison remains strictly read-only. It does not:
+
+- collect a new report;
+- modify either source report;
+- write a history snapshot;
+- update `latest.json`.
+
+### Live validation
+
+- Created a second immutable production Operations snapshot.
+- Compared two persisted healthy reports with scores of 100.
+- Detected two genuine runtime changes.
+- Detected memory usage changing from 9.36% to 9.33%.
+- Detected system uptime changing between snapshots.
+- Confirmed an overall score delta of zero.
+- Confirmed two changed findings and no added or removed findings.
+- Validated the four-field JSON comparison contract.
+- Validated all derived comparison summary counts.
+- Validated `--include-unchanged` with 14 total findings.
+- Confirmed 12 unchanged findings.
+- Confirmed comparison did not modify `latest.json`.
+- Confirmed comparison did not change the snapshot count.
+
+### Verification
+
+- 23 comparison model tests passed.
+- 8 comparison service tests passed.
+- 7 comparison renderer tests passed.
+- 45 Operations Python CLI tests passed.
+- 21 Operations shell integration tests passed.
+- 106 Operations persistence and model tests passed.
+- 430 complete Operations integration tests passed.
+- Python compilation passed.
+- Shell syntax validation passed.
+- Diff hygiene passed.
+
+### Boundary
+
+Scheduled collection, API routes, notifications, Portal visualization,
+comparison retention, and automatic remediation remain future work.
+
+### Result
+
+Atlas administrators can now determine exactly what changed between the
+two newest immutable Operations snapshots through stable human and JSON
+interfaces.

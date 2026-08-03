@@ -405,6 +405,42 @@ def history_report(
     )
 
 
+def comparison_report(
+    *,
+    report_id: str,
+    generated_at: str,
+    warning: bool,
+) -> OperationsReport:
+    """Build one deterministic report for comparison CLI tests."""
+
+    finding = OperationFinding(
+        identifier="system.memory",
+        name="Memory",
+        status="warning" if warning else "healthy",
+        severity="warning" if warning else "info",
+        message=(
+            "Memory usage is elevated"
+            if warning
+            else "Memory usage is healthy"
+        ),
+    )
+
+    return OperationsReport(
+        report_id=report_id,
+        hostname="docker",
+        atlas_version="0.9.0-rc.1",
+        git_commit="b16b5f66",
+        generated_at=generated_at,
+        sections=(
+            OperationsSection(
+                identifier="system",
+                name="System",
+                findings=(finding,),
+            ),
+        ),
+    )
+
+
 class FakeOperationsRepository:
     def __init__(self) -> None:
         self.saved: list[OperationsReport] = []
@@ -418,6 +454,18 @@ class FakeOperationsRepository:
             history_report(
                 report_id="older-report",
                 generated_at="2026-08-03T21:00:00Z",
+            ),
+        )
+        self.comparison_reports = (
+            comparison_report(
+                report_id="current-report",
+                generated_at="2026-08-03T22:00:00Z",
+                warning=True,
+            ),
+            comparison_report(
+                report_id="previous-report",
+                generated_at="2026-08-03T21:00:00Z",
+                warning=False,
             ),
         )
 
@@ -726,4 +774,181 @@ def test_main_normalizes_history_failure() -> None:
 
     assert result == 1
     assert "Operations history failed" in stderr.getvalue()
+    assert "history unavailable" in stderr.getvalue()
+
+
+def test_parser_accepts_compare_command() -> None:
+    args = build_parser().parse_args(["compare"])
+
+    assert args.command == "compare"
+    assert args.json is False
+    assert args.include_unchanged is False
+
+
+def test_parser_accepts_compare_options() -> None:
+    args = build_parser().parse_args(
+        [
+            "compare",
+            "--json",
+            "--include-unchanged",
+        ]
+    )
+
+    assert args.command == "compare"
+    assert args.json is True
+    assert args.include_unchanged is True
+
+
+def test_main_renders_operations_comparison() -> None:
+    repository = FakeOperationsRepository()
+    repository.history_reports = repository.comparison_reports
+    stdout = StringIO()
+    stderr = StringIO()
+
+    result = main(
+        ["compare"],
+        repository_factory=lambda: repository,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert result == 0
+    assert stderr.getvalue() == ""
+    assert repository.history_limits == [2]
+
+    rendered = stdout.getvalue()
+
+    assert "Atlas Operations Comparison" in rendered
+    assert "previous-report" in rendered
+    assert "current-report" in rendered
+    assert "Healthy -> Warning" in rendered
+    assert "100/100 -> 50/100 (-50)" in rendered
+    assert "~ [system] Memory (system.memory)" in rendered
+
+
+def test_main_renders_operations_comparison_json() -> None:
+    repository = FakeOperationsRepository()
+    repository.history_reports = repository.comparison_reports
+    stdout = StringIO()
+    stderr = StringIO()
+
+    result = main(
+        ["compare", "--json"],
+        repository_factory=lambda: repository,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert result == 0
+    assert stderr.getvalue() == ""
+    assert repository.history_limits == [2]
+
+    payload = json.loads(
+        stdout.getvalue()
+    )
+
+    assert payload["previous"]["report_id"] == (
+        "previous-report"
+    )
+    assert payload["current"]["report_id"] == (
+        "current-report"
+    )
+    assert payload["summary"]["status_changed"] is True
+    assert payload["summary"]["score_delta"] == -50
+    assert payload["summary"]["changed_count"] == 1
+
+
+def test_main_compare_can_include_unchanged() -> None:
+    repository = FakeOperationsRepository()
+    current = comparison_report(
+        report_id="current-report",
+        generated_at="2026-08-03T22:00:00Z",
+        warning=False,
+    )
+    previous = comparison_report(
+        report_id="previous-report",
+        generated_at="2026-08-03T21:00:00Z",
+        warning=False,
+    )
+    repository.history_reports = (
+        current,
+        previous,
+    )
+
+    stdout = StringIO()
+
+    result = main(
+        [
+            "compare",
+            "--json",
+            "--include-unchanged",
+        ],
+        repository_factory=lambda: repository,
+        stdout=stdout,
+        stderr=StringIO(),
+    )
+
+    assert result == 0
+
+    payload = json.loads(
+        stdout.getvalue()
+    )
+
+    assert payload["summary"]["difference_count"] == 0
+    assert payload["summary"]["unchanged_count"] == 1
+    assert payload["changes"][0]["change_type"] == (
+        "unchanged"
+    )
+
+
+def test_main_compare_requires_two_reports() -> None:
+    repository = FakeOperationsRepository()
+    repository.history_reports = (
+        comparison_report(
+            report_id="only-report",
+            generated_at="2026-08-03T22:00:00Z",
+            warning=False,
+        ),
+    )
+
+    stdout = StringIO()
+    stderr = StringIO()
+
+    result = main(
+        ["compare"],
+        repository_factory=lambda: repository,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert result == 1
+    assert stdout.getvalue() == ""
+    assert repository.history_limits == [2]
+    assert (
+        "at least two persisted reports are required"
+        in stderr.getvalue()
+    )
+
+
+def test_main_compare_normalizes_repository_failure() -> None:
+    class BrokenRepository(FakeOperationsRepository):
+        def history(
+            self,
+            limit: int = 25,
+        ) -> tuple[OperationsReport, ...]:
+            raise RuntimeError("history unavailable")
+
+    stdout = StringIO()
+    stderr = StringIO()
+
+    result = main(
+        ["compare"],
+        repository_factory=BrokenRepository,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert result == 1
+    assert stdout.getvalue() == ""
+    assert "Operations comparison failed" in stderr.getvalue()
     assert "history unavailable" in stderr.getvalue()
