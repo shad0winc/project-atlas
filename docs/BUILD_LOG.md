@@ -2578,3 +2578,80 @@ This sprint intentionally did not add:
 - 362 combined media-request tests passed.
 - Package compilation passed.
 - `git diff --check` passed.
+
+---
+
+# 2026-08-03
+
+## M-023.1.7 — Request Notification Integration
+
+### Objective
+
+Connect the Notifications module to normalized Media Request lifecycle events
+without coupling notification delivery to `MediaRequestService`.
+
+### Completed
+
+- Added the Notifications Runtime Bus subscription for `request.*`.
+- Added request routing based on normalized `payload.media_type`.
+- Routed movie requests to the Movies Discord channel.
+- Routed television requests to the TV Discord channel.
+- Routed anime movie requests to the Anime Movies Discord channel.
+- Routed anime television requests to the Anime TV Discord channel.
+- Added safe system-channel fallback for unknown request media types.
+- Added explicit notification titles for all request lifecycle events.
+- Added lifecycle-specific request descriptions.
+- Added normalized request and media context fields.
+- Added title, year, media type, status, provider, and request identity fields.
+- Added season context when available.
+- Added availability timestamps to ready-to-watch notifications.
+- Classified active request lifecycle notifications as informational.
+- Classified failed, rejected, and cancelled requests as warnings.
+- Classified `request.available` as a success notification.
+- Emphasized `request.available` as **Ready to Watch**.
+- Added request notification integration to module verification.
+- Added dedicated formatter, routing, severity, context, and contract tests.
+- Updated Notifications module documentation.
+- Preserved all existing health, storage, media, and Sports notification behavior.
+
+### Event Routing
+
+| Media request type | Notification route |
+| --- | --- |
+| `movie` | `movies` |
+| `tv` | `tv` |
+| `anime_movie` | `anime_movies` |
+| `anime_tv` | `anime_tv` |
+| Unknown | `system` |
+
+### Architectural Boundary
+
+The Notifications module consumes normalized Runtime Bus events only.
+
+It does not:
+
+- import or invoke `MediaRequestService`;
+- mutate Media Request repository state;
+- perform Jellyseerr operations;
+- own request lifecycle decisions;
+- add provider-specific request behavior;
+- add user-specific Discord mentions.
+
+User-specific notification preferences and Discord identity remain deferred to
+their later dedicated contracts.
+
+### Validation
+
+- 9 focused request-notification tests passed.
+- 371 combined Media Request tests passed.
+- Atlas Notifications module verification passed.
+- Request notification runtime verification passed.
+- Python package compilation passed.
+- Shell syntax validation passed.
+- `git diff --check` passed.
+
+### Result
+
+Atlas can now convert normalized request lifecycle events into appropriately
+routed Discord notifications while keeping request processing and notification
+delivery fully decoupled.

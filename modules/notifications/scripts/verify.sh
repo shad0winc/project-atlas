@@ -35,6 +35,12 @@ echo
 check "Module directory present" test -d "$MODULE_DIR"
 check "Module metadata present" test -f "$MODULE_DIR/module.conf"
 check "Module README present" test -f "$MODULE_DIR/README.md"
+check "Request notification documentation present" \
+  grep -Fq "request.*" "$MODULE_DIR/README.md"
+check "Ready to Watch documentation present" \
+  grep -Fq "Ready to Watch" "$MODULE_DIR/README.md"
+check "Request routing documentation present" \
+  grep -Fq "anime_movie" "$MODULE_DIR/README.md"
 check "Module compose present" test -f "$MODULE_DIR/docker-compose.yml"
 check "Module environment example present" test -f "$MODULE_DIR/.env.example"
 check "Module install script present" test -x "$MODULE_DIR/scripts/install.sh"
@@ -99,6 +105,71 @@ raise SystemExit(
     0 if all(checks) else 1
 )
 PY
+  '
+
+check "Media request notification integration valid" \
+  sh -c '
+    cd /opt/project-atlas
+
+    PYTHONPATH=modules/notifications/src python3 - <<'"'"'PYVERIFY'"'"'
+from formatter import (
+    notification_description,
+    notification_fields,
+    notification_route,
+    notification_title,
+)
+from processor import build_notification
+
+
+event = {
+    "id": "evt-request-verification",
+    "event": "request.available",
+    "source": "media-requests",
+    "payload": {
+        "request_id": "req-verification",
+        "user_id": "user-verification",
+        "provider": "jellyseerr",
+        "provider_request_id": "42",
+        "provider_media_id": "550",
+        "media_type": "anime_tv",
+        "title": "Atlas Request Verification",
+        "year": 2026,
+        "season_number": 1,
+        "status": "available",
+        "terminal": True,
+        "available_at": "2026-08-03T04:00:00Z",
+        "occurred_at": "2026-08-03T04:00:00Z",
+        "context": None,
+        "metadata": {},
+    },
+}
+
+notification = build_notification(event)
+
+fields = {
+    field["name"]: field["value"]
+    for field in notification_fields(notification)
+}
+
+checks = [
+    notification["severity"] == "success",
+    notification_route(notification) == "anime_tv",
+    notification_title(notification) == "Ready to Watch",
+    notification_description(notification)
+    == (
+        "Atlas Request Verification (2026) "
+        "is ready to watch."
+    ),
+    fields.get("Media") == "Atlas Request Verification",
+    fields.get("Type") == "Anime Tv",
+    fields.get("Status") == "Available",
+    fields.get("Request ID") == "req-verification",
+]
+
+raise SystemExit(
+    0 if all(checks) else 1
+)
+PYVERIFY
   '
 
 echo

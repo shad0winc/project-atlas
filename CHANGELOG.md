@@ -30,6 +30,7 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Added
 
+- Integrated normalized `request.*` lifecycle events with the Notifications module, including media-type Discord routing, lifecycle-specific formatting, Ready to Watch availability notifications, severity classification, module verification, documentation, and dedicated tests.
 - Added provider-neutral Media Request lifecycle events and optional best-effort publication from the Media Request service, including created, submitted, lifecycle transition, and cancellation events, publication error observability, package exports, and dedicated tests.
 - Added the Jellyseerr Media Request provider adapter with movie, TV, anime movie, and anime TV submission, request and media status normalization, cancellation, health reporting, environment-based construction, package exports, and dedicated mocked tests.
 - Added the reusable Media Request HTTP provider foundation with authenticated GET, POST, and DELETE operations, normalized URLs, deterministic JSON transport, timeout and response validation, safe error translation, package exports, and dedicated mocked tests.
