@@ -30,6 +30,7 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Added
 
+- Added the Operations collector and Docker provider foundation, including immutable collector contracts, a live read-only System collector, a guarded Docker CLI JSON adapter, normalized Docker Engine and container inventory snapshots, runtime and health state, UTC lifecycle timestamps, resource-governance ceilings, mounts, networks, exposed and published ports, deterministic serialization, package exports, live environment verification, and dedicated tests.
 - Added the canonical `atlas.operations` domain, including immutable findings, sections, summaries, and reports; schema-versioned serialization; canonical section identities; UTC timestamp and Git commit normalization; deterministic section and attention ordering; global finding uniqueness validation; package exports; and 57 focused tests.
 - Added production ingress resource governance for Caddy, Atlas API, and Atlas Portal, including memory, CPU, and PID ceilings, a native Caddy health check, and a permanent runtime verifier.
 - Integrated normalized `request.*` lifecycle events with the Notifications module, including media-type Discord routing, lifecycle-specific formatting, Ready to Watch availability notifications, severity classification, module verification, documentation, and dedicated tests.

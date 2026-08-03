@@ -2826,3 +2826,142 @@ Project Atlas now has a stable and deterministic Operations domain that
 can serve as the single normalized contract for collectors, reports,
 notifications, APIs, CLI output, historical snapshots, and Portal
 dashboards.
+
+---
+
+# 2026-08-03
+
+## M-023.3.2 — Operations Collector and Docker Provider Foundation
+
+### Objective
+
+Establish the first read-only Operations collection infrastructure and
+normalize live host and Docker data into stable, immutable contracts
+without coupling the subsystem to CLI, API, Portal, scheduler, or
+notification presentation layers.
+
+### Completed
+
+#### Collector Framework
+
+- Added the `atlas.operations.collectors` package.
+- Added the immutable `OperationsCollector` base contract.
+- Added canonical section identity validation.
+- Added collector timeout validation.
+- Added normalized collector exception contracts.
+- Added checked output and section-identity enforcement.
+- Added deterministic collector metadata serialization.
+
+#### System Collector
+
+- Added `SystemCollector`.
+- Added injectable `SystemProvider`.
+- Added `HostSystemProvider`.
+- Added read-only collection for:
+  - hostname;
+  - operating system;
+  - kernel release;
+  - uptime;
+  - logical CPU count;
+  - CPU model;
+  - total, used, and available memory.
+- Added graceful source-level degradation to unknown findings.
+- Corrected CPU model discovery so numeric `/proc/cpuinfo`
+  processor indexes are not treated as model identities.
+- Verified the live AMD Ryzen CPU model successfully.
+
+#### Docker Command Adapter
+
+- Added `DockerCommandRunner`.
+- Added `DockerCollectorError`.
+- Added validated timeout and executor injection.
+- Added read-only Docker commands for:
+  - version;
+  - daemon information;
+  - full container inventory;
+  - single-container inspection.
+- Added `subprocess.run()` execution with:
+  - argument-list invocation;
+  - no shell execution;
+  - explicit timeout;
+  - captured text output;
+  - normalized missing-binary, timeout, operating-system, non-zero
+    exit, empty-output, malformed-JSON, and output-shape errors.
+- Added JSON-lines parsing for Docker container inventory output.
+- Added guarded container identity validation.
+
+#### Docker Provider
+
+- Added `DockerProvider`.
+- Added `DockerRunner`.
+- Added `DockerProviderContractError`.
+- Added immutable normalized contracts:
+  - `DockerEngineSnapshot`;
+  - `DockerContainerSummary`;
+  - `DockerContainerSnapshot`;
+  - `DockerMountSnapshot`;
+  - `DockerNetworkSnapshot`;
+  - `DockerPortSnapshot`.
+- Added Docker Engine and daemon normalization.
+- Added deterministic container inventory ordering.
+- Added duplicate container identity and name validation.
+- Added runtime and health normalization.
+- Added restart, OOM, and exit-state normalization.
+- Added lifecycle timestamp normalization to UTC.
+- Added stale running-container `FinishedAt` normalization.
+- Added memory, CPU, PID, and restart-policy contracts.
+- Added mount normalization and destination uniqueness.
+- Added network identity, address, gateway, and alias normalization.
+- Added exposed and published TCP/UDP port normalization.
+- Added deterministic topology ordering and serialization.
+- Added public package exports.
+
+### Live Environment Validation
+
+- The System collector reported a healthy live system section.
+- CPU identity resolved as an AMD Ryzen 7 5700U with Radeon Graphics.
+- Docker inventory discovered 21 live containers.
+- Atlas API, Caddy, and Portal resource ceilings matched their
+  production governance contracts.
+- Atlas API topology validation passed.
+- Caddy topology validation passed with TCP and UDP publications.
+- Jellyfin topology validation passed with media mounts, Atlas
+  networking, and published ports.
+- All inspected running containers normalized `finished_at` to null.
+
+### Validation
+
+- 56 Docker provider tests passed.
+- 37 Docker command-adapter tests passed.
+- 100 Operations collector, System collector, and domain tests passed.
+- 376 related Health, Media Request, and Service Lifecycle tests passed.
+- 569 focused and related tests passed in total.
+- Python compilation passed.
+- Package import validation passed.
+- Live System collection passed.
+- Live Docker inventory passed.
+- Live ingress resource-governance validation passed.
+- Live Docker topology validation passed.
+- `git diff --check` passed.
+
+### Architectural Boundary
+
+This milestone does not yet add:
+
+- the final Docker Operations collector;
+- Operations service orchestration;
+- multi-section report generation;
+- CLI commands;
+- API routes;
+- Portal dashboards;
+- daily-report integration;
+- scheduler integration;
+- Operations event publication or notifications.
+
+### Result
+
+Project Atlas now has a tested, deterministic, and read-only
+Operations acquisition foundation. Host and Docker runtime information
+can be collected and normalized without exposing subprocess behavior or
+Docker-specific payload structures to future Operations collectors,
+reports, APIs, or user interfaces.

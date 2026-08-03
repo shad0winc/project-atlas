@@ -89,6 +89,104 @@ Review:
 
 ---
 
+# Operations Intelligence Foundation
+
+Project Atlas now includes a provider-neutral Operations collection
+foundation for read-only host and Docker inspection.
+
+## Implemented Components
+
+- `OperationsCollector`
+- `SystemCollector`
+- `HostSystemProvider`
+- `DockerCommandRunner`
+- `DockerProvider`
+- `DockerEngineSnapshot`
+- `DockerContainerSummary`
+- `DockerContainerSnapshot`
+- `DockerMountSnapshot`
+- `DockerNetworkSnapshot`
+- `DockerPortSnapshot`
+
+## Read-Only System Collection
+
+The System collector reports:
+
+- hostname;
+- operating system;
+- kernel;
+- uptime;
+- logical CPU count and model;
+- total, used, and available memory.
+
+Run a direct development verification with:
+
+    python - <<'PY'
+    from atlas.operations.collectors import SystemCollector
+
+    section = SystemCollector().collect_checked()
+    print(section.to_dict())
+    PY
+
+## Read-Only Docker Collection
+
+The Docker provider supports:
+
+- Docker client and server identity;
+- daemon capacity and container counts;
+- deterministic container inventory;
+- container state and health;
+- restart and OOM state;
+- lifecycle timestamps normalized to UTC;
+- memory, CPU, and PID ceilings;
+- restart policies;
+- mounts;
+- network attachments and aliases;
+- exposed and published ports.
+
+Run a direct development verification with:
+
+    python - <<'PY'
+    from atlas.operations.collectors import DockerProvider
+
+    provider = DockerProvider()
+
+    print(provider.engine().to_dict())
+
+    for container in provider.containers():
+        print(container.to_dict())
+    PY
+
+Inspect one container with:
+
+    python - <<'PY'
+    from atlas.operations.collectors import DockerProvider
+
+    snapshot = DockerProvider().container("atlas-api")
+    print(snapshot.to_dict())
+    PY
+
+All collection and provider operations are read-only. They do not
+start, stop, restart, remove, or otherwise mutate containers.
+
+## Current Architectural Boundary
+
+This milestone does not yet provide:
+
+- the final Docker `OperationsCollector`;
+- multi-collector `OperationsReport` orchestration;
+- `atlas operations` CLI commands;
+- API routes;
+- Portal dashboards;
+- scheduler integration;
+- daily-report integration;
+- event publication or notifications.
+
+These consumers will be added above the normalized collector and
+provider contracts in later increments.
+
+---
+
 # Production Ingress Operations
 
 ## Verify Ingress Governance
