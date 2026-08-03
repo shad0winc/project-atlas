@@ -2476,3 +2476,105 @@ This sprint intentionally did not add:
 - 331 combined media-request tests passed.
 - Package compilation passed.
 - `git diff --check` passed.
+
+---
+
+# 2026-08-03
+
+## M-023.1.6 — Request Event Publication
+
+### Objective
+
+Establish the provider-neutral Media Request lifecycle event contract and
+publish successful request state changes through the existing Atlas event
+publisher boundary.
+
+### Completed
+
+- Added `atlas/media_requests/events.py`.
+- Added `MediaRequestEvent`.
+- Added `MediaRequestEventType`.
+- Added `MediaRequestEventError`.
+- Added deterministic event-name mapping from request lifecycle states.
+- Added immutable event contracts.
+- Added request, user, provider, provider-request, and provider-media identity.
+- Added media type, title, year, and season context.
+- Added lifecycle status and terminal-state serialization.
+- Added normalized UTC occurrence timestamps.
+- Added availability timestamp validation.
+- Added provider-neutral `ProviderEventContext` support.
+- Added deterministic metadata serialization.
+- Added complete `to_payload()` serialization.
+- Added complete `to_dict()` serialization.
+- Added `MediaRequestEvent.from_request()`.
+- Added optional event publisher injection to `MediaRequestService`.
+- Added injectable clock support for deterministic event timestamps.
+- Added `request.created` publication after successful persistence.
+- Added `request.submitted` publication after successful provider submission.
+- Added lifecycle event publication after successful submission.
+- Added lifecycle event publication after status changes.
+- Prevented duplicate lifecycle publication when status is unchanged.
+- Added `request.cancelled` publication after successful cancellation.
+- Ensured failed repository or provider operations publish no event.
+- Added best-effort publication semantics.
+- Ensured event publication failure does not roll back committed request state.
+- Added captured publication failure observability.
+- Added `publication_errors`.
+- Added `clear_publication_errors()`.
+- Added package exports.
+- Added dedicated event-model contract tests.
+- Added dedicated service-publication tests.
+
+### Event Names
+
+- `request.created`;
+- `request.submitted`;
+- `request.pending`;
+- `request.approved`;
+- `request.searching`;
+- `request.downloading`;
+- `request.importing`;
+- `request.available`;
+- `request.rejected`;
+- `request.failed`;
+- `request.cancelled`.
+
+### Architectural Boundary
+
+The request service publishes normalized event names and payloads only.
+
+It does not know about:
+
+- Discord;
+- webhook URLs;
+- notification formatting;
+- notification routing;
+- user notification preferences;
+- Portal presentation.
+
+### Publication Semantics
+
+Request persistence and provider state changes remain authoritative.
+
+Event publication is best-effort so a temporary event-bus failure does not
+invalidate a successfully committed request operation. Publication failures are
+captured for observability and recovery.
+
+### Boundaries
+
+This sprint intentionally did not add:
+
+- notification-module subscriptions for request events;
+- Discord request formatting;
+- user-specific notification preferences;
+- persistent event retry queues;
+- scheduled lifecycle reconciliation;
+- REST or Portal API routes;
+- Portal functionality.
+
+### Validation
+
+- 31 focused event and publication tests passed.
+- 362 combined media-request tests passed.
+- Package compilation passed.
+- `git diff --check` passed.

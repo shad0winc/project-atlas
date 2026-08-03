@@ -1,5 +1,11 @@
 """Atlas media-request domain."""
 
+from .events import (
+    MediaRequestEvent,
+    MediaRequestEventError,
+    MediaRequestEventType,
+    event_type_for_status,
+)
 from .models import (
     MediaRequest,
     MediaRequestError,
@@ -39,6 +45,9 @@ __all__ = [
     "JsonMediaRequestRepository",
     "MediaRequest",
     "MediaRequestError",
+    "MediaRequestEvent",
+    "MediaRequestEventError",
+    "MediaRequestEventType",
     "MediaRequestHTTPError",
     "MediaRequestProvider",
     "MediaRequestProviderError",
@@ -56,4 +65,5 @@ __all__ = [
     "ProviderSubmissionResult",
     "SCHEMA_VERSION",
     "default_jellyseerr_media_request_provider",
+    "event_type_for_status",
 ]

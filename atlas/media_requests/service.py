@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import replace
+from datetime import datetime, timezone
 import re
+from typing import Any, Callable
 
+from .events import (
+    MediaRequestEvent,
+    MediaRequestEventType,
+    event_type_for_status,
+)
 from .models import (
     MediaRequest,
     MediaRequestStatus,
@@ -14,6 +21,7 @@ from .provider import (
     MediaRequestProvider,
     MediaRequestProviderError,
     MediaRequestProviderOperationError,
+    ProviderEventContext,
     ProviderStatusResult,
     ProviderSubmissionResult,
 )
@@ -21,6 +29,14 @@ from .repository import (
     JsonMediaRequestRepository,
     MediaRequestRepositoryError,
 )
+
+
+EventPublisher = Callable[[str, Mapping[str, Any]], None]
+Clock = Callable[[], datetime]
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 _PROVIDER_PATTERN = re.compile(
@@ -117,6 +133,9 @@ class MediaRequestService:
         self,
         repository: JsonMediaRequestRepository,
         providers: Iterable[MediaRequestProvider],
+        *,
+        event_publisher: EventPublisher | None = None,
+        clock: Clock = _utc_now,
     ) -> None:
         if not isinstance(repository, JsonMediaRequestRepository):
             raise MediaRequestServiceError(
@@ -152,14 +171,38 @@ class MediaRequestService:
 
             provider_map[name] = provider
 
+        if event_publisher is not None and not callable(event_publisher):
+            raise MediaRequestServiceError(
+                "event_publisher must be callable or null",
+            )
+
+        if not callable(clock):
+            raise MediaRequestServiceError(
+                "clock must be callable",
+            )
+
         self.repository = repository
         self._providers = provider_map
+        self._event_publisher = event_publisher
+        self._clock = clock
+        self._publication_errors: list[str] = []
 
     @property
     def provider_names(self) -> tuple[str, ...]:
         """Return registered provider names in deterministic order."""
 
         return tuple(sorted(self._providers))
+
+    @property
+    def publication_errors(self) -> tuple[str, ...]:
+        """Return captured best-effort event publication failures."""
+
+        return tuple(self._publication_errors)
+
+    def clear_publication_errors(self) -> None:
+        """Clear captured event publication failures."""
+
+        self._publication_errors.clear()
 
     def create_request(self, request: MediaRequest) -> MediaRequest:
         """Validate and persist a new unsubmitted Atlas request."""
@@ -194,11 +237,18 @@ class MediaRequestService:
             )
 
         try:
-            return self.repository.save(request)
+            persisted = self.repository.save(request)
         except MediaRequestRepositoryError as exc:
             raise MediaRequestServiceError(
                 f"unable to persist media request: {request.request_id}",
             ) from exc
+
+        self._publish(
+            MediaRequestEventType.CREATED,
+            persisted,
+        )
+
+        return persisted
 
     def submit_request(self, request_id: object) -> MediaRequest:
         """Submit one persisted request to its configured provider."""
@@ -259,7 +309,20 @@ class MediaRequestService:
             available_at=None,
         )
 
-        return self._replace(updated)
+        persisted = self._replace(updated)
+
+        self._publish(
+            MediaRequestEventType.SUBMITTED,
+            persisted,
+            context=result.context,
+        )
+        self._publish(
+            event_type_for_status(persisted.status),
+            persisted,
+            context=result.context,
+        )
+
+        return persisted
 
     def refresh_request(self, request_id: object) -> MediaRequest:
         """Refresh one submitted request from provider status."""
@@ -291,7 +354,16 @@ class MediaRequestService:
                 f"provider status refresh failed: {request.provider}",
             ) from exc
 
-        return self._apply_status_result(request, result)
+        updated = self._apply_status_result(request, result)
+
+        if updated.status is not request.status:
+            self._publish(
+                event_type_for_status(updated.status),
+                updated,
+                context=result.context,
+            )
+
+        return updated
 
     def cancel_request(self, request_id: object) -> MediaRequest:
         """Cancel one active provider-side request."""
@@ -340,7 +412,15 @@ class MediaRequestService:
                 "provider cancellation must return cancelled status",
             )
 
-        return self._apply_status_result(request, result)
+        updated = self._apply_status_result(request, result)
+
+        self._publish(
+            MediaRequestEventType.CANCELLED,
+            updated,
+            context=result.context,
+        )
+
+        return updated
 
     def get_request(self, request_id: object) -> MediaRequest:
         """Return one request through the repository boundary."""
@@ -391,6 +471,47 @@ class MediaRequestService:
             raise MediaRequestServiceError(
                 "unable to find provider media request",
             ) from exc
+
+    def _publish(
+        self,
+        event_type: MediaRequestEventType,
+        request: MediaRequest,
+        *,
+        context: ProviderEventContext | None = None,
+    ) -> None:
+        if self._event_publisher is None:
+            return
+
+        try:
+            event = MediaRequestEvent.from_request(
+                event_type,
+                request,
+                occurred_at=self._occurred_at(),
+                context=context,
+            )
+            self._event_publisher(
+                event.name,
+                event.to_payload(),
+            )
+        except Exception as exc:
+            self._publication_errors.append(
+                f"{event_type.value}: {exc}",
+            )
+
+    def _occurred_at(self) -> datetime:
+        value = self._clock()
+
+        if not isinstance(value, datetime):
+            raise MediaRequestServiceError(
+                "clock must return a datetime",
+            )
+
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise MediaRequestServiceError(
+                "clock must return a timezone-aware datetime",
+            )
+
+        return value.astimezone(timezone.utc)
 
     def _provider_for(
         self,
