@@ -2315,3 +2315,72 @@ This sprint intentionally did not add:
 - 227 combined media-request tests passed.
 - Package compilation passed.
 - `git diff --check` passed.
+
+---
+
+# 2026-08-02
+
+## M-023.1.5A — Media Request HTTP Foundation
+
+### Objective
+
+Establish the reusable authenticated HTTP and JSON transport foundation for
+concrete Atlas media-request providers.
+
+### Completed
+
+- Added `atlas/media_requests/providers/`.
+- Added `atlas/media_requests/providers/base.py`.
+- Added `BaseMediaRequestHTTPProvider`.
+- Added `MediaRequestHTTPError`.
+- Added normalized HTTP and HTTPS base URL validation.
+- Added protection against embedded URL credentials.
+- Added protection against absolute provider-path host replacement.
+- Added API-key validation with secret-safe object representation.
+- Added configurable positive request timeout validation.
+- Added normalized provider user-agent handling.
+- Added authenticated `X-Api-Key` headers.
+- Added JSON `Accept` and `Content-Type` headers.
+- Added authenticated JSON `GET` requests.
+- Added authenticated JSON `POST` requests.
+- Added authenticated JSON `DELETE` requests.
+- Added deterministic UTF-8 JSON request encoding.
+- Added empty-response handling.
+- Added HTTP status error translation.
+- Added timeout and connection error translation.
+- Added operating-system error translation.
+- Added invalid UTF-8 response detection.
+- Added invalid JSON response detection.
+- Ensured normalized exceptions do not expose API keys.
+- Added provider-package exports.
+- Added top-level media-request package exports.
+- Added dedicated mocked HTTP transport tests.
+
+### Architectural Boundary
+
+This foundation implements transport behavior only.
+
+It does not interpret Jellyseerr resources or implement request-domain
+submission, lifecycle, cancellation, or health mapping.
+
+### Boundaries
+
+This sprint intentionally did not add:
+
+- Jellyseerr payload mapping;
+- Jellyseerr request submission;
+- Jellyseerr status synchronization;
+- Jellyseerr cancellation behavior;
+- Jellyseerr health mapping;
+- live network tests;
+- repository mutation;
+- event publication;
+- Discord notification delivery;
+- API routes;
+- Portal functionality.
+
+### Validation
+
+- 286 combined media-request tests passed.
+- Package compilation passed.
+- `git diff --check` passed.

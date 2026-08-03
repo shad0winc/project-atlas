@@ -17,6 +17,10 @@ from .provider import (
     ProviderStatusResult,
     ProviderSubmissionResult,
 )
+from .providers import (
+    BaseMediaRequestHTTPProvider,
+    MediaRequestHTTPError,
+)
 from .repository import (
     JsonMediaRequestRepository,
     MediaRequestRepositoryError,
@@ -28,9 +32,11 @@ from .service import (
 )
 
 __all__ = [
+    "BaseMediaRequestHTTPProvider",
     "JsonMediaRequestRepository",
     "MediaRequest",
     "MediaRequestError",
+    "MediaRequestHTTPError",
     "MediaRequestProvider",
     "MediaRequestProviderError",
     "MediaRequestProviderOperationError",
