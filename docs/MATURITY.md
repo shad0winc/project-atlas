@@ -247,12 +247,16 @@ Implemented capabilities include:
 - atomic `latest.json` persistence;
 - duplicate-snapshot protection;
 - newest-first repository history support;
-- public `atlas operations report`, `save`, and `latest` commands;
+- configurable bounded history inspection;
+- concise human-readable history output;
+- stable wrapped JSON history output;
+- public `atlas operations report`, `save`, `latest`, and `history`
+  commands;
 - dedicated unit, integration, regression, corruption, atomic-write,
-  shell, and live validation.
+  renderer, shell, and live read-only validation.
 
 The subsystem is **Level 4 — Observable** with durable report
 persistence.
 
-History listing, comparison, scheduling, API exposure, notifications,
-and Portal visualization remain planned extensions.
+Report comparison, scheduling, API exposure, notifications, and Portal
+visualization remain planned extensions.

@@ -205,6 +205,9 @@ atlas operations save --json
 atlas operations save --report-id nightly-operations
 atlas operations latest
 atlas operations latest --json
+atlas operations history
+atlas operations history --json
+atlas operations history --limit 10
 ```
 
 ## Command behavior
@@ -214,6 +217,9 @@ atlas operations latest --json
   and atomically updates `latest.json`.
 - `latest` loads and validates the most recently persisted report without
   executing collectors.
+- `history` loads validated snapshots in newest-first order without
+  modifying persisted files.
+- `history --limit LIMIT` restricts the maximum returned report count.
 
 ## Storage layout
 
@@ -229,6 +235,23 @@ same generated timestamp instead of replacing the existing snapshot.
 
 `latest.json` is updated only after the historical snapshot is written
 successfully.
+
+## History output
+
+Human history output is intentionally concise. Each entry includes the
+report identity, generation timestamp, normalized status, and score.
+
+JSON history output uses a stable wrapped collection contract:
+
+    {
+      "count": 1,
+      "reports": [
+        { ...complete OperationsReport contract... }
+      ]
+    }
+
+Reports are returned newest first. Each JSON entry is the same complete,
+validated report contract exposed by `report --json` and `latest --json`.
 
 ## Report contract
 
@@ -282,9 +305,9 @@ human renderer.
 
 ## Current boundaries
 
-History listing, report comparison, scheduled collection, API routes,
-notifications, Portal visualization, retention, and automatic remediation
-remain planned extensions.
+Report comparison, scheduled collection, API routes, notifications,
+Portal visualization, retention, and automatic remediation remain planned
+extensions.
 
 # Production Ingress Operations
 

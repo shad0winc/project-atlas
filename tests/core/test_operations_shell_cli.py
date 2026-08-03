@@ -153,6 +153,7 @@ def test_operations_help_returns_zero(tmp_path: Path) -> None:
     assert "atlas operations report" in completed.stdout
     assert "atlas operations save" in completed.stdout
     assert "atlas operations latest" in completed.stdout
+    assert "atlas operations history" in completed.stdout
     assert completed.stderr == ""
     assert not capture_path.exists()
 
@@ -272,7 +273,7 @@ def test_central_help_lists_operations(
 
     assert completed.returncode == 0
     assert (
-        "atlas operations [help|report|save|latest]"
+        "atlas operations [help|report|save|latest|history]"
         in completed.stdout
     )
     assert (
@@ -287,6 +288,10 @@ def test_central_help_lists_operations(
     )
     assert (
         "atlas operations latest [--json]"
+        in completed.stdout
+    )
+    assert (
+        "atlas operations history [--limit LIMIT] [--json]"
         in completed.stdout
     )
 
@@ -418,3 +423,62 @@ def test_operations_latest_preserves_python_exit_code(
     )
 
     assert completed.returncode == 5
+
+
+def test_operations_history_forwards_to_python(
+    tmp_path: Path,
+) -> None:
+    completed, capture_path = run_atlas(
+        tmp_path,
+        "operations",
+        "history",
+    )
+
+    assert completed.returncode == 0
+    assert completed.stderr == ""
+    assert capture_path.read_text(
+        encoding="utf-8",
+    ).splitlines() == [
+        "-m",
+        "atlas.operations_cli",
+        "history",
+    ]
+
+
+def test_operations_history_forwards_options(
+    tmp_path: Path,
+) -> None:
+    completed, capture_path = run_atlas(
+        tmp_path,
+        "operations",
+        "history",
+        "--limit",
+        "10",
+        "--json",
+    )
+
+    assert completed.returncode == 0
+    assert completed.stderr == ""
+    assert capture_path.read_text(
+        encoding="utf-8",
+    ).splitlines() == [
+        "-m",
+        "atlas.operations_cli",
+        "history",
+        "--limit",
+        "10",
+        "--json",
+    ]
+
+
+def test_operations_history_preserves_python_exit_code(
+    tmp_path: Path,
+) -> None:
+    completed, _ = run_atlas(
+        tmp_path,
+        "operations",
+        "history",
+        python_status=7,
+    )
+
+    assert completed.returncode == 7

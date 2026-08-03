@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from collections.abc import Callable, Sequence
 import sys
 from typing import TextIO
@@ -85,6 +86,22 @@ def build_parser() -> argparse.ArgumentParser:
         "--json",
         action="store_true",
         help="Render the persisted report as JSON",
+    )
+
+    history_parser = subparsers.add_parser(
+        "history",
+        help="Render persisted Operations report history",
+    )
+    history_parser.add_argument(
+        "--limit",
+        type=int,
+        default=25,
+        help="Maximum reports to return (default: 25)",
+    )
+    history_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Render history as deterministic JSON",
     )
 
     return parser
@@ -244,6 +261,69 @@ def render_report_human(report: OperationsReport) -> str:
     return "\n".join(lines)
 
 
+def render_history_human(
+    reports: tuple[OperationsReport, ...],
+) -> str:
+    """Render concise newest-first Operations history."""
+
+    lines = [
+        "Atlas Operations History",
+        "========================",
+        "",
+        f"Reports: {len(reports)}",
+    ]
+
+    if not reports:
+        lines.extend(
+            [
+                "",
+                "No persisted Operations reports were found.",
+            ]
+        )
+
+        return "\n".join(lines)
+
+    for index, report in enumerate(
+        reports,
+        start=1,
+    ):
+        lines.extend(
+            [
+                "",
+                f"{index}.",
+                f"   Report ID: {report.report_id}",
+                f"   Generated: {report.generated_at}",
+                (
+                    "   Status:    "
+                    f"{_status_label(report.status.value)}"
+                ),
+                f"   Score:     {report.score}/100",
+            ]
+        )
+
+    return "\n".join(lines)
+
+
+def render_history_json(
+    reports: tuple[OperationsReport, ...],
+) -> str:
+    """Render the stable Operations history JSON contract."""
+
+    payload = {
+        "count": len(reports),
+        "reports": [
+            report.to_dict()
+            for report in reports
+        ],
+    }
+
+    return json.dumps(
+        payload,
+        indent=2,
+        sort_keys=True,
+    )
+
+
 def _run_report(
     args: argparse.Namespace,
     *,
@@ -358,6 +438,40 @@ def _run_latest(
     return 0
 
 
+def _run_history(
+    args: argparse.Namespace,
+    *,
+    repository_factory: OperationsRepositoryFactory,
+    stdout: TextIO,
+    stderr: TextIO,
+) -> int:
+    try:
+        repository = repository_factory()
+        reports = repository.history(
+            limit=args.limit,
+        )
+    except Exception as exc:
+        detail = str(exc).strip() or exc.__class__.__name__
+        print(
+            f"Operations history failed: {detail}",
+            file=stderr,
+        )
+        return 1
+
+    if args.json:
+        print(
+            render_history_json(reports),
+            file=stdout,
+        )
+    else:
+        print(
+            render_history_human(reports),
+            file=stdout,
+        )
+
+    return 0
+
+
 def main(
     argv: Sequence[str] | None = None,
     *,
@@ -400,6 +514,14 @@ def main(
 
     if args.command == "latest":
         return _run_latest(
+            args,
+            repository_factory=repository_factory,
+            stdout=output,
+            stderr=errors,
+        )
+
+    if args.command == "history":
+        return _run_history(
             args,
             repository_factory=repository_factory,
             stdout=output,

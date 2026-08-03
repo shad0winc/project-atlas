@@ -9,11 +9,13 @@ Usage:
   atlas operations report [--json] [--report-id REPORT_ID]
   atlas operations save [--json] [--report-id REPORT_ID]
   atlas operations latest [--json]
+  atlas operations history [--limit LIMIT] [--json]
 
 Commands:
   report    Collect the current live Operations report
   save      Collect and persist a new Operations report
   latest    Render the latest persisted Operations report
+  history   Render persisted Operations report history
   help      Show this help text
 
 Options:
@@ -55,6 +57,11 @@ atlas_command_operations() {
     latest)
       shift
       atlas_operations_python latest "$@"
+      ;;
+
+    history)
+      shift
+      atlas_operations_python history "$@"
       ;;
 
     *)

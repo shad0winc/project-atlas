@@ -981,6 +981,11 @@ atlas operations help
 atlas operations report
 atlas operations report --json
 atlas operations report --report-id REPORT_ID
+atlas operations save
+atlas operations latest
+atlas operations history
+atlas operations history --json
+atlas operations history --limit LIMIT
 ```
 
 The JSON `OperationsReport` is now the canonical persistence contract.
@@ -1002,5 +1007,13 @@ The default layout is:
 Historical snapshots are immutable and written atomically. `latest.json`
 is updated only after the historical snapshot succeeds.
 
-History listing, comparison, scheduling, APIs, notifications, and the
-Portal remain future extensions of this stable contract.
+History inspection is exposed through the read-only Operations CLI. The
+repository returns validated reports in deterministic newest-first order,
+and callers may apply a bounded result limit.
+
+Human history output intentionally summarizes report identity, generation
+time, status, and score. JSON history output wraps complete validated
+`OperationsReport` contracts with a deterministic `count` field.
+
+Report comparison, scheduling, APIs, notifications, and the Portal remain
+future extensions of this stable contract.

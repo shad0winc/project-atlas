@@ -16,6 +16,8 @@ from atlas.operations_cli import (
     build_parser,
     main,
     render_report_human,
+    render_history_human,
+    render_history_json,
 )
 
 
@@ -384,10 +386,40 @@ def test_json_output_contract_is_unchanged() -> None:
     assert "Atlas Operations Report" not in stdout.getvalue()
 
 
+def history_report(
+    *,
+    report_id: str,
+    generated_at: str,
+) -> OperationsReport:
+    """Build a distinct report for history rendering tests."""
+
+    base = operations_report()
+
+    return OperationsReport(
+        report_id=report_id,
+        hostname=base.hostname,
+        atlas_version=base.atlas_version,
+        git_commit=base.git_commit,
+        generated_at=generated_at,
+        sections=base.sections,
+    )
+
+
 class FakeOperationsRepository:
     def __init__(self) -> None:
         self.saved: list[OperationsReport] = []
         self.latest_report = operations_report()
+        self.history_limits: list[int] = []
+        self.history_reports = (
+            history_report(
+                report_id="newest-report",
+                generated_at="2026-08-03T22:00:00Z",
+            ),
+            history_report(
+                report_id="older-report",
+                generated_at="2026-08-03T21:00:00Z",
+            ),
+        )
 
     def save(self, report: OperationsReport):
         from pathlib import Path
@@ -405,7 +437,8 @@ class FakeOperationsRepository:
         self,
         limit: int = 25,
     ) -> tuple[OperationsReport, ...]:
-        return (self.latest_report,)
+        self.history_limits.append(limit)
+        return self.history_reports[:limit]
 
 
 def test_parser_accepts_save_command() -> None:
@@ -525,3 +558,172 @@ def test_persistence_commands_normalize_failures(
     assert result == 1
     assert message in stderr.getvalue()
     assert "storage unavailable" in stderr.getvalue()
+
+
+def test_parser_accepts_history_command() -> None:
+    args = build_parser().parse_args(["history"])
+
+    assert args.command == "history"
+    assert args.limit == 25
+    assert args.json is False
+
+
+def test_parser_accepts_history_options() -> None:
+    args = build_parser().parse_args(
+        [
+            "history",
+            "--limit",
+            "10",
+            "--json",
+        ]
+    )
+
+    assert args.command == "history"
+    assert args.limit == 10
+    assert args.json is True
+
+
+def test_history_human_renderer_lists_newest_first() -> None:
+    repository = FakeOperationsRepository()
+
+    rendered = render_history_human(
+        repository.history_reports,
+    )
+
+    assert rendered.startswith(
+        "Atlas Operations History\n"
+        "========================\n"
+    )
+    assert "Reports: 2" in rendered
+    assert rendered.index("newest-report") < rendered.index(
+        "older-report"
+    )
+    assert "Status:    Healthy" in rendered
+    assert "Score:     100/100" in rendered
+
+
+def test_history_human_renderer_handles_empty_history() -> None:
+    rendered = render_history_human(())
+
+    assert rendered == (
+        "Atlas Operations History\n"
+        "========================\n"
+        "\n"
+        "Reports: 0\n"
+        "\n"
+        "No persisted Operations reports were found."
+    )
+
+
+def test_history_json_renderer_uses_wrapped_contract() -> None:
+    repository = FakeOperationsRepository()
+
+    payload = json.loads(
+        render_history_json(
+            repository.history_reports,
+        )
+    )
+
+    assert payload == {
+        "count": 2,
+        "reports": [
+            report.to_dict()
+            for report in repository.history_reports
+        ],
+    }
+
+
+def test_main_renders_operations_history() -> None:
+    repository = FakeOperationsRepository()
+    stdout = StringIO()
+
+    result = main(
+        ["history"],
+        repository_factory=lambda: repository,
+        stdout=stdout,
+        stderr=StringIO(),
+    )
+
+    assert result == 0
+    assert repository.history_limits == [25]
+    assert "Atlas Operations History" in stdout.getvalue()
+    assert "Reports: 2" in stdout.getvalue()
+    assert stdout.getvalue().index(
+        "newest-report"
+    ) < stdout.getvalue().index(
+        "older-report"
+    )
+
+
+def test_main_renders_operations_history_json() -> None:
+    repository = FakeOperationsRepository()
+    stdout = StringIO()
+
+    result = main(
+        [
+            "history",
+            "--limit",
+            "1",
+            "--json",
+        ],
+        repository_factory=lambda: repository,
+        stdout=stdout,
+        stderr=StringIO(),
+    )
+
+    assert result == 0
+    assert repository.history_limits == [1]
+
+    payload = json.loads(
+        stdout.getvalue()
+    )
+
+    assert payload["count"] == 1
+    assert tuple(
+        report["report_id"]
+        for report in payload["reports"]
+    ) == (
+        "newest-report",
+    )
+
+
+def test_main_renders_empty_operations_history() -> None:
+    repository = FakeOperationsRepository()
+    repository.history_reports = ()
+    stdout = StringIO()
+
+    result = main(
+        ["history"],
+        repository_factory=lambda: repository,
+        stdout=stdout,
+        stderr=StringIO(),
+    )
+
+    assert result == 0
+    assert "Reports: 0" in stdout.getvalue()
+    assert (
+        "No persisted Operations reports were found."
+        in stdout.getvalue()
+    )
+
+
+def test_main_normalizes_history_failure() -> None:
+    class BrokenRepository(FakeOperationsRepository):
+        def history(
+            self,
+            limit: int = 25,
+        ) -> tuple[OperationsReport, ...]:
+            raise RuntimeError("history unavailable")
+
+    stderr = StringIO()
+
+    result = main(
+        ["history"],
+        repository_factory=BrokenRepository,
+        stdout=StringIO(),
+        stderr=stderr,
+    )
+
+    assert result == 1
+    assert "Operations history failed" in stderr.getvalue()
+    assert "history unavailable" in stderr.getvalue()

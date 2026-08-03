@@ -503,6 +503,9 @@ atlas operations save --json
 atlas operations save --report-id nightly-operations
 atlas operations latest
 atlas operations latest --json
+atlas operations history
+atlas operations history --json
+atlas operations history --limit 10
 ```
 
 `report` collects a live report without persisting it.
@@ -512,6 +515,10 @@ snapshot, and atomically updates `latest.json`.
 
 `latest` loads and validates the most recently persisted report without
 executing the collectors again.
+
+`history` loads persisted reports in newest-first order without modifying
+the snapshot archive or `latest.json`. The optional `--limit` argument
+controls the maximum number of reports returned.
 
 The default storage layout is:
 
@@ -527,8 +534,11 @@ Schema versions, identities, child contracts, timestamps, and canonical
 inputs are validated, while derived status, score, summary, and attention
 fields are recomputed.
 
-Historical listing, report comparison, scheduling, APIs, and Portal
-visualization remain planned extensions.
+Historical listing is implemented through concise human output and a
+wrapped JSON contract containing `count` and complete validated reports.
+
+Report comparison, scheduling, APIs, and Portal visualization remain
+planned extensions.
 
 See `docs/OPERATIONS.md` for the complete command and persistence contract.
 

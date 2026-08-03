@@ -30,6 +30,14 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Added
 
+- Added read-only Atlas Operations history inspection with newest-first
+  ordering, configurable limits, concise human output, and a stable wrapped
+  JSON contract.
+- Added `atlas operations history`, `atlas operations history --json`, and
+  `atlas operations history --limit LIMIT`.
+- Added focused parser, renderer, repository-forwarding, failure, shell, and
+  live read-only validation coverage.
+
 - Added immutable Atlas Operations report persistence with schema-validated
   deserialization, deterministic atomic JSON snapshots, duplicate-snapshot
   protection, `latest.json`, and newest-first repository history support.

@@ -3111,3 +3111,73 @@ future work.
 Atlas Operations now preserves validated, immutable operational snapshots
 while keeping live collection and persisted retrieval as explicit, separate
 commands.
+
+---
+
+# 2026-08-03
+
+## M-023.6B — Operations History Inspection
+
+### Objective
+
+Expose persisted Operations reports through a deterministic, read-only
+history interface without modifying immutable snapshots or `latest.json`.
+
+### Completed
+
+- Added the `history` Python CLI command.
+- Added configurable `--limit` handling with a default of 25 reports.
+- Added concise newest-first human history rendering.
+- Added stable wrapped JSON history output.
+- Preserved complete validated `OperationsReport` contracts in JSON.
+- Added normalized history repository failure reporting.
+- Added public shell forwarding and centralized help.
+- Added parser, renderer, limit, empty-history, failure, and shell tests.
+
+### Public interface
+
+```bash
+atlas operations history
+atlas operations history --json
+atlas operations history --limit 10
+atlas operations history --limit 10 --json
+```
+
+### JSON contract
+
+History JSON contains:
+
+- `count` — the number of returned reports;
+- `reports` — complete validated Operations report contracts.
+
+Reports are returned in deterministic newest-first order.
+
+### Live validation
+
+- Loaded the existing production Operations snapshot.
+- Rendered healthy human history with score 100.
+- Validated the wrapped JSON contract.
+- Validated newest-first timestamp ordering.
+- Validated `--limit 1` against the complete history result.
+- Confirmed history commands did not modify `latest.json`.
+- Confirmed history commands did not change the snapshot count.
+
+### Verification
+
+- 38 Operations Python CLI tests passed.
+- 18 Operations shell integration tests passed.
+- 106 Operations persistence and model tests passed.
+- 382 complete Operations integration tests passed.
+- Python compilation passed.
+- Shell syntax validation passed.
+- Diff hygiene passed.
+
+### Boundary
+
+Report comparison, scheduled collection, APIs, notifications, Portal
+visualization, and automatic remediation remain future work.
+
+### Result
+
+Atlas administrators can now inspect immutable operational history through
+stable human and JSON interfaces without affecting persisted state.
