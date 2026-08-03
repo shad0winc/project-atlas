@@ -187,6 +187,62 @@ provider contracts in later increments.
 
 ---
 
+# Atlas Operations Reports
+
+Atlas Operations provides one read-only report covering the current
+host and Docker deployment.
+
+## Commands
+
+```bash
+atlas operations
+atlas operations help
+atlas operations report
+atlas operations report --json
+atlas operations report --report-id nightly-operations
+```
+
+Every report includes its identity, hostname, Atlas version, Git
+commit, UTC generation timestamp, status, score, summary, attention
+references, and normalized sections.
+
+## System section
+
+The System section reports hostname, operating system, kernel, uptime,
+CPU, and memory.
+
+## Containers section
+
+The Containers section reports Docker Engine availability, inventory,
+runtime state, health checks, restart thresholds, OOM state, stopped-
+container exit state, and resource-governance compliance.
+
+## Status markers
+
+- `[OK]` — Healthy
+- `[!]` — Warning
+- `[X]` — Critical
+- `[?]` — Unknown
+
+Reports end with an **Attention Required** summary.
+
+## Failure isolation
+
+A failed collector does not abort the complete report. Atlas emits an
+unknown fallback section and preserves successfully collected
+sections.
+
+## JSON contract
+
+`atlas operations report --json` is the canonical machine-readable
+contract. Consumers should not parse the human renderer.
+
+## Current boundaries
+
+The subsystem remains read-only and does not yet persist history,
+schedule reports, publish events, send notifications, expose API
+routes, or perform automatic remediation.
+
 # Production Ingress Operations
 
 ## Verify Ingress Governance

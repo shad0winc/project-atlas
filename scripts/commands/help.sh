@@ -99,6 +99,8 @@ Intelligence
   atlas ari growth [--json]
   atlas ari forecast [--json]
   atlas discovery [help|indexers|categories|applications|health|report]
+  atlas operations [help|report]
+  atlas operations report [--json] [--report-id REPORT_ID]
   atlas retention evaluate <provider> <item-id> [--json]
   atlas cleanup evaluate <provider> <item-id> [--json]
   atlas cleanup scan <provider> [--page-size N] [--json]

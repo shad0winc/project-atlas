@@ -487,6 +487,29 @@ See `ROADMAP.md` for the authoritative milestone definitions.
 
 ---
 
+## Operations reporting
+
+Atlas includes a read-only Operations subsystem that aggregates
+host and Docker intelligence into one deterministic report.
+
+```bash
+atlas operations
+atlas operations help
+atlas operations report
+atlas operations report --json
+atlas operations report --report-id nightly-operations
+```
+
+The human report includes runtime metadata, overall health and score,
+section summaries, every finding, recommendations, and an attention
+summary.
+
+JSON output exposes the same immutable `OperationsReport` contract
+for automation and future API, scheduler, persistence, and Portal
+integrations.
+
+See `docs/OPERATIONS.md` for the complete command and report contract.
+
 ## Documentation
 
 | Document | Purpose |

@@ -2965,3 +2965,72 @@ Operations acquisition foundation. Host and Docker runtime information
 can be collected and normalized without exposing subprocess behavior or
 Docker-specific payload structures to future Operations collectors,
 reports, APIs, or user interfaces.
+
+---
+
+# 2026-08-03
+
+## M-023.5 — Operations Aggregation, Runtime Context, and CLI
+
+### Objective
+
+Complete the first end-to-end Atlas Operations reporting path
+and expose it through the public Atlas CLI.
+
+### Completed
+
+- Added the final read-only Docker Operations collector.
+- Added Docker Engine, inventory, runtime, health, restart, OOM,
+  exit-state, and resource-governance findings.
+- Added deterministic `OperationsService` aggregation.
+- Added canonical collector ordering and collector failure isolation.
+- Added immutable Operations runtime-context contracts.
+- Added automatic hostname, version, Git commit, and UTC discovery.
+- Added detailed human and deterministic JSON renderers.
+- Added report-ID overrides and normalized CLI errors.
+- Added `scripts/commands/operations.sh`.
+- Registered Operations in `scripts/atlas` and centralized help.
+
+### Public interface
+
+```bash
+atlas operations
+atlas operations help
+atlas operations report
+atlas operations report --json
+atlas operations report --report-id nightly-operations
+```
+
+### Live validation
+
+- Healthy overall status
+- Score 100 out of 100
+- Two sections
+- Six System findings
+- Eight Containers findings
+- Fourteen total findings
+- Zero attention findings
+- All 21 Docker containers running
+- All three governed Atlas containers matching policy
+
+### Verification
+
+- 21 focused Operations CLI tests passed.
+- 9 shell integration tests passed.
+- 307 complete Operations tests passed.
+- 376 related regression tests passed.
+- Python compilation passed.
+- Shell syntax passed.
+- Human and JSON live validation passed.
+- `git diff --check` passed.
+
+### Boundary
+
+Persistence, historical comparison, scheduling, APIs, events,
+notifications, Portal dashboards, and automatic remediation
+remain future work.
+
+### Result
+
+Project Atlas now has a complete, deterministic, tested, and public
+Operations reporting path backed by stable human and JSON contracts.

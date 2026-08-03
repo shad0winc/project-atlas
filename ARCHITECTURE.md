@@ -942,3 +942,46 @@ This work is planned through the M-020 Engineering Bundles and must follow evolu
 - advanced operational intelligence
 
 Future architecture must extend stable v1.0 contracts rather than bypass them.
+
+## Operations reporting architecture
+
+Atlas Operations is the canonical read-only infrastructure-reporting domain.
+
+```text
+SystemProvider / DockerProvider
+              |
+              v
+SystemCollector / DockerCollector
+              |
+              v
+       OperationsService
+              |
+              v
+       OperationsReport
+          /         \
+         v           v
+ Human CLI        Stable JSON
+```
+
+The `atlas.operations` package owns immutable findings, sections,
+summaries, reports, validation, deterministic ordering, and serialization.
+
+Collectors remain read-only. Provider boundaries isolate host and Docker
+access. Collector failures produce an unknown fallback section instead of
+aborting the complete report.
+
+`HostOperationsContextProvider` supplies report identity, hostname, Atlas
+version, Git commit, and one timezone-aware UTC timestamp.
+
+Public commands:
+
+```bash
+atlas operations
+atlas operations help
+atlas operations report
+atlas operations report --json
+atlas operations report --report-id REPORT_ID
+```
+
+The JSON `OperationsReport` is the future contract for persistence,
+scheduling, APIs, notifications, and the Portal.

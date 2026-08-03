@@ -55,6 +55,7 @@ source "$ATLAS_CLI_ROOT/commands/favorite.sh"
 source "$ATLAS_CLI_ROOT/commands/retention.sh"
 source "$ATLAS_CLI_ROOT/commands/cleanup.sh"
 source "$ATLAS_CLI_ROOT/commands/discovery.sh"
+source "$ATLAS_CLI_ROOT/commands/operations.sh"
 
 atlas_initialize
 
@@ -127,6 +128,10 @@ case "$command" in
 
   discovery)
     atlas_command_discovery "${@:2}"
+    ;;
+
+  operations)
+    atlas_command_operations "${@:2}"
     ;;
 
   module)

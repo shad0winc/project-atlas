@@ -566,9 +566,29 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 
 ## M-023 — Production Readiness and v1.0 Release
 
-**Status:** Planned
+**Status:** In Progress
 
 **Goal:** Make Atlas safe for continuous friends-and-family use.
+
+
+### Operations Foundation and CLI
+
+- [x] Define immutable Operations domain contracts
+- [x] Add deterministic section and attention ordering
+- [x] Add the read-only System collector
+- [x] Add the guarded Docker adapter and normalized provider
+- [x] Add Docker runtime, health, restart, OOM, exit, and governance findings
+- [x] Add deterministic multi-collector aggregation
+- [x] Isolate collector failures
+- [x] Add automatic hostname, version, Git, and UTC context discovery
+- [x] Add human-readable and JSON Operations reports
+- [x] Add the public `atlas operations report` command
+- [x] Add Python CLI and shell integration tests
+- [ ] Persist immutable Operations reports
+- [ ] Add report history and comparison
+- [ ] Schedule Operations report collection
+- [ ] Add Operations API routes
+- [ ] Add the Operations Portal dashboard
 
 ### Reliability
 
