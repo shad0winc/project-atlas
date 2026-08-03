@@ -19,7 +19,9 @@ from .provider import (
 )
 from .providers import (
     BaseMediaRequestHTTPProvider,
+    JellyseerrMediaRequestProvider,
     MediaRequestHTTPError,
+    default_jellyseerr_media_request_provider,
 )
 from .repository import (
     JsonMediaRequestRepository,
@@ -33,6 +35,7 @@ from .service import (
 
 __all__ = [
     "BaseMediaRequestHTTPProvider",
+    "JellyseerrMediaRequestProvider",
     "JsonMediaRequestRepository",
     "MediaRequest",
     "MediaRequestError",
@@ -52,4 +55,5 @@ __all__ = [
     "ProviderStatusResult",
     "ProviderSubmissionResult",
     "SCHEMA_VERSION",
+    "default_jellyseerr_media_request_provider",
 ]

@@ -2384,3 +2384,95 @@ This sprint intentionally did not add:
 - 286 combined media-request tests passed.
 - Package compilation passed.
 - `git diff --check` passed.
+
+---
+
+# 2026-08-03
+
+## M-023.1.5B — Jellyseerr Provider Adapter
+
+### Objective
+
+Implement the first concrete Atlas Media Request provider using the reusable
+HTTP foundation and the provider-neutral request contract.
+
+### Completed
+
+- Added `atlas/media_requests/providers/jellyseerr.py`.
+- Added `JellyseerrMediaRequestProvider`.
+- Added `default_jellyseerr_media_request_provider()`.
+- Added Jellyseerr provider capability declaration.
+- Added movie request payload mapping.
+- Added TV request payload mapping.
+- Added anime movie request mapping.
+- Added anime TV request mapping.
+- Added specific-season request support.
+- Added all-season request support.
+- Added numeric TMDB identity validation.
+- Added Jellyseerr request submission.
+- Added provider request-ID extraction.
+- Added request creation and update timestamp normalization.
+- Added Jellyseerr request-status normalization.
+- Added Jellyseerr media-availability normalization.
+- Added request-status synchronization.
+- Added availability timestamp mapping.
+- Added provider request-ID consistency validation.
+- Added request cancellation through the documented delete endpoint.
+- Added normalized provider health reporting.
+- Added environment-based provider construction.
+- Added explicit `ATLAS_JELLYSEERR_URL` support.
+- Added fallback URL construction from `LXC_IP` and `JELLYSEERR_PORT`.
+- Reused `ATLAS_JELLYSEERR_API_KEY`.
+- Added provider-neutral event context.
+- Added provider-package exports.
+- Added top-level media-request package exports.
+- Added dedicated mocked Jellyseerr adapter tests.
+- Preserved immutable provider configuration.
+- Corrected tests to mock class-level transport methods rather than frozen
+  provider instances.
+
+### Status Mapping
+
+Jellyseerr request and media states are normalized into Atlas lifecycle states:
+
+- pending;
+- approved;
+- searching;
+- importing;
+- available;
+- rejected;
+- failed;
+- cancelled.
+
+### Architectural Boundary
+
+The adapter translates only between Jellyseerr API resources and Atlas
+provider contracts.
+
+It does not:
+
+- mutate the request repository directly;
+- publish Atlas events;
+- deliver Discord notifications;
+- expose REST routes;
+- implement Portal behavior.
+
+### Boundaries
+
+This sprint intentionally did not add:
+
+- live request creation against the production Jellyseerr instance;
+- live cancellation;
+- scheduled request reconciliation;
+- event publication;
+- Discord notification delivery;
+- user notification preferences;
+- API routes;
+- Portal functionality.
+
+### Validation
+
+- 45 focused Jellyseerr provider tests passed.
+- 331 combined media-request tests passed.
+- Package compilation passed.
+- `git diff --check` passed.
