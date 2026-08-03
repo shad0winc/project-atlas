@@ -89,6 +89,42 @@ Review:
 
 ---
 
+# Production Ingress Operations
+
+## Verify Ingress Governance
+
+```bash
+scripts/verify-ingress.sh
+```
+
+The verifier checks:
+
+- ingress Compose syntax and network availability;
+- Caddy, Atlas API, and Atlas Portal health;
+- production memory, CPU, and PID ceilings;
+- Caddy configuration;
+- Portal and API routing through local HTTPS ingress.
+
+Expected result:
+
+```text
+Atlas Ingress Status: PASS
+```
+
+| Service | Memory | CPU | PID limit |
+| --- | ---: | ---: | ---: |
+| Caddy | 512 MiB | 1 CPU | 256 |
+| Atlas API | 1 GiB | 2 CPUs | 512 |
+| Atlas Portal | 1.5 GiB | 2 CPUs | 512 |
+
+These limits do not constrain Jellyfin, FFmpeg, Intel GPU
+transcoding, media playback, or the broader media stack.
+
+Run this verifier after ingress deployment or configuration changes
+and before production release validation.
+
+---
+
 # Weekly Maintenance
 
 Recommended tasks:

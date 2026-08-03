@@ -2655,3 +2655,80 @@ their later dedicated contracts.
 Atlas can now convert normalized request lifecycle events into appropriately
 routed Discord notifications while keeping request processing and notification
 delivery fully decoupled.
+
+---
+
+# 2026-08-03
+
+## M-023.2.2B — Ingress Resource Governance and Caddy Health
+
+### Objective
+
+Add evidence-based resource governance and native health monitoring
+to the production ingress stack without constraining media playback
+or hardware transcoding.
+
+### Completed
+
+- Added a 512 MiB memory ceiling, 1 CPU ceiling, and 256 PID
+  ceiling to Caddy.
+- Added a 1 GiB memory ceiling, 2 CPU ceiling, and 512 PID
+  ceiling to Atlas API.
+- Added a 1.5 GiB memory ceiling, 2 CPU ceiling, and 512 PID
+  ceiling to Atlas Portal.
+- Added a native Caddy Docker health check through the local
+  HTTPS API route.
+- Added `scripts/verify-ingress.sh`.
+- Added permanent validation for:
+  - ingress Compose syntax;
+  - ingress network availability;
+  - container presence and runtime state;
+  - Docker health status;
+  - memory, CPU, and PID ceilings;
+  - Caddy configuration;
+  - Portal routing;
+  - API routing.
+
+### Applied Runtime Contract
+
+| Service | Memory | CPU | PID limit |
+| --- | ---: | ---: | ---: |
+| Caddy | 512 MiB | 1 CPU | 256 |
+| Atlas API | 1 GiB | 2 CPUs | 512 |
+| Atlas Portal | 1.5 GiB | 2 CPUs | 512 |
+
+### Architectural Boundary
+
+These limits apply only to:
+
+- Caddy;
+- Atlas API;
+- Atlas Portal.
+
+They do not constrain:
+
+- Jellyfin;
+- FFmpeg;
+- Intel GPU transcoding;
+- media playback or streaming;
+- Sonarr or Radarr;
+- the broader media stack.
+
+### Validation
+
+- All three ingress containers reported running and healthy.
+- Caddy health checks repeatedly completed with exit code `0`.
+- Permanent ingress verification passed 24 checks with zero failures.
+- Portal routing through Caddy passed.
+- API routing through Caddy passed.
+- Caddy configuration validation passed.
+- Docker Compose validation passed.
+- Shell syntax validation passed.
+- `git diff --check` passed.
+
+### Result
+
+The production ingress deployment now has explicit fault-containment
+ceilings, native health monitoring, and a repeatable verification
+contract while preserving substantial capacity for future Portal and
+API growth.
