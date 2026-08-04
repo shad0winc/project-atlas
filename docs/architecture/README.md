@@ -24,6 +24,7 @@ Project Atlas
 ├── Core domains
 │   ├── Identity and authorization
 │   ├── Service Lifecycle
+│   │   └── Startup Policy
 │   ├── Health and observability
 │   ├── Policy, retention, and cleanup
 │   ├── Scheduler and events
@@ -46,6 +47,7 @@ logic.
 ## Current Architecture Documents
 
 - [Service Lifecycle](SERVICE_LIFECYCLE.md)
+- [Startup Policy](STARTUP_POLICY.md)
 - [Portal](PORTAL.md)
 
 Additional subsystem documents should be added only when their design is mature
@@ -85,8 +87,20 @@ Project Atlas milestones use this sequence:
 - Optional feature modules.
 - User-first operation and presentation.
 - Backups, verification, and rollback paths for production changes.
+
 ## Service Lifecycle
 
 - [Architecture](SERVICE_LIFECYCLE.md)
 - [CLI reference](../cli/SERVICE_LIFECYCLE.md)
 - [Python API reference](../api/SERVICE_LIFECYCLE.md)
+
+## Startup Policy
+
+Startup Policy extends Service Lifecycle with deterministic,
+provider-independent evaluation of service startup dependencies and readiness
+contracts.
+
+- [Architecture](STARTUP_POLICY.md)
+- [CLI reference](../cli/SERVICE_LIFECYCLE.md)
+- [Python API reference](../api/SERVICE_LIFECYCLE.md)
+- [ADR 0011 — Startup Policy Readiness Contracts](../ADR/0011-startup-policy-readiness-contracts.md)
