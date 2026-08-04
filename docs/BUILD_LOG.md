@@ -3975,3 +3975,149 @@ dashboard composed from one aggregate API response. Operational health, media
 statistics, Operations intelligence, comparison state, attention findings,
 Scheduler runtime state, and bounded Scheduler failures are presented through
 modular and independently testable frontend components.
+
+
+---
+
+# 2026-08-04
+
+## M-023.12 — Full-Stack Verification Framework
+
+### Objective
+
+Complete a production-ready root verification framework that validates Atlas
+configuration, filesystem readiness, infrastructure, the active Compose
+service model, ingress, Scheduler readiness, and enabled optional modules
+without duplicating subsystem-owned diagnostic logic.
+
+### Completed
+
+#### M-023.12.1 — Verify and Doctor Framework Boundaries
+
+- Refactored `scripts/commands/verify.sh` into reusable verification sections.
+- Added deterministic shell regression coverage for the root Verify command.
+- Preserved `scripts/commands/doctor.sh` as a thin delegation boundary to the
+  Python health engine.
+- Added dedicated Doctor shell tests covering text rendering, exit-status
+  propagation, and diagnostic-ownership boundaries.
+
+#### M-023.12.2 — Configuration Contract Verification
+
+- Added required-value validation.
+- Added absolute-path validation.
+- Added HTTP and HTTPS URL validation.
+- Added positive-integer validation.
+- Added deterministic parent-and-child path relationship validation.
+- Kept configuration validation independent from filesystem creation and
+  runtime initialization.
+
+#### M-023.12.3 — Runtime Filesystem Contract
+
+- Added required-directory existence checks.
+- Added non-destructive writability probes.
+- Verified project, storage, media, downloads, backup, configuration, and
+  runtime-configuration foundations.
+- Preserved lazy ownership for users, identity, ARI, Scheduler, and other
+  subsystem state directories.
+- Ensured `atlas verify` creates no runtime directories.
+
+#### M-023.12.4 — Compose-Aware Service Verification
+
+- Replaced the incomplete hardcoded service list.
+- Added active root Compose service discovery through
+  `docker compose config --services`.
+- Added running-service discovery through
+  `docker compose ps --status running --services`.
+- Added automatic verification for newly introduced active services.
+- Added explicit handling for Compose discovery and runtime-query failures.
+- Kept optional module Compose stacks outside the root Compose contract.
+
+#### M-023.12.5 — Specialized Verifier Orchestration
+
+- Added `scripts/lib/verifiers.sh`.
+- Added shared specialized-command aggregation helpers.
+- Delegated ingress verification to `scripts/verify-ingress.sh`.
+- Delegated Scheduler readiness to the public Scheduler CLI.
+- Used shared module enumeration and enabled-state contracts.
+- Delegated enabled-module validation to `atlas module verify <module>`.
+- Preserved complete subsystem verifier output.
+- Continued later verifier execution after individual failures.
+- Added explicit handling for installations with no enabled optional modules.
+
+#### M-023.12.6 — Live Verification
+
+Completed clean live validation of:
+
+- the root Atlas configuration contract;
+- the runtime filesystem contract;
+- Docker Engine and Docker Compose;
+- Intel GPU availability;
+- all 15 active root Compose services;
+- required media and download paths;
+- required project documentation;
+- Gluetun and the qBittorrent VPN namespace;
+- ingress Compose, containers, health, resource ceilings, and HTTPS routes;
+- Scheduler registry readiness;
+- the enabled Notifications module;
+- the enabled Sports module;
+- the Python Doctor health engine.
+
+### Architecture
+
+The final ownership model is:
+
+- `atlas verify` owns orchestration, aggregation, and the final PASS or FAIL
+  result.
+- `atlas doctor` remains a thin wrapper around the Python health engine.
+- the ingress verifier owns ingress-specific operational checks;
+- the Scheduler CLI owns Scheduler registry presentation;
+- the module framework owns module discovery and enabled-state evaluation;
+- each module verifier owns its domain-specific verification logic;
+- root Compose discovery owns only the active root service model.
+
+This prevents diagnostic duplication while allowing future services and
+modules to participate in verification through stable extension boundaries.
+
+### Validation
+
+Completed:
+
+- shell syntax validation;
+- Python test compilation;
+- Git diff-hygiene validation;
+- 21 focused Verify shell tests;
+- 138 focused and related operational regression tests;
+- clean live `atlas verify`;
+- clean live `atlas doctor`;
+- clean live ingress verification;
+- clean live Scheduler registry inspection;
+- clean enabled-module discovery;
+- clean repository-hygiene validation.
+
+Live results:
+
+- `atlas verify`: exit status `0`;
+- `atlas doctor`: exit status `0`;
+- Doctor overall status: `HEALTHY`;
+- Doctor overall score: `100%`;
+- ingress verifier: 24 passed, 0 failed;
+- Scheduler registry: 2 registered tasks;
+- enabled modules: Notifications and Sports;
+- root Verify overall status: `PASS`.
+
+### Commits
+
+- `d00cee53` — establish the Verify framework;
+- `0137bc2c` — lock the Doctor delegation boundary;
+- `424d5a73` — validate the Atlas configuration contract;
+- `b591060b` — verify the runtime filesystem contract;
+- `aca45714` — discover active Compose services;
+- `2c8c2d18` — orchestrate specialized verifiers.
+
+### Result
+
+Atlas now has a modular, deterministic, extensible, and production-validated
+full-stack verification framework. The root command verifies platform
+foundations and delegates specialized diagnostics to their owning
+subsystems, providing one complete operational PASS or FAIL result without
+centralizing domain-specific implementation details.

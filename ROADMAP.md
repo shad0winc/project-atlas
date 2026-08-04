@@ -633,7 +633,17 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 
 ### Reliability
 
-- [ ] Complete full-stack health verification
+- [x] Complete full-stack health verification
+  - [x] Refactor `atlas verify` into reusable verification sections
+  - [x] Lock the `atlas doctor` delegation boundary
+  - [x] Validate the canonical Atlas configuration contract
+  - [x] Validate required runtime filesystem paths and writability
+  - [x] Discover and verify active root Compose services
+  - [x] Delegate ingress verification to its owned verifier
+  - [x] Validate Scheduler registry readiness through the Scheduler CLI
+  - [x] Discover and verify all enabled optional modules
+  - [x] Aggregate failures without suppressing later verification sections
+  - [x] Complete clean live Verify and Doctor validation
 - [ ] Complete startup-order verification
 - [ ] Complete restart recovery verification
 - [ ] Complete service dependency verification
