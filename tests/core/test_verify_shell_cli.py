@@ -17,17 +17,22 @@ VERIFY_SCRIPT = (
     / "verify.sh"
 )
 
-CORE_SERVICES = (
-    "jellyfin",
-    "jellyseerr",
-    "prowlarr",
-    "sonarr",
-    "sonarr-anime",
-    "radarr",
-    "radarr-anime",
+COMPOSE_SERVICES = (
+    "dozzle",
+    "flaresolverr",
     "gluetun",
     "qbittorrent",
+    "sonarr",
+    "jellyfin",
+    "radarr",
+    "maintainerr",
+    "tautulli",
+    "jellyseerr",
+    "sonarr-anime",
+    "bazarr",
     "homepage",
+    "prowlarr",
+    "radarr-anime",
 )
 
 REQUIRED_PROJECT_FILES = (
@@ -107,6 +112,11 @@ def prepare_runtime(
             encoding="utf-8",
         )
 
+    (project_dir / "docker-compose.yml").write_text(
+        "services: {}\n",
+        encoding="utf-8",
+    )
+
     write_executable(
         bin_directory / "docker",
         r"""
@@ -124,6 +134,28 @@ def prepare_runtime(
 
         if [[ "${1:-}" == "compose" && "${2:-}" == "version" ]]; then
           exit 0
+        fi
+
+        if [[ "${1:-}" == "compose" ]]; then
+          arguments=" $* "
+
+          if [[ "$arguments" == *" config --services "* ]]; then
+            if [[ "${ATLAS_TEST_COMPOSE_CONFIG_STATUS:-0}" != "0" ]]; then
+              exit "${ATLAS_TEST_COMPOSE_CONFIG_STATUS}"
+            fi
+
+            printf '%s\n' "${ATLAS_TEST_COMPOSE_SERVICES:-}"
+            exit 0
+          fi
+
+          if [[ "$arguments" == *" ps --status running --services "* ]]; then
+            if [[ "${ATLAS_TEST_COMPOSE_PS_STATUS:-0}" != "0" ]]; then
+              exit "${ATLAS_TEST_COMPOSE_PS_STATUS}"
+            fi
+
+            printf '%s\n' "${ATLAS_TEST_RUNNING_SERVICES:-}"
+            exit 0
+          fi
         fi
 
         if [[ "${1:-}" == "ps" ]]; then
@@ -175,8 +207,11 @@ def prepare_runtime(
                 scheduler_dir / "scheduler.lock"
             ),
             "ATLAS_VERIFY_GPU_DEVICE": str(gpu_device),
+            "ATLAS_TEST_COMPOSE_SERVICES": "\n".join(
+                COMPOSE_SERVICES
+            ),
             "ATLAS_TEST_RUNNING_SERVICES": "\n".join(
-                CORE_SERVICES
+                COMPOSE_SERVICES
             ),
         }
     )
@@ -249,11 +284,12 @@ def test_verify_reports_pass_for_valid_runtime(
     assert "Configuration" in result.stdout
     assert "Runtime Filesystem" in result.stdout
     assert "Infrastructure" in result.stdout
-    assert "Core Services" in result.stdout
+    assert "Compose Services" in result.stdout
     assert "Storage Paths" in result.stdout
     assert "Project Files" in result.stdout
     assert "VPN" in result.stdout
     assert "OK   Docker Engine" in result.stdout
+    assert "OK   dozzle running" in result.stdout
     assert "OK   homepage running" in result.stdout
     assert "Overall Status: PASS" in result.stdout
     assert "Overall Status: FAIL" not in result.stdout
@@ -282,10 +318,10 @@ def test_verify_aggregates_infrastructure_failures(
     assert "Overall Status: FAIL" in result.stdout
 
 
-def test_verify_reports_missing_core_service(
+def test_verify_reports_missing_compose_service(
     tmp_path: Path,
 ) -> None:
-    """A missing required service must fail verification."""
+    """A configured service that is not running must fail verification."""
 
     environment = dict(
         prepare_runtime(tmp_path)
@@ -293,14 +329,14 @@ def test_verify_reports_missing_core_service(
 
     environment["ATLAS_TEST_RUNNING_SERVICES"] = "\n".join(
         service
-        for service in CORE_SERVICES
-        if service != "homepage"
+        for service in COMPOSE_SERVICES
+        if service != "dozzle"
     )
 
     result = run_verify(environment)
 
     assert result.returncode == 1
-    assert "FAIL homepage running" in result.stdout
+    assert "FAIL dozzle running" in result.stdout
     assert "OK   jellyfin running" in result.stdout
     assert "Overall Status: FAIL" in result.stdout
 
@@ -520,3 +556,80 @@ def test_verify_does_not_require_lazy_subsystem_directories(
         "ATLAS_SCHEDULER_DIR directory present"
         not in result.stdout
     )
+
+
+def test_verify_reports_compose_discovery_failure(
+    tmp_path: Path,
+) -> None:
+    """A failed Compose model query must fail verification cleanly."""
+
+    environment = dict(
+        prepare_runtime(tmp_path)
+    )
+
+    environment["ATLAS_TEST_COMPOSE_CONFIG_STATUS"] = "1"
+
+    result = run_verify(environment)
+
+    assert result.returncode == 1
+    assert "FAIL Compose service discovery" in result.stdout
+    assert "Compose runtime query" not in result.stdout
+    assert "Overall Status: FAIL" in result.stdout
+
+
+def test_verify_reports_empty_compose_service_model(
+    tmp_path: Path,
+) -> None:
+    """An empty active Compose model must fail verification."""
+
+    environment = dict(
+        prepare_runtime(tmp_path)
+    )
+
+    environment["ATLAS_TEST_COMPOSE_SERVICES"] = ""
+
+    result = run_verify(environment)
+
+    assert result.returncode == 1
+    assert "FAIL Compose service discovery" in result.stdout
+    assert "Overall Status: FAIL" in result.stdout
+
+
+def test_verify_checks_newly_discovered_compose_service(
+    tmp_path: Path,
+) -> None:
+    """New active Compose services must be verified without code changes."""
+
+    environment = dict(
+        prepare_runtime(tmp_path)
+    )
+
+    environment["ATLAS_TEST_COMPOSE_SERVICES"] = (
+        environment["ATLAS_TEST_COMPOSE_SERVICES"]
+        + "\nnew-service"
+    )
+
+    result = run_verify(environment)
+
+    assert result.returncode == 1
+    assert "FAIL new-service running" in result.stdout
+    assert "Overall Status: FAIL" in result.stdout
+
+
+def test_verify_reports_compose_runtime_query_failure(
+    tmp_path: Path,
+) -> None:
+    """A failed running-service query must fail verification cleanly."""
+
+    environment = dict(
+        prepare_runtime(tmp_path)
+    )
+
+    environment["ATLAS_TEST_COMPOSE_PS_STATUS"] = "1"
+
+    result = run_verify(environment)
+
+    assert result.returncode == 1
+    assert "OK   Compose service discovery" in result.stdout
+    assert "FAIL Compose runtime query" in result.stdout
+    assert "Overall Status: FAIL" in result.stdout

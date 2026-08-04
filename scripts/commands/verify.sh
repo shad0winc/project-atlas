@@ -97,6 +97,13 @@ atlas_verify_directory_writable() {
   rm -f "$probe"
 }
 
+atlas_verify_line_list_contains() {
+  local expected="$1"
+  local values="$2"
+
+  grep -Fxq -- "$expected" <<<"$values"
+}
+
 atlas_verify_configuration() {
   local variable
 
@@ -271,28 +278,62 @@ atlas_verify_infrastructure() {
     test -e "$gpu_device"
 }
 
-atlas_verify_core_services() {
+atlas_verify_compose_services() {
+  local compose_file
+  local configured_services
+  local running_services
   local service
 
-  atlas_section "Core Services"
+  compose_file="${ATLAS_VERIFY_COMPOSE_FILE:-$ATLAS_PROJECT_DIR/docker-compose.yml}"
 
-  for service in \
-    jellyfin \
-    jellyseerr \
-    prowlarr \
-    sonarr \
-    sonarr-anime \
-    radarr \
-    radarr-anime \
-    gluetun \
-    qbittorrent \
-    homepage
-  do
+  atlas_section "Compose Services"
+
+  atlas_verify_check \
+    "Compose file present" \
+    test -f "$compose_file"
+
+  if ! configured_services="$(
+    docker compose \
+      -f "$compose_file" \
+      config \
+      --services
+  )"; then
+    atlas_fail "Compose service discovery"
+    ATLAS_VERIFY_PASS=false
+    return
+  fi
+
+  if [[ -z "${configured_services//[[:space:]]/}" ]]; then
+    atlas_fail "Compose service discovery"
+    ATLAS_VERIFY_PASS=false
+    return
+  fi
+
+  atlas_ok "Compose service discovery"
+
+  if ! running_services="$(
+    docker compose \
+      -f "$compose_file" \
+      ps \
+      --status running \
+      --services
+  )"; then
+    atlas_fail "Compose runtime query"
+    ATLAS_VERIFY_PASS=false
+    return
+  fi
+
+  atlas_ok "Compose runtime query"
+
+  while IFS= read -r service; do
+    [[ -n "$service" ]] || continue
+
     atlas_verify_check \
       "$service running" \
-      sh -c \
-      "docker ps --format '{{.Names}}' | grep -qx '$service'"
-  done
+      atlas_verify_line_list_contains \
+      "$service" \
+      "$running_services"
+  done <<<"$configured_services"
 }
 
 atlas_verify_storage_paths() {
@@ -366,7 +407,7 @@ atlas_command_verify() {
   atlas_verify_infrastructure
 
   echo
-  atlas_verify_core_services
+  atlas_verify_compose_services
 
   echo
   atlas_verify_storage_paths
