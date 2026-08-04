@@ -10,7 +10,9 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from atlas.operations import (
+    FileOperationsRepository,
     HostOperationsContextProvider,
+    OperationsRepository,
     OperationsService,
 )
 from atlas.operations.collectors import (
@@ -108,6 +110,29 @@ def get_operations_service() -> OperationsService:
     )
 
 
+@lru_cache(maxsize=1)
+def get_operations_repository() -> OperationsRepository:
+    """Return the configured Operations report repository."""
+
+    configured_root = os.getenv(
+        "ATLAS_OPERATIONS_DIRECTORY",
+    )
+
+    if configured_root is None:
+        return FileOperationsRepository()
+
+    normalized_root = configured_root.strip()
+
+    if not normalized_root:
+        raise ValueError(
+            "ATLAS_OPERATIONS_DIRECTORY cannot be empty",
+        )
+
+    return FileOperationsRepository(
+        normalized_root,
+    )
+
+
 def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(
         _bearer_scheme
@@ -200,6 +225,7 @@ def clear_dependency_caches() -> None:
 
     get_authentication_service.cache_clear()
     get_jellyfin_authentication_client.cache_clear()
+    get_operations_repository.cache_clear()
     get_operations_service.cache_clear()
     get_user_profile_store.cache_clear()
     get_jwt_service.cache_clear()

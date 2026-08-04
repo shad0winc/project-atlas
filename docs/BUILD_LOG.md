@@ -3535,3 +3535,39 @@ behavior into the Operations domain.
 Atlas now exposes a production-quality read-only Operations report
 endpoint using the shared transport-neutral API contracts established
 during M-023.9B.
+
+---
+
+# 2026-08-04
+
+## M-023.10 — Operations Latest API (Slice 2)
+
+### Objective
+
+Expose the latest persisted Operations report through the Atlas HTTP API while
+reusing the existing repository implementation and shared API contracts.
+
+### Completed
+
+- Added the persisted Operations report endpoint.
+- Reused the production Operations repository.
+- Added repository dependency injection.
+- Added shared 404 failure envelopes.
+- Added OpenAPI success and failure schemas.
+- Added endpoint regression tests.
+- Validated production latest-report retrieval.
+- Confirmed read-only repository behavior.
+
+### Live validation
+
+- Latest persisted report returned successfully.
+- Overall score: 100.
+- Shared success envelope returned.
+- Missing reports returned HTTP 404 with the shared failure contract.
+- OpenAPI documented both response types.
+- No repository mutations occurred.
+
+### Result
+
+Atlas now exposes both live and persisted Operations reporting through
+consistent transport-neutral API contracts without duplicating business logic.

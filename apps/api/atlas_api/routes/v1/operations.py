@@ -4,17 +4,41 @@ from __future__ import annotations
 
 from typing import Annotated, Final
 
-from fastapi import APIRouter, Depends, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    status,
+)
+from fastapi.responses import JSONResponse
 
-from atlas.operations import OperationsService
-from atlas_api.adapters import success_envelope
+from atlas.operations import (
+    OperationsReportNotFoundError,
+    OperationsRepository,
+    OperationsService,
+)
+from atlas_api.adapters import (
+    failure_envelope,
+    success_envelope,
+)
 from atlas_api.auth.models import AuthenticatedUser
-from atlas_api.dependencies import get_operations_service
-from atlas_api.schemas import ApiSuccessEnvelopeSchema
+from atlas_api.dependencies import (
+    get_operations_repository,
+    get_operations_service,
+)
+from atlas_api.schemas import (
+    ApiFailureEnvelopeSchema,
+    ApiSuccessEnvelopeSchema,
+)
 from atlas_api.security import require_permission
 
 
 OPERATIONS_REPORT_PERMISSION: Final = "system.health.read"
+OPERATIONS_REPORT_NOT_FOUND_CODE: Final = (
+    "operations_report_not_found"
+)
+OPERATIONS_REPORT_NOT_FOUND_MESSAGE: Final = (
+    "Latest Operations report was not found"
+)
 
 
 router = APIRouter(
@@ -56,9 +80,64 @@ def read_operations_report(
     )
 
 
+@router.get(
+    "/latest",
+    response_model=ApiSuccessEnvelopeSchema,
+    responses={
+        status.HTTP_404_NOT_FOUND: {
+            "model": ApiFailureEnvelopeSchema,
+            "description": (
+                "No persisted Operations report is available."
+            ),
+        },
+    },
+    status_code=status.HTTP_200_OK,
+    summary="Read the latest persisted Atlas Operations report",
+)
+def read_latest_operations_report(
+    _current_user: Annotated[
+        AuthenticatedUser,
+        Depends(require_operations_report_read),
+    ],
+    repository: Annotated[
+        OperationsRepository,
+        Depends(get_operations_repository),
+    ],
+) -> ApiSuccessEnvelopeSchema | JSONResponse:
+    """Return the latest validated persisted Operations report."""
+
+    try:
+        report = repository.latest()
+    except OperationsReportNotFoundError:
+        failure = failure_envelope(
+            OPERATIONS_REPORT_NOT_FOUND_CODE,
+            OPERATIONS_REPORT_NOT_FOUND_MESSAGE,
+            details={
+                "resource": "operations_report",
+                "selector": "latest",
+            },
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content=failure.model_dump(
+                mode="json",
+            ),
+        )
+
+    return success_envelope(
+        {
+            "report": report,
+        },
+        generated_at=report.generated_at,
+    )
+
+
 __all__ = [
+    "OPERATIONS_REPORT_NOT_FOUND_CODE",
+    "OPERATIONS_REPORT_NOT_FOUND_MESSAGE",
     "OPERATIONS_REPORT_PERMISSION",
-    "get_operations_service",
+    "read_latest_operations_report",
     "read_operations_report",
     "require_operations_report_read",
     "router",
