@@ -34,6 +34,7 @@ from atlas_api.services import (
     DashboardMediaSummaryService,
     DashboardSummaryService,
     PortalDashboardService,
+    SchedulerDashboardService,
 )
 
 
@@ -133,6 +134,42 @@ def get_dashboard_media_summary_service(
 
 
 @lru_cache(maxsize=1)
+def get_scheduler_dashboard_service() -> SchedulerDashboardService:
+    """Return the process-wide scheduler dashboard adapter."""
+
+    from atlas.scheduler import TaskScheduler
+
+    return SchedulerDashboardService(
+        TaskScheduler(),
+    )
+
+
+@lru_cache(maxsize=1)
+def get_task_scheduler():
+    """Return the Atlas scheduler runtime reader."""
+
+    from atlas.scheduler import TaskScheduler
+
+    return TaskScheduler(
+        Path(
+            os.getenv(
+                "ATLAS_SCHEDULER_STATE_FILE",
+                "/mnt/storage/configs/atlas/scheduler/tasks.json",
+            )
+        )
+    )
+
+
+@lru_cache(maxsize=1)
+def get_scheduler_dashboard_service() -> SchedulerDashboardService:
+    """Return the Portal scheduler widget adapter."""
+
+    return SchedulerDashboardService(
+        get_task_scheduler(),
+    )
+
+
+@lru_cache(maxsize=1)
 def get_portal_dashboard_service() -> PortalDashboardService:
     """Return the process-wide aggregate Portal service."""
 
@@ -140,6 +177,7 @@ def get_portal_dashboard_service() -> PortalDashboardService:
         get_dashboard_summary_service(),
         get_dashboard_media_summary_service(),
         get_operations_repository(),
+        get_scheduler_dashboard_service(),
         get_operations_comparison_service(),
     )
 
@@ -284,6 +322,8 @@ def clear_dependency_caches() -> None:
     get_operations_comparison_service.cache_clear()
     get_operations_repository.cache_clear()
     get_operations_service.cache_clear()
+    get_scheduler_dashboard_service.cache_clear()
+    get_task_scheduler.cache_clear()
     get_portal_dashboard_service.cache_clear()
     get_user_profile_store.cache_clear()
     get_jwt_service.cache_clear()

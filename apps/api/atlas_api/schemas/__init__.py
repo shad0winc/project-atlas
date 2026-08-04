@@ -13,6 +13,8 @@ from .portal_dashboard import (
     PortalOperationsReportSummaryResponse,
     PortalOperationsStatus,
     PortalOperationsSummaryResponse,
+    PortalSchedulerFailureResponse,
+    PortalSchedulerSummaryResponse,
     PortalSectionStatus,
 )
 
@@ -27,5 +29,7 @@ __all__ = [
     "PortalOperationsReportSummaryResponse",
     "PortalOperationsStatus",
     "PortalOperationsSummaryResponse",
+    "PortalSchedulerFailureResponse",
+    "PortalSchedulerSummaryResponse",
     "PortalSectionStatus",
 ]

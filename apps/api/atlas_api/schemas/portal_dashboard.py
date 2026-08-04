@@ -28,6 +28,92 @@ PortalOperationsStatus = Literal[
 ]
 
 
+class PortalSchedulerFailureResponse(BaseModel):
+    """Bounded scheduler failure information for Portal display."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+    )
+
+    task_name: str
+    failed_at: str | None
+    error: str
+
+
+class PortalSchedulerSummaryResponse(BaseModel):
+    """Compact scheduler health summary for Portal."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+    )
+
+    status: PortalSectionStatus
+    detail: str | None = None
+
+    registered_count: int | None = None
+    enabled_count: int | None = None
+    disabled_count: int | None = None
+    due_count: int | None = None
+    running_count: int | None = None
+    failed_count: int | None = None
+
+    last_run_at: str | None = None
+    next_run_at: str | None = None
+
+    recent_failures: tuple[
+        PortalSchedulerFailureResponse,
+        ...
+    ] = ()
+
+    @model_validator(mode="after")
+    def validate_scheduler_state(
+        self,
+    ) -> "PortalSchedulerSummaryResponse":
+        """Reject contradictory scheduler availability."""
+
+        fields = (
+            self.registered_count,
+            self.enabled_count,
+            self.disabled_count,
+            self.due_count,
+            self.running_count,
+            self.failed_count,
+        )
+
+        if self.status == "available":
+            if any(
+                value is None
+                for value in fields
+            ):
+                raise ValueError(
+                    "available scheduler state requires metrics"
+                )
+
+            if self.detail is not None:
+                raise ValueError(
+                    "available scheduler state cannot include detail"
+                )
+
+            return self
+
+        if self.detail is None or not self.detail.strip():
+            raise ValueError(
+                "unavailable scheduler state requires detail"
+            )
+
+        if any(
+            value is not None
+            for value in fields
+        ):
+            raise ValueError(
+                "unavailable scheduler state cannot include metrics"
+            )
+
+        return self
+
+
 class PortalOperationsReportSummaryResponse(BaseModel):
     """Compact summary of the latest persisted Operations report."""
 
@@ -245,6 +331,7 @@ class PortalDashboardResponse(BaseModel):
     operational: DashboardSummaryResponse
     media: DashboardMediaSummaryResponse
     operations: PortalOperationsSummaryResponse
+    scheduler: PortalSchedulerSummaryResponse
 
 
 __all__ = [
@@ -254,5 +341,7 @@ __all__ = [
     "PortalOperationsReportSummaryResponse",
     "PortalOperationsStatus",
     "PortalOperationsSummaryResponse",
+    "PortalSchedulerFailureResponse",
+    "PortalSchedulerSummaryResponse",
     "PortalSectionStatus",
 ]

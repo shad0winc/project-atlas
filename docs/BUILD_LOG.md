@@ -3821,3 +3821,42 @@ When at least two persisted reports exist:
 The aggregate Portal endpoint now exposes compact Operations widgets suitable
 for dashboard cards, change indicators, and attention panels without requiring
 the frontend to parse full Operations reports or reproduce domain logic.
+
+
+---
+
+# 2026-08-04
+
+## M-023.11 — Scheduler Portal Widget Enrichment (Slice 3)
+
+### Completed
+
+- Added Portal-ready Scheduler summary widgets.
+- Added Scheduler runtime status visibility.
+- Added bounded Scheduler failure visibility.
+- Added a read-only Scheduler dashboard adapter.
+- Integrated Scheduler state into the aggregate Portal dashboard contract.
+
+### Architecture
+
+- Existing TaskScheduler runtime remains the source of truth.
+- Portal reads scheduler state without executing jobs.
+- No scheduler mutation, synchronization, or persistence occurs from the API read path.
+- Scheduler ownership remains isolated from Portal presentation.
+
+### Validation
+
+Completed:
+
+- Scheduler widget schema tests
+- Scheduler dashboard service tests
+- Portal dashboard schema regressions
+- Portal dashboard service regressions
+- Portal dashboard route regressions
+- Operations regressions
+- Compilation checks
+- Repository hygiene checks
+
+Result:
+
+`M-023.11 Slice 3C Scheduler widget validation: PASS`

@@ -619,6 +619,9 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 - [x] Add Portal-ready Operations summary widgets
 - [x] Add Portal-ready Operations comparison widgets
 - [x] Add bounded recent Operations attention widgets
+- [x] Add Portal-ready Scheduler summary widgets
+- [x] Add Scheduler runtime status visibility
+- [x] Add bounded Scheduler failure visibility
 - [ ] Add the Operations Portal dashboard interface
 
 ### Reliability

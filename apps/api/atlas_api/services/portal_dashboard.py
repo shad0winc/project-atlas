@@ -28,6 +28,7 @@ from atlas_api.schemas.portal_dashboard import (
 from .dashboard import DashboardSummaryService
 from .dashboard_media import DashboardMediaSummaryService
 
+from .scheduler_dashboard import SchedulerDashboardService
 
 PORTAL_RECENT_ATTENTION_LIMIT: Final = 5
 PORTAL_COMPARISON_HISTORY_LIMIT: Final = 2
@@ -41,8 +42,18 @@ class PortalDashboardService:
         dashboard_service: DashboardSummaryService,
         media_service: DashboardMediaSummaryService,
         operations_repository: OperationsRepository,
+        scheduler_service: SchedulerDashboardService,
         comparison_service: OperationsComparisonService | None = None,
     ) -> None:
+        if not isinstance(
+            scheduler_service,
+            SchedulerDashboardService,
+        ):
+            raise TypeError(
+                "scheduler_service must be a "
+                "SchedulerDashboardService"
+            )
+
         if not isinstance(
             dashboard_service,
             DashboardSummaryService,
@@ -99,6 +110,7 @@ class PortalDashboardService:
         self._media_service = media_service
         self._operations_repository = operations_repository
         self._comparison_service = comparison_service
+        self._scheduler_service = scheduler_service
 
     def read_dashboard(self) -> PortalDashboardResponse:
         """Return one aggregate, read-only Portal dashboard."""
@@ -106,6 +118,7 @@ class PortalDashboardService:
         operational = self._dashboard_service.read_summary()
         media = self._media_service.read_summary()
         operations = self._read_operations_summary()
+        scheduler = self._scheduler_service.read_summary()
 
         return PortalDashboardResponse(
             health=HealthResponse(
@@ -116,6 +129,7 @@ class PortalDashboardService:
             operational=operational,
             media=media,
             operations=operations,
+            scheduler=scheduler,
         )
 
     def _read_operations_summary(

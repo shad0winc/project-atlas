@@ -18,6 +18,7 @@ from atlas_api.services import (
     DashboardMediaSummaryService,
     DashboardSummaryService,
     PortalDashboardService,
+    SchedulerDashboardService,
 )
 from atlas_api.services.portal_dashboard import (
     PORTAL_COMPARISON_HISTORY_LIMIT,
@@ -98,6 +99,30 @@ def operations_report(
     )
 
 
+
+class StubSchedulerService(
+    SchedulerDashboardService,
+):
+    def __init__(self) -> None:
+        pass
+
+    def read_summary(self):
+        from atlas_api.schemas.portal_dashboard import (
+            PortalSchedulerSummaryResponse,
+        )
+
+        return PortalSchedulerSummaryResponse(
+            status="available",
+            registered_count=0,
+            enabled_count=0,
+            disabled_count=0,
+            due_count=0,
+            running_count=0,
+            failed_count=0,
+            recent_failures=(),
+        )
+
+
 class StubMediaService(DashboardMediaSummaryService):
     def __init__(self) -> None:
         pass
@@ -153,6 +178,7 @@ def service(
         DashboardSummaryService(health_report),
         StubMediaService(),
         repository,
+        StubSchedulerService(),
         OperationsComparisonService(),
     )
 
@@ -359,6 +385,7 @@ def test_service_rejects_repository_without_history() -> None:
             DashboardSummaryService(health_report),
             StubMediaService(),
             LatestOnlyRepository(),  # type: ignore[arg-type]
+            StubSchedulerService(),
         )
     except TypeError as error:
         assert str(error) == (
@@ -374,6 +401,7 @@ def test_service_rejects_invalid_comparison_service() -> None:
             DashboardSummaryService(health_report),
             StubMediaService(),
             RecordingRepository(()),
+            StubSchedulerService(),
             object(),  # type: ignore[arg-type]
         )
     except TypeError as error:

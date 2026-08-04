@@ -24,10 +24,14 @@ from atlas_api.services import (
     DashboardMediaSummaryService,
     DashboardSummaryService,
     PortalDashboardService,
+    SchedulerDashboardService,
 )
 from atlas_api.schemas.dashboard_media import (
     DashboardMediaSummaryResponse,
     MediaLibraryResponse,
+)
+from atlas_api.schemas.portal_dashboard import (
+    PortalSchedulerSummaryResponse,
 )
 
 
@@ -84,6 +88,27 @@ class StubMediaService(DashboardMediaSummaryService):
         )
 
 
+class StubSchedulerService(
+    SchedulerDashboardService,
+):
+    def __init__(self) -> None:
+        pass
+
+    def read_summary(
+        self,
+    ) -> PortalSchedulerSummaryResponse:
+        return PortalSchedulerSummaryResponse(
+            status="available",
+            registered_count=0,
+            enabled_count=0,
+            disabled_count=0,
+            due_count=0,
+            running_count=0,
+            failed_count=0,
+            recent_failures=(),
+        )
+
+
 class MissingOperationsRepository:
     def latest(self):
         raise OperationsReportNotFoundError(
@@ -120,6 +145,7 @@ def portal_service() -> PortalDashboardService:
         DashboardSummaryService(lambda: report),
         StubMediaService(),
         MissingOperationsRepository(),
+        StubSchedulerService(),
     )
 
 
@@ -170,6 +196,7 @@ def test_portal_dashboard_returns_shared_envelope() -> None:
         "operational",
         "media",
         "operations",
+        "scheduler",
     }
     assert dashboard["health"] == {
         "status": "ok",
@@ -186,6 +213,22 @@ def test_portal_dashboard_returns_shared_envelope() -> None:
         "unavailable"
     )
     assert operations["comparison"]["difference_count"] is None
+
+    scheduler = dashboard["scheduler"]
+
+    assert scheduler == {
+        "status": "available",
+        "detail": None,
+        "registered_count": 0,
+        "enabled_count": 0,
+        "disabled_count": 0,
+        "due_count": 0,
+        "running_count": 0,
+        "failed_count": 0,
+        "last_run_at": None,
+        "next_run_at": None,
+        "recent_failures": [],
+    }
 
 
 def test_portal_dashboard_requires_authentication() -> None:

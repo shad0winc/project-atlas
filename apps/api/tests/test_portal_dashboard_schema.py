@@ -21,6 +21,7 @@ from atlas_api.schemas.portal_dashboard import (
     PortalOperationsComparisonResponse,
     PortalOperationsReportSummaryResponse,
     PortalOperationsSummaryResponse,
+    PortalSchedulerSummaryResponse,
 )
 
 
@@ -55,6 +56,19 @@ def media_summary() -> DashboardMediaSummaryResponse:
                 detail=None,
             ),
         ),
+    )
+
+
+def scheduler_summary() -> PortalSchedulerSummaryResponse:
+    return PortalSchedulerSummaryResponse(
+        status="available",
+        registered_count=2,
+        enabled_count=2,
+        disabled_count=0,
+        due_count=2,
+        running_count=0,
+        failed_count=0,
+        recent_failures=(),
     )
 
 
@@ -352,6 +366,7 @@ def test_portal_dashboard_serialization_is_stable() -> None:
             comparison=available_comparison(),
             recent_attention=(attention_finding(),),
         ),
+        scheduler=scheduler_summary(),
     )
 
     serialized = dashboard.model_dump(mode="json")
@@ -407,6 +422,8 @@ def test_schema_package_exports_portal_contracts() -> None:
         "PortalOperationsReportSummaryResponse",
         "PortalOperationsStatus",
         "PortalOperationsSummaryResponse",
+        "PortalSchedulerFailureResponse",
+        "PortalSchedulerSummaryResponse",
         "PortalSectionStatus",
     }
 
