@@ -24,6 +24,8 @@ from atlas.service_lifecycle import (
     UpdateReport,
     MaintenanceReport,
     ServiceMaintenanceHistoryService,
+    ServiceStartupPolicyService,
+    StartupPolicyReport,
 )
 from atlas.service_lifecycle.service import (
     InfrastructureDependencyGraph,
@@ -130,6 +132,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run read-only diagnostics for managed services.",
     )
     doctor_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Render machine-readable JSON.",
+    )
+
+    startup_policy_parser = subparsers.add_parser(
+        "startup-policy",
+        help="Evaluate read-only service startup policy.",
+    )
+    startup_policy_parser.add_argument(
         "--json",
         action="store_true",
         dest="as_json",
@@ -792,6 +805,102 @@ def _command_doctor(
 
 
 
+def _render_startup_policy_json(
+    report: StartupPolicyReport,
+    *,
+    output: TextIO,
+) -> None:
+    json.dump(
+        report.to_dict(),
+        output,
+        indent=2,
+        sort_keys=True,
+    )
+    output.write("\n")
+
+
+def _render_startup_policy_human(
+    report: StartupPolicyReport,
+    *,
+    output: TextIO,
+) -> None:
+    output.write("Atlas Service Startup Policy\n")
+    output.write("============================\n\n")
+    output.write(f"Provider: {report.provider}\n")
+    output.write(f"Status:   {report.status.title()}\n")
+    output.write(
+        f"Passed:   {'Yes' if report.passed else 'No'}\n"
+    )
+    output.write(
+        "Attention Required: "
+        f"{'Yes' if report.requires_attention else 'No'}\n"
+    )
+    output.write(f"Findings: {len(report.findings)}\n")
+    output.write(f"Critical: {report.counts['critical']}\n")
+    output.write(f"Errors:   {report.counts['error']}\n")
+    output.write(f"Warnings: {report.counts['warning']}\n")
+    output.write(f"Info:     {report.counts['info']}\n")
+
+    output.write("\nFindings\n")
+    output.write("--------\n")
+
+    if not report.findings:
+        output.write("None\n")
+    else:
+        for finding in report.findings:
+            service_label = (
+                f"[{finding.service_identifier}] "
+                if finding.service_identifier
+                else ""
+            )
+
+            output.write(
+                f"{finding.severity.value.upper():8} "
+                f"{service_label}{finding.message}\n"
+            )
+            output.write(
+                f"  Code: {finding.code}\n"
+            )
+
+            if finding.recommendation:
+                output.write(
+                    "  Recommendation: "
+                    f"{finding.recommendation}\n"
+                )
+
+    output.write(
+        f"\nEvaluated: {report.evaluated_at}\n"
+    )
+    output.write(
+        "Overall Status: "
+        f"{'PASS' if report.passed else 'FAIL'}\n"
+    )
+
+
+def _command_startup_policy(
+    *,
+    service: ServiceLifecycleService,
+    as_json: bool,
+    output: TextIO,
+) -> int:
+    report = ServiceStartupPolicyService(
+        service,
+    ).inspect()
+
+    if as_json:
+        _render_startup_policy_json(
+            report,
+            output=output,
+        )
+    else:
+        _render_startup_policy_human(
+            report,
+            output=output,
+        )
+
+    return 0 if report.passed else 1
+
+
 def _render_updates_json(
     report: UpdateReport,
     *,
@@ -1049,6 +1158,13 @@ def main(
 
         if arguments.command == "doctor":
             return _command_doctor(
+                service=resolved_service,
+                as_json=arguments.as_json,
+                output=resolved_output,
+            )
+
+        if arguments.command == "startup-policy":
+            return _command_startup_policy(
                 service=resolved_service,
                 as_json=arguments.as_json,
                 output=resolved_output,

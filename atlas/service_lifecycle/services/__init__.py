@@ -11,3 +11,4 @@ __all__ = [
     "ServiceMaintenanceHistoryService",
     "ServiceUpdateService",
 ]
+from .startup_policy import ServiceStartupPolicyService

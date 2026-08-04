@@ -15,6 +15,7 @@ Usage:
   atlas service summary [--json]
   atlas service graph [--json]
   atlas service doctor [--json]
+  atlas service startup-policy [--json]
   atlas service updates [--json]
   atlas service history [<identifier>] [--json]
 
@@ -26,6 +27,7 @@ Commands:
   summary    Show concise infrastructure runtime and health totals
   graph      Show managed-service dependency relationships
   doctor     Run read-only diagnostics for managed services
+  startup-policy  Evaluate read-only service startup policy
   updates    Show read-only service image update metadata
   history    Show read-only service maintenance history
   help       Show this help text
@@ -81,6 +83,11 @@ atlas_command_service() {
       shift
       atlas_service_python doctor "$@"
       ;;
+    startup-policy)
+      shift
+      atlas_service_python startup-policy "$@"
+      ;;
+
     updates)
       shift
       atlas_service_python updates "$@"

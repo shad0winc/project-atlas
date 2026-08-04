@@ -27,6 +27,9 @@ from atlas.service_lifecycle import (
     MaintenanceRecord,
     MaintenanceReport,
     MaintenanceResult,
+    StartupPolicyFinding,
+    StartupPolicyReport,
+    StartupPolicySeverity,
 )
 from atlas.service_lifecycle.service import (
     InfrastructureDependencyGraph,
@@ -220,6 +223,37 @@ def sample_doctor_report() -> DoctorReport:
             ),
         ),
         evaluated_at="2026-08-02T01:00:00Z",
+    )
+
+
+def sample_startup_policy_report(
+    *,
+    severity: StartupPolicySeverity | None = None,
+) -> StartupPolicyReport:
+    findings = ()
+
+    if severity is not None:
+        findings = (
+            StartupPolicyFinding(
+                identifier="qbittorrent.gluetun.readiness",
+                code="namespace-readiness-weak",
+                severity=severity,
+                message=(
+                    "qBittorrent starts when Gluetun is "
+                    "only started, not healthy."
+                ),
+                service_identifier="qbittorrent",
+                recommendation=(
+                    "Configure a Gluetun healthcheck and "
+                    "use service_healthy."
+                ),
+            ),
+        )
+
+    return StartupPolicyReport(
+        findings=findings,
+        provider="docker-compose",
+        evaluated_at="2026-08-04T18:00:00Z",
     )
 
 
@@ -1164,4 +1198,145 @@ def test_history_help_is_active() -> None:
     assert result.returncode == 0
     assert "usage: atlas service history" in result.stdout
     assert "identifier" in result.stdout
+    assert "--json" in result.stdout
+
+def test_startup_policy_human_output_passes() -> None:
+    service = Mock()
+    output = StringIO()
+
+    with patch(
+        "atlas.service_lifecycle_cli."
+        "ServiceStartupPolicyService"
+    ) as policy_service_class:
+        policy_service_class.return_value.inspect.return_value = (
+            sample_startup_policy_report()
+        )
+
+        result = main(
+            ["startup-policy"],
+            service=service,
+            output=output,
+        )
+
+    rendered = output.getvalue()
+
+    assert result == 0
+    assert "Atlas Service Startup Policy" in rendered
+    assert "Provider: docker-compose" in rendered
+    assert "Status:   Healthy" in rendered
+    assert "Findings: 0" in rendered
+    assert "Overall Status: PASS" in rendered
+    policy_service_class.assert_called_once_with(
+        service,
+    )
+    policy_service_class.return_value.inspect.assert_called_once_with()
+
+
+def test_startup_policy_warning_remains_successful() -> None:
+    service = Mock()
+    output = StringIO()
+
+    with patch(
+        "atlas.service_lifecycle_cli."
+        "ServiceStartupPolicyService"
+    ) as policy_service_class:
+        policy_service_class.return_value.inspect.return_value = (
+            sample_startup_policy_report(
+                severity=StartupPolicySeverity.WARNING,
+            )
+        )
+
+        result = main(
+            ["startup-policy"],
+            service=service,
+            output=output,
+        )
+
+    rendered = output.getvalue()
+
+    assert result == 0
+    assert "Status:   Degraded" in rendered
+    assert "Warnings: 1" in rendered
+    assert "WARNING" in rendered
+    assert "Overall Status: PASS" in rendered
+
+
+def test_startup_policy_error_returns_failure() -> None:
+    service = Mock()
+    output = StringIO()
+
+    with patch(
+        "atlas.service_lifecycle_cli."
+        "ServiceStartupPolicyService"
+    ) as policy_service_class:
+        policy_service_class.return_value.inspect.return_value = (
+            sample_startup_policy_report(
+                severity=StartupPolicySeverity.ERROR,
+            )
+        )
+
+        result = main(
+            ["startup-policy"],
+            service=service,
+            output=output,
+        )
+
+    assert result == 1
+    assert "Status:   Unhealthy" in output.getvalue()
+    assert "Overall Status: FAIL" in output.getvalue()
+
+
+def test_startup_policy_json_output() -> None:
+    service = Mock()
+    output = StringIO()
+
+    with patch(
+        "atlas.service_lifecycle_cli."
+        "ServiceStartupPolicyService"
+    ) as policy_service_class:
+        policy_service_class.return_value.inspect.return_value = (
+            sample_startup_policy_report(
+                severity=StartupPolicySeverity.WARNING,
+            )
+        )
+
+        result = main(
+            ["startup-policy", "--json"],
+            service=service,
+            output=output,
+        )
+
+    payload = json.loads(
+        output.getvalue(),
+    )
+
+    assert result == 0
+    assert payload["provider"] == "docker-compose"
+    assert payload["status"] == "degraded"
+    assert payload["counts"]["warning"] == 1
+    assert payload["finding_count"] == 1
+    assert payload["findings"][0]["code"] == (
+        "namespace-readiness-weak"
+    )
+
+
+def test_startup_policy_help_is_active() -> None:
+    result = subprocess.run(
+        [
+            str(ATLAS_CLI),
+            "service",
+            "startup-policy",
+            "--help",
+        ],
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert (
+        "usage: atlas service startup-policy"
+        in result.stdout
+    )
     assert "--json" in result.stdout

@@ -84,3 +84,4 @@ from .startup_policy_models import (
 )
 
 from .startup_policy import StartupPolicyEvaluator
+from .services.startup_policy import ServiceStartupPolicyService

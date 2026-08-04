@@ -22,6 +22,7 @@ Core Commands
   atlas service summary [--json]
   atlas service graph [--json]
   atlas service doctor [--json]
+  atlas service startup-policy [--json]
   atlas service updates [--json]
   atlas service history [<identifier>] [--json]
   atlas urls
