@@ -70,3 +70,9 @@ __all__ = [
     "ServiceMaintenanceHistoryService",
     "ServiceRuntime",
 ]
+
+from .startup_models import (
+    ServiceStartupContract,
+    ServiceStartupDependency,
+    StartupDependencyCondition,
+)
