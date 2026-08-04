@@ -12,6 +12,193 @@ atlas_verify_check() {
   fi
 }
 
+atlas_verify_has_value() {
+  local variable="$1"
+  local value
+
+  if [[ ! -v "$variable" ]]; then
+    return 1
+  fi
+
+  value="${!variable}"
+
+  [[ -n "${value//[[:space:]]/}" ]]
+}
+
+atlas_verify_is_absolute_path() {
+  local variable="$1"
+  local value
+
+  atlas_verify_has_value "$variable" || return 1
+
+  value="${!variable}"
+
+  [[ "$value" == /* ]]
+}
+
+atlas_verify_is_http_url() {
+  local variable="$1"
+  local value
+
+  atlas_verify_has_value "$variable" || return 1
+
+  value="${!variable}"
+
+  [[ "$value" =~ ^https?://[^[:space:]]+$ ]]
+}
+
+atlas_verify_is_positive_integer() {
+  local variable="$1"
+  local value
+
+  atlas_verify_has_value "$variable" || return 1
+
+  value="${!variable}"
+
+  [[ "$value" =~ ^[1-9][0-9]*$ ]]
+}
+
+atlas_verify_path_within() {
+  local child_variable="$1"
+  local parent_variable="$2"
+  local child
+  local parent
+
+  atlas_verify_is_absolute_path "$child_variable" || return 1
+  atlas_verify_is_absolute_path "$parent_variable" || return 1
+
+  child="${!child_variable}"
+  parent="${!parent_variable}"
+
+  [[ "$child" == "$parent" || "$child" == "$parent/"* ]]
+}
+
+atlas_verify_configuration() {
+  local variable
+
+  atlas_section "Configuration"
+
+  for variable in \
+    ATLAS_PROJECT_DIR \
+    ATLAS_STORAGE_ROOT \
+    ATLAS_MEDIA_ROOT \
+    ATLAS_DOWNLOADS_ROOT \
+    ATLAS_BACKUP_DIR \
+    ATLAS_CONFIG_ROOT \
+    ATLAS_RUNTIME_CONFIG_DIR \
+    ATLAS_USERS_DIR \
+    ATLAS_IDENTITY_DIR \
+    ATLAS_ARI_DIR \
+    ATLAS_ARI_SNAPSHOT_DIR \
+    ATLAS_ARI_LATEST_FILE \
+    ATLAS_JELLYFIN_MOVIES_PATH \
+    ATLAS_JELLYFIN_TV_PATH \
+    ATLAS_JELLYFIN_ANIME_MOVIES_PATH \
+    ATLAS_JELLYFIN_ANIME_TV_PATH \
+    ATLAS_SCHEDULER_DIR \
+    ATLAS_SCHEDULER_STATE_FILE \
+    ATLAS_SCHEDULER_LOCK_FILE
+  do
+    atlas_verify_check \
+      "$variable absolute path" \
+      atlas_verify_is_absolute_path \
+      "$variable"
+  done
+
+  for variable in \
+    ATLAS_BASE_URL \
+    ATLAS_JELLYFIN_URL
+  do
+    atlas_verify_check \
+      "$variable HTTP URL" \
+      atlas_verify_is_http_url \
+      "$variable"
+  done
+
+  atlas_verify_check \
+    "ATLAS_INVITE_EXPIRATION_DAYS positive integer" \
+    atlas_verify_is_positive_integer \
+    ATLAS_INVITE_EXPIRATION_DAYS
+
+  atlas_verify_check \
+    "ATLAS_MEDIA_ROOT within ATLAS_STORAGE_ROOT" \
+    atlas_verify_path_within \
+    ATLAS_MEDIA_ROOT \
+    ATLAS_STORAGE_ROOT
+
+  atlas_verify_check \
+    "ATLAS_DOWNLOADS_ROOT within ATLAS_STORAGE_ROOT" \
+    atlas_verify_path_within \
+    ATLAS_DOWNLOADS_ROOT \
+    ATLAS_STORAGE_ROOT
+
+  atlas_verify_check \
+    "ATLAS_BACKUP_DIR within ATLAS_STORAGE_ROOT" \
+    atlas_verify_path_within \
+    ATLAS_BACKUP_DIR \
+    ATLAS_STORAGE_ROOT
+
+  atlas_verify_check \
+    "ATLAS_CONFIG_ROOT within ATLAS_STORAGE_ROOT" \
+    atlas_verify_path_within \
+    ATLAS_CONFIG_ROOT \
+    ATLAS_STORAGE_ROOT
+
+  atlas_verify_check \
+    "ATLAS_RUNTIME_CONFIG_DIR within ATLAS_CONFIG_ROOT" \
+    atlas_verify_path_within \
+    ATLAS_RUNTIME_CONFIG_DIR \
+    ATLAS_CONFIG_ROOT
+
+  atlas_verify_check \
+    "ATLAS_USERS_DIR within ATLAS_RUNTIME_CONFIG_DIR" \
+    atlas_verify_path_within \
+    ATLAS_USERS_DIR \
+    ATLAS_RUNTIME_CONFIG_DIR
+
+  atlas_verify_check \
+    "ATLAS_IDENTITY_DIR within ATLAS_RUNTIME_CONFIG_DIR" \
+    atlas_verify_path_within \
+    ATLAS_IDENTITY_DIR \
+    ATLAS_RUNTIME_CONFIG_DIR
+
+  atlas_verify_check \
+    "ATLAS_ARI_DIR within ATLAS_RUNTIME_CONFIG_DIR" \
+    atlas_verify_path_within \
+    ATLAS_ARI_DIR \
+    ATLAS_RUNTIME_CONFIG_DIR
+
+  atlas_verify_check \
+    "ATLAS_ARI_SNAPSHOT_DIR within ATLAS_ARI_DIR" \
+    atlas_verify_path_within \
+    ATLAS_ARI_SNAPSHOT_DIR \
+    ATLAS_ARI_DIR
+
+  atlas_verify_check \
+    "ATLAS_ARI_LATEST_FILE within ATLAS_ARI_DIR" \
+    atlas_verify_path_within \
+    ATLAS_ARI_LATEST_FILE \
+    ATLAS_ARI_DIR
+
+  atlas_verify_check \
+    "ATLAS_SCHEDULER_DIR within ATLAS_RUNTIME_CONFIG_DIR" \
+    atlas_verify_path_within \
+    ATLAS_SCHEDULER_DIR \
+    ATLAS_RUNTIME_CONFIG_DIR
+
+  atlas_verify_check \
+    "ATLAS_SCHEDULER_STATE_FILE within ATLAS_SCHEDULER_DIR" \
+    atlas_verify_path_within \
+    ATLAS_SCHEDULER_STATE_FILE \
+    ATLAS_SCHEDULER_DIR
+
+  atlas_verify_check \
+    "ATLAS_SCHEDULER_LOCK_FILE within ATLAS_SCHEDULER_DIR" \
+    atlas_verify_path_within \
+    ATLAS_SCHEDULER_LOCK_FILE \
+    ATLAS_SCHEDULER_DIR
+}
+
 atlas_verify_infrastructure() {
   local gpu_device="${ATLAS_VERIFY_GPU_DEVICE:-/dev/dri/renderD128}"
 
@@ -124,6 +311,9 @@ atlas_command_verify() {
 
   ATLAS_VERIFY_PASS=true
 
+  atlas_verify_configuration
+
+  echo
   atlas_verify_infrastructure
 
   echo

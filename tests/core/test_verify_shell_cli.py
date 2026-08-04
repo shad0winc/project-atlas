@@ -64,6 +64,14 @@ def prepare_runtime(
     storage_root = tmp_path / "storage"
     media_root = storage_root / "media"
     downloads_root = storage_root / "downloads"
+    backup_dir = storage_root / "backups" / "atlas"
+    config_root = storage_root / "configs"
+    runtime_config_dir = config_root / "atlas"
+    users_dir = runtime_config_dir / "users"
+    identity_dir = runtime_config_dir / "identity"
+    ari_dir = runtime_config_dir / "ari"
+    ari_snapshot_dir = ari_dir / "snapshots"
+    scheduler_dir = runtime_config_dir / "scheduler"
     gpu_device = tmp_path / "renderD128"
     bin_directory = tmp_path / "bin"
 
@@ -141,6 +149,28 @@ def prepare_runtime(
             "ATLAS_STORAGE_ROOT": str(storage_root),
             "ATLAS_MEDIA_ROOT": str(media_root),
             "ATLAS_DOWNLOADS_ROOT": str(downloads_root),
+            "ATLAS_BACKUP_DIR": str(backup_dir),
+            "ATLAS_CONFIG_ROOT": str(config_root),
+            "ATLAS_RUNTIME_CONFIG_DIR": str(runtime_config_dir),
+            "ATLAS_USERS_DIR": str(users_dir),
+            "ATLAS_IDENTITY_DIR": str(identity_dir),
+            "ATLAS_BASE_URL": "http://atlas.local",
+            "ATLAS_INVITE_EXPIRATION_DAYS": "7",
+            "ATLAS_ARI_DIR": str(ari_dir),
+            "ATLAS_ARI_SNAPSHOT_DIR": str(ari_snapshot_dir),
+            "ATLAS_ARI_LATEST_FILE": str(ari_dir / "latest.json"),
+            "ATLAS_JELLYFIN_URL": "http://127.0.0.1:8096",
+            "ATLAS_JELLYFIN_MOVIES_PATH": "/media/Movies",
+            "ATLAS_JELLYFIN_TV_PATH": "/media/TV",
+            "ATLAS_JELLYFIN_ANIME_MOVIES_PATH": "/media/Anime Movies",
+            "ATLAS_JELLYFIN_ANIME_TV_PATH": "/media/Anime TV",
+            "ATLAS_SCHEDULER_DIR": str(scheduler_dir),
+            "ATLAS_SCHEDULER_STATE_FILE": str(
+                scheduler_dir / "tasks.json"
+            ),
+            "ATLAS_SCHEDULER_LOCK_FILE": str(
+                scheduler_dir / "scheduler.lock"
+            ),
             "ATLAS_VERIFY_GPU_DEVICE": str(gpu_device),
             "ATLAS_TEST_RUNNING_SERVICES": "\n".join(
                 CORE_SERVICES
@@ -213,6 +243,7 @@ def test_verify_reports_pass_for_valid_runtime(
     assert result.returncode == 0
     assert result.stderr == ""
     assert "Atlas Verification" in result.stdout
+    assert "Configuration" in result.stdout
     assert "Infrastructure" in result.stdout
     assert "Core Services" in result.stdout
     assert "Storage Paths" in result.stdout
@@ -268,3 +299,123 @@ def test_verify_reports_missing_core_service(
     assert "FAIL homepage running" in result.stdout
     assert "OK   jellyfin running" in result.stdout
     assert "Overall Status: FAIL" in result.stdout
+
+
+def test_verify_reports_missing_configuration_value(
+    tmp_path: Path,
+) -> None:
+    """A missing required variable must fail configuration verification."""
+
+    environment = dict(
+        prepare_runtime(tmp_path)
+    )
+
+    environment.pop(
+        "ATLAS_BACKUP_DIR"
+    )
+
+    result = run_verify(environment)
+
+    assert result.returncode == 1
+    assert (
+        "FAIL ATLAS_BACKUP_DIR absolute path"
+        in result.stdout
+    )
+    assert "Infrastructure" in result.stdout
+    assert "Overall Status: FAIL" in result.stdout
+
+
+def test_verify_rejects_blank_url_configuration(
+    tmp_path: Path,
+) -> None:
+    """Required URLs must reject blank values."""
+
+    environment = dict(
+        prepare_runtime(tmp_path)
+    )
+
+    environment["ATLAS_BASE_URL"] = "   "
+
+    result = run_verify(environment)
+
+    assert result.returncode == 1
+    assert (
+        "FAIL ATLAS_BASE_URL HTTP URL"
+        in result.stdout
+    )
+    assert "Overall Status: FAIL" in result.stdout
+
+
+def test_verify_rejects_relative_path_configuration(
+    tmp_path: Path,
+) -> None:
+    """Path contracts must require absolute values."""
+
+    environment = dict(
+        prepare_runtime(tmp_path)
+    )
+
+    environment["ATLAS_USERS_DIR"] = "users"
+
+    result = run_verify(environment)
+
+    assert result.returncode == 1
+    assert (
+        "FAIL ATLAS_USERS_DIR absolute path"
+        in result.stdout
+    )
+    assert (
+        "FAIL ATLAS_USERS_DIR within "
+        "ATLAS_RUNTIME_CONFIG_DIR"
+        in result.stdout
+    )
+
+
+def test_verify_rejects_invalid_positive_integer(
+    tmp_path: Path,
+) -> None:
+    """Invitation expiry must be a positive integer."""
+
+    environment = dict(
+        prepare_runtime(tmp_path)
+    )
+
+    environment[
+        "ATLAS_INVITE_EXPIRATION_DAYS"
+    ] = "0"
+
+    result = run_verify(environment)
+
+    assert result.returncode == 1
+    assert (
+        "FAIL ATLAS_INVITE_EXPIRATION_DAYS "
+        "positive integer"
+        in result.stdout
+    )
+
+
+def test_verify_rejects_inconsistent_path_relationship(
+    tmp_path: Path,
+) -> None:
+    """Derived paths must remain beneath their canonical parent."""
+
+    environment = dict(
+        prepare_runtime(tmp_path)
+    )
+
+    environment["ATLAS_SCHEDULER_STATE_FILE"] = (
+        "/tmp/tasks.json"
+    )
+
+    result = run_verify(environment)
+
+    assert result.returncode == 1
+    assert (
+        "OK   ATLAS_SCHEDULER_STATE_FILE absolute path"
+        in result.stdout
+    )
+    assert (
+        "FAIL ATLAS_SCHEDULER_STATE_FILE within "
+        "ATLAS_SCHEDULER_DIR"
+        in result.stdout
+    )
