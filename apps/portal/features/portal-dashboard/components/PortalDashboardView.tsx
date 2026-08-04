@@ -9,6 +9,15 @@ import {
 } from "../hooks/use-portal-dashboard";
 
 
+import {
+  PortalDashboardGrid
+} from "./PortalDashboardGrid";
+
+import {
+  PortalHealthCard
+} from "./PortalHealthCard";
+
+
 function DashboardPlaceholderCard(
   {
     title,
@@ -97,32 +106,13 @@ export function PortalDashboardView(): React.ReactElement {
 
   return (
     <div className="dashboard-runtime">
-      <Card>
-        <h3>
-          System Health
-        </h3>
-
-        <p>
-          {state.data.health.service}
-        </p>
-
-        <p>
-          Status: {state.data.health.status}
-        </p>
-
-        <time dateTime={state.data.generatedAt}>
-          Updated{" "}
-          {new Date(
-            state.data.generatedAt
-          ).toLocaleString()}
-        </time>
-      </Card>
+      <PortalHealthCard
+        generatedAt={state.data.generatedAt}
+        health={state.data.health}
+      />
 
 
-      <section
-        aria-label="Portal dashboard sections"
-        className="dashboard-metric-grid"
-      >
+      <PortalDashboardGrid>
         <DashboardPlaceholderCard
           description="Operational dashboard metrics and runtime summaries."
           title="Operations"
@@ -142,7 +132,7 @@ export function PortalDashboardView(): React.ReactElement {
           description="Scheduler runtime state and recent failures."
           title="Scheduler"
         />
-      </section>
+      </PortalDashboardGrid>
     </div>
   );
 }

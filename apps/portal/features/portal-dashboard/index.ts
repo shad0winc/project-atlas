@@ -37,3 +37,7 @@ export type {
   PortalSchedulerSnapshot,
   PortalSchedulerFailure
 } from "./types/scheduler";
+
+export { PortalDashboardGrid } from "./components/PortalDashboardGrid";
+
+export { PortalHealthCard } from "./components/PortalHealthCard";
