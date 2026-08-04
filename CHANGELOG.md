@@ -30,6 +30,20 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Added
 
+- Added the transport-neutral Atlas API contract foundation under `atlas.api`,
+  including canonical API and schema versions, immutable success and failure
+  envelopes, normalized API errors, deterministic serialization, UTC timestamp
+  normalization, and explicit public exports.
+- Added serialization support for mappings, sequences, enums, dataclasses,
+  timezone-aware datetimes, and Atlas contracts exposing `to_dict()`, while
+  rejecting unsupported and framework-specific values.
+- Added opt-in FastAPI and OpenAPI envelope schemas under `apps/api` together
+  with reusable success and failure adapter helpers.
+- Preserved all existing unwrapped health, authentication, dashboard, and
+  media-library response contracts for backward compatibility.
+- Added focused shared-contract, serialization, Operations integration,
+  Pydantic adapter, OpenAPI schema, and existing-endpoint regression coverage.
+
 - Added scheduled Atlas Operations report collection through the shared
   `TaskScheduler` runtime, without introducing a parallel Operations-specific
   scheduling system.

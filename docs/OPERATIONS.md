@@ -414,6 +414,40 @@ domain contracts are normalized into Operations repository errors.
 the canonical machine-readable contract. Consumers should not parse the
 human renderer.
 
+## Shared API Contract Foundation
+
+Operations now shares a transport-neutral contract layer located under
+`atlas/api`.
+
+The shared package provides:
+
+- canonical API and schema version identifiers;
+- immutable success and failure response envelopes;
+- normalized API error contracts;
+- deterministic JSON-compatible serialization;
+- UTC timestamp normalization;
+- explicit public exports.
+
+These contracts remain framework-independent and intentionally avoid
+FastAPI, Pydantic, Starlette, routing objects, HTTP request objects,
+and status codes.
+
+Future Operations HTTP routes will construct shared Atlas API contracts
+first and adapt them into FastAPI schemas only at the outer HTTP
+boundary.
+
+This preserves one canonical transport contract for:
+
+- CLI output;
+- HTTP endpoints;
+- automation;
+- integration tests;
+- future Portal communication.
+
+Existing CLI behavior is unchanged.
+
+Operations HTTP routes remain planned work and are not yet implemented.
+
 ## Current boundaries
 
 API routes, notifications, Portal visualization, comparison retention,

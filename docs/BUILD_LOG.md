@@ -3373,3 +3373,123 @@ Atlas Operations now performs automatic immutable report collection through
 the shared scheduler while preserving one scheduler architecture, one
 Operations persistence contract, deterministic execution, and complete
 runtime observability.
+
+---
+
+# 2026-08-04
+
+## M-023.9B — Shared API Contract and FastAPI Adapter Foundation
+
+### Objective
+
+Establish one deterministic, versioned, framework-neutral API contract layer
+that can be consumed by the existing FastAPI application without duplicating
+Atlas domain behavior or breaking established endpoint response contracts.
+
+### Architecture
+
+```text
+FastAPI route and Pydantic schema
+              |
+              v
+      FastAPI envelope adapter
+              |
+              v
+Transport-neutral atlas.api contract
+              |
+              v
+   Atlas application/domain service
+```
+
+The dependency direction remains one-way:
+
+- `atlas.api` owns transport-neutral contracts and serialization;
+- `apps/api` owns FastAPI, Pydantic, HTTP, and OpenAPI adaptation;
+- Atlas domain and application services remain independent of FastAPI;
+- framework-specific schemas are never inserted back into shared contracts.
+
+### Completed
+
+- Added canonical API and schema version constants.
+- Added the stable Project Atlas vendor media type.
+- Added immutable normalized `ApiError` contracts.
+- Added immutable success and failure response envelopes.
+- Added deterministic response reconstruction.
+- Added timezone-aware UTC timestamp normalization.
+- Added deterministic JSON-compatible serialization.
+- Added support for mappings, sequences, enums, dataclasses, aware
+  datetimes, and Atlas contracts exposing `to_dict()`.
+- Added explicit rejection of unsupported and framework-specific values.
+- Added centralized and explicit `atlas.api` public exports.
+- Added cross-contract serialization validation using Operations reports,
+  history collections, and comparisons.
+- Added Pydantic/OpenAPI success and failure envelope schemas.
+- Added FastAPI success and failure envelope-construction helpers.
+- Preserved existing health, authentication, dashboard, dashboard-media,
+  and media-library response bodies.
+- Defined envelope adoption as opt-in for new routes.
+- Documented shared-contract ownership, dependency direction, maturity,
+  compatibility, and Operations integration boundaries.
+
+### Public contract
+
+```python
+from atlas.api import (
+    API_MEDIA_TYPE,
+    API_SCHEMA_VERSION,
+    API_VERSION,
+    ApiContractError,
+    ApiError,
+    ApiFailureResponse,
+    ApiSerializationError,
+    ApiSuccessResponse,
+    to_api_json,
+    to_api_value,
+)
+```
+
+### Compatibility boundary
+
+Existing API consumers continue to receive the established unwrapped response
+bodies from current routes.
+
+The shared envelopes are initially opt-in. Existing routes may migrate only
+through a deliberate, test-backed compatibility plan.
+
+Operations HTTP routes are planned as the first new consumers of the shared
+envelope contracts, but those routes are not part of this milestone.
+
+### Validation
+
+- 81 shared API foundation tests passed.
+- 10 FastAPI envelope-schema tests passed.
+- 10 FastAPI envelope-helper tests passed.
+- 26 existing FastAPI endpoint regression tests passed.
+- 109 Operations model and comparison regression tests passed.
+- Shared API and Operations cross-contract integration passed.
+- Existing endpoint response compatibility passed.
+- Python compilation passed.
+- Markdown fence validation passed.
+- Git diff hygiene passed.
+
+### Boundary
+
+This milestone does not add:
+
+- Operations HTTP routes;
+- global FastAPI exception handlers;
+- automatic migration of existing endpoint response bodies;
+- Portal Operations visualization;
+- notification delivery;
+- automatic remediation.
+
+### Result
+
+Project Atlas now has one versioned, deterministic API contract and
+serialization foundation that remains independent of FastAPI while integrating
+cleanly with the existing HTTP application through opt-in Pydantic and OpenAPI
+adapters.
+
+The next implementation phase can expose Operations reports, history, and
+comparisons through thin FastAPI routes without redefining domain contracts or
+serialization behavior.

@@ -227,6 +227,46 @@ Project Atlas prioritizes:
 - Intelligence through operational data
 - Documentation as a first-class feature
 
+# Atlas API Contract Foundation
+
+## Status
+
+**Implemented — Shared Contract and Adapter Foundation Complete**
+
+Implemented capabilities include:
+
+- canonical API and schema version constants;
+- a stable vendor media type;
+- immutable transport-neutral API errors;
+- immutable success and failure response envelopes;
+- normalized UTC response timestamps;
+- validated response reconstruction;
+- deterministic JSON-compatible serialization;
+- mapping, sequence, enum, dataclass, datetime, and `to_dict()` support;
+- explicit rejection of unsupported and framework-specific values;
+- stable public exports through `atlas.api`;
+- Pydantic and OpenAPI envelope schemas under `apps/api`;
+- reusable FastAPI success and failure envelope helpers;
+- opt-in adoption for new HTTP routes;
+- backward compatibility for existing unwrapped endpoint responses;
+- cross-contract validation with Operations reports and comparisons;
+- dedicated shared-contract, integration, adapter, schema, and endpoint
+  regression tests.
+
+The shared API contract layer is **Level 4 — Observable**.
+
+Its contracts are deterministic, versioned, test-backed, and ready for use by
+new HTTP endpoints. The layer remains independent of FastAPI, Pydantic,
+Starlette, routers, HTTP request objects, and status codes.
+
+The existing FastAPI application owns HTTP routing, request parsing,
+authentication, authorization, Pydantic validation, and OpenAPI generation.
+
+Operations HTTP routes, broader envelope adoption, endpoint migration, and
+Portal visualization remain planned extensions.
+
+---
+
 # Atlas Operations Reporting
 
 ## Status
@@ -265,12 +305,15 @@ Implemented capabilities include:
   `compare` commands;
 - public scheduler synchronization, inspection, execution, and history
   workflows for scheduled Operations collection;
+- validated compatibility with the shared transport-neutral API contract;
+- deterministic serialization through shared API response envelopes;
 - dedicated unit, integration, regression, corruption, atomic-write,
-  comparison, renderer, scheduler, subprocess, shell, and live
+  comparison, renderer, scheduler, subprocess, shell, API-contract, and live
   validation.
 
 The subsystem is **Level 4 — Observable** with durable report
 persistence and automated scheduled collection.
 
-API exposure, notifications, and Portal visualization remain planned
-extensions.
+Operations HTTP route exposure, notifications, and Portal visualization
+remain planned extensions. The shared API contract and FastAPI adapter
+foundations are implemented, but no Operations endpoint is claimed complete.

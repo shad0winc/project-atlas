@@ -605,6 +605,12 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 - [x] Isolate core Operations tasks from optional-module event routing
 - [x] Validate live and subprocess scheduled collection
 - [x] Validate scheduled history and comparison continuity
+- [x] Add shared transport-neutral API version contracts
+- [x] Add immutable API error and response envelopes
+- [x] Add deterministic API serialization
+- [x] Add FastAPI and OpenAPI envelope adapters
+- [x] Preserve existing endpoint response compatibility
+- [x] Validate API contracts against Operations domain models
 - [ ] Add Operations API routes
 - [ ] Add the Operations Portal dashboard
 

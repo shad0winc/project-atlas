@@ -167,7 +167,77 @@ Responsibilities:
 - translation between transport schemas and Atlas services
 - consistent error responses
 
+
 The API should remain thin. It must not create a second implementation of core Atlas business logic.
+
+#### Shared transport contracts
+
+The canonical framework-neutral API contracts are located under:
+
+```text
+atlas/api/
+```
+
+This package owns:
+
+- canonical API and schema versions;
+- normalized transport-neutral errors;
+- immutable success and failure envelopes;
+- deterministic JSON-compatible serialization;
+- timezone-aware UTC timestamp normalization;
+- stable public exports.
+
+The shared contract package must remain independent of FastAPI, Pydantic,
+Starlette, HTTP request objects, routers, status codes, and OpenAPI-specific
+types.
+
+The HTTP dependency direction is:
+
+```text
+HTTP request
+      |
+      v
+FastAPI route
+      |
+      v
+Pydantic / OpenAPI adapter
+      |
+      v
+Transport-neutral atlas.api contract
+      |
+      v
+Atlas application or domain service
+```
+
+FastAPI-specific adaptation is owned under:
+
+```text
+apps/api/atlas_api/
+├── adapters/
+└── schemas/
+```
+
+Pydantic schemas validate the HTTP and OpenAPI representation of shared Atlas
+contracts. Adapter helpers construct transport-neutral contracts first and
+convert them to Pydantic schemas only at the outer HTTP boundary.
+
+Framework-specific schemas must not be inserted back into transport-neutral
+contracts. This preserves one-way dependency flow and prevents the shared
+serializer from depending on Pydantic.
+
+#### Response compatibility
+
+Shared envelopes are initially opt-in for new API routes. Existing health,
+authentication, dashboard, dashboard-media, and media-library routes retain
+their established unwrapped response bodies.
+
+This compatibility boundary permits incremental adoption without breaking the
+Portal or other current API consumers. Existing endpoints may migrate only
+through an explicit, tested compatibility plan.
+
+Operations routes are the planned first consumers of the shared envelope
+contract. The existence of the contract and adapter layers does not mean those
+routes are already implemented.
 
 ---
 

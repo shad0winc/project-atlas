@@ -174,6 +174,46 @@ The current foundation includes:
 - OpenAPI generation
 - dedicated API tests
 
+The shared transport contract layer is located under `atlas/api/`. It provides:
+
+- canonical API and schema versions;
+- immutable success and failure response envelopes;
+- normalized transport-neutral API errors;
+- deterministic JSON-compatible serialization;
+- timezone-aware UTC timestamp normalization;
+- explicit package exports and dedicated contract tests.
+
+The shared package does not depend on FastAPI, Pydantic, HTTP requests, route
+objects, or status codes. This keeps API contracts reusable across HTTP,
+automation, testing, and future transport adapters.
+
+The FastAPI application owns the HTTP-specific boundary:
+
+```text
+HTTP request
+    |
+    v
+FastAPI route and Pydantic schema
+    |
+    v
+Atlas API adapter
+    |
+    v
+Transport-neutral atlas.api contract
+    |
+    v
+Atlas domain service
+```
+
+Pydantic envelope schemas and construction helpers under
+`apps/api/atlas_api` adapt shared contracts for FastAPI and OpenAPI. These
+envelopes are initially opt-in for new routes.
+
+Existing health, authentication, dashboard, dashboard-media, and media-library
+endpoints retain their established unwrapped response bodies for backward
+compatibility. Operations API routes remain planned and will be the first new
+consumers of the shared envelope contract.
+
 ### Atlas Portal
 
 The Portal application is located under `apps/portal/` and uses Next.js as the primary user-facing Atlas interface.
