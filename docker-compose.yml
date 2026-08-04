@@ -151,6 +151,12 @@ services:
       - SERVER_REGIONS=${VPN_REGION}
       - TZ=${TZ}
       - FIREWALL=on
+    healthcheck:
+      test: ["CMD", "/gluetun-entrypoint", "healthcheck"]
+      interval: 5s
+      timeout: 5s
+      retries: 1
+      start_period: 10s
     restart: unless-stopped
 
   qbittorrent:
@@ -168,7 +174,7 @@ services:
     restart: unless-stopped
     depends_on:
       gluetun:
-        condition: service_started
+        condition: service_healthy
 
   jellyseerr:
     image: fallenbagel/jellyseerr:latest
