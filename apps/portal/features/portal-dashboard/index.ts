@@ -36,3 +36,5 @@ export { PortalOperationalSection } from "./components/PortalOperationalSection"
 export { OperationsComparisonCard } from "./components/OperationsComparisonCard";
 
 export { OperationsAttentionPanel } from "./components/OperationsAttentionPanel";
+
+export { SchedulerFailuresPanel } from "./components/SchedulerFailuresPanel";

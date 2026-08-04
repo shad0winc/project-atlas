@@ -18,6 +18,8 @@ import { OperationsAttentionPanel } from "./OperationsAttentionPanel";
 
 import { SchedulerSummaryCard } from "./SchedulerSummaryCard";
 
+import { SchedulerFailuresPanel } from "./SchedulerFailuresPanel";
+
 export function PortalDashboardView(): React.ReactElement {
   const { state, refresh } = usePortalDashboard();
 
@@ -80,6 +82,8 @@ export function PortalDashboardView(): React.ReactElement {
         <OperationsAttentionPanel operations={state.data.operations} />
 
         <SchedulerSummaryCard scheduler={state.data.scheduler} />
+
+        <SchedulerFailuresPanel scheduler={state.data.scheduler} />
       </PortalDashboardGrid>
     </div>
   );
