@@ -622,7 +622,14 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 - [x] Add Portal-ready Scheduler summary widgets
 - [x] Add Scheduler runtime status visibility
 - [x] Add bounded Scheduler failure visibility
-- [ ] Add the Operations Portal dashboard interface
+- [x] Add the Operations Portal dashboard interface
+- [x] Consume the aggregate Portal dashboard API
+- [x] Normalize aggregate dashboard transport contracts
+- [x] Reuse existing operational and media dashboard models
+- [x] Reuse existing operational and media presentation components
+- [x] Add Operations comparison and recent-attention panels
+- [x] Add bounded Scheduler failure presentation
+- [x] Remove all Portal dashboard placeholder sections
 
 ### Reliability
 

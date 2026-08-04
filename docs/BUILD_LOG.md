@@ -3860,3 +3860,118 @@ Completed:
 Result:
 
 `M-023.11 Slice 3C Scheduler widget validation: PASS`
+
+
+---
+
+# 2026-08-04
+
+## M-023.11 — Operations Portal Dashboard Interface Completion
+
+### Objective
+
+Complete the user-facing Operations Portal dashboard on top of the
+aggregate `GET /api/v1/portal/dashboard` contract while preserving API
+ownership, frontend domain boundaries, read-only behavior, and existing
+dashboard presentation components.
+
+### Completed
+
+- Added the authenticated aggregate Portal dashboard client.
+- Switched the protected Portal landing page to the aggregate dashboard
+  endpoint.
+- Added stable frontend transport contracts for aggregate Operations and
+  Scheduler state.
+- Added normalized Portal domain models for Operations and Scheduler data.
+- Normalized aggregate health, operational, media, Operations, and Scheduler
+  state before presentation.
+- Reused the existing operational `DashboardSnapshot` model.
+- Reused the existing operational `DashboardGrid` presentation.
+- Reused the existing media `DashboardMediaSnapshot` model.
+- Reused the existing `MediaLibraryGrid` and `MediaLibraryCard`
+  presentation.
+- Added `PortalHealthCard`.
+- Added `PortalOperationalSection`.
+- Added `PortalMediaSection`.
+- Added `OperationsSummaryCard`.
+- Added `OperationsComparisonCard`.
+- Added `OperationsAttentionPanel`.
+- Added `SchedulerSummaryCard`.
+- Added `SchedulerFailuresPanel`.
+- Removed all aggregate dashboard placeholder cards.
+- Exported the new Portal dashboard components through the feature package
+  boundary.
+
+### Architecture
+
+- The Atlas API remains responsible for aggregate dashboard assembly.
+- The Portal performs one authenticated request to
+  `GET /api/v1/portal/dashboard`.
+- The Portal does not make secondary operational or media dashboard
+  requests.
+- Existing operational and media normalization contracts remain the source
+  of truth for those frontend domains.
+- Operations and Scheduler transport field names are normalized before
+  reaching React components.
+- React components remain presentation-only and do not reproduce API domain
+  logic.
+- Operations comparison ordering, attention ordering, and result bounds
+  remain owned by the API.
+- Scheduler execution, persistence, and mutation remain outside the Portal
+  read path.
+
+### Operations Intelligence
+
+The completed Operations presentation includes:
+
+- current availability and status;
+- latest score;
+- current attention count;
+- report generation time;
+- score and attention deltas;
+- added, removed, changed, unchanged, and total difference counts;
+- unavailable comparison normalization;
+- bounded recent attention findings;
+- severity, message, and optional recommendation presentation;
+- explicit clear and unavailable states.
+
+### Scheduler Intelligence
+
+The completed Scheduler presentation includes:
+
+- registered, enabled, running, due, and failed task counts;
+- last and next runtime timestamps;
+- explicit available and unavailable states;
+- bounded recent Scheduler failures;
+- task identity;
+- error details;
+- optional failure timestamps;
+- explicit clear state when no recent failures exist.
+
+### Validation
+
+Completed:
+
+- Portal TypeScript validation
+- Portal Vitest regression suite
+- Portal ESLint validation
+- Portal Prettier validation
+- Git diff hygiene validation
+- Placeholder-removal validation
+- Prettier-equivalence audit for previously committed Portal files
+- Focused Operations comparison rendering tests
+- Focused Operations attention rendering tests
+- Focused Scheduler failure rendering tests
+
+Final Portal test result:
+
+- 14 test files passed
+- 122 tests passed
+
+### Result
+
+The Atlas Portal now exposes a complete, authenticated, read-only Operations
+dashboard composed from one aggregate API response. Operational health, media
+statistics, Operations intelligence, comparison state, attention findings,
+Scheduler runtime state, and bounded Scheduler failures are presented through
+modular and independently testable frontend components.
