@@ -1,58 +1,21 @@
 "use client";
 
-import {
-  Card
-} from "../../../components/ui/Card";
+import { usePortalDashboard } from "../hooks/use-portal-dashboard";
 
-import {
-  usePortalDashboard
-} from "../hooks/use-portal-dashboard";
+import { PortalDashboardGrid } from "./PortalDashboardGrid";
 
+import { PortalHealthCard } from "./PortalHealthCard";
 
-import {
-  PortalDashboardGrid
-} from "./PortalDashboardGrid";
+import { PortalMediaSection } from "./PortalMediaSection";
 
-import {
-  PortalHealthCard
-} from "./PortalHealthCard";
+import { PortalOperationalSection } from "./PortalOperationalSection";
 
+import { OperationsSummaryCard } from "./OperationsSummaryCard";
 
-import {
-  OperationsSummaryCard
-} from "./OperationsSummaryCard";
-
-
-import {
-  SchedulerSummaryCard
-} from "./SchedulerSummaryCard";
-
-
-function DashboardPlaceholderCard(
-  {
-    title,
-    description
-  }: Readonly<{
-    title: string;
-    description: string;
-  }>
-): React.ReactElement {
-  return (
-    <Card>
-      <h3>{title}</h3>
-
-      <p>{description}</p>
-    </Card>
-  );
-}
-
+import { SchedulerSummaryCard } from "./SchedulerSummaryCard";
 
 export function PortalDashboardView(): React.ReactElement {
-  const {
-    state,
-    refresh
-  } = usePortalDashboard();
-
+  const { state, refresh } = usePortalDashboard();
 
   if (state.status === "loading") {
     return (
@@ -66,17 +29,12 @@ export function PortalDashboardView(): React.ReactElement {
             length: 5
           },
           (_, index) => (
-            <div
-              aria-hidden="true"
-              className="dashboard-skeleton-card"
-              key={index}
-            />
+            <div aria-hidden="true" className="dashboard-skeleton-card" key={index} />
           )
         )}
       </section>
     );
   }
-
 
   if (state.status === "error") {
     return (
@@ -86,60 +44,34 @@ export function PortalDashboardView(): React.ReactElement {
         role="alert"
       >
         <div>
-          <p className="dashboard-error-eyebrow">
-            Portal unavailable
-          </p>
+          <p className="dashboard-error-eyebrow">Portal unavailable</p>
 
-          <h3
-            className="dashboard-error-title"
-            id="portal-dashboard-error-title"
-          >
+          <h3 className="dashboard-error-title" id="portal-dashboard-error-title">
             Atlas could not load the portal dashboard
           </h3>
 
-          <p className="dashboard-error-message">
-            {state.error.message}
-          </p>
+          <p className="dashboard-error-message">{state.error.message}</p>
         </div>
 
-        <button
-          className="dashboard-retry-button"
-          onClick={refresh}
-          type="button"
-        >
+        <button className="dashboard-retry-button" onClick={refresh} type="button">
           Try again
         </button>
       </section>
     );
   }
 
-
   return (
     <div className="dashboard-runtime">
-      <PortalHealthCard
-        generatedAt={state.data.generatedAt}
-        health={state.data.health}
-      />
-
+      <PortalHealthCard generatedAt={state.data.generatedAt} health={state.data.health} />
 
       <PortalDashboardGrid>
-        <DashboardPlaceholderCard
-          description="Operational dashboard metrics and runtime summaries."
-          title="Operations"
-        />
+        <PortalOperationalSection operational={state.data.operational} />
 
-        <DashboardPlaceholderCard
-          description="Media library availability and statistics."
-          title="Media"
-        />
+        <PortalMediaSection media={state.data.media} />
 
-        <OperationsSummaryCard
-          operations={state.data.operations}
-        />
+        <OperationsSummaryCard operations={state.data.operations} />
 
-        <SchedulerSummaryCard
-          scheduler={state.data.scheduler}
-        />
+        <SchedulerSummaryCard scheduler={state.data.scheduler} />
       </PortalDashboardGrid>
     </div>
   );

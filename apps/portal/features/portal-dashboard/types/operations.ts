@@ -4,13 +4,7 @@ import type {
   AtlasPortalOperationsSummaryResponse
 } from "../../../lib/api/contracts";
 
-
-export type PortalOperationsStatus =
-  | "healthy"
-  | "warning"
-  | "critical"
-  | "unknown";
-
+export type PortalOperationsStatus = "healthy" | "warning" | "critical" | "unknown";
 
 export type PortalOperationsAttention = Readonly<{
   section: string;
@@ -21,7 +15,6 @@ export type PortalOperationsAttention = Readonly<{
   message: string;
   recommendation: string | null;
 }>;
-
 
 export type PortalOperationsComparison = Readonly<{
   status: "available" | "unavailable";
@@ -34,7 +27,6 @@ export type PortalOperationsComparison = Readonly<{
   differenceCount: number | null;
   detail: string | null;
 }>;
-
 
 export type PortalOperationsSnapshot = Readonly<{
   status: "available" | "unavailable";
@@ -49,25 +41,17 @@ export type PortalOperationsSnapshot = Readonly<{
   recentAttention: readonly PortalOperationsAttention[];
 }>;
 
-
-function normalizeTimestamp(
-  value: string
-): string {
+function normalizeTimestamp(value: string): string {
   const timestamp = new Date(value);
 
   if (Number.isNaN(timestamp.getTime())) {
-    throw new Error(
-      "Operations timestamp must be valid."
-    );
+    throw new Error("Operations timestamp must be valid.");
   }
 
   return timestamp.toISOString();
 }
 
-
-function mapAttention(
-  value: AtlasPortalOperationsAttentionResponse
-): PortalOperationsAttention {
+function mapAttention(value: AtlasPortalOperationsAttentionResponse): PortalOperationsAttention {
   return {
     section: value.section,
     identifier: value.identifier,
@@ -79,10 +63,7 @@ function mapAttention(
   };
 }
 
-
-function mapComparison(
-  value: AtlasPortalOperationsComparisonResponse
-): PortalOperationsComparison {
+function mapComparison(value: AtlasPortalOperationsComparisonResponse): PortalOperationsComparison {
   return {
     status: value.status,
     scoreDelta: value.score_delta,
@@ -96,11 +77,9 @@ function mapComparison(
   };
 }
 
-
 export function createPortalOperationsSnapshot(
   value: AtlasPortalOperationsSummaryResponse
 ): PortalOperationsSnapshot {
-
   return {
     status: value.status,
     detail: value.detail,
@@ -110,19 +89,12 @@ export function createPortalOperationsSnapshot(
           status: value.summary.status,
           score: value.summary.score,
           attentionCount: value.summary.attention_count,
-          generatedAt: normalizeTimestamp(
-            value.summary.generated_at
-          )
+          generatedAt: normalizeTimestamp(value.summary.generated_at)
         }
       : null,
 
-    comparison: mapComparison(
-      value.comparison
-    ),
+    comparison: mapComparison(value.comparison),
 
-    recentAttention:
-      value.recent_attention.map(
-        mapAttention
-      )
+    recentAttention: value.recent_attention.map(mapAttention)
   };
 }

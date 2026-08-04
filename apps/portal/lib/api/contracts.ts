@@ -65,13 +65,7 @@ export interface AtlasDashboardMediaSummaryResponse {
   readonly libraries: readonly AtlasDashboardMediaLibraryResponse[];
 }
 
-
-export type AtlasPortalOperationsStatus =
-  | "healthy"
-  | "warning"
-  | "critical"
-  | "unknown";
-
+export type AtlasPortalOperationsStatus = "healthy" | "warning" | "critical" | "unknown";
 
 export interface AtlasPortalOperationsReportSummaryResponse {
   readonly status: AtlasPortalOperationsStatus;
@@ -79,7 +73,6 @@ export interface AtlasPortalOperationsReportSummaryResponse {
   readonly attention_count: number;
   readonly generated_at: string;
 }
-
 
 export interface AtlasPortalOperationsComparisonResponse {
   readonly status: "available" | "unavailable";
@@ -93,20 +86,15 @@ export interface AtlasPortalOperationsComparisonResponse {
   readonly detail: string | null;
 }
 
-
 export interface AtlasPortalOperationsAttentionResponse {
   readonly section: string;
   readonly identifier: string;
   readonly name: string;
   readonly status: AtlasPortalOperationsStatus;
-  readonly severity:
-    | "critical"
-    | "warning"
-    | "info";
+  readonly severity: "critical" | "warning" | "info";
   readonly message: string;
   readonly recommendation: string | null;
 }
-
 
 export interface AtlasPortalOperationsSummaryResponse {
   readonly status: "available" | "unavailable";
@@ -114,17 +102,14 @@ export interface AtlasPortalOperationsSummaryResponse {
   readonly detail: string | null;
   readonly summary: AtlasPortalOperationsReportSummaryResponse | null;
   readonly comparison: AtlasPortalOperationsComparisonResponse;
-  readonly recent_attention:
-    readonly AtlasPortalOperationsAttentionResponse[];
+  readonly recent_attention: readonly AtlasPortalOperationsAttentionResponse[];
 }
-
 
 export interface AtlasPortalSchedulerFailureResponse {
   readonly task_name: string;
   readonly failed_at: string | null;
   readonly error: string;
 }
-
 
 export interface AtlasPortalSchedulerSummaryResponse {
   readonly status: "available" | "unavailable";
@@ -140,8 +125,7 @@ export interface AtlasPortalSchedulerSummaryResponse {
   readonly last_run_at: string | null;
   readonly next_run_at: string | null;
 
-  readonly recent_failures:
-    readonly AtlasPortalSchedulerFailureResponse[];
+  readonly recent_failures: readonly AtlasPortalSchedulerFailureResponse[];
 }
 
 export interface AtlasPortalDashboardResponse {

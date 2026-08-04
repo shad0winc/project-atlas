@@ -1,15 +1,11 @@
 import { Badge } from "../../../components/ui/Badge";
 import { Card } from "../../../components/ui/Card";
 
-import type {
-  PortalOperationsSnapshot
-} from "../types/operations";
-
+import type { PortalOperationsSnapshot } from "../types/operations";
 
 type OperationsSummaryCardProps = Readonly<{
   operations: PortalOperationsSnapshot;
 }>;
-
 
 function statusVariant(
   status: "healthy" | "warning" | "critical" | "unknown"
@@ -25,26 +21,17 @@ function statusVariant(
   return "default";
 }
 
-
 export function OperationsSummaryCard({
   operations
 }: OperationsSummaryCardProps): React.ReactElement {
-  if (
-    operations.status === "unavailable" ||
-    operations.summary === null
-  ) {
+  if (operations.status === "unavailable" || operations.summary === null) {
     return (
       <Card>
         <h3>Operations</h3>
 
-        <Badge>
-          Unavailable
-        </Badge>
+        <Badge>Unavailable</Badge>
 
-        <p>
-          {operations.detail ??
-            "No Operations report is available."}
-        </p>
+        <p>{operations.detail ?? "No Operations report is available."}</p>
       </Card>
     );
   }
@@ -55,23 +42,14 @@ export function OperationsSummaryCard({
     <Card>
       <h3>Operations</h3>
 
-      <Badge variant={statusVariant(summary.status)}>
-        {summary.status}
-      </Badge>
+      <Badge variant={statusVariant(summary.status)}>{summary.status}</Badge>
 
-      <p>
-        Score: {summary.score}
-      </p>
+      <p>Score: {summary.score}</p>
 
-      <p>
-        Attention: {summary.attentionCount}
-      </p>
+      <p>Attention: {summary.attentionCount}</p>
 
       <time dateTime={summary.generatedAt}>
-        Generated{" "}
-        {new Date(
-          summary.generatedAt
-        ).toLocaleString()}
+        Generated {new Date(summary.generatedAt).toLocaleString()}
       </time>
     </Card>
   );

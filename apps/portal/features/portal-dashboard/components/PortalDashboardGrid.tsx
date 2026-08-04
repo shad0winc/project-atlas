@@ -4,14 +4,9 @@ type PortalDashboardGridProps = Readonly<{
   children: ReactNode;
 }>;
 
-export function PortalDashboardGrid({
-  children
-}: PortalDashboardGridProps): React.ReactElement {
+export function PortalDashboardGrid({ children }: PortalDashboardGridProps): React.ReactElement {
   return (
-    <section
-      aria-label="Portal dashboard sections"
-      className="dashboard-metric-grid"
-    >
+    <section aria-label="Portal dashboard sections" className="dashboard-metric-grid">
       {children}
     </section>
   );

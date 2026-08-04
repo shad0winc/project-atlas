@@ -19,17 +19,11 @@ export function PortalHealthCard({
 
       <p>{health.service}</p>
 
-      <p>
-        Status: {health.status}
-      </p>
+      <p>Status: {health.status}</p>
 
-      <p>
-        Version: {health.apiVersion}
-      </p>
+      <p>Version: {health.apiVersion}</p>
 
-      <time dateTime={generatedAt}>
-        Updated {new Date(generatedAt).toLocaleString()}
-      </time>
+      <time dateTime={generatedAt}>Updated {new Date(generatedAt).toLocaleString()}</time>
     </Card>
   );
 }

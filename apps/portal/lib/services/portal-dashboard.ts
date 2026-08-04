@@ -1,29 +1,17 @@
-import type {
-  AtlasPortalDashboardResponse
-} from "../api/contracts";
+import type { AtlasPortalDashboardResponse } from "../api/contracts";
 
-import {
-  authenticatedAtlasApiRequest
-} from "./authenticated";
-
+import { authenticatedAtlasApiRequest } from "./authenticated";
 
 export type ReadPortalDashboardOptions = Readonly<{
   signal?: AbortSignal;
 }>;
 
-
-export async function readPortalDashboard(
-  {
+export async function readPortalDashboard({
+  signal
+}: ReadPortalDashboardOptions = {}): Promise<AtlasPortalDashboardResponse> {
+  return authenticatedAtlasApiRequest<AtlasPortalDashboardResponse>("/portal/dashboard", {
+    method: "GET",
+    cache: "no-store",
     signal
-  }: ReadPortalDashboardOptions = {}
-): Promise<AtlasPortalDashboardResponse> {
-
-  return authenticatedAtlasApiRequest<AtlasPortalDashboardResponse>(
-    "/portal/dashboard",
-    {
-      method: "GET",
-      cache: "no-store",
-      signal
-    }
-  );
+  });
 }
