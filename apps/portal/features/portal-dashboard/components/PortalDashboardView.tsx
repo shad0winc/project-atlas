@@ -23,6 +23,11 @@ import {
 } from "./OperationsSummaryCard";
 
 
+import {
+  SchedulerSummaryCard
+} from "./SchedulerSummaryCard";
+
+
 function DashboardPlaceholderCard(
   {
     title,
@@ -132,9 +137,8 @@ export function PortalDashboardView(): React.ReactElement {
           operations={state.data.operations}
         />
 
-        <DashboardPlaceholderCard
-          description="Scheduler runtime state and recent failures."
-          title="Scheduler"
+        <SchedulerSummaryCard
+          scheduler={state.data.scheduler}
         />
       </PortalDashboardGrid>
     </div>
