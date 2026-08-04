@@ -8,6 +8,15 @@ import {
 } from "../types/portal-dashboard";
 
 
+import {
+  createPortalOperationsSnapshot
+} from "../types/operations";
+
+import {
+  createPortalSchedulerSnapshot
+} from "../types/scheduler";
+
+
 export type LoadPortalDashboardOptions = Readonly<{
   signal?: AbortSignal;
 }>;
@@ -32,7 +41,12 @@ export async function loadPortalDashboard(
     },
     operational: response.dashboard.operational,
     media: response.dashboard.media,
-    operations: response.dashboard.operations,
-    scheduler: response.dashboard.scheduler
+    operations: createPortalOperationsSnapshot(
+      response.dashboard.operations
+    ),
+
+    scheduler: createPortalSchedulerSnapshot(
+      response.dashboard.scheduler
+    )
   });
 }

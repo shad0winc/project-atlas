@@ -1,3 +1,6 @@
+import type { PortalOperationsSnapshot } from "./operations";
+import type { PortalSchedulerSnapshot } from "./scheduler";
+
 export type PortalDashboardSnapshot = Readonly<{
   generatedAt: string;
   health: Readonly<{
@@ -7,8 +10,8 @@ export type PortalDashboardSnapshot = Readonly<{
   }>;
   operational: unknown;
   media: unknown;
-  operations: unknown;
-  scheduler: unknown;
+  operations: PortalOperationsSnapshot;
+  scheduler: PortalSchedulerSnapshot;
 }>;
 
 

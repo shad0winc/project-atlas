@@ -18,3 +18,22 @@ export type {
 export type {
   PortalDashboardSnapshot
 } from "./types/portal-dashboard";
+
+export {
+  createPortalOperationsSnapshot
+} from "./types/operations";
+
+export {
+  createPortalSchedulerSnapshot
+} from "./types/scheduler";
+
+export type {
+  PortalOperationsSnapshot,
+  PortalOperationsAttention,
+  PortalOperationsComparison
+} from "./types/operations";
+
+export type {
+  PortalSchedulerSnapshot,
+  PortalSchedulerFailure
+} from "./types/scheduler";

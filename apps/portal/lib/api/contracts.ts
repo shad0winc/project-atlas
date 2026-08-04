@@ -65,13 +65,92 @@ export interface AtlasDashboardMediaSummaryResponse {
   readonly libraries: readonly AtlasDashboardMediaLibraryResponse[];
 }
 
+
+export type AtlasPortalOperationsStatus =
+  | "healthy"
+  | "warning"
+  | "critical"
+  | "unknown";
+
+
+export interface AtlasPortalOperationsReportSummaryResponse {
+  readonly status: AtlasPortalOperationsStatus;
+  readonly score: number;
+  readonly attention_count: number;
+  readonly generated_at: string;
+}
+
+
+export interface AtlasPortalOperationsComparisonResponse {
+  readonly status: "available" | "unavailable";
+  readonly score_delta: number | null;
+  readonly attention_delta: number | null;
+  readonly added_count: number | null;
+  readonly removed_count: number | null;
+  readonly changed_count: number | null;
+  readonly unchanged_count: number | null;
+  readonly difference_count: number | null;
+  readonly detail: string | null;
+}
+
+
+export interface AtlasPortalOperationsAttentionResponse {
+  readonly section: string;
+  readonly identifier: string;
+  readonly name: string;
+  readonly status: AtlasPortalOperationsStatus;
+  readonly severity:
+    | "critical"
+    | "warning"
+    | "info";
+  readonly message: string;
+  readonly recommendation: string | null;
+}
+
+
+export interface AtlasPortalOperationsSummaryResponse {
+  readonly status: "available" | "unavailable";
+  readonly report: Record<string, unknown> | null;
+  readonly detail: string | null;
+  readonly summary: AtlasPortalOperationsReportSummaryResponse | null;
+  readonly comparison: AtlasPortalOperationsComparisonResponse;
+  readonly recent_attention:
+    readonly AtlasPortalOperationsAttentionResponse[];
+}
+
+
+export interface AtlasPortalSchedulerFailureResponse {
+  readonly task_name: string;
+  readonly failed_at: string | null;
+  readonly error: string;
+}
+
+
+export interface AtlasPortalSchedulerSummaryResponse {
+  readonly status: "available" | "unavailable";
+  readonly detail: string | null;
+
+  readonly registered_count: number | null;
+  readonly enabled_count: number | null;
+  readonly disabled_count: number | null;
+  readonly due_count: number | null;
+  readonly running_count: number | null;
+  readonly failed_count: number | null;
+
+  readonly last_run_at: string | null;
+  readonly next_run_at: string | null;
+
+  readonly recent_failures:
+    readonly AtlasPortalSchedulerFailureResponse[];
+}
+
 export interface AtlasPortalDashboardResponse {
   readonly dashboard: {
     readonly health: AtlasHealthResponse;
     readonly operational: AtlasDashboardSummaryResponse;
     readonly media: AtlasDashboardMediaSummaryResponse;
-    readonly operations: unknown;
-    readonly scheduler: unknown;
+    readonly operations: AtlasPortalOperationsSummaryResponse;
+    readonly scheduler: AtlasPortalSchedulerSummaryResponse;
   };
 }
 
