@@ -18,6 +18,11 @@ import {
 } from "./PortalHealthCard";
 
 
+import {
+  OperationsSummaryCard
+} from "./OperationsSummaryCard";
+
+
 function DashboardPlaceholderCard(
   {
     title,
@@ -123,9 +128,8 @@ export function PortalDashboardView(): React.ReactElement {
           title="Media"
         />
 
-        <DashboardPlaceholderCard
-          description="Persisted Operations reports and attention data."
-          title="Operations Intelligence"
+        <OperationsSummaryCard
+          operations={state.data.operations}
         />
 
         <DashboardPlaceholderCard
