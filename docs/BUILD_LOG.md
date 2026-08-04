@@ -3617,3 +3617,51 @@ and read-only behavior.
 Atlas now exposes deterministic, bounded, newest-first Operations history
 through the shared API envelope without collecting, persisting, comparing,
 or mutating reports.
+
+---
+
+# 2026-08-04
+
+## M-023.10 — Operations Comparison API (Slice 4)
+
+### Objective
+
+Expose deterministic comparison of the two newest persisted Atlas Operations
+reports through the HTTP API while reusing the existing repository,
+comparison service, shared response contracts, and read-only architecture.
+
+### Completed
+
+- Added `GET /api/v1/operations/compare`.
+- Reused the configured Operations repository dependency.
+- Added a cached OperationsComparisonService dependency.
+- Reused the `system.health.read` permission.
+- Loaded exactly the two newest persisted Operations reports.
+- Preserved previous and current report ordering.
+- Added the optional `include_unchanged` Boolean query parameter.
+- Reused the immutable OperationsComparison domain contract.
+- Added a shared HTTP 409 failure envelope when fewer than two reports exist.
+- Added OpenAPI success, conflict, and query-parameter documentation.
+- Added focused comparison, dependency, validation, immutability, failure,
+  serialization, and OpenAPI tests.
+- Validated the endpoint against production Operations history.
+
+### Live validation
+
+- Compared the two newest production Operations reports.
+- Previous report:
+  `2026-08-03T23:38:17.879647Z`.
+- Current report:
+  `2026-08-04T00:15:52.438537Z`.
+- Two operational differences were detected.
+- `include_unchanged=true` returned the expanded comparison contract.
+- An empty repository returned HTTP 409 using the shared failure envelope.
+- OpenAPI documented the Boolean query parameter and both response schemas.
+- `latest.json` remained unchanged.
+- Operations history remained unchanged.
+
+### Result
+
+Atlas now exposes the complete read-only Operations reporting lifecycle through
+the HTTP API: live collection, latest persisted retrieval, bounded history,
+and deterministic comparison.

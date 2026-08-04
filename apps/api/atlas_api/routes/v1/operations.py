@@ -13,6 +13,7 @@ from fastapi import (
 from fastapi.responses import JSONResponse
 
 from atlas.operations import (
+    OperationsComparisonService,
     OperationsReportNotFoundError,
     OperationsRepository,
     OperationsService,
@@ -23,6 +24,7 @@ from atlas_api.adapters import (
 )
 from atlas_api.auth.models import AuthenticatedUser
 from atlas_api.dependencies import (
+    get_operations_comparison_service,
     get_operations_repository,
     get_operations_service,
 )
@@ -44,6 +46,15 @@ OPERATIONS_REPORT_NOT_FOUND_MESSAGE: Final = (
 
 OPERATIONS_HISTORY_DEFAULT_LIMIT: Final = 25
 OPERATIONS_HISTORY_MAX_LIMIT: Final = 100
+
+
+OPERATIONS_COMPARISON_HISTORY_LIMIT: Final = 2
+OPERATIONS_COMPARISON_UNAVAILABLE_CODE: Final = (
+    "operations_comparison_unavailable"
+)
+OPERATIONS_COMPARISON_UNAVAILABLE_MESSAGE: Final = (
+    "At least two persisted Operations reports are required"
+)
 
 
 router = APIRouter(
@@ -179,12 +190,96 @@ def read_operations_history(
     )
 
 
+@router.get(
+    "/compare",
+    response_model=ApiSuccessEnvelopeSchema,
+    responses={
+        status.HTTP_409_CONFLICT: {
+            "model": ApiFailureEnvelopeSchema,
+            "description": (
+                "At least two persisted Operations reports are "
+                "required for comparison."
+            ),
+        },
+    },
+    status_code=status.HTTP_200_OK,
+    summary="Compare the two newest Atlas Operations reports",
+)
+def compare_operations_reports(
+    _current_user: Annotated[
+        AuthenticatedUser,
+        Depends(require_operations_report_read),
+    ],
+    repository: Annotated[
+        OperationsRepository,
+        Depends(get_operations_repository),
+    ],
+    comparison_service: Annotated[
+        OperationsComparisonService,
+        Depends(get_operations_comparison_service),
+    ],
+    include_unchanged: Annotated[
+        bool,
+        Query(
+            description=(
+                "Include findings that are unchanged between "
+                "the two reports."
+            ),
+        ),
+    ] = False,
+) -> ApiSuccessEnvelopeSchema | JSONResponse:
+    """Compare the two newest persisted Operations reports."""
+
+    reports = repository.history(
+        limit=OPERATIONS_COMPARISON_HISTORY_LIMIT,
+    )
+
+    if len(reports) < OPERATIONS_COMPARISON_HISTORY_LIMIT:
+        failure = failure_envelope(
+            OPERATIONS_COMPARISON_UNAVAILABLE_CODE,
+            OPERATIONS_COMPARISON_UNAVAILABLE_MESSAGE,
+            details={
+                "resource": "operations_comparison",
+                "required_reports": (
+                    OPERATIONS_COMPARISON_HISTORY_LIMIT
+                ),
+                "available_reports": len(reports),
+            },
+        )
+
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content=failure.model_dump(
+                mode="json",
+            ),
+        )
+
+    current = reports[0]
+    previous = reports[1]
+
+    comparison = comparison_service.compare(
+        previous,
+        current,
+        include_unchanged=include_unchanged,
+    )
+
+    return success_envelope(
+        {
+            "comparison": comparison,
+        },
+    )
+
+
 __all__ = [
+    "OPERATIONS_COMPARISON_HISTORY_LIMIT",
+    "OPERATIONS_COMPARISON_UNAVAILABLE_CODE",
+    "OPERATIONS_COMPARISON_UNAVAILABLE_MESSAGE",
     "OPERATIONS_HISTORY_DEFAULT_LIMIT",
     "OPERATIONS_HISTORY_MAX_LIMIT",
     "OPERATIONS_REPORT_NOT_FOUND_CODE",
     "OPERATIONS_REPORT_NOT_FOUND_MESSAGE",
     "OPERATIONS_REPORT_PERMISSION",
+    "compare_operations_reports",
     "read_latest_operations_report",
     "read_operations_history",
     "read_operations_report",

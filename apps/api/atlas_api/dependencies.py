@@ -12,6 +12,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from atlas.operations import (
     FileOperationsRepository,
     HostOperationsContextProvider,
+    OperationsComparisonService,
     OperationsRepository,
     OperationsService,
 )
@@ -108,6 +109,13 @@ def get_operations_service() -> OperationsService:
         ),
         context_provider=HostOperationsContextProvider(),
     )
+
+
+@lru_cache(maxsize=1)
+def get_operations_comparison_service() -> OperationsComparisonService:
+    """Return the process-wide Operations comparison service."""
+
+    return OperationsComparisonService()
 
 
 @lru_cache(maxsize=1)
@@ -225,6 +233,7 @@ def clear_dependency_caches() -> None:
 
     get_authentication_service.cache_clear()
     get_jellyfin_authentication_client.cache_clear()
+    get_operations_comparison_service.cache_clear()
     get_operations_repository.cache_clear()
     get_operations_service.cache_clear()
     get_user_profile_store.cache_clear()
