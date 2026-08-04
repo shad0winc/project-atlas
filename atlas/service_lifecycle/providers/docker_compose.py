@@ -18,6 +18,11 @@ from atlas.service_lifecycle.models import (
     ServiceRuntime,
 )
 from atlas.service_lifecycle.provider import ServiceLifecycleProvider
+from atlas.service_lifecycle.startup_models import (
+    ServiceStartupContract,
+    ServiceStartupDependency,
+    StartupDependencyCondition,
+)
 from atlas.service_lifecycle.update_models import (
     ImageReference,
     ServiceUpdate,
@@ -149,6 +154,67 @@ class DockerComposeProvider(ServiceLifecycleProvider):
                 key=lambda service: (
                     service.name.casefold(),
                     service.identifier,
+                ),
+            )
+        )
+
+    def inspect_startup_contracts(
+        self,
+    ) -> tuple[ServiceStartupContract, ...]:
+        """Return normalized startup contracts for Compose services."""
+
+        payload = self._run_compose_json(
+            "config",
+            "--format",
+            "json",
+        )
+
+        if not isinstance(payload, Mapping):
+            raise DockerComposeProviderError(
+                "Docker Compose configuration must be an object",
+            )
+
+        services = payload.get("services")
+
+        if not isinstance(services, Mapping):
+            raise DockerComposeProviderError(
+                "Docker Compose configuration must contain "
+                "a services object",
+            )
+
+        project_name = _normalize_project_name(
+            payload.get("name"),
+            fallback=self.project_directory.name,
+        )
+
+        contracts: list[ServiceStartupContract] = []
+
+        for raw_identifier, raw_configuration in services.items():
+            service = _normalize_configured_service(
+                raw_identifier,
+                raw_configuration,
+                project_name=project_name,
+            )
+
+            if not isinstance(raw_configuration, Mapping):
+                raise DockerComposeProviderError(
+                    "Compose service configuration must be an object: "
+                    f"{service.identifier}",
+                )
+
+            contracts.append(
+                _normalize_startup_contract(
+                    service,
+                    raw_configuration,
+                )
+            )
+
+        return tuple(
+            sorted(
+                contracts,
+                key=lambda contract: (
+                    contract.service.name.casefold(),
+                    contract.service.identifier,
                 ),
             )
         )
@@ -982,6 +1048,226 @@ def _normalize_configured_service(
             "Invalid Compose service configuration: "
             f"{normalized_identifier}: {exc}",
         ) from exc
+
+
+def _normalize_startup_contract(
+    service: ManagedService,
+    configuration: Mapping[str, Any],
+) -> ServiceStartupContract:
+    dependencies = _normalize_startup_dependencies(
+        configuration.get("depends_on"),
+        service_identifier=service.identifier,
+    )
+
+    namespace_target = _normalize_namespace_target(
+        configuration.get("network_mode"),
+        service_identifier=service.identifier,
+    )
+
+    restart_policy = _normalize_restart_policy(
+        configuration.get("restart"),
+        service_identifier=service.identifier,
+    )
+
+    healthcheck_configured = _normalize_healthcheck_presence(
+        configuration.get("healthcheck"),
+        service_identifier=service.identifier,
+    )
+
+    try:
+        return ServiceStartupContract(
+            service=service,
+            dependencies=dependencies,
+            namespace_target=namespace_target,
+            restart_policy=restart_policy,
+            healthcheck_configured=healthcheck_configured,
+        )
+    except ServiceLifecycleError as exc:
+        raise DockerComposeProviderError(
+            "Invalid Compose startup configuration: "
+            f"{service.identifier}: {exc}",
+        ) from exc
+
+
+def _normalize_startup_dependencies(
+    value: object,
+    *,
+    service_identifier: str,
+) -> tuple[ServiceStartupDependency, ...]:
+    if value is None:
+        return ()
+
+    dependencies: list[ServiceStartupDependency] = []
+
+    if isinstance(value, Mapping):
+        raw_entries = value.items()
+
+        for raw_identifier, raw_options in raw_entries:
+            identifier = _normalize_dependency_identifier(
+                raw_identifier,
+                service_identifier=service_identifier,
+            )
+
+            condition: object = (
+                StartupDependencyCondition.SERVICE_STARTED
+            )
+            required: object = True
+
+            if raw_options is None:
+                pass
+            elif isinstance(raw_options, Mapping):
+                condition = raw_options.get(
+                    "condition",
+                    StartupDependencyCondition.SERVICE_STARTED,
+                )
+                required = raw_options.get(
+                    "required",
+                    True,
+                )
+            else:
+                raise DockerComposeProviderError(
+                    "Compose startup dependency options must be "
+                    "an object or null: "
+                    f"{service_identifier}: {identifier}",
+                )
+
+            try:
+                dependencies.append(
+                    ServiceStartupDependency(
+                        identifier=identifier,
+                        condition=condition,
+                        required=required,
+                    )
+                )
+            except ServiceLifecycleError as exc:
+                raise DockerComposeProviderError(
+                    "Invalid Compose startup dependency: "
+                    f"{service_identifier}: {identifier}: {exc}",
+                ) from exc
+
+    elif (
+        isinstance(value, Sequence)
+        and not isinstance(value, (str, bytes))
+    ):
+        for raw_identifier in value:
+            identifier = _normalize_dependency_identifier(
+                raw_identifier,
+                service_identifier=service_identifier,
+            )
+
+            dependencies.append(
+                ServiceStartupDependency(
+                    identifier=identifier,
+                    condition=(
+                        StartupDependencyCondition.SERVICE_STARTED
+                    ),
+                    required=True,
+                )
+            )
+
+    else:
+        raise DockerComposeProviderError(
+            "Compose depends_on must be an object, "
+            "a collection, or null: "
+            f"{service_identifier}",
+        )
+
+    return tuple(dependencies)
+
+
+def _normalize_dependency_identifier(
+    value: object,
+    *,
+    service_identifier: str,
+) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise DockerComposeProviderError(
+            "Compose dependencies must contain "
+            "non-empty service identifiers: "
+            f"{service_identifier}",
+        )
+
+    return value.strip().casefold()
+
+
+def _normalize_namespace_target(
+    value: object,
+    *,
+    service_identifier: str,
+) -> str | None:
+    if value is None:
+        return None
+
+    if not isinstance(value, str) or not value.strip():
+        raise DockerComposeProviderError(
+            "Compose network_mode must be non-empty text or null: "
+            f"{service_identifier}",
+        )
+
+    normalized = value.strip()
+
+    if not normalized.casefold().startswith("service:"):
+        return None
+
+    target = normalized.split(
+        ":",
+        1,
+    )[1].strip()
+
+    if not target:
+        raise DockerComposeProviderError(
+            "Compose service network namespace target "
+            "must be non-empty: "
+            f"{service_identifier}",
+        )
+
+    return target.casefold()
+
+
+def _normalize_restart_policy(
+    value: object,
+    *,
+    service_identifier: str,
+) -> str | None:
+    if value is None:
+        return None
+
+    if not isinstance(value, str) or not value.strip():
+        raise DockerComposeProviderError(
+            "Compose restart policy must be "
+            "non-empty text or null: "
+            f"{service_identifier}",
+        )
+
+    return value.strip().casefold()
+
+
+def _normalize_healthcheck_presence(
+    value: object,
+    *,
+    service_identifier: str,
+) -> bool:
+    if value is None:
+        return False
+
+    if not isinstance(value, Mapping):
+        raise DockerComposeProviderError(
+            "Compose healthcheck must be an object or null: "
+            f"{service_identifier}",
+        )
+
+    disabled = value.get(
+        "disable",
+        False,
+    )
+
+    if not isinstance(disabled, bool):
+        raise DockerComposeProviderError(
+            "Compose healthcheck disable must be a boolean: "
+            f"{service_identifier}",
+        )
+
+    return not disabled
 
 
 def _normalize_compose_dependencies(

@@ -17,6 +17,8 @@ from atlas.service_lifecycle import (
     ServiceImage,
     ServiceLifecycleProvider,
     ServiceRuntime,
+    ServiceStartupContract,
+    StartupDependencyCondition,
     UpdateStatus,
 )
 
@@ -2695,3 +2697,684 @@ def test_inspect_update_preserves_digest_pinned_identity(
     assert update.current_image.digest == digest
     assert update.current_image.is_mutable is False
     assert update.current_image.canonical_reference == f"registry.example/team/sonarr@{digest}"
+
+
+def test_inspect_startup_contracts_normalizes_compose_policy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    payload = {
+        "name": "project-atlas",
+        "services": {
+            "qbittorrent": {
+                "container_name": "qbittorrent",
+                "depends_on": {
+                    "gluetun": {
+                        "condition": "service_healthy",
+                        "required": True,
+                    },
+                },
+                "network_mode": "service:gluetun",
+                "restart": "unless-stopped",
+            },
+            "gluetun": {
+                "container_name": "gluetun",
+                "restart": "unless-stopped",
+                "healthcheck": {
+                    "test": [
+                        "CMD",
+                        "healthcheck",
+                    ],
+                },
+            },
+        },
+    }
+
+    captured: list[tuple[str, ...]] = []
+
+    def fake_run_compose_json(
+        self: DockerComposeProvider,
+        *arguments: str,
+    ) -> object:
+        captured.append(arguments)
+        return payload
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        fake_run_compose_json,
+    )
+
+    contracts = provider.inspect_startup_contracts()
+
+    assert captured == [
+        (
+            "config",
+            "--format",
+            "json",
+        ),
+    ]
+
+    assert all(
+        isinstance(contract, ServiceStartupContract)
+        for contract in contracts
+    )
+
+    assert tuple(
+        contract.service.identifier
+        for contract in contracts
+    ) == (
+        "gluetun",
+        "qbittorrent",
+    )
+
+    by_identifier = {
+        contract.service.identifier: contract
+        for contract in contracts
+    }
+
+    gluetun = by_identifier["gluetun"]
+
+    assert gluetun.dependencies == ()
+    assert gluetun.namespace_target is None
+    assert gluetun.restart_policy == "unless-stopped"
+    assert gluetun.healthcheck_configured is True
+
+    qbittorrent = by_identifier["qbittorrent"]
+
+    assert qbittorrent.dependency_identifiers == (
+        "gluetun",
+    )
+    assert (
+        qbittorrent.dependency("gluetun").condition
+        is StartupDependencyCondition.SERVICE_HEALTHY
+    )
+    assert qbittorrent.dependency("gluetun").required is True
+    assert qbittorrent.namespace_target == "gluetun"
+    assert qbittorrent.restart_policy == "unless-stopped"
+    assert qbittorrent.healthcheck_configured is False
+
+
+def test_inspect_startup_contracts_accepts_short_dependencies(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "name": "atlas",
+            "services": {
+                "jellyseerr": {
+                    "depends_on": [
+                        " Sonarr ",
+                        "radarr",
+                    ],
+                },
+            },
+        },
+    )
+
+    contract = provider.inspect_startup_contracts()[0]
+
+    assert contract.dependency_identifiers == (
+        "radarr",
+        "sonarr",
+    )
+
+    for dependency in contract.dependencies:
+        assert (
+            dependency.condition
+            is StartupDependencyCondition.SERVICE_STARTED
+        )
+        assert dependency.required is True
+
+
+def test_inspect_startup_contracts_defaults_long_dependency_fields(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "name": "atlas",
+            "services": {
+                "portal": {
+                    "depends_on": {
+                        "api": {},
+                    },
+                },
+            },
+        },
+    )
+
+    dependency = (
+        provider.inspect_startup_contracts()[0]
+        .dependency("api")
+    )
+
+    assert (
+        dependency.condition
+        is StartupDependencyCondition.SERVICE_STARTED
+    )
+    assert dependency.required is True
+
+
+def test_inspect_startup_contracts_preserves_optional_dependency(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "name": "atlas",
+            "services": {
+                "portal": {
+                    "depends_on": {
+                        "api": {
+                            "condition": "service_healthy",
+                            "required": False,
+                        },
+                    },
+                },
+            },
+        },
+    )
+
+    dependency = (
+        provider.inspect_startup_contracts()[0]
+        .dependency("api")
+    )
+
+    assert (
+        dependency.condition
+        is StartupDependencyCondition.SERVICE_HEALTHY
+    )
+    assert dependency.required is False
+
+
+def test_inspect_startup_contracts_ignores_non_service_network_mode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "name": "atlas",
+            "services": {
+                "sonarr": {
+                    "network_mode": "host",
+                },
+            },
+        },
+    )
+
+    contract = provider.inspect_startup_contracts()[0]
+
+    assert contract.namespace_target is None
+
+
+def test_inspect_startup_contracts_treats_disabled_healthcheck_as_absent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "name": "atlas",
+            "services": {
+                "sonarr": {
+                    "healthcheck": {
+                        "disable": True,
+                    },
+                },
+            },
+        },
+    )
+
+    contract = provider.inspect_startup_contracts()[0]
+
+    assert contract.healthcheck_configured is False
+
+
+@pytest.mark.parametrize(
+    "payload",
+    (
+        None,
+        [],
+        "services",
+        42,
+        True,
+    ),
+)
+def test_inspect_startup_contracts_requires_configuration_object(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    payload: object,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: payload,
+    )
+
+    with pytest.raises(
+        DockerComposeProviderError,
+        match="configuration must be an object",
+    ):
+        provider.inspect_startup_contracts()
+
+
+@pytest.mark.parametrize(
+    "services",
+    (
+        None,
+        [],
+        "services",
+        42,
+        True,
+    ),
+)
+def test_inspect_startup_contracts_requires_services_object(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    services: object,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "name": "atlas",
+            "services": services,
+        },
+    )
+
+    with pytest.raises(
+        DockerComposeProviderError,
+        match="must contain a services object",
+    ):
+        provider.inspect_startup_contracts()
+
+
+@pytest.mark.parametrize(
+    "options",
+    (
+        "service_healthy",
+        [],
+        42,
+        True,
+    ),
+)
+def test_inspect_startup_contracts_rejects_invalid_dependency_options(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    options: object,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "name": "atlas",
+            "services": {
+                "portal": {
+                    "depends_on": {
+                        "api": options,
+                    },
+                },
+            },
+        },
+    )
+
+    with pytest.raises(
+        DockerComposeProviderError,
+        match="dependency options must be an object or null",
+    ):
+        provider.inspect_startup_contracts()
+
+
+@pytest.mark.parametrize(
+    "condition",
+    (
+        "",
+        "healthy",
+        "ready",
+        42,
+        True,
+    ),
+)
+def test_inspect_startup_contracts_rejects_invalid_condition(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    condition: object,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "name": "atlas",
+            "services": {
+                "portal": {
+                    "depends_on": {
+                        "api": {
+                            "condition": condition,
+                        },
+                    },
+                },
+            },
+        },
+    )
+
+    with pytest.raises(
+        DockerComposeProviderError,
+        match="Invalid Compose startup dependency",
+    ):
+        provider.inspect_startup_contracts()
+
+
+@pytest.mark.parametrize(
+    "required",
+    (
+        None,
+        "true",
+        1,
+    ),
+)
+def test_inspect_startup_contracts_requires_boolean_required(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    required: object,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "name": "atlas",
+            "services": {
+                "portal": {
+                    "depends_on": {
+                        "api": {
+                            "required": required,
+                        },
+                    },
+                },
+            },
+        },
+    )
+
+    with pytest.raises(
+        DockerComposeProviderError,
+        match="Invalid Compose startup dependency",
+    ):
+        provider.inspect_startup_contracts()
+
+
+@pytest.mark.parametrize(
+    "network_mode",
+    (
+        "",
+        "   ",
+        42,
+        True,
+    ),
+)
+def test_inspect_startup_contracts_rejects_invalid_network_mode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    network_mode: object,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "name": "atlas",
+            "services": {
+                "qbittorrent": {
+                    "network_mode": network_mode,
+                },
+            },
+        },
+    )
+
+    with pytest.raises(
+        DockerComposeProviderError,
+        match="network_mode must be non-empty text or null",
+    ):
+        provider.inspect_startup_contracts()
+
+
+def test_inspect_startup_contracts_rejects_empty_namespace_target(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "name": "atlas",
+            "services": {
+                "qbittorrent": {
+                    "network_mode": "service: ",
+                },
+            },
+        },
+    )
+
+    with pytest.raises(
+        DockerComposeProviderError,
+        match="namespace target must be non-empty",
+    ):
+        provider.inspect_startup_contracts()
+
+
+@pytest.mark.parametrize(
+    "restart",
+    (
+        "",
+        "   ",
+        42,
+        True,
+    ),
+)
+def test_inspect_startup_contracts_rejects_invalid_restart_policy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    restart: object,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "name": "atlas",
+            "services": {
+                "sonarr": {
+                    "restart": restart,
+                },
+            },
+        },
+    )
+
+    with pytest.raises(
+        DockerComposeProviderError,
+        match="restart policy must be non-empty text or null",
+    ):
+        provider.inspect_startup_contracts()
+
+
+@pytest.mark.parametrize(
+    "healthcheck",
+    (
+        [],
+        "healthy",
+        42,
+        True,
+    ),
+)
+def test_inspect_startup_contracts_rejects_invalid_healthcheck(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    healthcheck: object,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "name": "atlas",
+            "services": {
+                "sonarr": {
+                    "healthcheck": healthcheck,
+                },
+            },
+        },
+    )
+
+    with pytest.raises(
+        DockerComposeProviderError,
+        match="healthcheck must be an object or null",
+    ):
+        provider.inspect_startup_contracts()
+
+
+@pytest.mark.parametrize(
+    "disabled",
+    (
+        None,
+        "true",
+        1,
+    ),
+)
+def test_inspect_startup_contracts_requires_boolean_healthcheck_disable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    disabled: object,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "name": "atlas",
+            "services": {
+                "sonarr": {
+                    "healthcheck": {
+                        "disable": disabled,
+                    },
+                },
+            },
+        },
+    )
+
+    with pytest.raises(
+        DockerComposeProviderError,
+        match="healthcheck disable must be a boolean",
+    ):
+        provider.inspect_startup_contracts()
+
+
+def test_inspect_startup_contracts_translates_contract_validation_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: {
+            "name": "atlas",
+            "services": {
+                "sonarr": {
+                    "network_mode": "service:sonarr",
+                },
+            },
+        },
+    )
+
+    with pytest.raises(
+        DockerComposeProviderError,
+        match="Invalid Compose startup configuration",
+    ):
+        provider.inspect_startup_contracts()
+
+
+def test_inspect_startup_contracts_does_not_change_list_services(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    payload = {
+        "name": "atlas",
+        "services": {
+            "portal": {
+                "depends_on": {
+                    "api": {
+                        "condition": "service_healthy",
+                        "required": False,
+                    },
+                },
+                "restart": "unless-stopped",
+                "healthcheck": {
+                    "test": [
+                        "CMD",
+                        "healthcheck",
+                    ],
+                },
+            },
+        },
+    }
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_compose_json",
+        lambda self, *arguments: payload,
+    )
+
+    service = provider.list_services()[0]
+    contract = provider.inspect_startup_contracts()[0]
+
+    assert service.dependencies == (
+        "api",
+    )
+    assert contract.service.dependencies == (
+        "api",
+    )
+    assert (
+        contract.dependency("api").condition
+        is StartupDependencyCondition.SERVICE_HEALTHY
+    )
+    assert contract.dependency("api").required is False
