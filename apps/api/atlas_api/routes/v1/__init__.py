@@ -7,6 +7,7 @@ from .dashboard import router as dashboard_router
 from .dashboard_media import router as dashboard_media_router
 from .media_libraries import router as media_libraries_router
 from .operations import router as operations_router
+from .portal import router as portal_router
 from .health import router as health_router
 
 
@@ -20,6 +21,7 @@ router.include_router(dashboard_router)
 router.include_router(dashboard_media_router)
 router.include_router(media_libraries_router)
 router.include_router(operations_router)
+router.include_router(portal_router)
 
 __all__ = [
     "router",

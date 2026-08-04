@@ -30,6 +30,11 @@ from atlas_api.auth.provider import (
 )
 from atlas_api.auth.service import AuthenticationService
 from atlas_api.core.settings import AtlasAPISettings
+from atlas_api.services import (
+    DashboardMediaSummaryService,
+    DashboardSummaryService,
+    PortalDashboardService,
+)
 
 
 _bearer_scheme = HTTPBearer(auto_error=False)
@@ -95,6 +100,46 @@ def get_authentication_service() -> AuthenticationService:
     return AuthenticationService(
         provider,
         get_jwt_service(),
+    )
+
+
+@lru_cache(maxsize=1)
+def get_dashboard_summary_service() -> DashboardSummaryService:
+    """Return the process-wide operational dashboard service."""
+
+    return DashboardSummaryService()
+
+
+@lru_cache(maxsize=1)
+def get_dashboard_media_summary_service(
+) -> DashboardMediaSummaryService:
+    """Return the configured media dashboard service."""
+
+    configured_path = os.getenv(
+        "ATLAS_ARI_LATEST_PATH",
+        "/mnt/storage/configs/atlas/ari/latest.json",
+    )
+
+    normalized_path = configured_path.strip()
+
+    if not normalized_path:
+        raise ValueError(
+            "ATLAS_ARI_LATEST_PATH cannot be empty"
+        )
+
+    return DashboardMediaSummaryService(
+        Path(normalized_path),
+    )
+
+
+@lru_cache(maxsize=1)
+def get_portal_dashboard_service() -> PortalDashboardService:
+    """Return the process-wide aggregate Portal service."""
+
+    return PortalDashboardService(
+        get_dashboard_summary_service(),
+        get_dashboard_media_summary_service(),
+        get_operations_repository(),
     )
 
 
@@ -232,10 +277,13 @@ def clear_dependency_caches() -> None:
     """Clear cached dependencies for tests and controlled reconfiguration."""
 
     get_authentication_service.cache_clear()
+    get_dashboard_media_summary_service.cache_clear()
+    get_dashboard_summary_service.cache_clear()
     get_jellyfin_authentication_client.cache_clear()
     get_operations_comparison_service.cache_clear()
     get_operations_repository.cache_clear()
     get_operations_service.cache_clear()
+    get_portal_dashboard_service.cache_clear()
     get_user_profile_store.cache_clear()
     get_jwt_service.cache_clear()
     get_settings.cache_clear()

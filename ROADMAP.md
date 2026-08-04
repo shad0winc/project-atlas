@@ -615,7 +615,8 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 - [x] Add latest persisted Operations endpoint
 - [x] Add bounded Operations history endpoint
 - [x] Add Operations comparison endpoint
-- [ ] Add the Operations Portal dashboard
+- [x] Add the aggregate Operations Portal dashboard API
+- [ ] Add the Operations Portal dashboard interface
 
 ### Reliability
 

@@ -3665,3 +3665,76 @@ comparison service, shared response contracts, and read-only architecture.
 Atlas now exposes the complete read-only Operations reporting lifecycle through
 the HTTP API: live collection, latest persisted retrieval, bounded history,
 and deterministic comparison.
+
+---
+
+# 2026-08-04
+
+## M-023.11 — Aggregate Operations Portal Dashboard API (Slice 1)
+
+### Objective
+
+Provide one stable, read-only Portal endpoint that composes existing Atlas
+health, operational dashboard, media dashboard, and persisted Operations
+contracts without duplicating business logic or making internal HTTP calls.
+
+### Completed
+
+- Added immutable aggregate Portal dashboard schemas.
+- Added validated available and unavailable Operations section states.
+- Added `PortalDashboardService`.
+- Reused `DashboardSummaryService`.
+- Reused `DashboardMediaSummaryService`.
+- Reused the configured Operations repository.
+- Normalized missing Operations state into an unavailable section.
+- Preserved existing media unavailable-state normalization.
+- Added cached dashboard, media, and aggregate Portal dependencies.
+- Added the dedicated `/portal` API router.
+- Added `GET /api/v1/portal/dashboard`.
+- Required `atlas.dashboard.read`, `media.read`, and
+  `system.health.read`.
+- Returned the aggregate through the shared Atlas API success envelope.
+- Registered the endpoint in OpenAPI.
+- Preserved all existing dashboard, media, and Operations endpoints.
+- Added dedicated schema, service, route, authorization, dependency,
+  serialization, and OpenAPI tests.
+- Exported public permission dependencies for deterministic testing.
+- Added `DashboardMediaSummaryService` to the service package exports.
+
+### Aggregate contract
+
+The initial aggregate contains:
+
+- API health identity;
+- the existing operational dashboard summary;
+- the existing media dashboard summary;
+- the latest persisted Operations report when available;
+- a normalized unavailable Operations section when no report exists.
+
+The endpoint does not:
+
+- collect a new Operations report;
+- persist data;
+- query Operations history;
+- perform report comparison;
+- call Atlas HTTP endpoints internally;
+- duplicate dashboard or Operations business logic.
+
+### Live validation
+
+- The aggregate endpoint returned HTTP 200 using production-backed services.
+- Operational dashboard metrics were returned.
+- Media library state was returned through the existing ARI adapter.
+- Persisted Operations state was returned when available.
+- OpenAPI registered the Portal route and shared response envelope.
+- Missing ARI state remained a successful unavailable media section.
+- Missing Operations state remained a successful unavailable section.
+- ARI data was unchanged.
+- `latest.json` was unchanged.
+- Operations history was unchanged.
+
+### Result
+
+Atlas now provides a single-request backend contract for the initial
+Operations Portal landing page while preserving modular service boundaries,
+partial availability, explicit authorization, and read-only behavior.
