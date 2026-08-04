@@ -1,7 +1,7 @@
 "use client";
 
 import { PortalPage } from "../../../components/portal/PortalPage";
-import { DashboardView } from "../../../features/dashboard";
+import { PortalDashboardView } from "../../../features/portal-dashboard";
 import { useAuth } from "../../../lib/auth/use-auth";
 import { PORTAL_ROUTES } from "../../../lib/navigation/portal";
 
@@ -20,7 +20,7 @@ export default function PortalPageRoute(): React.ReactElement {
       permission={dashboardRoute.permission}
       title={`Welcome back, ${displayName}`}
     >
-      <DashboardView />
+      <PortalDashboardView />
     </PortalPage>
   );
 }

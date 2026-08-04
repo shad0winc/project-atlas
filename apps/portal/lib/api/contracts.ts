@@ -65,6 +65,16 @@ export interface AtlasDashboardMediaSummaryResponse {
   readonly libraries: readonly AtlasDashboardMediaLibraryResponse[];
 }
 
+export interface AtlasPortalDashboardResponse {
+  readonly dashboard: {
+    readonly health: AtlasHealthResponse;
+    readonly operational: AtlasDashboardSummaryResponse;
+    readonly media: AtlasDashboardMediaSummaryResponse;
+    readonly operations: unknown;
+    readonly scheduler: unknown;
+  };
+}
+
 export interface AtlasErrorResponse {
   readonly detail?: string;
 }
