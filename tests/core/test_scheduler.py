@@ -432,3 +432,274 @@ class ModuleSchedulerCliTests(unittest.TestCase):
                 self.assertEqual(main(["sync", "sports"]), 0)
             stored = json.loads(state.read_text(encoding="utf-8"))
             self.assertIn("sports.sync", stored["tasks"])
+
+
+class OperationsSchedulerSyncCliTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.addCleanup(
+            self.temporary_directory.cleanup,
+        )
+
+        self.project_directory = Path(
+            self.temporary_directory.name
+        )
+        self.state_file = (
+            self.project_directory
+            / "scheduler"
+            / "tasks.json"
+        )
+        self.registry_file = (
+            self.project_directory
+            / "config"
+            / "modules"
+            / "modules.conf"
+        )
+        self.registry_file.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+    def _environment(self):
+        return patch.dict(
+            "os.environ",
+            {
+                "ATLAS_PROJECT_DIR": str(
+                    self.project_directory
+                ),
+                "ATLAS_MODULES_CONFIG_FILE": str(
+                    self.registry_file
+                ),
+                "ATLAS_SCHEDULER_STATE_FILE": str(
+                    self.state_file
+                ),
+            },
+        )
+
+    def test_unqualified_sync_registers_operations_task(
+        self,
+    ) -> None:
+        self.registry_file.write_text(
+            "",
+            encoding="utf-8",
+        )
+
+        with self._environment():
+            result = main(["sync"])
+
+        self.assertEqual(result, 0)
+
+        stored = json.loads(
+            self.state_file.read_text(
+                encoding="utf-8",
+            )
+        )
+        task = stored["tasks"]["operations.collect"]
+
+        self.assertEqual(
+            task["interval_seconds"],
+            3600,
+        )
+        self.assertEqual(
+            task["callback"],
+            (
+                "python3 -m "
+                "atlas.operations_scheduled_collection"
+            ),
+        )
+        self.assertEqual(
+            task["description"],
+            "Persist an Atlas Operations report",
+        )
+        self.assertIsNone(
+            task["module"],
+        )
+        self.assertTrue(task["enabled"])
+
+    def test_unqualified_sync_registers_core_and_modules(
+        self,
+    ) -> None:
+        module_directory = (
+            self.project_directory
+            / "modules"
+            / "sports"
+        )
+        scripts_directory = (
+            module_directory
+            / "scripts"
+        )
+        scripts_directory.mkdir(
+            parents=True,
+        )
+
+        callback = scripts_directory / "job.py"
+        callback.write_text(
+            "#!/usr/bin/env python3\n",
+            encoding="utf-8",
+        )
+
+        (
+            module_directory
+            / "scheduler.json"
+        ).write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "jobs": [
+                        {
+                            "name": "sync",
+                            "callback": "scripts/job.py",
+                            "interval_seconds": 300,
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        self.registry_file.write_text(
+            "ATLAS_MODULE_SPORTS_ENABLED=true\n",
+            encoding="utf-8",
+        )
+
+        with self._environment():
+            result = main(["sync"])
+
+        self.assertEqual(result, 0)
+
+        stored = json.loads(
+            self.state_file.read_text(
+                encoding="utf-8",
+            )
+        )
+
+        self.assertEqual(
+            set(stored["tasks"]),
+            {
+                "operations.collect",
+                "sports.sync",
+            },
+        )
+
+    def test_targeted_module_sync_does_not_register_core_jobs(
+        self,
+    ) -> None:
+        module_directory = (
+            self.project_directory
+            / "modules"
+            / "sports"
+        )
+        scripts_directory = (
+            module_directory
+            / "scripts"
+        )
+        scripts_directory.mkdir(
+            parents=True,
+        )
+
+        (
+            scripts_directory
+            / "job.py"
+        ).write_text(
+            "#!/usr/bin/env python3\n",
+            encoding="utf-8",
+        )
+
+        (
+            module_directory
+            / "scheduler.json"
+        ).write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "jobs": [
+                        {
+                            "name": "sync",
+                            "callback": "scripts/job.py",
+                            "interval_seconds": 300,
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        self.registry_file.write_text(
+            "ATLAS_MODULE_SPORTS_ENABLED=true\n",
+            encoding="utf-8",
+        )
+
+        with self._environment():
+            result = main(
+                [
+                    "sync",
+                    "sports",
+                ]
+            )
+
+        self.assertEqual(result, 0)
+
+        stored = json.loads(
+            self.state_file.read_text(
+                encoding="utf-8",
+            )
+        )
+
+        self.assertEqual(
+            set(stored["tasks"]),
+            {
+                "sports.sync",
+            },
+        )
+        self.assertNotIn(
+            "operations.collect",
+            stored["tasks"],
+        )
+
+    def test_repeated_sync_preserves_operations_runtime_state(
+        self,
+    ) -> None:
+        self.registry_file.write_text(
+            "",
+            encoding="utf-8",
+        )
+
+        with self._environment():
+            self.assertEqual(
+                main(["sync"]),
+                0,
+            )
+
+            scheduler = TaskScheduler(
+                self.state_file,
+            )
+            scheduler.succeeded(
+                "operations.collect",
+                now=datetime.now(timezone.utc),
+                duration_ms=125,
+            )
+
+            self.assertEqual(
+                main(["sync"]),
+                0,
+            )
+
+        stored = json.loads(
+            self.state_file.read_text(
+                encoding="utf-8",
+            )
+        )
+        task = stored["tasks"]["operations.collect"]
+
+        self.assertEqual(task["run_count"], 1)
+        self.assertEqual(
+            task["last_duration_ms"],
+            125,
+        )
+        self.assertEqual(
+            task["status"],
+            "healthy",
+        )
+        self.assertIsNotNone(
+            task["last_success"],
+        )

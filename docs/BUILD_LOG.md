@@ -3270,3 +3270,106 @@ comparison retention, and automatic remediation remain future work.
 Atlas administrators can now determine exactly what changed between the
 two newest immutable Operations snapshots through stable human and JSON
 interfaces.
+
+---
+
+# 2026-08-04
+
+## M-023.8 — Shared Scheduled Operations Collection
+
+### Objective
+
+Integrate Atlas Operations with the shared scheduler without introducing
+a parallel scheduling implementation.
+
+### Completed
+
+- Added the scheduled Operations collection callback.
+- Added the structural Operations collection-service protocol.
+- Added normalized callback success and failure output.
+- Added configurable repository-root support through
+  `ATLAS_OPERATIONS_DIRECTORY`.
+- Added the canonical `operations.collect` task.
+- Added the default hourly collection interval.
+- Added core Operations registration through `TaskScheduler.register()`.
+- Integrated core jobs into unqualified `atlas scheduler sync`.
+- Preserved targeted module-only synchronization behavior.
+- Preserved scheduler runtime state across repeated synchronization.
+- Removed optional-module event routing from the core Operations task.
+- Added isolated subprocess execution through the production scheduler.
+- Added scheduler registration, callback, sync, and execution tests.
+
+### Canonical task
+
+```text
+Name:        operations.collect
+Interval:    3600 seconds
+Callback:    python3 -m atlas.operations_scheduled_collection
+Description: Persist an Atlas Operations report
+Module:      none
+```
+
+### Public interface
+
+```bash
+atlas scheduler sync
+atlas scheduler inspect operations.collect
+atlas scheduler run operations.collect
+atlas scheduler history --limit 10
+```
+
+### Runtime behavior
+
+An unqualified scheduler synchronization registers core jobs together with
+jobs from enabled module manifests. A targeted module synchronization
+continues to affect only the requested module.
+
+The scheduled callback executes one direct Operations collection and saves
+the resulting report through `FileOperationsRepository`. Successful runs
+create an immutable history snapshot, update `latest.json`, and record
+scheduler health, counters, duration, timestamps, and execution history.
+
+Operations is a core subsystem rather than an optional module. The task
+therefore stores `module: null` and does not use optional-module event
+routing.
+
+### Live validation
+
+- Registered `operations.collect` through live scheduler synchronization.
+- Verified the hourly callback, description, enabled state, and core-task
+  identity.
+- Executed the task through the production scheduler.
+- Created a third immutable production Operations snapshot.
+- Confirmed the new snapshot matched `latest.json`.
+- Confirmed a healthy report with score 100.
+- Confirmed scheduler status, counters, success time, and duration.
+- Confirmed scheduler execution history recorded the successful run.
+- Preserved the original event-delivery error as immutable execution
+  evidence.
+- Resynchronized the corrected task while preserving runtime metadata.
+- Confirmed Operations history and comparison continued to function.
+
+### Automated verification
+
+- 9 scheduled-collection callback tests passed.
+- 13 Operations scheduler registration tests passed.
+- 4 Operations scheduler execution tests passed.
+- 33 scheduler regression tests passed.
+- 65 Operations persistence regression tests passed.
+- Real subprocess collection into an isolated repository passed.
+- Python compilation passed.
+- Shell syntax validation passed.
+- Markdown validation passed.
+- Diff hygiene passed.
+
+### Boundary
+
+Operations API routes, notifications, Portal visualization, comparison
+retention, and automatic remediation remain future work.
+
+### Result
+
+Atlas Operations now performs automatic immutable report collection through
+the shared scheduler while preserving one scheduler architecture, one
+Operations persistence contract, deterministic execution, and complete
+runtime observability.

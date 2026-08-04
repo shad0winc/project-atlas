@@ -211,6 +211,10 @@ atlas operations history --limit 10
 atlas operations compare
 atlas operations compare --json
 atlas operations compare --include-unchanged
+atlas scheduler sync
+atlas scheduler inspect operations.collect
+atlas scheduler run operations.collect
+atlas scheduler history --limit 10
 ```
 
 ## Command behavior
@@ -227,6 +231,71 @@ atlas operations compare --include-unchanged
   either snapshot or `latest.json`.
 - `compare --include-unchanged` includes stable findings in the serialized
   comparison contract while human output remains difference-focused.
+- `scheduler sync` registers the core `operations.collect` task together
+  with jobs from enabled module manifests.
+- `scheduler inspect operations.collect` shows the persistent task state,
+  cadence, callback, due status, health, and run counters.
+- `scheduler run operations.collect` forces one scheduled collection and
+  records the result in scheduler history.
+
+## Scheduled collection
+
+Atlas Operations uses the shared `TaskScheduler`; it does not implement a
+second scheduler. The canonical task definition is:
+
+```text
+Name:        operations.collect
+Interval:    3600 seconds
+Callback:    python3 -m atlas.operations_scheduled_collection
+Description: Persist an Atlas Operations report
+Module:      none
+```
+
+An unqualified `atlas scheduler sync` registers core jobs and enabled
+module jobs. A targeted command such as `atlas scheduler sync sports`
+continues to synchronize only that module and does not register core jobs.
+
+Registration is idempotent. Repeated synchronization refreshes the task
+definition while preserving runtime fields such as `run_count`,
+`failure_count`, `last_success`, `last_duration_ms`, status, and execution
+history.
+
+Operations is a core subsystem, not an optional module. Its scheduler task
+therefore stores `module: null`, preventing the optional-module event
+publisher from attempting to route Operations events through the module
+registry.
+
+The callback performs one direct collection and persistence cycle:
+
+```text
+TaskScheduler
+      |
+      v
+atlas.operations_scheduled_collection
+      |
+      v
+OperationsService.collect()
+      |
+      v
+FileOperationsRepository.save()
+      |
+      +--> history/<generated-at>.json
+      `--> latest.json
+```
+
+The scheduler executes the callback as a subprocess from the Atlas project
+directory. A successful run updates task health, counters, success time,
+duration, and scheduler history. Callback failures are normalized through
+the existing scheduler execution contract.
+
+## Scheduled collection repository root
+
+The callback uses `/mnt/storage/configs/atlas/operations` by default.
+`ATLAS_OPERATIONS_DIRECTORY` may override that root for automated tests,
+isolated deployments, or controlled alternate runtime layouts.
+
+The value is trimmed before use. An empty or whitespace-only override is
+rejected rather than silently falling back to the production directory.
 
 ## Storage layout
 
@@ -347,8 +416,8 @@ human renderer.
 
 ## Current boundaries
 
-Scheduled collection, API routes, notifications, Portal visualization,
-comparison retention, and automatic remediation remain planned extensions.
+API routes, notifications, Portal visualization, comparison retention,
+and automatic remediation remain planned extensions.
 
 # Production Ingress Operations
 

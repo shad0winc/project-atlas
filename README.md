@@ -509,6 +509,10 @@ atlas operations history --limit 10
 atlas operations compare
 atlas operations compare --json
 atlas operations compare --include-unchanged
+atlas scheduler sync
+atlas scheduler inspect operations.collect
+atlas scheduler run operations.collect
+atlas scheduler history --limit 10
 ```
 
 `report` collects a live report without persisting it.
@@ -527,6 +531,21 @@ controls the maximum number of reports returned.
 deterministic comparison. It detects added, removed, and changed findings,
 along with status, score, and attention deltas. Use
 `--include-unchanged` when the complete finding set is required.
+
+Scheduled collection reuses the shared Atlas scheduler. An unqualified
+`atlas scheduler sync` registers the canonical `operations.collect` core
+task alongside enabled module jobs. The task runs hourly by default and
+executes `python3 -m atlas.operations_scheduled_collection`.
+
+Repeated synchronization updates the task definition while preserving
+runtime state such as run counts, success timestamps, duration, failures,
+and scheduler history. Because Operations is a core subsystem rather than
+an optional module, the task has no module event route.
+
+The callback uses the default Operations repository unless
+`ATLAS_OPERATIONS_DIRECTORY` is set. That override is intended for tests,
+isolated environments, and controlled alternate runtime roots; an empty
+override is rejected.
 
 The default storage layout is:
 
@@ -548,8 +567,10 @@ wrapped JSON contract containing `count` and complete validated reports.
 Comparison is implemented through immutable change contracts, a pure
 comparison service, concise human output, and stable JSON serialization.
 
-Scheduled collection, APIs, notifications, and Portal visualization remain
-planned extensions.
+Scheduled collection is implemented through the shared scheduler, the
+`operations.collect` task, and an isolated subprocess callback.
+
+APIs, notifications, and Portal visualization remain planned extensions.
 
 See `docs/OPERATIONS.md` for the complete command and persistence contract.
 

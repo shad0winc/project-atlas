@@ -254,13 +254,23 @@ Implemented capabilities include:
 - deterministic added, removed, changed, and unchanged detection;
 - derived status, score, attention, and change summaries;
 - concise human and stable JSON comparison rendering;
+- shared `TaskScheduler` integration;
+- canonical hourly `operations.collect` registration;
+- idempotent core-task synchronization with runtime-state preservation;
+- isolated scheduled-collection subprocess execution;
+- core-task isolation from optional-module event routing;
+- configurable scheduled repository roots through
+  `ATLAS_OPERATIONS_DIRECTORY`;
 - public `atlas operations report`, `save`, `latest`, `history`, and
   `compare` commands;
+- public scheduler synchronization, inspection, execution, and history
+  workflows for scheduled Operations collection;
 - dedicated unit, integration, regression, corruption, atomic-write,
-  comparison, renderer, shell, and live read-only validation.
+  comparison, renderer, scheduler, subprocess, shell, and live
+  validation.
 
 The subsystem is **Level 4 — Observable** with durable report
-persistence.
+persistence and automated scheduled collection.
 
-Scheduled collection, API exposure, notifications, and Portal
-visualization remain planned extensions.
+API exposure, notifications, and Portal visualization remain planned
+extensions.

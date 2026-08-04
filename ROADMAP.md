@@ -598,7 +598,13 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 - [x] Add `atlas operations compare`
 - [x] Add optional unchanged-finding inclusion
 - [x] Validate live comparison as read-only
-- [ ] Schedule Operations report collection
+- [x] Add the scheduled Operations collection callback
+- [x] Register `operations.collect` through the shared scheduler
+- [x] Integrate core jobs into unqualified `atlas scheduler sync`
+- [x] Preserve scheduler runtime state during repeated synchronization
+- [x] Isolate core Operations tasks from optional-module event routing
+- [x] Validate live and subprocess scheduled collection
+- [x] Validate scheduled history and comparison continuity
 - [ ] Add Operations API routes
 - [ ] Add the Operations Portal dashboard
 

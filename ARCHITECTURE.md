@@ -1043,5 +1043,39 @@ not read files directly, mutate reports, write snapshots, or update
 Status changes, score deltas, attention deltas, and change counts are
 derived from those canonical inputs rather than persisted independently.
 
-Scheduled collection, APIs, notifications, and the Portal remain future
-extensions of this stable contract.
+Scheduled collection is integrated through the shared `TaskScheduler`
+rather than an Operations-specific scheduler. Unqualified scheduler
+synchronization registers the canonical `operations.collect` core task
+alongside jobs from enabled module manifests.
+
+```text
+TaskScheduler
+      |
+      v
+operations.collect
+      |
+      v
+atlas.operations_scheduled_collection
+      |
+      v
+OperationsService.collect()
+      |
+      v
+FileOperationsRepository.save()
+```
+
+The callback runs as an isolated subprocess and performs exactly one
+collection-and-persistence cycle. Scheduler state, locking, due
+evaluation, execution history, health, counters, and durations remain
+owned by the shared scheduler subsystem.
+
+Repeated synchronization refreshes the task definition while preserving
+runtime state. Because Operations is a core subsystem rather than an
+optional module, the task stores no module event route.
+
+The callback uses the standard Operations repository root by default.
+`ATLAS_OPERATIONS_DIRECTORY` provides an explicit override for tests and
+isolated runtime layouts.
+
+APIs, notifications, and the Portal remain future extensions of this
+stable contract.

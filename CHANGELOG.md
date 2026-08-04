@@ -30,6 +30,21 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Added
 
+- Added scheduled Atlas Operations report collection through the shared
+  `TaskScheduler` runtime, without introducing a parallel Operations-specific
+  scheduling system.
+- Added the canonical `operations.collect` task with hourly registration,
+  idempotent scheduler synchronization, persistent runtime-state preservation,
+  and core-task event isolation.
+- Added the `atlas.operations_scheduled_collection` callback, including
+  normalized errors, deterministic result output, immutable report persistence,
+  and the `ATLAS_OPERATIONS_DIRECTORY` runtime override.
+- Extended unqualified `atlas scheduler sync` to register core Operations jobs
+  alongside enabled module manifests while preserving targeted module sync.
+- Added live scheduler execution, immutable snapshot, `latest.json`, scheduler
+  history, Operations history, comparison, and real subprocess regression
+  validation.
+
 - Added deterministic Atlas Operations report comparison with immutable
   finding-change and aggregate comparison contracts, derived status, score,
   attention, and change summaries, and validated round-trip serialization.
