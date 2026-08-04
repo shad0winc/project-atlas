@@ -1,5 +1,15 @@
 #!/usr/bin/env bash
 
+atlas_verify_command_directory="$(
+  cd "$(dirname "${BASH_SOURCE[0]}")"
+  pwd
+)"
+
+# shellcheck disable=SC1091
+source "$atlas_verify_command_directory/../lib/verifiers.sh"
+
+unset atlas_verify_command_directory
+
 atlas_verify_check() {
   local label="$1"
   shift
@@ -375,6 +385,61 @@ atlas_verify_project_files() {
   done
 }
 
+atlas_verify_ingress() {
+  local verifier
+
+  verifier="${ATLAS_VERIFY_INGRESS_VERIFIER:-$ATLAS_PROJECT_DIR/scripts/verify-ingress.sh}"
+
+  atlas_verify_specialized_command \
+    "Ingress verification" \
+    "$verifier" || true
+}
+
+atlas_verify_scheduler() {
+  atlas_verify_specialized_output_command \
+    "Scheduler registry readiness" \
+    "No scheduler tasks registered." \
+    atlas_command_scheduler \
+    list || true
+}
+
+atlas_verify_enabled_modules() {
+  local module
+  local enabled_count=0
+
+  while IFS= read -r module; do
+    [[ -n "$module" ]] || continue
+
+    if ! atlas_module_enabled "$module"; then
+      continue
+    fi
+
+    enabled_count=$((enabled_count + 1))
+
+    atlas_verify_specialized_command \
+      "$module module verification" \
+      atlas_command_module \
+      verify \
+      "$module" || true
+  done < <(atlas_module_list)
+
+  if [[ "$enabled_count" -eq 0 ]]; then
+    atlas_ok "No enabled modules require verification"
+  fi
+}
+
+atlas_verify_specialized_verifiers() {
+  atlas_section "Specialized Verifiers"
+
+  atlas_verify_ingress
+
+  echo
+  atlas_verify_scheduler
+
+  echo
+  atlas_verify_enabled_modules
+}
+
 atlas_verify_vpn() {
   atlas_section "VPN"
 
@@ -417,6 +482,9 @@ atlas_command_verify() {
 
   echo
   atlas_verify_vpn
+
+  echo
+  atlas_verify_specialized_verifiers
 
   echo
 

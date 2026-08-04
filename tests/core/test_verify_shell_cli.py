@@ -90,6 +90,7 @@ def prepare_runtime(
         backup_dir,
         config_root,
         runtime_config_dir,
+        project_dir / "scripts",
         bin_directory,
     ):
         path.mkdir(
@@ -115,6 +116,16 @@ def prepare_runtime(
     (project_dir / "docker-compose.yml").write_text(
         "services: {}\n",
         encoding="utf-8",
+    )
+
+    write_executable(
+        project_dir / "scripts" / "verify-ingress.sh",
+        """
+        #!/usr/bin/env bash
+
+        printf '%s\n' "${ATLAS_TEST_INGRESS_OUTPUT:-Atlas Ingress Status: PASS}"
+        exit "${ATLAS_TEST_INGRESS_STATUS:-0}"
+        """,
     )
 
     write_executable(
@@ -248,6 +259,45 @@ def run_verify(
       echo "FAIL $*"
     }
 
+    atlas_command_scheduler() {
+      if [[ "${ATLAS_TEST_SCHEDULER_STATUS:-0}" != "0" ]]; then
+        printf '%s\n' "${ATLAS_TEST_SCHEDULER_OUTPUT:-Scheduler unavailable}"
+        return "${ATLAS_TEST_SCHEDULER_STATUS}"
+      fi
+
+      printf '%s\n' "${ATLAS_TEST_SCHEDULER_OUTPUT:-operations.collect true 300 healthy false -}"
+    }
+
+    atlas_module_list() {
+      printf '%s\n' "${ATLAS_TEST_MODULES:-notifications
+sports}"
+    }
+
+    atlas_module_enabled() {
+      local module="$1"
+      local enabled_modules="${ATLAS_TEST_ENABLED_MODULES-notifications
+sports}"
+
+      grep -Fxq -- "$module" <<<"$enabled_modules"
+    }
+
+    atlas_command_module() {
+      local subcommand="${1:-}"
+      local module="${2:-}"
+
+      if [[ "$subcommand" != "verify" ]]; then
+        return 1
+      fi
+
+      printf '%s\n' "$module module verifier output"
+
+      if [[ "$module" == "${ATLAS_TEST_FAIL_MODULE:-}" ]]; then
+        return 1
+      fi
+
+      return 0
+    }
+
     atlas_command_verify
     """
 
@@ -288,6 +338,11 @@ def test_verify_reports_pass_for_valid_runtime(
     assert "Storage Paths" in result.stdout
     assert "Project Files" in result.stdout
     assert "VPN" in result.stdout
+    assert "Specialized Verifiers" in result.stdout
+    assert "OK   Ingress verification" in result.stdout
+    assert "OK   Scheduler registry readiness" in result.stdout
+    assert "OK   notifications module verification" in result.stdout
+    assert "OK   sports module verification" in result.stdout
     assert "OK   Docker Engine" in result.stdout
     assert "OK   dozzle running" in result.stdout
     assert "OK   homepage running" in result.stdout
@@ -633,3 +688,135 @@ def test_verify_reports_compose_runtime_query_failure(
     assert "OK   Compose service discovery" in result.stdout
     assert "FAIL Compose runtime query" in result.stdout
     assert "Overall Status: FAIL" in result.stdout
+
+
+def test_verify_reports_ingress_verifier_failure(
+    tmp_path: Path,
+) -> None:
+    """Ingress failure must be aggregated without stopping later checks."""
+
+    environment = dict(
+        prepare_runtime(tmp_path)
+    )
+
+    environment["ATLAS_TEST_INGRESS_STATUS"] = "1"
+    environment["ATLAS_TEST_INGRESS_OUTPUT"] = (
+        "Atlas Ingress Status: FAIL"
+    )
+
+    result = run_verify(environment)
+
+    assert result.returncode == 1
+    assert "Atlas Ingress Status: FAIL" in result.stdout
+    assert "FAIL Ingress verification" in result.stdout
+    assert "OK   Scheduler registry readiness" in result.stdout
+    assert "OK   sports module verification" in result.stdout
+    assert "Overall Status: FAIL" in result.stdout
+
+
+def test_verify_reports_scheduler_command_failure(
+    tmp_path: Path,
+) -> None:
+    """A failing Scheduler CLI must fail readiness verification."""
+
+    environment = dict(
+        prepare_runtime(tmp_path)
+    )
+
+    environment["ATLAS_TEST_SCHEDULER_STATUS"] = "1"
+    environment["ATLAS_TEST_SCHEDULER_OUTPUT"] = (
+        "Scheduler registry unavailable"
+    )
+
+    result = run_verify(environment)
+
+    assert result.returncode == 1
+    assert "Scheduler registry unavailable" in result.stdout
+    assert "FAIL Scheduler registry readiness" in result.stdout
+    assert "OK   notifications module verification" in result.stdout
+    assert "Overall Status: FAIL" in result.stdout
+
+
+def test_verify_rejects_empty_scheduler_registry(
+    tmp_path: Path,
+) -> None:
+    """A successful but empty Scheduler registry is not ready."""
+
+    environment = dict(
+        prepare_runtime(tmp_path)
+    )
+
+    environment["ATLAS_TEST_SCHEDULER_OUTPUT"] = (
+        "No scheduler tasks registered."
+    )
+
+    result = run_verify(environment)
+
+    assert result.returncode == 1
+    assert "No scheduler tasks registered." in result.stdout
+    assert "FAIL Scheduler registry readiness" in result.stdout
+    assert "Overall Status: FAIL" in result.stdout
+
+
+def test_verify_runs_only_enabled_module_verifiers(
+    tmp_path: Path,
+) -> None:
+    """Disabled modules must not participate in root verification."""
+
+    environment = dict(
+        prepare_runtime(tmp_path)
+    )
+
+    environment["ATLAS_TEST_ENABLED_MODULES"] = "sports"
+
+    result = run_verify(environment)
+
+    assert result.returncode == 0
+    assert "OK   sports module verification" in result.stdout
+    assert "notifications module verifier output" not in result.stdout
+    assert (
+        "notifications module verification"
+        not in result.stdout
+    )
+    assert "Overall Status: PASS" in result.stdout
+
+
+def test_verify_aggregates_enabled_module_failure(
+    tmp_path: Path,
+) -> None:
+    """One enabled module failure must not suppress remaining modules."""
+
+    environment = dict(
+        prepare_runtime(tmp_path)
+    )
+
+    environment["ATLAS_TEST_FAIL_MODULE"] = "notifications"
+
+    result = run_verify(environment)
+
+    assert result.returncode == 1
+    assert "FAIL notifications module verification" in result.stdout
+    assert "OK   sports module verification" in result.stdout
+    assert "Overall Status: FAIL" in result.stdout
+
+
+def test_verify_handles_no_enabled_modules(
+    tmp_path: Path,
+) -> None:
+    """A system with no enabled optional modules remains valid."""
+
+    environment = dict(
+        prepare_runtime(tmp_path)
+    )
+
+    environment["ATLAS_TEST_ENABLED_MODULES"] = ""
+
+    result = run_verify(environment)
+
+    assert result.returncode == 0
+    assert (
+        "OK   No enabled modules require verification"
+        in result.stdout
+    )
+    assert "module verifier output" not in result.stdout
+    assert "Overall Status: PASS" in result.stdout
