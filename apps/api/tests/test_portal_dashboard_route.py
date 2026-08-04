@@ -90,6 +90,9 @@ class MissingOperationsRepository:
             "latest Operations report was not found"
         )
 
+    def history(self, limit: int = 25):
+        return ()
+
 
 def portal_service() -> PortalDashboardService:
     report = HealthReport(
@@ -173,9 +176,16 @@ def test_portal_dashboard_returns_shared_envelope() -> None:
         "service": "atlas-api",
         "api_version": "v1",
     }
-    assert dashboard["operations"]["status"] == (
+    operations = dashboard["operations"]
+
+    assert operations["status"] == "unavailable"
+    assert operations["report"] is None
+    assert operations["summary"] is None
+    assert operations["recent_attention"] == []
+    assert operations["comparison"]["status"] == (
         "unavailable"
     )
+    assert operations["comparison"]["difference_count"] is None
 
 
 def test_portal_dashboard_requires_authentication() -> None:

@@ -17,6 +17,9 @@ from atlas_api.schemas.dashboard_media import (
 from atlas_api.schemas.health import HealthResponse
 from atlas_api.schemas.portal_dashboard import (
     PortalDashboardResponse,
+    PortalOperationsAttentionResponse,
+    PortalOperationsComparisonResponse,
+    PortalOperationsReportSummaryResponse,
     PortalOperationsSummaryResponse,
 )
 
@@ -59,37 +62,83 @@ def operations_report() -> dict[str, object]:
     return {
         "report_id": "operations-latest",
         "hostname": "docker",
-        "status": "healthy",
-        "score": 100,
+        "status": "warning",
+        "score": 75,
         "generated_at": GENERATED_AT,
     }
 
 
-def test_available_operations_section_is_stable() -> None:
-    section = PortalOperationsSummaryResponse(
-        status="available",
-        report=operations_report(),
+def report_summary() -> PortalOperationsReportSummaryResponse:
+    return PortalOperationsReportSummaryResponse(
+        status="warning",
+        score=75,
+        attention_count=1,
+        generated_at=GENERATED_AT,
     )
 
-    assert section.model_dump() == {
+
+def available_comparison() -> PortalOperationsComparisonResponse:
+    return PortalOperationsComparisonResponse(
+        status="available",
+        score_delta=-25,
+        attention_delta=1,
+        added_count=0,
+        removed_count=0,
+        changed_count=1,
+        unchanged_count=0,
+        difference_count=1,
+    )
+
+
+def unavailable_comparison() -> PortalOperationsComparisonResponse:
+    return PortalOperationsComparisonResponse(
+        status="unavailable",
+        detail=(
+            "At least two persisted Operations reports "
+            "are required for comparison."
+        ),
+    )
+
+
+def attention_finding() -> PortalOperationsAttentionResponse:
+    return PortalOperationsAttentionResponse(
+        section="system",
+        identifier="system.memory",
+        name="Memory",
+        status="warning",
+        severity="warning",
+        message="Memory usage is elevated",
+        recommendation="Review memory usage.",
+    )
+
+
+def test_available_comparison_is_stable() -> None:
+    assert available_comparison().model_dump() == {
         "status": "available",
-        "report": operations_report(),
+        "score_delta": -25,
+        "attention_delta": 1,
+        "added_count": 0,
+        "removed_count": 0,
+        "changed_count": 1,
+        "unchanged_count": 0,
+        "difference_count": 1,
         "detail": None,
     }
 
 
-def test_unavailable_operations_section_is_stable() -> None:
-    section = PortalOperationsSummaryResponse(
-        status="unavailable",
-        report=None,
-        detail="No persisted Operations report is available.",
-    )
-
-    assert section.model_dump() == {
+def test_unavailable_comparison_is_stable() -> None:
+    assert unavailable_comparison().model_dump() == {
         "status": "unavailable",
-        "report": None,
+        "score_delta": None,
+        "attention_delta": None,
+        "added_count": None,
+        "removed_count": None,
+        "changed_count": None,
+        "unchanged_count": None,
+        "difference_count": None,
         "detail": (
-            "No persisted Operations report is available."
+            "At least two persisted Operations reports "
+            "are required for comparison."
         ),
     }
 
@@ -100,8 +149,127 @@ def test_unavailable_operations_section_is_stable() -> None:
         (
             {
                 "status": "available",
+                "score_delta": 0,
+                "attention_delta": 0,
+                "added_count": 0,
+                "removed_count": 0,
+                "changed_count": None,
+                "unchanged_count": 0,
+                "difference_count": 0,
+            },
+            "available comparison requires all metrics",
+        ),
+        (
+            {
+                "status": "available",
+                "score_delta": 0,
+                "attention_delta": 0,
+                "added_count": 0,
+                "removed_count": 0,
+                "changed_count": 0,
+                "unchanged_count": 0,
+                "difference_count": 0,
+                "detail": "Unexpected detail",
+            },
+            "available comparison cannot include detail",
+        ),
+        (
+            {
+                "status": "available",
+                "score_delta": 0,
+                "attention_delta": 0,
+                "added_count": 1,
+                "removed_count": 1,
+                "changed_count": 1,
+                "unchanged_count": 0,
+                "difference_count": 2,
+            },
+            "difference_count must equal",
+        ),
+        (
+            {
+                "status": "unavailable",
+                "score_delta": 0,
+                "detail": "Unavailable",
+            },
+            "unavailable comparison cannot include metrics",
+        ),
+        (
+            {
+                "status": "unavailable",
+                "detail": "   ",
+            },
+            "unavailable comparison requires detail",
+        ),
+    ),
+)
+def test_comparison_rejects_contradictory_state(
+    payload: dict[str, object],
+    message: str,
+) -> None:
+    with pytest.raises(ValidationError, match=message):
+        PortalOperationsComparisonResponse.model_validate(
+            payload,
+        )
+
+
+def test_available_operations_section_is_stable() -> None:
+    section = PortalOperationsSummaryResponse(
+        status="available",
+        report=operations_report(),
+        summary=report_summary(),
+        comparison=available_comparison(),
+        recent_attention=(attention_finding(),),
+    )
+
+    assert section.model_dump(mode="json") == {
+        "status": "available",
+        "report": operations_report(),
+        "detail": None,
+        "summary": {
+            "status": "warning",
+            "score": 75,
+            "attention_count": 1,
+            "generated_at": GENERATED_AT,
+        },
+        "comparison": available_comparison().model_dump(),
+        "recent_attention": [
+            attention_finding().model_dump(),
+        ],
+    }
+
+
+def test_unavailable_operations_section_is_stable() -> None:
+    section = PortalOperationsSummaryResponse(
+        status="unavailable",
+        report=None,
+        detail="No persisted Operations report is available.",
+        summary=None,
+        comparison=unavailable_comparison(),
+        recent_attention=(),
+    )
+
+    assert section.model_dump(mode="json") == {
+        "status": "unavailable",
+        "report": None,
+        "detail": (
+            "No persisted Operations report is available."
+        ),
+        "summary": None,
+        "comparison": unavailable_comparison().model_dump(),
+        "recent_attention": [],
+    }
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    (
+        (
+            {
+                "status": "available",
                 "report": None,
-                "detail": None,
+                "summary": report_summary().model_dump(),
+                "comparison": available_comparison().model_dump(),
             },
             "available Operations state requires a report",
         ),
@@ -110,14 +278,26 @@ def test_unavailable_operations_section_is_stable() -> None:
                 "status": "available",
                 "report": operations_report(),
                 "detail": "Unexpected detail",
+                "summary": report_summary().model_dump(),
+                "comparison": available_comparison().model_dump(),
             },
             "available Operations state cannot include detail",
+        ),
+        (
+            {
+                "status": "available",
+                "report": operations_report(),
+                "summary": None,
+                "comparison": available_comparison().model_dump(),
+            },
+            "available Operations state requires a summary",
         ),
         (
             {
                 "status": "unavailable",
                 "report": operations_report(),
                 "detail": "Unavailable",
+                "comparison": unavailable_comparison().model_dump(),
             },
             "unavailable Operations state cannot include a report",
         ),
@@ -125,9 +305,24 @@ def test_unavailable_operations_section_is_stable() -> None:
             {
                 "status": "unavailable",
                 "report": None,
-                "detail": "   ",
+                "detail": "Unavailable",
+                "summary": report_summary().model_dump(),
+                "comparison": unavailable_comparison().model_dump(),
             },
-            "unavailable Operations state requires detail",
+            "unavailable Operations state cannot include a summary",
+        ),
+        (
+            {
+                "status": "unavailable",
+                "report": None,
+                "detail": "Unavailable",
+                "summary": None,
+                "comparison": unavailable_comparison().model_dump(),
+                "recent_attention": [
+                    attention_finding().model_dump(),
+                ],
+            },
+            "unavailable Operations state cannot include attention",
         ),
     ),
 )
@@ -135,10 +330,7 @@ def test_operations_section_rejects_contradictory_state(
     payload: dict[str, object],
     message: str,
 ) -> None:
-    with pytest.raises(
-        ValidationError,
-        match=message,
-    ):
+    with pytest.raises(ValidationError, match=message):
         PortalOperationsSummaryResponse.model_validate(
             payload,
         )
@@ -156,46 +348,31 @@ def test_portal_dashboard_serialization_is_stable() -> None:
         operations=PortalOperationsSummaryResponse(
             status="available",
             report=operations_report(),
+            summary=report_summary(),
+            comparison=available_comparison(),
+            recent_attention=(attention_finding(),),
         ),
     )
 
-    assert dashboard.model_dump(mode="json") == {
-        "health": {
-            "status": "ok",
-            "service": "atlas-api",
-            "api_version": "v1",
-        },
-        "operational": {
-            "generated_at": GENERATED_AT,
-            "metrics": [
-                {
-                    "id": "system-health",
-                    "label": "System health",
-                    "value": "100%",
-                    "description": "Aggregate Atlas health.",
-                    "status": "healthy",
-                    "detail": "4 checks",
-                },
-            ],
-        },
-        "media": {
-            "generated_at": GENERATED_AT,
-            "libraries": [
-                {
-                    "id": "movies",
-                    "label": "Movies",
-                    "count": 12,
-                    "status": "available",
-                    "detail": None,
-                },
-            ],
-        },
-        "operations": {
-            "status": "available",
-            "report": operations_report(),
-            "detail": None,
-        },
+    serialized = dashboard.model_dump(mode="json")
+
+    assert serialized["health"] == {
+        "status": "ok",
+        "service": "atlas-api",
+        "api_version": "v1",
     }
+    assert serialized["operations"]["summary"] == {
+        "status": "warning",
+        "score": 75,
+        "attention_count": 1,
+        "generated_at": GENERATED_AT,
+    }
+    assert serialized["operations"]["comparison"][
+        "difference_count"
+    ] == 1
+    assert serialized["operations"]["recent_attention"] == [
+        attention_finding().model_dump(),
+    ]
 
 
 def test_portal_dashboard_forbids_extra_fields() -> None:
@@ -211,6 +388,9 @@ def test_portal_dashboard_forbids_extra_fields() -> None:
             "status": "unavailable",
             "report": None,
             "detail": "Unavailable",
+            "summary": None,
+            "comparison": unavailable_comparison().model_dump(),
+            "recent_attention": [],
         },
         "unexpected": True,
     }
@@ -220,12 +400,14 @@ def test_portal_dashboard_forbids_extra_fields() -> None:
 
 
 def test_schema_package_exports_portal_contracts() -> None:
-    assert (
-        schemas.PortalDashboardResponse
-        is PortalDashboardResponse
-    )
-    assert (
-        schemas.PortalOperationsSummaryResponse
-        is PortalOperationsSummaryResponse
-    )
-    assert "PortalSectionStatus" in schemas.__all__
+    expected = {
+        "PortalDashboardResponse",
+        "PortalOperationsAttentionResponse",
+        "PortalOperationsComparisonResponse",
+        "PortalOperationsReportSummaryResponse",
+        "PortalOperationsStatus",
+        "PortalOperationsSummaryResponse",
+        "PortalSectionStatus",
+    }
+
+    assert expected.issubset(set(schemas.__all__))

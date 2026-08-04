@@ -8,6 +8,10 @@ from .api_envelope import (
 from .health import HealthResponse
 from .portal_dashboard import (
     PortalDashboardResponse,
+    PortalOperationsAttentionResponse,
+    PortalOperationsComparisonResponse,
+    PortalOperationsReportSummaryResponse,
+    PortalOperationsStatus,
     PortalOperationsSummaryResponse,
     PortalSectionStatus,
 )
@@ -18,6 +22,10 @@ __all__ = [
     "ApiSuccessEnvelopeSchema",
     "HealthResponse",
     "PortalDashboardResponse",
+    "PortalOperationsAttentionResponse",
+    "PortalOperationsComparisonResponse",
+    "PortalOperationsReportSummaryResponse",
+    "PortalOperationsStatus",
     "PortalOperationsSummaryResponse",
     "PortalSectionStatus",
 ]

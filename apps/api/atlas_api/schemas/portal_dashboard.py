@@ -20,6 +20,147 @@ PortalSectionStatus = Literal[
     "unavailable",
 ]
 
+PortalOperationsStatus = Literal[
+    "healthy",
+    "warning",
+    "critical",
+    "unknown",
+]
+
+
+class PortalOperationsReportSummaryResponse(BaseModel):
+    """Compact summary of the latest persisted Operations report."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+    )
+
+    status: PortalOperationsStatus
+    score: int
+    attention_count: int
+    generated_at: str
+
+
+class PortalOperationsComparisonResponse(BaseModel):
+    """Compact comparison state for the two newest reports."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+    )
+
+    status: PortalSectionStatus
+    score_delta: int | None = None
+    attention_delta: int | None = None
+    added_count: int | None = None
+    removed_count: int | None = None
+    changed_count: int | None = None
+    unchanged_count: int | None = None
+    difference_count: int | None = None
+    detail: str | None = None
+
+    @model_validator(mode="after")
+    def validate_comparison_state(
+        self,
+    ) -> "PortalOperationsComparisonResponse":
+        """Reject contradictory comparison availability state."""
+
+        metric_names = (
+            "score_delta",
+            "attention_delta",
+            "added_count",
+            "removed_count",
+            "changed_count",
+            "unchanged_count",
+            "difference_count",
+        )
+
+        metrics = tuple(
+            getattr(self, name)
+            for name in metric_names
+        )
+
+        if self.status == "available":
+            if any(value is None for value in metrics):
+                raise ValueError(
+                    "available comparison requires all metrics"
+                )
+
+            if self.detail is not None:
+                raise ValueError(
+                    "available comparison cannot include detail"
+                )
+
+            for name in (
+                "added_count",
+                "removed_count",
+                "changed_count",
+                "unchanged_count",
+                "difference_count",
+            ):
+                value = getattr(self, name)
+
+                if value is not None and value < 0:
+                    raise ValueError(
+                        f"{name} must be non-negative"
+                    )
+
+            assert self.added_count is not None
+            assert self.removed_count is not None
+            assert self.changed_count is not None
+            assert self.difference_count is not None
+
+            expected_difference_count = (
+                self.added_count
+                + self.removed_count
+                + self.changed_count
+            )
+
+            if (
+                self.difference_count
+                != expected_difference_count
+            ):
+                raise ValueError(
+                    "difference_count must equal added, "
+                    "removed, and changed counts"
+                )
+
+            return self
+
+        if any(value is not None for value in metrics):
+            raise ValueError(
+                "unavailable comparison cannot include metrics"
+            )
+
+        if self.detail is None or not self.detail.strip():
+            raise ValueError(
+                "unavailable comparison requires detail"
+            )
+
+        return self
+
+
+class PortalOperationsAttentionResponse(BaseModel):
+    """One compact attention finding for Portal display."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+    )
+
+    section: str
+    identifier: str
+    name: str
+    status: PortalOperationsStatus
+    severity: Literal[
+        "critical",
+        "warning",
+        "info",
+    ]
+    message: str
+    recommendation: str | None = None
+
 
 class PortalOperationsSummaryResponse(BaseModel):
     """Latest persisted Operations state exposed to the Portal."""
@@ -32,6 +173,12 @@ class PortalOperationsSummaryResponse(BaseModel):
     status: PortalSectionStatus
     report: dict[str, Any] | None
     detail: str | None = None
+    summary: PortalOperationsReportSummaryResponse | None = None
+    comparison: PortalOperationsComparisonResponse
+    recent_attention: tuple[
+        PortalOperationsAttentionResponse,
+        ...,
+    ] = ()
 
     @model_validator(mode="after")
     def validate_section_state(
@@ -50,11 +197,32 @@ class PortalOperationsSummaryResponse(BaseModel):
                     "available Operations state cannot include detail"
                 )
 
+            if self.summary is None:
+                raise ValueError(
+                    "available Operations state requires a summary"
+                )
+
             return self
 
         if self.report is not None:
             raise ValueError(
                 "unavailable Operations state cannot include a report"
+            )
+
+        if self.summary is not None:
+            raise ValueError(
+                "unavailable Operations state cannot include a summary"
+            )
+
+        if self.recent_attention:
+            raise ValueError(
+                "unavailable Operations state cannot include attention"
+            )
+
+        if self.comparison.status != "unavailable":
+            raise ValueError(
+                "unavailable Operations state requires an "
+                "unavailable comparison"
             )
 
         if self.detail is None or not self.detail.strip():
@@ -81,6 +249,10 @@ class PortalDashboardResponse(BaseModel):
 
 __all__ = [
     "PortalDashboardResponse",
+    "PortalOperationsAttentionResponse",
+    "PortalOperationsComparisonResponse",
+    "PortalOperationsReportSummaryResponse",
+    "PortalOperationsStatus",
     "PortalOperationsSummaryResponse",
     "PortalSectionStatus",
 ]

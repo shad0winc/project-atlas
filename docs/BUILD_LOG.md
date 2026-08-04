@@ -3738,3 +3738,86 @@ The endpoint does not:
 Atlas now provides a single-request backend contract for the initial
 Operations Portal landing page while preserving modular service boundaries,
 partial availability, explicit authorization, and read-only behavior.
+
+---
+
+# 2026-08-04
+
+## M-023.11 — Operations Portal Widget Enrichment (Slice 2)
+
+### Objective
+
+Enrich the aggregate Operations Portal dashboard contract with compact,
+Portal-ready latest-report, comparison, and attention data while preserving
+the complete persisted report for drill-down access.
+
+### Completed
+
+- Added a compact latest Operations report summary.
+- Added canonical status, score, attention count, and generation timestamp
+  fields.
+- Added a compact comparison contract for the two newest persisted reports.
+- Added score and attention deltas.
+- Added added, removed, changed, unchanged, and difference counts.
+- Added explicit available and unavailable comparison states.
+- Added model validation for contradictory comparison states.
+- Added deterministic recent-attention contracts.
+- Reused the canonical Operations attention ordering.
+- Bounded recent attention to five findings.
+- Preserved stable finding identity, section, name, status, severity, message,
+  and recommendation fields.
+- Retained the complete latest Operations report in the aggregate contract.
+- Reused `OperationsRepository.latest()`.
+- Reused `OperationsRepository.history(limit=2)`.
+- Reused `OperationsComparisonService`.
+- Injected the shared cached comparison service through the API dependency
+  layer.
+- Preserved zero-report and one-report partial-availability behavior.
+- Preserved immutable tuple representation inside Python and JSON arrays at
+  the transport boundary.
+- Added focused schema, service, dependency, route, ordering, limit,
+  comparison, serialization, and immutability tests.
+
+### Availability behavior
+
+When no persisted report exists:
+
+- the Operations section is unavailable;
+- the report and summary are absent;
+- comparison is unavailable;
+- recent attention is empty.
+
+When exactly one persisted report exists:
+
+- the latest report and summary are available;
+- recent attention is available;
+- comparison is unavailable.
+
+When at least two persisted reports exist:
+
+- the latest report and summary are available;
+- recent attention is available;
+- canonical comparison metrics are available.
+
+### Live validation
+
+- Latest production status: `healthy`.
+- Latest production score: `100`.
+- Latest production attention count: `0`.
+- Recent production attention count: `0`.
+- Production comparison status: `available`.
+- Two production differences were returned.
+- Latest summary values matched the canonical persisted report.
+- Comparison values matched `OperationsComparisonService`.
+- Recent attention matched canonical ordering.
+- The five-item recent-attention bound was enforced.
+- One-report comparison normalization passed.
+- Empty-repository normalization passed.
+- `latest.json` remained unchanged.
+- Operations history remained unchanged.
+
+### Result
+
+The aggregate Portal endpoint now exposes compact Operations widgets suitable
+for dashboard cards, change indicators, and attention panels without requiring
+the frontend to parse full Operations reports or reproduce domain logic.

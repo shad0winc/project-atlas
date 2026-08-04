@@ -140,6 +140,7 @@ def get_portal_dashboard_service() -> PortalDashboardService:
         get_dashboard_summary_service(),
         get_dashboard_media_summary_service(),
         get_operations_repository(),
+        get_operations_comparison_service(),
     )
 
 
