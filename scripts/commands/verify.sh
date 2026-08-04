@@ -73,6 +73,30 @@ atlas_verify_path_within() {
   [[ "$child" == "$parent" || "$child" == "$parent/"* ]]
 }
 
+atlas_verify_directory_exists() {
+  local variable="$1"
+
+  atlas_verify_is_absolute_path "$variable" || return 1
+
+  test -d "${!variable}"
+}
+
+atlas_verify_directory_writable() {
+  local variable="$1"
+  local directory
+  local probe
+
+  atlas_verify_directory_exists "$variable" || return 1
+
+  directory="${!variable}"
+
+  probe="$(
+    mktemp "$directory/.atlas-verify.XXXXXX"
+  )" || return 1
+
+  rm -f "$probe"
+}
+
 atlas_verify_configuration() {
   local variable
 
@@ -199,6 +223,36 @@ atlas_verify_configuration() {
     ATLAS_SCHEDULER_DIR
 }
 
+atlas_verify_runtime_filesystem() {
+  local variable
+
+  atlas_section "Runtime Filesystem"
+
+  atlas_verify_check \
+    "ATLAS_PROJECT_DIR directory present" \
+    atlas_verify_directory_exists \
+    ATLAS_PROJECT_DIR
+
+  for variable in \
+    ATLAS_STORAGE_ROOT \
+    ATLAS_MEDIA_ROOT \
+    ATLAS_DOWNLOADS_ROOT \
+    ATLAS_BACKUP_DIR \
+    ATLAS_CONFIG_ROOT \
+    ATLAS_RUNTIME_CONFIG_DIR
+  do
+    atlas_verify_check \
+      "$variable directory present" \
+      atlas_verify_directory_exists \
+      "$variable"
+
+    atlas_verify_check \
+      "$variable directory writable" \
+      atlas_verify_directory_writable \
+      "$variable"
+  done
+}
+
 atlas_verify_infrastructure() {
   local gpu_device="${ATLAS_VERIFY_GPU_DEVICE:-/dev/dri/renderD128}"
 
@@ -211,14 +265,6 @@ atlas_verify_infrastructure() {
   atlas_verify_check \
     "Docker Compose" \
     docker compose version
-
-  atlas_verify_check \
-    "Project Directory" \
-    test -d "$ATLAS_PROJECT_DIR"
-
-  atlas_verify_check \
-    "Storage Mounted" \
-    test -d "$ATLAS_STORAGE_ROOT"
 
   atlas_verify_check \
     "Intel GPU Available" \
@@ -312,6 +358,9 @@ atlas_command_verify() {
   ATLAS_VERIFY_PASS=true
 
   atlas_verify_configuration
+
+  echo
+  atlas_verify_runtime_filesystem
 
   echo
   atlas_verify_infrastructure

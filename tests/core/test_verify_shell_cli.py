@@ -82,6 +82,9 @@ def prepare_runtime(
         media_root / "Anime Movies",
         media_root / "Anime TV",
         downloads_root,
+        backup_dir,
+        config_root,
+        runtime_config_dir,
         bin_directory,
     ):
         path.mkdir(
@@ -244,6 +247,7 @@ def test_verify_reports_pass_for_valid_runtime(
     assert result.stderr == ""
     assert "Atlas Verification" in result.stdout
     assert "Configuration" in result.stdout
+    assert "Runtime Filesystem" in result.stdout
     assert "Infrastructure" in result.stdout
     assert "Core Services" in result.stdout
     assert "Storage Paths" in result.stdout
@@ -418,4 +422,101 @@ def test_verify_rejects_inconsistent_path_relationship(
         "FAIL ATLAS_SCHEDULER_STATE_FILE within "
         "ATLAS_SCHEDULER_DIR"
         in result.stdout
+    )
+
+
+def test_verify_reports_missing_required_runtime_directory(
+    tmp_path: Path,
+) -> None:
+    """A missing foundational runtime directory must fail verification."""
+
+    environment = dict(
+        prepare_runtime(tmp_path)
+    )
+
+    backup_dir = Path(
+        environment["ATLAS_BACKUP_DIR"]
+    )
+
+    backup_dir.rmdir()
+
+    result = run_verify(environment)
+
+    assert result.returncode == 1
+    assert (
+        "FAIL ATLAS_BACKUP_DIR directory present"
+        in result.stdout
+    )
+    assert (
+        "FAIL ATLAS_BACKUP_DIR directory writable"
+        in result.stdout
+    )
+    assert "Infrastructure" in result.stdout
+    assert "Overall Status: FAIL" in result.stdout
+
+
+def test_verify_rejects_runtime_path_that_is_not_a_directory(
+    tmp_path: Path,
+) -> None:
+    """A configured runtime path must resolve to a directory."""
+
+    environment = dict(
+        prepare_runtime(tmp_path)
+    )
+
+    runtime_config_dir = Path(
+        environment["ATLAS_RUNTIME_CONFIG_DIR"]
+    )
+
+    runtime_config_dir.rmdir()
+    runtime_config_dir.write_text(
+        "not a directory\n",
+        encoding="utf-8",
+    )
+
+    result = run_verify(environment)
+
+    assert result.returncode == 1
+    assert (
+        "FAIL ATLAS_RUNTIME_CONFIG_DIR directory present"
+        in result.stdout
+    )
+    assert (
+        "FAIL ATLAS_RUNTIME_CONFIG_DIR directory writable"
+        in result.stdout
+    )
+    assert "Overall Status: FAIL" in result.stdout
+
+
+def test_verify_does_not_require_lazy_subsystem_directories(
+    tmp_path: Path,
+) -> None:
+    """Subsystem-owned state directories may be absent before initialization."""
+
+    environment = dict(
+        prepare_runtime(tmp_path)
+    )
+
+    for variable in (
+        "ATLAS_USERS_DIR",
+        "ATLAS_IDENTITY_DIR",
+        "ATLAS_ARI_DIR",
+        "ATLAS_ARI_SNAPSHOT_DIR",
+        "ATLAS_SCHEDULER_DIR",
+    ):
+        assert not Path(
+            environment[variable]
+        ).exists()
+
+    result = run_verify(environment)
+
+    assert result.returncode == 0
+    assert "Overall Status: PASS" in result.stdout
+    assert (
+        "ATLAS_USERS_DIR directory present"
+        not in result.stdout
+    )
+    assert (
+        "ATLAS_SCHEDULER_DIR directory present"
+        not in result.stdout
     )
