@@ -3571,3 +3571,49 @@ reusing the existing repository implementation and shared API contracts.
 
 Atlas now exposes both live and persisted Operations reporting through
 consistent transport-neutral API contracts without duplicating business logic.
+
+---
+
+# 2026-08-04
+
+## M-023.10 — Operations History API (Slice 3)
+
+### Objective
+
+Expose persisted Atlas Operations report history through the HTTP API while
+preserving repository ordering, bounded retrieval, shared response contracts,
+and read-only behavior.
+
+### Completed
+
+- Added `GET /api/v1/operations/history`.
+- Reused the configured Operations repository dependency.
+- Reused the `system.health.read` permission.
+- Added a default history limit of 25.
+- Added an HTTP maximum history limit of 100.
+- Added FastAPI validation for non-integer and out-of-range limits.
+- Preserved deterministic newest-first repository ordering.
+- Returned the established `count` and `reports` history contract.
+- Returned empty history as a successful empty collection.
+- Added OpenAPI query-parameter documentation.
+- Added focused route, validation, ordering, immutability, and OpenAPI tests.
+- Validated the endpoint against the production Operations history.
+
+### Live validation
+
+- Three persisted Operations reports were returned.
+- The newest report was generated at
+  `2026-08-04T00:15:52.438537Z`.
+- `limit=2` returned exactly two reports.
+- Limits below 1 returned HTTP 422.
+- Limits above 100 returned HTTP 422.
+- Non-integer limits returned HTTP 422.
+- OpenAPI documented the default, minimum, and maximum limit values.
+- `latest.json` remained unchanged.
+- Operations history remained unchanged.
+
+### Result
+
+Atlas now exposes deterministic, bounded, newest-first Operations history
+through the shared API envelope without collecting, persisting, comparing,
+or mutating reports.

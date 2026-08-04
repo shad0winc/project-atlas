@@ -7,6 +7,7 @@ from typing import Annotated, Final
 from fastapi import (
     APIRouter,
     Depends,
+    Query,
     status,
 )
 from fastapi.responses import JSONResponse
@@ -39,6 +40,10 @@ OPERATIONS_REPORT_NOT_FOUND_CODE: Final = (
 OPERATIONS_REPORT_NOT_FOUND_MESSAGE: Final = (
     "Latest Operations report was not found"
 )
+
+
+OPERATIONS_HISTORY_DEFAULT_LIMIT: Final = 25
+OPERATIONS_HISTORY_MAX_LIMIT: Final = 100
 
 
 router = APIRouter(
@@ -133,11 +138,55 @@ def read_latest_operations_report(
     )
 
 
+@router.get(
+    "/history",
+    response_model=ApiSuccessEnvelopeSchema,
+    status_code=status.HTTP_200_OK,
+    summary="Read persisted Atlas Operations report history",
+)
+def read_operations_history(
+    _current_user: Annotated[
+        AuthenticatedUser,
+        Depends(require_operations_report_read),
+    ],
+    repository: Annotated[
+        OperationsRepository,
+        Depends(get_operations_repository),
+    ],
+    limit: Annotated[
+        int,
+        Query(
+            ge=1,
+            le=OPERATIONS_HISTORY_MAX_LIMIT,
+            description=(
+                "Maximum number of newest Operations reports "
+                "to return."
+            ),
+        ),
+    ] = OPERATIONS_HISTORY_DEFAULT_LIMIT,
+) -> ApiSuccessEnvelopeSchema:
+    """Return validated Operations history in newest-first order."""
+
+    reports = repository.history(
+        limit=limit,
+    )
+
+    return success_envelope(
+        {
+            "count": len(reports),
+            "reports": reports,
+        },
+    )
+
+
 __all__ = [
+    "OPERATIONS_HISTORY_DEFAULT_LIMIT",
+    "OPERATIONS_HISTORY_MAX_LIMIT",
     "OPERATIONS_REPORT_NOT_FOUND_CODE",
     "OPERATIONS_REPORT_NOT_FOUND_MESSAGE",
     "OPERATIONS_REPORT_PERMISSION",
     "read_latest_operations_report",
+    "read_operations_history",
     "read_operations_report",
     "require_operations_report_read",
     "router",
