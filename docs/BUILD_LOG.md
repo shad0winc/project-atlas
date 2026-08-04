@@ -3493,3 +3493,45 @@ adapters.
 The next implementation phase can expose Operations reports, history, and
 comparisons through thin FastAPI routes without redefining domain contracts or
 serialization behavior.
+
+---
+
+# 2026-08-04
+
+## M-023.10 — Operations Report API (Slice 1)
+
+### Objective
+
+Expose the existing Operations reporting subsystem through the Atlas HTTP
+API without duplicating business logic or introducing HTTP-specific
+behavior into the Operations domain.
+
+### Completed
+
+- Added the first Operations API route.
+- Reused the production OperationsService.
+- Added dependency injection for OperationsService.
+- Added permission-gated endpoint wiring.
+- Added shared API envelope integration.
+- Registered the route under `/api/v1`.
+- Added OpenAPI registration.
+- Added endpoint regression tests.
+- Validated live production execution.
+- Confirmed read-only behavior.
+
+### Live validation
+
+- Endpoint returned a healthy Operations report.
+- Overall score: 100.
+- Two report sections returned.
+- Unauthorized requests correctly returned HTTP 401.
+- Route appeared in generated OpenAPI.
+- No Operations snapshots were created.
+- `latest.json` remained unchanged.
+- History directory remained unchanged.
+
+### Result
+
+Atlas now exposes a production-quality read-only Operations report
+endpoint using the shared transport-neutral API contracts established
+during M-023.9B.

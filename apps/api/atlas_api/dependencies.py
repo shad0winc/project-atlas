@@ -9,6 +9,14 @@ from pathlib import Path
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from atlas.operations import (
+    HostOperationsContextProvider,
+    OperationsService,
+)
+from atlas.operations.collectors import (
+    DockerCollector,
+    SystemCollector,
+)
 from atlas.user_profiles import UserProfileError, UserProfileStore
 from atlas_api.auth.exceptions import TokenError
 from atlas_api.auth.jwt import JWTService
@@ -84,6 +92,19 @@ def get_authentication_service() -> AuthenticationService:
     return AuthenticationService(
         provider,
         get_jwt_service(),
+    )
+
+
+@lru_cache(maxsize=1)
+def get_operations_service() -> OperationsService:
+    """Return the process-wide live Operations service."""
+
+    return OperationsService(
+        collectors=(
+            SystemCollector(),
+            DockerCollector(),
+        ),
+        context_provider=HostOperationsContextProvider(),
     )
 
 
@@ -179,6 +200,7 @@ def clear_dependency_caches() -> None:
 
     get_authentication_service.cache_clear()
     get_jellyfin_authentication_client.cache_clear()
+    get_operations_service.cache_clear()
     get_user_profile_store.cache_clear()
     get_jwt_service.cache_clear()
     get_settings.cache_clear()

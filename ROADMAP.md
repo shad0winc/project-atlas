@@ -611,7 +611,9 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 - [x] Add FastAPI and OpenAPI envelope adapters
 - [x] Preserve existing endpoint response compatibility
 - [x] Validate API contracts against Operations domain models
-- [ ] Add Operations API routes
+- [x] Add read-only Operations report endpoint
+- [ ] Add Operations history endpoint
+- [ ] Add Operations comparison endpoint
 - [ ] Add the Operations Portal dashboard
 
 ### Reliability
