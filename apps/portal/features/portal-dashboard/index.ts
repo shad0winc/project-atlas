@@ -32,3 +32,7 @@ export { SchedulerSummaryCard } from "./components/SchedulerSummaryCard";
 export { PortalMediaSection } from "./components/PortalMediaSection";
 
 export { PortalOperationalSection } from "./components/PortalOperationalSection";
+
+export { OperationsComparisonCard } from "./components/OperationsComparisonCard";
+
+export { OperationsAttentionPanel } from "./components/OperationsAttentionPanel";

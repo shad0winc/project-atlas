@@ -12,6 +12,10 @@ import { PortalOperationalSection } from "./PortalOperationalSection";
 
 import { OperationsSummaryCard } from "./OperationsSummaryCard";
 
+import { OperationsComparisonCard } from "./OperationsComparisonCard";
+
+import { OperationsAttentionPanel } from "./OperationsAttentionPanel";
+
 import { SchedulerSummaryCard } from "./SchedulerSummaryCard";
 
 export function PortalDashboardView(): React.ReactElement {
@@ -70,6 +74,10 @@ export function PortalDashboardView(): React.ReactElement {
         <PortalMediaSection media={state.data.media} />
 
         <OperationsSummaryCard operations={state.data.operations} />
+
+        <OperationsComparisonCard comparison={state.data.operations.comparison} />
+
+        <OperationsAttentionPanel operations={state.data.operations} />
 
         <SchedulerSummaryCard scheduler={state.data.scheduler} />
       </PortalDashboardGrid>
