@@ -7,7 +7,9 @@ The canonical public API is exported through:
 ```python
 from atlas.service_lifecycle import (
     DockerComposeProvider,
+    InfrastructureDependencyGraph,
     ManagedService,
+    ServiceDependencyNode,
     ServiceDoctor,
     ServiceLifecycleProvider,
     ServiceLifecycleService,
@@ -72,6 +74,23 @@ Responsibilities include:
 - dependency graph;
 - provider error translation;
 - normalized contract validation.
+
+## Dependency Graph
+
+### `ServiceLifecycleService.inspect_graph()`
+
+Returns one deterministic `InfrastructureDependencyGraph` containing every
+managed service, its resolved dependencies, reverse dependents, unresolved
+dependency identifiers, roots, standalone services, and aggregate edge count.
+
+`ServiceDependencyNode` and `InfrastructureDependencyGraph` are canonical
+public contracts exported through `atlas.service_lifecycle`. Compatibility
+imports through `atlas.service_lifecycle.services.lifecycle` resolve to the
+same class identities.
+
+The graph owns topology only. Service Doctor owns current missing or
+non-running dependency findings, while Startup Policy owns readiness strength
+and startup conditions. None of these boundaries mutates infrastructure.
 
 ## Service Doctor
 
@@ -174,6 +193,10 @@ without persistence remain backward compatible.
 - `ServiceHealth`
 - `InfrastructureHealthReport`
 - `InfrastructureSummary`
+
+### Dependency Graph
+
+- `ServiceDependencyNode`
 - `InfrastructureDependencyGraph`
 
 ### Doctor

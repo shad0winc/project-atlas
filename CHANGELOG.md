@@ -36,6 +36,16 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Added
 
+- Completed M-023.15 Service Dependency Verification by hardening and publicly
+  exporting `ServiceDependencyNode` and `InfrastructureDependencyGraph`, while
+  preserving compatibility through the existing lifecycle service module.
+- Validated the permanent dependency boundaries across Docker Compose
+  normalization, graph topology, Service Doctor operational findings, Startup
+  Policy readiness, and human and JSON CLI reporting.
+- Production validation modeled 15 services and eight resolved relationships
+  with no unresolved dependencies, no Doctor dependency findings, and a
+  Healthy, attention-free Startup Policy result.
+
 - Added normalized Restart Recovery observation, status, and result contracts,
   deterministic provider-independent evaluation, and dedicated tests.
 - Added the read-only `ServiceRestartRecoveryService` orchestration boundary.

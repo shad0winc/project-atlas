@@ -68,8 +68,18 @@ Shows concise service, runtime, and health totals.
 
 ### `atlas service graph`
 
-Shows dependency relationships, reverse relationships, and unresolved
-dependencies.
+Shows the normalized dependency topology for all managed services, including:
+
+- direct dependency relationships;
+- reverse dependents;
+- root services;
+- standalone services;
+- unresolved dependency identifiers;
+- provider, Compose project, service, and edge totals.
+
+Human output provides an operator-readable relationship tree. JSON output
+serializes the canonical `InfrastructureDependencyGraph` contract. The command
+is read-only and does not start, stop, restart, or reorder services.
 
 ## Diagnostics
 

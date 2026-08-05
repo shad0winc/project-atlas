@@ -4275,3 +4275,84 @@ Observed evidence:
 M-023.14 is complete. Atlas now has a documented, tested, provider-independent,
 production-validated Restart Recovery capability that observes and explains
 recovery without performing infrastructure mutation.
+
+
+---
+
+# 2026-08-05
+
+## M-023.15 — Service Dependency Verification
+
+### Objective
+
+Harden and production-validate Atlas dependency verification without creating
+a parallel provider, graph engine, service, or evaluator.
+
+### Architecture and Boundaries
+
+- Added the Service Dependency Verification architecture document and ADR
+  0013.
+- Confirmed that the dependency graph owns topology, Service Doctor owns
+  current missing and non-running dependency findings, and Startup Policy owns
+  startup readiness strength.
+- Preserved provider adapters as fact translators and kept all dependency
+  verification read-only.
+
+### Contract Hardening
+
+- Moved `ServiceDependencyNode` and `InfrastructureDependencyGraph` into the
+  dedicated `dependency_models` module.
+- Added collection normalization, service identity and child-contract
+  validation, duplicate and self-reference rejection, deterministic unresolved
+  identifier normalization, UTC timestamp normalization, and deterministic
+  `to_dict()` serialization.
+- Exported both models through `atlas.service_lifecycle`.
+- Preserved compatibility imports through the existing lifecycle service
+  module as true class aliases.
+- Added a dedicated 30-test dependency-model suite.
+
+### Focused Validation
+
+- 30 dependency-model tests passed.
+- Four graph-service tests passed.
+- Two Service Doctor dependency tests passed.
+- 22 Startup Policy tests passed.
+- Four graph CLI tests passed.
+- 57 Docker Compose dependency and startup normalization tests passed.
+- Public compatibility identity, Python compilation, shell syntax, and Git
+  diff hygiene passed.
+
+### Production Validation
+
+Validated at commit `7552b947` without infrastructure mutation:
+
+- provider: `docker-compose`;
+- Compose project: `project-atlas`;
+- managed services: 15;
+- resolved relationships: eight;
+- graph roots: Gluetun, Jellyfin, Radarr, and Sonarr;
+- standalone services: seven;
+- unresolved dependencies: zero;
+- forward and reverse relationships: reciprocal;
+- Service Doctor dependency findings: zero;
+- Startup Policy status: Healthy;
+- Startup Policy findings: zero;
+- Startup Policy attention required: false;
+- repository remained clean.
+
+Service Doctor's overall Degraded result contained 11 observability warnings
+for services without explicit Docker health checks and 14 informational
+`latest`-tag findings. It contained no dependency errors and does not block
+this milestone.
+
+### Commits
+
+- `9a5c3358` — define Dependency Verification architecture and ADR 0013;
+- `7552b947` — harden and publicly export dependency graph models.
+
+### Result
+
+M-023.15 is complete. Atlas now has a stable, deterministic, publicly exported,
+and production-validated dependency graph integrated with the existing Service
+Doctor and Startup Policy boundaries. No duplicate evaluator or infrastructure
+mutation capability was introduced.

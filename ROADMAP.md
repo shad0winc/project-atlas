@@ -226,8 +226,8 @@ for Atlas-managed infrastructure.
 - [x] Add individual service inspection
 - [x] Add aggregate infrastructure health
 - [x] Add normalized infrastructure summary
-- [ ] Add service doctor diagnostics
-- [ ] Add service dependency graph
+- [x] Add service doctor diagnostics
+- [x] Add service dependency graph
 - [ ] Add update-availability inspection
 - [x] Add human-readable reports
 - [x] Add machine-readable JSON reports
@@ -258,8 +258,8 @@ for Atlas-managed infrastructure.
 - [x] Add `atlas service health <service> [--json]`
 - [x] Add aggregate `atlas service health [--json]`
 - [x] Add `atlas service summary [--json]`
-- [ ] Add `atlas service doctor [--json]`
-- [ ] Add `atlas service graph [--json]`
+- [x] Add `atlas service doctor [--json]`
+- [x] Add `atlas service graph [--json]`
 - [ ] Add `atlas service updates`
 - [ ] Add `atlas service history`
 - [ ] Add `atlas service update <service> --dry-run`

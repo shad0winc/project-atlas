@@ -90,10 +90,10 @@ duplicate dependency rules.
 
 ## Contract Hardening
 
-M-023.15 will bring the existing graph contracts fully in line with the Atlas
+M-023.15 brought the existing graph contracts fully in line with the Atlas
 Engineering Charter.
 
-Every public graph model must:
+Every public graph model now:
 
 - normalize accepted collection inputs;
 - validate service identity and child contracts;
@@ -160,6 +160,38 @@ Service Dependency Verification does not:
 4. Focused graph, Doctor, Startup Policy, and CLI regression validation.
 5. Human and JSON production graph validation.
 6. Roadmap and completion documentation reconciliation.
+
+## Production Validation
+
+Completed at commit `7552b947` against the active Docker Compose environment.
+
+Validated evidence:
+
+- 30 dedicated dependency-model tests passed;
+- four focused graph-service tests passed;
+- two focused Service Doctor dependency tests passed;
+- 22 Startup Policy evaluator tests passed;
+- four graph CLI tests passed;
+- 57 Compose dependency and startup normalization tests passed;
+- public and compatibility import identities passed;
+- the production graph contained 15 services and eight resolved edges;
+- all forward and reverse relationships were reciprocal;
+- unresolved dependency count was zero;
+- Service Doctor reported zero dependency findings;
+- Startup Policy was Healthy, passed, attention-free, and contained zero
+  findings;
+- all validation was read-only and left the repository clean.
+
+The Service Doctor remained Degraded only because of 11 missing-health-check
+observability warnings. Its 14 additional findings were informational mutable
+image-tag notices. Neither finding class represents a dependency-verification
+failure.
+
+## Completion State
+
+M-023.15 is complete. Atlas now exposes a normalized, deterministic, tested,
+documented, and production-validated dependency topology while preserving the
+separate operational and readiness responsibilities defined by ADR 0013.
 
 ## Related Documents
 
