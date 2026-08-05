@@ -42,6 +42,7 @@ from .services import (
     ServiceDoctor,
     ServiceLifecycleService,
     ServiceMaintenanceHistoryService,
+    ServiceRestartRecoveryService,
     ServiceUpdateService,
 )
 from .provider import ServiceLifecycleProvider
@@ -79,6 +80,7 @@ __all__ = [
     "ServiceRecoveryObservation",
     "ServiceRecoveryResult",
     "ServiceRecoveryStatus",
+    "ServiceRestartRecoveryService",
     "ServiceRuntime",
 ]
 
