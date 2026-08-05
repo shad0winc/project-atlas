@@ -228,10 +228,10 @@ for Atlas-managed infrastructure.
 - [x] Add normalized infrastructure summary
 - [x] Add service doctor diagnostics
 - [x] Add service dependency graph
-- [ ] Add update-availability inspection
+- [x] Add update-availability inspection
 - [x] Add human-readable reports
 - [x] Add machine-readable JSON reports
-- [ ] Add maintenance history
+- [x] Add maintenance history
 - [ ] Add audit events for lifecycle operations
 
 ### Guarded Lifecycle Operations
@@ -260,8 +260,8 @@ for Atlas-managed infrastructure.
 - [x] Add `atlas service summary [--json]`
 - [x] Add `atlas service doctor [--json]`
 - [x] Add `atlas service graph [--json]`
-- [ ] Add `atlas service updates`
-- [ ] Add `atlas service history`
+- [x] Add `atlas service updates`
+- [x] Add `atlas service history`
 - [ ] Add `atlas service update <service> --dry-run`
 - [ ] Add guarded lifecycle API endpoints
 - [ ] Add lifecycle API authorization tests
