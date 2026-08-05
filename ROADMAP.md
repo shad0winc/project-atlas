@@ -652,15 +652,15 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
   - [x] Add human-readable and JSON CLI reporting
   - [x] Enforce fail-closed qBittorrent readiness through Gluetun health
   - [x] Validate the production startup policy as Healthy
-- [ ] Complete restart recovery verification
+- [x] Complete restart recovery verification
   - [x] Define Restart Recovery architecture and ADR 0012
   - [x] Add normalized observation, status, and result contracts
   - [x] Add deterministic provider-independent recovery evaluation
   - [x] Add read-only recovery observation orchestration
   - [x] Add human-readable and JSON CLI reporting
   - [x] Validate the production no-restart path as `not-observed`
-  - [ ] Perform an explicitly approved controlled live restart
-  - [ ] Validate the production restart path as `recovered`
+  - [x] Perform an explicitly approved controlled live restart
+  - [x] Validate the production restart path as `recovered`
 - [ ] Complete service dependency verification
 - [ ] Complete stale-state recovery verification
 - [ ] Complete scheduler recovery verification

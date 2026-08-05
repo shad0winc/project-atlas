@@ -183,14 +183,29 @@ Completed:
 6. Production read-only validation of the `not-observed` path.
 7. Implementation documentation reconciliation.
 
-Remaining before M-023.14 completion:
+## Controlled Production Validation
 
-1. Select a production service and review its dependency boundary.
-2. Define the timeout and rollback procedure.
-3. Receive explicit operator approval.
-4. Perform one controlled restart outside the recovery capability.
-5. Evaluate the saved before observation and verify `recovered`.
-6. Record the controlled validation and completion checkpoint.
+M-023.14 was completed with an explicitly approved controlled restart of
+FlareSolverr. The target had no declared Compose dependencies, exposed an
+explicit health check, and provided a low-impact rollback boundary.
+
+Validation evidence:
+
+- before state: running and Healthy;
+- before restart count: `0`;
+- controlled action: `docker compose restart flaresolverr`;
+- health returned to Healthy on poll attempt 3;
+- after restart count: `0`;
+- normalized start timestamp advanced;
+- restart evidence: true;
+- recovery status: `recovered`;
+- pass state: true;
+- attention required: false;
+- final Atlas health: Healthy, 100/100;
+- repository mutations: none.
+
+This confirms the evaluator correctly accepts either an increased restart count
+or an advanced normalized start timestamp as restart evidence.
 
 ## Related Documents
 

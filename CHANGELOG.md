@@ -42,8 +42,9 @@ All notable changes to Project Atlas are documented in this file.
 - Added `atlas service recovery observe` and `atlas service recovery evaluate`
   with human and JSON output, validated observation loading, and no mutation
   operation.
-- Validated the production no-restart path as `not-observed`; a controlled live
-  restart remains required before M-023.14 is complete.
+- Validated the production no-restart path as `not-observed`.
+- Completed an explicitly approved controlled FlareSolverr restart and verified
+  the production recovery path as `recovered`, healthy, and attention-free.
 
 - Added normalized startup dependency and per-service startup contracts,
   Docker Compose provider translation, deterministic Startup Policy result

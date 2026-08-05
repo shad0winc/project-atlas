@@ -4245,9 +4245,33 @@ Validated against Jellyfin at commit `834ebf52` without restarting it:
 - `5a9cdcba` — add read-only recovery orchestration;
 - `834ebf52` — add human and JSON recovery CLI reporting.
 
-### Remaining Completion Gate
+### Controlled Production Restart
 
-M-023.14 implementation is complete, but the milestone remains open. A real
-production restart has not been performed. Completion requires explicit operator
-approval, dependency review, timeout and rollback planning, one controlled
-restart outside the recovery capability, and a verified `recovered` result.
+Completed against FlareSolverr at commit `391c755a` after explicit operator
+approval. FlareSolverr was selected because it had no declared Compose
+dependencies, exposed an explicit health check, and presented lower user impact
+than Jellyfin or the VPN boundary.
+
+The guarded validation captured the before observation, restarted only
+FlareSolverr through Docker Compose, polled health for up to 90 seconds, evaluated
+the normalized result, verified final Atlas health, preserved diagnostics, and
+kept the repository unchanged.
+
+Observed evidence:
+
+- health returned to Healthy on poll attempt 3;
+- restart-count delta was `0`;
+- the normalized start timestamp advanced;
+- `restart_observed` was true;
+- status was `recovered`;
+- pass state was true;
+- attention required was false;
+- warnings and errors were empty;
+- final Atlas service health was Healthy at 100/100;
+- repository mutations were none.
+
+### Result
+
+M-023.14 is complete. Atlas now has a documented, tested, provider-independent,
+production-validated Restart Recovery capability that observes and explains
+recovery without performing infrastructure mutation.
