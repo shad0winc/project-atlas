@@ -4181,3 +4181,73 @@ Validated at commit `5f779ac8`:
 M-023.13 is complete. Atlas now has a tested, documented,
 production-validated, read-only Startup Policy capability and an explicit
 fail-closed readiness contract between qBittorrent and Gluetun.
+
+---
+
+# 2026-08-05
+
+## M-023.14 — Restart Recovery Implementation
+
+### Objective
+
+Establish a deterministic, provider-independent, read-only capability that
+compares normalized observations from before and after a service restart and
+reports whether the service recovered safely.
+
+### Completed Implementation
+
+- Added `ServiceRecoveryObservation`, `ServiceRecoveryStatus`, and
+  `ServiceRecoveryResult` with identity validation, child-contract validation,
+  normalized timestamps, deterministic serialization, public exports, and a
+  dedicated model suite.
+- Added the pure `RestartRecoveryEvaluator` with conservative normalized
+  outcomes: `not-observed`, `recovering`, `recovered`, `degraded`, `failed`, and
+  `unknown`.
+- Added the read-only `ServiceRestartRecoveryService` observation and evaluation
+  boundary.
+- Reused the existing Docker Compose `ServiceRuntime` facts rather than creating
+  a parallel provider contract.
+- Added human and JSON CLI workflows for capturing a before observation and
+  evaluating it against current state.
+- Preserved the v1.0 non-mutation boundary: Restart Recovery cannot start, stop,
+  restart, or recreate services.
+
+### Automated Validation
+
+- 32 recovery-model tests passed.
+- 22 evaluator tests passed.
+- 10 orchestration-service tests passed.
+- 9 focused recovery CLI tests passed.
+- 117 combined CLI and recovery regression tests passed.
+- Public import boundaries, Python compilation, shell syntax, command help, and
+  Git diff hygiene passed throughout the implementation slices.
+
+### Production Read-Only Validation
+
+Validated against Jellyfin at commit `834ebf52` without restarting it:
+
+- before and after runtime state: `running`;
+- before and after health: `healthy`;
+- restart-count delta: `0`;
+- start-time advancement: false;
+- normalized result: `not-observed`;
+- attention required: false;
+- infrastructure mutations: none;
+- human and JSON interfaces both returned the intentional conservative exit
+  status `1`;
+- JSON contract assertions passed.
+
+### Commits
+
+- `6b20947d` — define Restart Recovery architecture and ADR 0012;
+- `0ee3f6f6` — add Restart Recovery models;
+- `ec334109` — add deterministic recovery evaluation;
+- `5a9cdcba` — add read-only recovery orchestration;
+- `834ebf52` — add human and JSON recovery CLI reporting.
+
+### Remaining Completion Gate
+
+M-023.14 implementation is complete, but the milestone remains open. A real
+production restart has not been performed. Completion requires explicit operator
+approval, dependency review, timeout and rollback planning, one controlled
+restart outside the recovery capability, and a verified `recovered` result.

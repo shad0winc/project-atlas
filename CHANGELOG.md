@@ -36,6 +36,15 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Added
 
+- Added normalized Restart Recovery observation, status, and result contracts,
+  deterministic provider-independent evaluation, and dedicated tests.
+- Added the read-only `ServiceRestartRecoveryService` orchestration boundary.
+- Added `atlas service recovery observe` and `atlas service recovery evaluate`
+  with human and JSON output, validated observation loading, and no mutation
+  operation.
+- Validated the production no-restart path as `not-observed`; a controlled live
+  restart remains required before M-023.14 is complete.
+
 - Added normalized startup dependency and per-service startup contracts,
   Docker Compose provider translation, deterministic Startup Policy result
   contracts, provider-independent evaluation, and dedicated tests.

@@ -23,6 +23,8 @@ atlas service doctor [--json]
 atlas service updates [--json]
 atlas service history [<identifier>] [--json]
 atlas service startup-policy [--json]
+atlas service recovery observe <identifier> [--json]
+atlas service recovery evaluate <identifier> --before <path> [--json]
 atlas service help
 ```
 
@@ -125,6 +127,34 @@ output reports provider, status, pass state, attention state, severity totals,
 findings, recommendations, and evaluation time. JSON output serializes the
 canonical `StartupPolicyReport` for scripts and future API, Portal, and guarded
 automation consumers.
+
+## Restart Recovery
+
+### `atlas service recovery observe <identifier>`
+
+Captures one immutable `ServiceRecoveryObservation` through the read-only
+Service Lifecycle boundary. Human output summarizes runtime, health, restart
+count, start time, and observation time. Use `--json` to save the canonical
+before contract for a later comparison.
+
+### `atlas service recovery evaluate <identifier> --before <path>`
+
+Loads and revalidates a saved before observation, captures the current after
+observation, and renders one deterministic `ServiceRecoveryResult`. Human output
+reports status, restart evidence, restart-count delta, start-time evidence,
+attention state, reason, warnings, errors, and evaluation time. `--json` emits
+the complete normalized result.
+
+A `recovered` result returns exit code `0`. Conservative outcomes such as
+`not-observed`, `recovering`, `degraded`, `failed`, and `unknown` return exit
+code `1`. The CLI never performs the restart itself.
+
+Example read-only baseline validation:
+
+```bash
+atlas service recovery observe jellyfin --json > /tmp/jellyfin-before.json
+atlas service recovery evaluate jellyfin --before /tmp/jellyfin-before.json
+```
 
 ## JSON behavior
 

@@ -48,7 +48,7 @@ Providers expose runtime and health facts. Service Lifecycle normalizes those
 facts. Restart Recovery compares normalized observations. Consumers render the
 result and must not duplicate provider-specific recovery logic.
 
-## Planned Contracts
+## Implemented Contracts
 
 ### `ServiceRecoveryObservation`
 
@@ -123,13 +123,29 @@ Restart Recovery reuses existing Atlas contracts and facts:
 It does not create a parallel runtime provider, health engine, persistence
 system, or root verification framework.
 
-## Interface Ownership
+## Service and Interface Ownership
 
 Service Lifecycle owns recovery contracts and evaluation.
 
+`ServiceRestartRecoveryService.observe()` captures one normalized observation
+through `ServiceLifecycleService`. `evaluate()` delegates two observations to
+the pure evaluator, and `inspect()` captures the after observation before
+delegating evaluation. The service never mutates infrastructure.
+
+The CLI exposes the read-only workflow as:
+
+```bash
+atlas service recovery observe <identifier> [--json]
+atlas service recovery evaluate <identifier> --before <path> [--json]
+```
+
+The saved JSON observation is reconstructed through public Atlas domain models,
+so identity, child contracts, and timestamps are validated again before
+evaluation. The CLI does not expose a restart operation.
+
 Operations may consume recovery results for historical reporting. Root Verify
-may orchestrate the completed read-only capability. CLI, API, and Portal
-interfaces consume normalized results.
+may orchestrate the completed read-only capability. Future API and Portal
+interfaces consume the same normalized contracts.
 
 ## Live Validation Safety
 
@@ -155,15 +171,26 @@ Restart Recovery does not:
 - become an orchestration engine;
 - introduce infrastructure mutation into Atlas v1.0.
 
-## Delivery Sequence
+## Delivery Status
 
-1. Architecture document and ADR.
+Completed:
+
+1. Architecture document and ADR 0012.
 2. Recovery models and dedicated tests.
 3. Pure evaluator and dedicated tests.
 4. Read-only orchestration service.
 5. Human and JSON CLI integration.
-6. Controlled live validation.
-7. Documentation reconciliation and completion checkpoint.
+6. Production read-only validation of the `not-observed` path.
+7. Implementation documentation reconciliation.
+
+Remaining before M-023.14 completion:
+
+1. Select a production service and review its dependency boundary.
+2. Define the timeout and rollback procedure.
+3. Receive explicit operator approval.
+4. Perform one controlled restart outside the recovery capability.
+5. Evaluate the saved before observation and verify `recovered`.
+6. Record the controlled validation and completion checkpoint.
 
 ## Related Documents
 

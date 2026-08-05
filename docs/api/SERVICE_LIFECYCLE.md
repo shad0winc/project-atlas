@@ -12,6 +12,10 @@ from atlas.service_lifecycle import (
     ServiceLifecycleProvider,
     ServiceLifecycleService,
     ServiceMaintenanceHistoryService,
+    ServiceRecoveryObservation,
+    ServiceRecoveryResult,
+    ServiceRecoveryStatus,
+    ServiceRestartRecoveryService,
     ServiceStartupContract,
     ServiceStartupDependency,
     ServiceStartupPolicyService,
@@ -41,7 +45,8 @@ Services
 ├── ServiceDoctor
 ├── ServiceUpdateService
 ├── ServiceMaintenanceHistoryService
-└── ServiceStartupPolicyService
+├── ServiceStartupPolicyService
+└── ServiceRestartRecoveryService
         │
         ▼
 ServiceLifecycleProvider
@@ -115,6 +120,28 @@ without invoking Docker or modifying infrastructure.
 `DockerComposeProvider.inspect_startup_contracts()` is the current optional
 provider capability. Providers without it remain backward compatible.
 
+## Restart Recovery
+
+### `ServiceRestartRecoveryService.observe(identifier)`
+
+Returns one validated `ServiceRecoveryObservation` assembled from normalized
+service identity, runtime, and health contracts.
+
+### `ServiceRestartRecoveryService.evaluate(before, after)`
+
+Delegates two validated observations to `RestartRecoveryEvaluator` and returns
+one deterministic `ServiceRecoveryResult`.
+
+### `ServiceRestartRecoveryService.inspect(identifier, before)`
+
+Captures the current after observation and evaluates it against the supplied
+before observation. It does not start, stop, or restart the service.
+
+`RestartRecoveryEvaluator.evaluate(before, after)` is pure and
+provider-independent. Existing `ServiceRuntime` fields provide restart count,
+start and finish timestamps, exit code, runtime state, health state, and status
+message; no parallel provider API is required.
+
 ## Provider contract
 
 ### Required provider methods
@@ -178,6 +205,12 @@ without persistence remain backward compatible.
 - `StartupPolicySeverity`
 - `StartupPolicyFinding`
 - `StartupPolicyReport`
+
+### Restart Recovery
+
+- `ServiceRecoveryObservation`
+- `ServiceRecoveryStatus`
+- `ServiceRecoveryResult`
 
 All public models normalize inputs, validate identity and child contracts,
 normalize timestamps, and provide deterministic `to_dict()` serialization.
