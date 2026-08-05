@@ -26,7 +26,8 @@ Project Atlas
 │   ├── Service Lifecycle
 │   │   ├── Startup Policy
 │   │   ├── Restart Recovery
-│   │   └── Service Dependency Verification
+│   │   ├── Service Dependency Verification
+│   │   └── Stale-State Recovery
 │   ├── Health and observability
 │   ├── Policy, retention, and cleanup
 │   ├── Scheduler and events
@@ -52,6 +53,7 @@ logic.
 - [Startup Policy](STARTUP_POLICY.md)
 - [Restart Recovery](RESTART_RECOVERY.md)
 - [Service Dependency Verification](SERVICE_DEPENDENCY_VERIFICATION.md)
+- [Stale-State Recovery](STALE_STATE_RECOVERY.md)
 - [Portal](PORTAL.md)
 
 Additional subsystem documents should be added only when their design is mature

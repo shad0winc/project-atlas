@@ -64,3 +64,4 @@ The simplified numeric format is the project standard for all future ADRs.
 - [ADR 0011 — Startup Policy Readiness Contracts](0011-startup-policy-readiness-contracts.md)
 - [ADR 0012 — Restart Recovery Observation Contracts](0012-restart-recovery-observation-contracts.md)
 - [ADR 0013 — Dependency Verification Boundaries](0013-dependency-verification-boundaries.md)
+- [ADR 0014 — Stale Runtime State Normalization](0014-stale-runtime-state-normalization.md)
