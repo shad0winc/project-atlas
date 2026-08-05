@@ -6,6 +6,10 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Fixed
 
+- Prevented active Service Lifecycle observations from exposing a previous
+  Docker lifecycle's `FinishedAt` timestamp as the current `finished_at` value.
+  Running and restarting services now expose `finished_at: null` while terminal
+  services retain valid finish timestamps.
 - Prevented Service Doctor from double-counting a missing Docker health check as both an observability warning and a degraded-health warning.
 
 

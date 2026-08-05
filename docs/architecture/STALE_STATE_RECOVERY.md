@@ -139,6 +139,41 @@ M-023.16 does not:
 5. Read-only production runtime validation.
 6. Roadmap and completion documentation reconciliation.
 
+## Production Validation
+
+Completed against the active Docker Compose environment after implementation
+at commit `9dea5c88`.
+
+Automated evidence:
+
+- five focused stale-state provider tests passed;
+- all 225 Docker Compose provider tests passed;
+- all 64 Restart Recovery tests passed;
+- all 33 Service Doctor tests passed;
+- all 56 Operations Docker provider tests passed;
+- 378 distinct tests passed across the authoritative regression suites, with
+  the five focused stale-state cases also run separately;
+- Python compilation and Git diff hygiene passed.
+
+Production evidence:
+
+- 15 managed services were inspected through the Service Lifecycle CLI;
+- all 15 services were in active `running` lifecycles;
+- every active service exposed `finished_at: null`;
+- stale active finish-timestamp violations: zero;
+- a Jellyfin Restart Recovery observation consumed the same normalized
+  `finished_at: null` runtime contract;
+- no service was started, stopped, restarted, or recreated;
+- validation introduced no repository mutation beyond the implementation under
+  review.
+
+## Completion State
+
+M-023.16 is complete. Service Lifecycle and Operations now agree that an
+active Docker lifecycle has no current finish timestamp. Valid terminal finish
+timestamps and invalid-timestamp rejection remain intact, and all later
+recovery domains retain their independent milestone boundaries.
+
 ## Related Documents
 
 - [Service Lifecycle Architecture](SERVICE_LIFECYCLE.md)

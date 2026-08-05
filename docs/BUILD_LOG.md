@@ -4356,3 +4356,83 @@ M-023.15 is complete. Atlas now has a stable, deterministic, publicly exported,
 and production-validated dependency graph integrated with the existing Service
 Doctor and Startup Policy boundaries. No duplicate evaluator or infrastructure
 mutation capability was introduced.
+
+
+---
+
+# 2026-08-05
+
+## M-023.16 — Stale-State Recovery Verification
+
+### Objective
+
+Prevent stale Docker lifecycle metadata from being presented as current
+Service Lifecycle state while preserving Atlas's read-only provider boundary.
+
+### Discovery
+
+Repository and production review established one concrete stale-state
+inconsistency:
+
+- Operations already discarded `FinishedAt` for active containers;
+- Service Lifecycle preserved Docker `FinishedAt` regardless of active state;
+- live Restart Recovery observations therefore exposed an older finish time
+  alongside the current running lifecycle's newer start time.
+
+Scheduler lock recovery, interrupted media requests, and Sports recorder
+recovery remain separately scoped milestones.
+
+### Architecture
+
+- Added the Stale-State Recovery architecture document.
+- Added ADR 0014, Stale Runtime State Normalization.
+- Defined the active-lifecycle invariant: running and restarting services have
+  no normalized current finish timestamp.
+- Kept `ServiceRuntime` provider-independent and placed Docker-specific stale
+  fact suppression in the Docker Compose provider.
+- Explicitly rejected a generic stale-state engine or universal freshness TTL.
+
+### Implementation
+
+- The Docker Compose provider validates the complete `ServiceRuntime` contract
+  before suppressing a stale active `finished_at` value.
+- Running and restarting services expose `finished_at=None`.
+- Stopped and terminal services preserve valid finish timestamps.
+- Docker zero timestamps remain `None`.
+- Malformed non-zero finish timestamps remain explicit provider errors.
+- No public command, model shape, or infrastructure mutation capability was
+  introduced.
+
+### Automated Validation
+
+- Five focused stale-state tests passed.
+- 225 Docker Compose provider tests passed.
+- 64 Restart Recovery tests passed.
+- 33 Service Doctor tests passed.
+- 56 Operations Docker provider tests passed.
+- 378 distinct regression tests passed in total, with the five focused
+  stale-state cases also run separately.
+- Python compilation and Git diff hygiene passed.
+
+### Production Validation
+
+Validated read-only against the active Docker environment:
+
+- managed services inspected: 15;
+- active running lifecycles: 15;
+- active services with non-null `finished_at`: zero;
+- stale-state contract violations: zero;
+- Jellyfin Restart Recovery observation: normalized `finished_at` was `null`;
+- infrastructure mutations: none.
+
+### Commits
+
+- `69188297` — define Stale-State Recovery architecture and ADR 0014;
+- `9dea5c88` — discard stale active Docker finish timestamps.
+
+### Result
+
+M-023.16 is complete. Atlas now presents a consistent current-lifecycle
+contract across Service Lifecycle and Operations: active containers do not
+carry stale finish metadata from a previous lifecycle, while terminal history
+and malformed-input validation remain preserved.

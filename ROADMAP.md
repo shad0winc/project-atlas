@@ -662,7 +662,7 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
   - [x] Perform an explicitly approved controlled live restart
   - [x] Validate the production restart path as `recovered`
 - [x] Complete service dependency verification
-- [ ] Complete stale-state recovery verification
+- [x] Complete stale-state recovery verification
 - [ ] Complete scheduler recovery verification
 - [ ] Complete interrupted-request recovery verification
 - [ ] Complete Sports recovery verification
