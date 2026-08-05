@@ -24,7 +24,8 @@ Project Atlas
 ├── Core domains
 │   ├── Identity and authorization
 │   ├── Service Lifecycle
-│   │   └── Startup Policy
+│   │   ├── Startup Policy
+│   │   └── Restart Recovery
 │   ├── Health and observability
 │   ├── Policy, retention, and cleanup
 │   ├── Scheduler and events
@@ -48,6 +49,7 @@ logic.
 
 - [Service Lifecycle](SERVICE_LIFECYCLE.md)
 - [Startup Policy](STARTUP_POLICY.md)
+- [Restart Recovery](RESTART_RECOVERY.md)
 - [Portal](PORTAL.md)
 
 Additional subsystem documents should be added only when their design is mature
@@ -104,3 +106,13 @@ contracts.
 - [CLI reference](../cli/SERVICE_LIFECYCLE.md)
 - [Python API reference](../api/SERVICE_LIFECYCLE.md)
 - [ADR 0011 — Startup Policy Readiness Contracts](../ADR/0011-startup-policy-readiness-contracts.md)
+
+## Restart Recovery
+
+Restart Recovery extends Service Lifecycle with deterministic comparison of
+normalized before and after observations without executing restarts.
+
+- [Architecture](RESTART_RECOVERY.md)
+- [Service Lifecycle CLI reference](../cli/SERVICE_LIFECYCLE.md)
+- [Python API reference](../api/SERVICE_LIFECYCLE.md)
+- [ADR 0012 — Restart Recovery Observation Contracts](../ADR/0012-restart-recovery-observation-contracts.md)
