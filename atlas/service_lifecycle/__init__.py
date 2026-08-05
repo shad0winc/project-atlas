@@ -5,6 +5,10 @@ contracts for discovering, inspecting, and safely managing Atlas-operated
 infrastructure services.
 """
 
+from .dependency_models import (
+    InfrastructureDependencyGraph,
+    ServiceDependencyNode,
+)
 from .recovery import RestartRecoveryEvaluator
 from .recovery_models import (
     ServiceRecoveryObservation,
@@ -52,6 +56,8 @@ from .providers import (
 )
 
 __all__ = [
+    "InfrastructureDependencyGraph",
+    "ServiceDependencyNode",
     "MaintenanceAction",
     "MaintenanceRecord",
     "MaintenanceReport",
