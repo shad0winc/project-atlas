@@ -18,6 +18,9 @@ from atlas.service_lifecycle import (
     ServiceHealthStatus,
     ServiceImage,
     ServiceLifecycleError,
+    ServiceRecoveryObservation,
+    ServiceRecoveryResult,
+    ServiceRecoveryStatus,
     ServiceRuntime,
     ImageReference,
     ServiceUpdate,
@@ -1340,3 +1343,203 @@ def test_startup_policy_help_is_active() -> None:
         in result.stdout
     )
     assert "--json" in result.stdout
+
+
+def sample_recovery_observation(
+    *,
+    restart_count: int = 0,
+    observed_at: str = "2026-08-01T12:10:00Z",
+) -> ServiceRecoveryObservation:
+    return ServiceRecoveryObservation(
+        service=sample_services()[0],
+        runtime=ServiceRuntime(
+            state="running",
+            health="healthy",
+            image=sample_runtime().image,
+            restart_count=restart_count,
+            started_at="2026-08-01T12:00:00Z",
+            exit_code=0,
+            status_message="running",
+        ),
+        health=sample_health(),
+        observed_at=observed_at,
+    )
+
+
+def sample_recovery_result() -> ServiceRecoveryResult:
+    before = sample_recovery_observation()
+    after = ServiceRecoveryObservation(
+        service=before.service,
+        runtime=ServiceRuntime(
+            state="running",
+            health="healthy",
+            image=before.runtime.image,
+            restart_count=1,
+            started_at="2026-08-01T12:20:00Z",
+            exit_code=0,
+            status_message="running",
+        ),
+        health=ServiceHealth(
+            status=ServiceHealthStatus.HEALTHY,
+            score=100,
+            details={"service_identifier": "jellyfin"},
+            evaluated_at="2026-08-01T12:25:00Z",
+        ),
+        observed_at="2026-08-01T12:25:00Z",
+    )
+    return ServiceRecoveryResult(
+        before=before,
+        after=after,
+        status=ServiceRecoveryStatus.RECOVERED,
+        reason="Service recovered after restart.",
+        evaluated_at="2026-08-01T12:25:00Z",
+    )
+
+
+def test_recovery_observe_json_output() -> None:
+    service = Mock()
+    output = StringIO()
+    observation = sample_recovery_observation()
+    with patch(
+        "atlas.service_lifecycle_cli.ServiceRestartRecoveryService"
+    ) as recovery_service_class:
+        recovery_service_class.return_value.observe.return_value = observation
+        result = main(
+            ["recovery", "observe", "jellyfin", "--json"],
+            service=service,
+            output=output,
+        )
+    assert result == 0
+    assert json.loads(output.getvalue()) == observation.to_dict()
+    recovery_service_class.assert_called_once_with(service)
+    recovery_service_class.return_value.observe.assert_called_once_with(
+        "jellyfin"
+    )
+
+
+def test_recovery_observe_human_output() -> None:
+    output = StringIO()
+    with patch(
+        "atlas.service_lifecycle_cli.ServiceRestartRecoveryService"
+    ) as recovery_service_class:
+        recovery_service_class.return_value.observe.return_value = (
+            sample_recovery_observation()
+        )
+        result = main(
+            ["recovery", "observe", "jellyfin"],
+            service=Mock(),
+            output=output,
+        )
+    assert result == 0
+    assert "Atlas Service Recovery Observation" in output.getvalue()
+    assert "Restart Count: 0" in output.getvalue()
+
+
+def test_recovery_evaluate_json_output(tmp_path: Path) -> None:
+    before = sample_recovery_observation()
+    before_path = tmp_path / "before.json"
+    before_path.write_text(json.dumps(before.to_dict()))
+    output = StringIO()
+    report = sample_recovery_result()
+    with patch(
+        "atlas.service_lifecycle_cli.ServiceRestartRecoveryService"
+    ) as recovery_service_class:
+        recovery_service_class.return_value.inspect.return_value = report
+        result = main(
+            [
+                "recovery", "evaluate", "jellyfin",
+                "--before", str(before_path), "--json",
+            ],
+            service=Mock(),
+            output=output,
+        )
+    assert result == 0
+    assert json.loads(output.getvalue()) == report.to_dict()
+    loaded_before = recovery_service_class.return_value.inspect.call_args.args[1]
+    assert loaded_before.to_dict() == before.to_dict()
+
+
+def test_recovery_evaluate_human_output(tmp_path: Path) -> None:
+    before_path = tmp_path / "before.json"
+    before_path.write_text(json.dumps(sample_recovery_observation().to_dict()))
+    output = StringIO()
+    with patch(
+        "atlas.service_lifecycle_cli.ServiceRestartRecoveryService"
+    ) as recovery_service_class:
+        recovery_service_class.return_value.inspect.return_value = (
+            sample_recovery_result()
+        )
+        result = main(
+            ["recovery", "evaluate", "jellyfin", "--before", str(before_path)],
+            service=Mock(),
+            output=output,
+        )
+    assert result == 0
+    assert "Atlas Service Restart Recovery" in output.getvalue()
+    assert "Overall Status: PASS" in output.getvalue()
+
+
+def test_recovery_evaluate_missing_file_is_domain_error(tmp_path: Path) -> None:
+    error = StringIO()
+    result = main(
+        [
+            "recovery", "evaluate", "jellyfin",
+            "--before", str(tmp_path / "missing.json"),
+        ],
+        service=Mock(),
+        error=error,
+    )
+    assert result == 1
+    assert "could not read recovery observation" in error.getvalue()
+
+
+def test_recovery_evaluate_rejects_invalid_json(tmp_path: Path) -> None:
+    before_path = tmp_path / "before.json"
+    before_path.write_text("not-json")
+    error = StringIO()
+    result = main(
+        ["recovery", "evaluate", "jellyfin", "--before", str(before_path)],
+        service=Mock(),
+        error=error,
+    )
+    assert result == 1
+    assert "not valid JSON" in error.getvalue()
+
+
+def test_recovery_evaluate_revalidates_child_contracts(tmp_path: Path) -> None:
+    payload = sample_recovery_observation().to_dict()
+    payload["runtime"]["restart_count"] = -1
+    before_path = tmp_path / "before.json"
+    before_path.write_text(json.dumps(payload))
+    error = StringIO()
+    result = main(
+        ["recovery", "evaluate", "jellyfin", "--before", str(before_path)],
+        service=Mock(),
+        error=error,
+    )
+    assert result == 1
+    assert "restart_count must be a non-negative integer" in error.getvalue()
+
+
+def test_recovery_help_is_active() -> None:
+    result = subprocess.run(
+        [str(ATLAS_CLI), "service", "recovery", "--help"],
+        cwd=PROJECT_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0
+    assert "{observe,evaluate}" in result.stdout
+
+
+def test_recovery_cli_exposes_no_restart_operation() -> None:
+    result = subprocess.run(
+        [str(ATLAS_CLI), "service", "recovery", "restart", "jellyfin"],
+        cwd=PROJECT_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 2
+    assert "invalid choice" in result.stderr

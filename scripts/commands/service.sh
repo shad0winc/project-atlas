@@ -16,6 +16,8 @@ Usage:
   atlas service graph [--json]
   atlas service doctor [--json]
   atlas service startup-policy [--json]
+  atlas service recovery observe <identifier> [--json]
+  atlas service recovery evaluate <identifier> --before <path> [--json]
   atlas service updates [--json]
   atlas service history [<identifier>] [--json]
 
@@ -28,6 +30,7 @@ Commands:
   graph      Show managed-service dependency relationships
   doctor     Run read-only diagnostics for managed services
   startup-policy  Evaluate read-only service startup policy
+  recovery   Capture and evaluate read-only restart recovery
   updates    Show read-only service image update metadata
   history    Show read-only service maintenance history
   help       Show this help text
@@ -86,6 +89,11 @@ atlas_command_service() {
     startup-policy)
       shift
       atlas_service_python startup-policy "$@"
+      ;;
+
+    recovery)
+      shift
+      atlas_service_python recovery "$@"
       ;;
 
     updates)

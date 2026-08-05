@@ -6,7 +6,7 @@ import argparse
 import json
 import os
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import TextIO
 
@@ -19,6 +19,11 @@ from atlas.service_lifecycle import (
     ServiceLifecycleError,
     ServiceLifecycleService,
     ServiceDoctor,
+    ServiceHealthStatus,
+    ServiceImage,
+    ServiceRecoveryObservation,
+    ServiceRecoveryResult,
+    ServiceRestartRecoveryService,
     ServiceRuntime,
     ServiceUpdateService,
     UpdateReport,
@@ -143,6 +148,49 @@ def build_parser() -> argparse.ArgumentParser:
         help="Evaluate read-only service startup policy.",
     )
     startup_policy_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Render machine-readable JSON.",
+    )
+
+    recovery_parser = subparsers.add_parser(
+        "recovery",
+        help="Capture and evaluate read-only restart recovery.",
+    )
+    recovery_subparsers = recovery_parser.add_subparsers(
+        dest="recovery_command",
+        required=True,
+    )
+    recovery_observe_parser = recovery_subparsers.add_parser(
+        "observe",
+        help="Capture one immutable service observation.",
+    )
+    recovery_observe_parser.add_argument(
+        "identifier",
+        help="Stable managed-service identifier.",
+    )
+    recovery_observe_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Render machine-readable JSON.",
+    )
+    recovery_evaluate_parser = recovery_subparsers.add_parser(
+        "evaluate",
+        help="Compare a saved observation with current state.",
+    )
+    recovery_evaluate_parser.add_argument(
+        "identifier",
+        help="Stable managed-service identifier.",
+    )
+    recovery_evaluate_parser.add_argument(
+        "--before",
+        required=True,
+        type=Path,
+        help="JSON file containing the before observation.",
+    )
+    recovery_evaluate_parser.add_argument(
         "--json",
         action="store_true",
         dest="as_json",
@@ -901,6 +949,173 @@ def _command_startup_policy(
     return 0 if report.passed else 1
 
 
+
+def _render_recovery_observation_json(
+    observation: ServiceRecoveryObservation,
+    *,
+    output: TextIO,
+) -> None:
+    json.dump(observation.to_dict(), output, indent=2, sort_keys=True)
+    output.write("\n")
+
+
+def _render_recovery_observation_human(
+    observation: ServiceRecoveryObservation,
+    *,
+    output: TextIO,
+) -> None:
+    output.write("Atlas Service Recovery Observation\n")
+    output.write("==================================\n\n")
+    output.write(f"Service:       {observation.service.identifier}\n")
+    output.write(f"Runtime:       {observation.runtime.state}\n")
+    output.write(f"Health:        {observation.health.status.value}\n")
+    output.write(f"Restart Count: {observation.runtime.restart_count}\n")
+    output.write(f"Started:       {observation.runtime.started_at or '-'}\n")
+    output.write(f"Observed:      {observation.observed_at}\n")
+
+
+def _render_recovery_result_json(
+    result: ServiceRecoveryResult,
+    *,
+    output: TextIO,
+) -> None:
+    json.dump(result.to_dict(), output, indent=2, sort_keys=True)
+    output.write("\n")
+
+
+def _render_recovery_result_human(
+    result: ServiceRecoveryResult,
+    *,
+    output: TextIO,
+) -> None:
+    output.write("Atlas Service Restart Recovery\n")
+    output.write("==============================\n\n")
+    output.write(f"Service:          {result.service_identifier}\n")
+    output.write(f"Status:           {result.status.value.replace('-', ' ').title()}\n")
+    output.write(f"Restart Observed: {'Yes' if result.restart_observed else 'No'}\n")
+    output.write(f"Restart Delta:    {result.restart_count_delta}\n")
+    output.write(f"Start Advanced:   {'Yes' if result.start_time_advanced else 'No'}\n")
+    output.write(f"Attention:        {'Yes' if result.requires_attention else 'No'}\n")
+    output.write(f"Reason:           {result.reason}\n")
+    if result.warnings:
+        output.write("\nWarnings\n--------\n")
+        for warning in result.warnings:
+            output.write(f"- {warning}\n")
+    if result.errors:
+        output.write("\nErrors\n------\n")
+        for error in result.errors:
+            output.write(f"- {error}\n")
+    output.write(f"\nEvaluated: {result.evaluated_at}\n")
+    output.write(f"Overall Status: {'PASS' if result.passed else 'FAIL'}\n")
+
+
+def _mapping(value: object, field_name: str) -> Mapping[str, object]:
+    if not isinstance(value, Mapping):
+        raise ServiceLifecycleError(f"{field_name} must be an object")
+    return value
+
+
+def _recovery_observation_from_payload(
+    payload: object,
+) -> ServiceRecoveryObservation:
+    root = _mapping(payload, "recovery observation")
+    service_payload = _mapping(root.get("service"), "service")
+    runtime_payload = _mapping(root.get("runtime"), "runtime")
+    image_payload = _mapping(runtime_payload.get("image"), "runtime.image")
+    health_payload = _mapping(root.get("health"), "health")
+
+    service = ManagedService(
+        identifier=service_payload.get("identifier"),
+        name=service_payload.get("name"),
+        provider=service_payload.get("provider"),
+        enabled=service_payload.get("enabled", True),
+        compose_project=service_payload.get("compose_project"),
+        container_name=service_payload.get("container_name"),
+        dependencies=service_payload.get("dependencies", ()),
+        created_at=service_payload.get("created_at"),
+        updated_at=service_payload.get("updated_at"),
+    )
+    image = ServiceImage(
+        reference=image_payload.get("reference"),
+        repository=image_payload.get("repository"),
+        tag=image_payload.get("tag"),
+        digest=image_payload.get("digest"),
+        image_id=image_payload.get("image_id"),
+        created_at=image_payload.get("created_at"),
+    )
+    runtime = ServiceRuntime(
+        state=runtime_payload.get("state"),
+        health=runtime_payload.get("health"),
+        image=image,
+        restart_count=runtime_payload.get("restart_count", 0),
+        started_at=runtime_payload.get("started_at"),
+        finished_at=runtime_payload.get("finished_at"),
+        exit_code=runtime_payload.get("exit_code"),
+        status_message=runtime_payload.get("status_message"),
+    )
+    health = ServiceHealth(
+        status=health_payload.get("status"),
+        score=health_payload.get("score", 100),
+        warnings=health_payload.get("warnings", ()),
+        errors=health_payload.get("errors", ()),
+        details=health_payload.get("details", {}),
+        evaluated_at=health_payload.get("evaluated_at"),
+    )
+    return ServiceRecoveryObservation(
+        service=service,
+        runtime=runtime,
+        health=health,
+        observed_at=root.get("observed_at"),
+    )
+
+
+def _load_recovery_observation(path: Path) -> ServiceRecoveryObservation:
+    try:
+        with path.open(encoding="utf-8") as stream:
+            payload = json.load(stream)
+    except OSError as exc:
+        raise ServiceLifecycleError(
+            f"could not read recovery observation: {path}: {exc}"
+        ) from exc
+    except json.JSONDecodeError as exc:
+        raise ServiceLifecycleError(
+            f"recovery observation is not valid JSON: {path}"
+        ) from exc
+    return _recovery_observation_from_payload(payload)
+
+
+def _command_recovery_observe(
+    identifier: str,
+    *,
+    service: ServiceLifecycleService,
+    as_json: bool,
+    output: TextIO,
+) -> int:
+    observation = ServiceRestartRecoveryService(service).observe(identifier)
+    if as_json:
+        _render_recovery_observation_json(observation, output=output)
+    else:
+        _render_recovery_observation_human(observation, output=output)
+    return 0
+
+
+def _command_recovery_evaluate(
+    identifier: str,
+    before_path: Path,
+    *,
+    service: ServiceLifecycleService,
+    as_json: bool,
+    output: TextIO,
+) -> int:
+    before = _load_recovery_observation(before_path)
+    result = ServiceRestartRecoveryService(service).inspect(identifier, before)
+    if as_json:
+        _render_recovery_result_json(result, output=output)
+    else:
+        _render_recovery_result_human(result, output=output)
+    return 0 if result.passed else 1
+
+
 def _render_updates_json(
     report: UpdateReport,
     *,
@@ -1165,6 +1380,22 @@ def main(
 
         if arguments.command == "startup-policy":
             return _command_startup_policy(
+                service=resolved_service,
+                as_json=arguments.as_json,
+                output=resolved_output,
+            )
+
+        if arguments.command == "recovery":
+            if arguments.recovery_command == "observe":
+                return _command_recovery_observe(
+                    arguments.identifier,
+                    service=resolved_service,
+                    as_json=arguments.as_json,
+                    output=resolved_output,
+                )
+            return _command_recovery_evaluate(
+                arguments.identifier,
+                arguments.before,
                 service=resolved_service,
                 as_json=arguments.as_json,
                 output=resolved_output,
