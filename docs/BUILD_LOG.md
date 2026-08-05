@@ -4121,3 +4121,63 @@ full-stack verification framework. The root command verifies platform
 foundations and delegates specialized diagnostics to their owning
 subsystems, providing one complete operational PASS or FAIL result without
 centralizing domain-specific implementation details.
+
+---
+
+# 2026-08-04
+
+## M-023.13 — Startup Policy and VPN Readiness
+
+### Objective
+
+Establish a deterministic, provider-independent, read-only policy boundary for
+evaluating whether Atlas-managed dependencies provide explicit startup and
+readiness guarantees.
+
+### Completed
+
+- Added `StartupDependencyCondition`, `ServiceStartupDependency`, and
+  `ServiceStartupContract` with normalization, child validation, deterministic
+  ordering, serialization, package imports, and dedicated tests.
+- Added Docker Compose startup-contract inspection behind the Service Lifecycle
+  provider boundary.
+- Added `StartupPolicySeverity`, `StartupPolicyFinding`, and
+  `StartupPolicyReport` with normalized timestamps and deterministic output.
+- Added the provider-independent `StartupPolicyEvaluator`.
+- Added the read-only `ServiceStartupPolicyService` orchestration boundary.
+- Added `atlas service startup-policy` with human and JSON output.
+- Remediated qBittorrent startup so it waits for Gluetun health, preserving a
+  fail-closed VPN readiness boundary.
+- Added Startup Policy architecture documentation and ADR 0011.
+
+### Validation
+
+Validated at commit `5f779ac8`:
+
+- 78 Startup Policy model, evaluator, and service tests passed;
+- 46 Compose startup-provider tests passed;
+- six Startup Policy CLI tests passed;
+- 130 focused tests passed in total;
+- public import validation passed;
+- Python compilation passed;
+- shell syntax validation passed;
+- Git diff-hygiene validation passed;
+- live human and JSON commands both returned exit status `0`;
+- live provider status was `healthy`, with no attention requirement and zero
+  findings.
+
+### Commits
+
+- `13b87821` — add startup contract models;
+- `f1abd2c8` — inspect Compose startup contracts;
+- `664ce4c8` — add Startup Policy result models;
+- `9b295db9` — evaluate Startup Policy contracts;
+- `a789269b` — add the Startup Policy CLI command;
+- `b4f16211` — enforce the qBittorrent VPN readiness contract;
+- `5f779ac8` — add Startup Policy architecture and ADR documentation.
+
+### Result
+
+M-023.13 is complete. Atlas now has a tested, documented,
+production-validated, read-only Startup Policy capability and an explicit
+fail-closed readiness contract between qBittorrent and Gluetun.

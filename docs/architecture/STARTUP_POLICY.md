@@ -75,3 +75,35 @@ readiness expectations.
 User interfaces and automation consumers consume Startup Policy results and
 must not duplicate provider-specific readiness logic.
 
+## Implemented Contracts
+
+Startup Policy is implemented through `StartupDependencyCondition`,
+`ServiceStartupDependency`, `ServiceStartupContract`,
+`StartupPolicySeverity`, `StartupPolicyFinding`, `StartupPolicyReport`,
+`StartupPolicyEvaluator`, and `ServiceStartupPolicyService`.
+
+`DockerComposeProvider.inspect_startup_contracts()` translates Compose facts
+into normalized contracts. The evaluator consumes those contracts and returns
+one deterministic report without performing infrastructure mutation.
+
+## Public Interface
+
+```bash
+atlas service startup-policy
+atlas service startup-policy --json
+```
+
+Human and JSON rendering consume the same report contract.
+
+## Production Readiness Contract
+
+qBittorrent shares Gluetun's network namespace. Its startup contract therefore
+depends on Gluetun health rather than process startup alone, preserving
+fail-closed VPN behavior.
+
+## Validation
+
+At commit `5f779ac8`, 130 focused tests passed: 78 model, evaluator, and service
+tests; 46 Compose provider tests; and six CLI tests. Live human and JSON
+evaluations both returned exit status `0`, provider `docker-compose`, status
+`healthy`, no attention requirement, and zero findings.

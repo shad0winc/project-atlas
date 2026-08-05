@@ -11,6 +11,12 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Documentation
 
+- Reconciled M-023.13 documentation with the completed Startup Policy
+  implementation, provider boundary, CLI, tests, VPN readiness remediation,
+  and live production validation.
+- Adopted `/tmp/project-atlas-doc-work` as the permanent staging and review
+  path for reliable documentation changes.
+
 - Added the Atlas Release Notes Template covering release highlights, features, improvements, fixes, breaking changes, upgrades, known issues, deprecations, acknowledgements, and support information.
 - Added the reusable Atlas Release Template covering release scope, features, fixes, compatibility, validation, metrics, rollback guidance, and approval.
 - Added the Atlas User Acceptance Certification guide covering critical end-user and administrator journeys, accessibility, responsiveness, performance, failure handling, defect classification, and approval.
@@ -29,6 +35,13 @@ All notable changes to Project Atlas are documented in this file.
 - Completed Service Lifecycle architecture, CLI, and Python API documentation, including compatibility paths, JSON contracts, Administration Portal integration, and the v1.0 read-only boundary.
 
 ### Added
+
+- Added normalized startup dependency and per-service startup contracts,
+  Docker Compose provider translation, deterministic Startup Policy result
+  contracts, provider-independent evaluation, and dedicated tests.
+- Added the read-only `ServiceStartupPolicyService` and public
+  `atlas service startup-policy [--json]` command.
+- Added fail-closed qBittorrent startup readiness through Gluetun health.
 
 - Added the transport-neutral Atlas API contract foundation under `atlas.api`,
   including canonical API and schema versions, immutable success and failure

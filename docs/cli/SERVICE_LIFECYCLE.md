@@ -22,6 +22,7 @@ atlas service graph [--json]
 atlas service doctor [--json]
 atlas service updates [--json]
 atlas service history [<identifier>] [--json]
+atlas service startup-policy [--json]
 atlas service help
 ```
 
@@ -114,6 +115,16 @@ Shows maintenance history for one managed service.
 Until a persistence provider is introduced, valid empty reports are expected.
 
 JSON output serializes the canonical `MaintenanceReport` contract.
+
+## Startup Policy
+
+### `atlas service startup-policy`
+
+Evaluates normalized startup contracts without modifying infrastructure. Human
+output reports provider, status, pass state, attention state, severity totals,
+findings, recommendations, and evaluation time. JSON output serializes the
+canonical `StartupPolicyReport` for scripts and future API, Portal, and guarded
+automation consumers.
 
 ## JSON behavior
 

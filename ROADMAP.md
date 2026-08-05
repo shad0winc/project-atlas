@@ -644,7 +644,14 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
   - [x] Discover and verify all enabled optional modules
   - [x] Aggregate failures without suppressing later verification sections
   - [x] Complete clean live Verify and Doctor validation
-- [ ] Complete startup-order verification
+- [x] Complete startup-order verification
+  - [x] Add normalized startup dependency and service contracts
+  - [x] Translate Docker Compose configuration through the provider boundary
+  - [x] Add deterministic Startup Policy results and evaluation
+  - [x] Add read-only service orchestration
+  - [x] Add human-readable and JSON CLI reporting
+  - [x] Enforce fail-closed qBittorrent readiness through Gluetun health
+  - [x] Validate the production startup policy as Healthy
 - [ ] Complete restart recovery verification
 - [ ] Complete service dependency verification
 - [ ] Complete stale-state recovery verification

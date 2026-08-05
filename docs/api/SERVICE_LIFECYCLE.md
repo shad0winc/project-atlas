@@ -12,7 +12,15 @@ from atlas.service_lifecycle import (
     ServiceLifecycleProvider,
     ServiceLifecycleService,
     ServiceMaintenanceHistoryService,
+    ServiceStartupContract,
+    ServiceStartupDependency,
+    ServiceStartupPolicyService,
     ServiceUpdateService,
+    StartupDependencyCondition,
+    StartupPolicyEvaluator,
+    StartupPolicyFinding,
+    StartupPolicyReport,
+    StartupPolicySeverity,
 )
 ```
 
@@ -32,7 +40,8 @@ Services
 ├── ServiceLifecycleService
 ├── ServiceDoctor
 ├── ServiceUpdateService
-└── ServiceMaintenanceHistoryService
+├── ServiceMaintenanceHistoryService
+└── ServiceStartupPolicyService
         │
         ▼
 ServiceLifecycleProvider
@@ -94,6 +103,18 @@ Returns one validated service-specific `MaintenanceReport`.
 Service-specific records must match the requested normalized service identity
 and name.
 
+## Startup Policy
+
+`ServiceStartupPolicyService.inspect()` requests normalized startup contracts
+from a capable provider, validates the collection and child contracts, and
+returns one deterministic `StartupPolicyReport`.
+
+`StartupPolicyEvaluator.evaluate(contracts)` evaluates normalized contracts
+without invoking Docker or modifying infrastructure.
+
+`DockerComposeProvider.inspect_startup_contracts()` is the current optional
+provider capability. Providers without it remain backward compatible.
+
 ## Provider contract
 
 ### Required provider methods
@@ -148,6 +169,15 @@ without persistence remain backward compatible.
 - `MaintenanceResult`
 - `MaintenanceRecord`
 - `MaintenanceReport`
+
+### Startup Policy
+
+- `StartupDependencyCondition`
+- `ServiceStartupDependency`
+- `ServiceStartupContract`
+- `StartupPolicySeverity`
+- `StartupPolicyFinding`
+- `StartupPolicyReport`
 
 All public models normalize inputs, validate identity and child contracts,
 normalize timestamps, and provide deterministic `to_dict()` serialization.
