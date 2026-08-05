@@ -5,6 +5,7 @@ contracts for discovering, inspecting, and safely managing Atlas-operated
 infrastructure services.
 """
 
+from .recovery import RestartRecoveryEvaluator
 from .recovery_models import (
     ServiceRecoveryObservation,
     ServiceRecoveryResult,
@@ -74,6 +75,7 @@ __all__ = [
     "ServiceLifecycleProvider",
     "ServiceLifecycleService",
     "ServiceMaintenanceHistoryService",
+    "RestartRecoveryEvaluator",
     "ServiceRecoveryObservation",
     "ServiceRecoveryResult",
     "ServiceRecoveryStatus",
