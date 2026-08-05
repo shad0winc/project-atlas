@@ -1480,6 +1480,108 @@ def test_inspect_runtime_normalizes_live_container_state(
     )
 
 
+def _inspect_runtime_with_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    **state_updates: object,
+) -> ServiceRuntime:
+    provider = make_provider(tmp_path)
+    service = ManagedService(
+        identifier="sonarr",
+        name="Sonarr",
+        provider="docker-compose",
+        compose_project="atlas",
+        container_name="sonarr",
+    )
+    payload = make_runtime_inspect_payload()
+    container = payload[0]
+    assert isinstance(container, dict)
+    state = container["State"]
+    assert isinstance(state, dict)
+    state.update(state_updates)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "inspect_service",
+        lambda self, identifier: service,
+    )
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_resolve_container_identifier",
+        lambda self, value: "container-id",
+    )
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_docker_json",
+        lambda self, *arguments: payload,
+    )
+
+    return provider.inspect_runtime("sonarr")
+
+
+def test_running_runtime_discards_stale_finished_timestamp(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime = _inspect_runtime_with_state(
+        tmp_path,
+        monkeypatch,
+        FinishedAt="2026-08-01T11:55:00Z",
+    )
+
+    assert runtime.state == "running"
+    assert runtime.started_at == "2026-08-01T12:00:00Z"
+    assert runtime.finished_at is None
+
+
+def test_restarting_runtime_discards_stale_finished_timestamp(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime = _inspect_runtime_with_state(
+        tmp_path,
+        monkeypatch,
+        Status="running",
+        Restarting=True,
+        FinishedAt="2026-08-01T11:55:00Z",
+    )
+
+    assert runtime.state == "restarting"
+    assert runtime.finished_at is None
+
+
+def test_stopped_runtime_preserves_terminal_finished_timestamp(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime = _inspect_runtime_with_state(
+        tmp_path,
+        monkeypatch,
+        Status="exited",
+        Running=False,
+        Health=None,
+        FinishedAt="2026-08-01T13:00:00-04:00",
+    )
+
+    assert runtime.state == "exited"
+    assert runtime.finished_at == "2026-08-01T17:00:00Z"
+
+
+def test_active_runtime_still_rejects_invalid_finished_timestamp(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with pytest.raises(
+        DockerComposeProviderError,
+        match="finished_at must be an ISO-8601 timestamp",
+    ):
+        _inspect_runtime_with_state(
+            tmp_path,
+            monkeypatch,
+            FinishedAt="not-a-timestamp",
+        )
+
+
 def test_inspect_runtime_uses_expected_provider_operations(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from json import JSONDecodeError, loads
 from pathlib import Path
 import subprocess
@@ -827,7 +827,7 @@ def _normalize_runtime_payload(
             ),
         )
 
-        return ServiceRuntime(
+        runtime = ServiceRuntime(
             state=runtime_state,
             health=health_state,
             image=image,
@@ -841,6 +841,14 @@ def _normalize_runtime_payload(
             exit_code=normalized_exit_code,
             status_message=status_message,
         )
+
+        if runtime_state in {"running", "restarting"}:
+            runtime = replace(
+                runtime,
+                finished_at=None,
+            )
+
+        return runtime
     except ServiceLifecycleError as exc:
         raise DockerComposeProviderError(
             "Invalid Docker runtime state: "
