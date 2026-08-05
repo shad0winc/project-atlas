@@ -25,7 +25,8 @@ Project Atlas
 │   ├── Identity and authorization
 │   ├── Service Lifecycle
 │   │   ├── Startup Policy
-│   │   └── Restart Recovery
+│   │   ├── Restart Recovery
+│   │   └── Service Dependency Verification
 │   ├── Health and observability
 │   ├── Policy, retention, and cleanup
 │   ├── Scheduler and events
@@ -50,6 +51,7 @@ logic.
 - [Service Lifecycle](SERVICE_LIFECYCLE.md)
 - [Startup Policy](STARTUP_POLICY.md)
 - [Restart Recovery](RESTART_RECOVERY.md)
+- [Service Dependency Verification](SERVICE_DEPENDENCY_VERIFICATION.md)
 - [Portal](PORTAL.md)
 
 Additional subsystem documents should be added only when their design is mature
@@ -116,3 +118,14 @@ normalized before and after observations without executing restarts.
 - [Service Lifecycle CLI reference](../cli/SERVICE_LIFECYCLE.md)
 - [Python API reference](../api/SERVICE_LIFECYCLE.md)
 - [ADR 0012 — Restart Recovery Observation Contracts](../ADR/0012-restart-recovery-observation-contracts.md)
+
+## Service Dependency Verification
+
+Service Dependency Verification hardens the existing Service Lifecycle graph
+and preserves separate topology, operational-diagnosis, and startup-readiness
+boundaries.
+
+- [Architecture](SERVICE_DEPENDENCY_VERIFICATION.md)
+- [Service Lifecycle CLI reference](../cli/SERVICE_LIFECYCLE.md)
+- [Python API reference](../api/SERVICE_LIFECYCLE.md)
+- [ADR 0013 — Dependency Verification Boundaries](../ADR/0013-dependency-verification-boundaries.md)
