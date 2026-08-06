@@ -95,5 +95,5 @@ It does not authorize destructive production failure injection.
 
 - [Scheduler Recovery Architecture](../architecture/SCHEDULER_RECOVERY.md)
 - [Project Atlas Architecture](../architecture/README.md)
-- [ADR 0004 — Runtime State Architecture](ADR-0004-runtime-state-architecture.md)
+- [ADR 0004 — Runtime State Architecture](0004-runtime-state-architecture.md)
 - [ADR 0014 — Stale Runtime State Normalization](0014-stale-runtime-state-normalization.md)

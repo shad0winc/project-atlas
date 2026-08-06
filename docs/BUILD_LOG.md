@@ -4436,3 +4436,105 @@ M-023.16 is complete. Atlas now presents a consistent current-lifecycle
 contract across Service Lifecycle and Operations: active containers do not
 carry stale finish metadata from a previous lifecycle, while terminal history
 and malformed-input validation remain preserved.
+
+---
+
+# 2026-08-05
+
+## M-023.17 — Scheduler Recovery Verification
+
+### Objective
+
+Verify and harden recovery of the shared Atlas scheduler after scheduler
+process interruption without adding a parallel scheduling or recovery engine.
+
+### Discovery
+
+Repository review confirmed that the existing `TaskScheduler` already owns the
+required recovery foundation:
+
+- scheduler state is persisted through Atlas atomic JSON writes;
+- execution is serialized with an exclusive PID lock;
+- task start is persisted before callback execution;
+- successful and failed terminal states are explicit;
+- normal due-state calculation is based on `last_success`;
+- a lock whose PID no longer exists is reclaimable.
+
+The review also identified one fail-open edge. Empty, malformed, or unreadable
+lock ownership was treated as stale and automatically deleted even though
+exclusive lock creation and PID writing are separate operations. Ambiguous
+ownership was therefore not sufficient evidence that the lock was stale.
+
+### Architecture
+
+- Added the Scheduler Recovery architecture document.
+- Added ADR 0015, Scheduler Recovery Boundaries.
+- Kept `TaskScheduler` as the sole scheduler and recovery authority.
+- Defined automatic reclamation only for a PID positively known not to exist.
+- Defined fail-closed behavior for ambiguous ownership.
+- Preserved `last_success` as the scheduling authority after interruption.
+- Explicitly rejected exactly-once claims, a watchdog, a stale-state TTL, and
+  a second recovery daemon.
+
+### Implementation
+
+- Empty and malformed runtime locks now fail closed.
+- Non-positive PID values fail closed.
+- Unreadable ownership fails closed.
+- Indeterminate PID ownership fails closed.
+- Permission-limited ownership remains protected.
+- A positively dead PID still permits automatic stale-lock reclamation.
+- Interrupted task state does not advance `last_success`, run counters,
+  failure counters, or execution history without a terminal result.
+- Successful retry returns the task to `healthy`.
+- Failed retry transitions the task to `degraded`.
+- No state schema, public model, CLI contract, or scheduler API changed.
+
+### Automated Validation
+
+- Nine focused Scheduler Recovery tests passed.
+- 59 shared Scheduler and Operations scheduler regression tests passed.
+- 10 Portal Scheduler service and schema tests passed.
+- 69 distinct regression tests passed; the nine focused recovery tests are a
+  subset of the 59 shared Scheduler tests and were also run separately.
+- Python compilation and Git diff hygiene passed.
+
+### Production Validation
+
+Validated read-only at commit `b79870e1`:
+
+- state file: `/mnt/storage/configs/atlas/scheduler/tasks.json`;
+- lock file: `/mnt/storage/configs/atlas/scheduler/tasks.lock`;
+- scheduler schema version: 2;
+- registered tasks: two;
+- task states: one `healthy`, one `never_run`;
+- due tasks: `operations.collect` and `sports.maintenance`;
+- persisted `running` tasks: zero;
+- execution-history entries: one;
+- runtime lock: absent;
+- runtime consistency: passed;
+- infrastructure mutations: none;
+- repository remained clean.
+
+The single historical Operations execution succeeded. Its stored
+`event_error` records an older optional-module publication failure. The current
+`operations.collect` registration has `module: null`, matching the later
+core-task event-isolation boundary, so the historical event-delivery failure
+does not represent a current Scheduler Recovery defect.
+
+Production scheduler termination was intentionally not performed. The focused
+tests deterministically exercise dead-owner lock reclamation and interrupted
+task recovery without adding unnecessary production risk.
+
+### Commits
+
+- `51ce679a` — define Scheduler Recovery architecture and ADR 0015;
+- `b79870e1` — fail closed on ambiguous scheduler locks.
+
+### Result
+
+M-023.17 is complete. Atlas now has a documented, fail-closed, tested, and
+production-inspected Scheduler Recovery contract. Provably dead lock owners
+remain automatically recoverable, ambiguous ownership cannot authorize
+concurrent automation, and interrupted tasks preserve factual scheduler state
+until a real terminal execution outcome is recorded.

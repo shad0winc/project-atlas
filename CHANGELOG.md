@@ -6,6 +6,10 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Fixed
 
+- Hardened Scheduler Recovery lock ownership to fail closed when a runtime
+  lock is empty, malformed, unreadable, non-positive, or otherwise
+  indeterminate, while preserving automatic reclamation for a PID positively
+  known not to exist.
 - Prevented active Service Lifecycle observations from exposing a previous
   Docker lifecycle's `FinishedAt` timestamp as the current `finished_at` value.
   Running and restarting services now expose `finished_at: null` while terminal

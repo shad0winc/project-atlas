@@ -184,9 +184,51 @@ Scheduler Recovery does not:
 7. Reconcile roadmap, changelog, build history, and architecture completion
    evidence.
 
+
+## Production Validation
+
+M-023.17 was validated at commit `b79870e1` against the configured production
+scheduler without executing tasks, changing scheduler state, deleting locks,
+or terminating processes.
+
+Production evidence:
+
+- scheduler schema version: 2;
+- registered tasks: 2;
+- persisted task states: one `healthy` and one `never_run`;
+- persisted `running` tasks: zero;
+- due tasks: `operations.collect` and `sports.maintenance`;
+- scheduler history entries: one;
+- runtime lock: absent;
+- scheduler runtime consistency: passed;
+- repository mutations: none.
+
+The existing Operations history entry records a successful callback together
+with a historical module-event publication error. The currently registered
+`operations.collect` task has `module: null`, preserving the later core-job
+event-routing isolation. That historical event-delivery record is not a
+Scheduler Recovery failure.
+
+Recovery mechanics were proven deterministically rather than by terminating a
+production scheduler. Nine focused recovery tests cover live and dead PID
+ownership, fail-closed ambiguous ownership, interrupted task facts, successful
+retry, and failed retry. The broader shared Scheduler/Operations and Portal
+Scheduler regressions also passed.
+
+## Completion State
+
+M-023.17 is complete. Atlas now automatically reclaims only scheduler locks
+whose recorded owners are positively known to be gone, fails closed when lock
+ownership is ambiguous, preserves interrupted task facts without manufacturing
+success, and retains deterministic retry outcomes through the existing shared
+scheduler.
+
+No second scheduler, watchdog, stale-state TTL, recovery daemon, or destructive
+production failure injection was introduced.
+
 ## Related Documents
 
 - [Project Atlas Architecture](README.md)
 - [Stale-State Recovery](STALE_STATE_RECOVERY.md)
 - [ADR 0015 — Scheduler Recovery Boundaries](../ADR/0015-scheduler-recovery-boundaries.md)
-- [ADR 0004 — Runtime State Architecture](../ADR/ADR-0004-runtime-state-architecture.md)
+- [ADR 0004 — Runtime State Architecture](../ADR/0004-runtime-state-architecture.md)
