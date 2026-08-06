@@ -32,6 +32,8 @@ Project Atlas
 │   ├── Policy, retention, and cleanup
 │   ├── Scheduler and events
 │   │   └── Scheduler Recovery
+│   ├── Media Requests
+│   │   └── Interrupted-Request Recovery
 │   └── Module platform
 ├── Providers and adapters
 │   ├── Docker Compose
@@ -56,6 +58,7 @@ logic.
 - [Service Dependency Verification](SERVICE_DEPENDENCY_VERIFICATION.md)
 - [Stale-State Recovery](STALE_STATE_RECOVERY.md)
 - [Scheduler Recovery](SCHEDULER_RECOVERY.md)
+- [Interrupted-Request Recovery](INTERRUPTED_REQUEST_RECOVERY.md)
 - [Portal](PORTAL.md)
 
 Additional subsystem documents should be added only when their design is mature
@@ -141,3 +144,12 @@ runtime-lock behavior without introducing a second scheduling engine.
 
 - [Architecture](SCHEDULER_RECOVERY.md)
 - [ADR 0015 — Scheduler Recovery Boundaries](../ADR/0015-scheduler-recovery-boundaries.md)
+
+## Interrupted-Request Recovery
+
+Interrupted-Request Recovery extends the existing Media Requests state machine
+with durable mutation intent so outcome-ambiguous provider operations fail
+closed instead of being silently replayed.
+
+- [Architecture](INTERRUPTED_REQUEST_RECOVERY.md)
+- [ADR 0016 — Interrupted-Request Recovery Boundaries](../ADR/0016-interrupted-request-recovery-boundaries.md)
