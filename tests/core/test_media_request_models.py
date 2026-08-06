@@ -81,8 +81,10 @@ def test_media_request_rejects_invalid_media_types(value: object) -> None:
     ("value", "expected"),
     [
         ("pending", MediaRequestStatus.PENDING),
+        ("SUBMITTING", MediaRequestStatus.SUBMITTING),
         ("APPROVED", MediaRequestStatus.APPROVED),
         ("downloading", MediaRequestStatus.DOWNLOADING),
+        ("cancelling", MediaRequestStatus.CANCELLING),
         ("cancelled", MediaRequestStatus.CANCELLED),
     ],
 )
@@ -90,7 +92,12 @@ def test_media_request_normalizes_supported_statuses(
     value: str,
     expected: MediaRequestStatus,
 ) -> None:
-    assert make_request(status=value).status is expected
+    overrides: dict[str, object] = {"status": value}
+
+    if expected is MediaRequestStatus.CANCELLING:
+        overrides["provider_request_id"] = "provider-request-001"
+
+    assert make_request(**overrides).status is expected
 
 
 @pytest.mark.parametrize(
@@ -248,10 +255,12 @@ def test_media_request_rejects_available_at_before_created_at() -> None:
     ("status", "terminal"),
     [
         (MediaRequestStatus.PENDING, False),
+        (MediaRequestStatus.SUBMITTING, False),
         (MediaRequestStatus.APPROVED, False),
         (MediaRequestStatus.SEARCHING, False),
         (MediaRequestStatus.DOWNLOADING, False),
         (MediaRequestStatus.IMPORTING, False),
+        (MediaRequestStatus.CANCELLING, False),
         (MediaRequestStatus.AVAILABLE, True),
         (MediaRequestStatus.REJECTED, True),
         (MediaRequestStatus.FAILED, True),
@@ -266,11 +275,68 @@ def test_media_request_terminal_contract(
 
     if status is MediaRequestStatus.AVAILABLE:
         overrides["available_at"] = "2026-08-02T21:00:00Z"
+    elif status is MediaRequestStatus.CANCELLING:
+        overrides["provider_request_id"] = "provider-request-001"
 
     request = make_request(**overrides)
 
     assert request.terminal is terminal
     assert request.active is not terminal
+
+
+def test_submitting_request_is_recovery_intent_without_provider_id() -> None:
+    request = make_request(
+        status=" submitting ",
+        provider_request_id=None,
+        updated_at="2026-08-02T20:30:00Z",
+    )
+
+    assert request.status is MediaRequestStatus.SUBMITTING
+    assert request.provider_request_id is None
+    assert request.terminal is False
+    assert request.active is True
+    assert request.to_dict()["status"] == "submitting"
+
+
+def test_submitting_request_rejects_provider_request_id() -> None:
+    with pytest.raises(
+        MediaRequestError,
+        match="provider_request_id must be null when status is submitting",
+    ):
+        make_request(
+            status="submitting",
+            provider_request_id="provider-request-001",
+        )
+
+
+def test_cancelling_request_requires_provider_request_id() -> None:
+    with pytest.raises(
+        MediaRequestError,
+        match="provider_request_id is required when status is cancelling",
+    ):
+        make_request(
+            status="cancelling",
+            provider_request_id=None,
+        )
+
+
+def test_cancelling_request_is_recovery_intent_with_provider_id() -> None:
+    request = make_request(
+        status=" cancelling ",
+        provider_request_id=" provider-request-001 ",
+        updated_at="2026-08-02T20:30:00Z",
+    )
+
+    assert request.status is MediaRequestStatus.CANCELLING
+    assert request.provider_request_id == "provider-request-001"
+    assert request.terminal is False
+    assert request.active is True
+    assert request.to_dict()["status"] == "cancelling"
+
+
+def test_recovery_intent_statuses_are_publicly_exported() -> None:
+    assert MediaRequestStatus.SUBMITTING.value == "submitting"
+    assert MediaRequestStatus.CANCELLING.value == "cancelling"
 
 
 def test_media_request_is_immutable() -> None:

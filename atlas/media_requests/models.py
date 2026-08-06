@@ -35,10 +35,12 @@ class MediaRequestStatus(str, Enum):
     """Normalized lifecycle states for an Atlas media request."""
 
     PENDING = "pending"
+    SUBMITTING = "submitting"
     APPROVED = "approved"
     SEARCHING = "searching"
     DOWNLOADING = "downloading"
     IMPORTING = "importing"
+    CANCELLING = "cancelling"
     AVAILABLE = "available"
     REJECTED = "rejected"
     FAILED = "failed"
@@ -97,6 +99,22 @@ class MediaRequest:
         } and season_number is not None:
             raise MediaRequestError(
                 "season_number is only valid for tv and anime_tv requests",
+            )
+
+        if (
+            status is MediaRequestStatus.SUBMITTING
+            and provider_request_id is not None
+        ):
+            raise MediaRequestError(
+                "provider_request_id must be null when status is submitting",
+            )
+
+        if (
+            status is MediaRequestStatus.CANCELLING
+            and provider_request_id is None
+        ):
+            raise MediaRequestError(
+                "provider_request_id is required when status is cancelling",
             )
 
         if status is MediaRequestStatus.AVAILABLE and available_at is None:
