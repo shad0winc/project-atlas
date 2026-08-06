@@ -646,6 +646,63 @@ def test_cancel_requires_cancelled_result(
     assert service.get_request("request-001").status is MediaRequestStatus.CANCELLING
 
 
+def test_list_recovery_required_requests_is_read_only(
+    service: MediaRequestService,
+    provider: FakeProvider,
+) -> None:
+    service.create_request(make_request())
+    submitting = service.repository.save(
+        make_request(
+            request_id="request-002",
+            provider_media_id="tmdb:603",
+            status="submitting",
+        )
+    )
+    cancelling = service.repository.save(
+        make_request(
+            request_id="request-003",
+            provider_request_id="provider-003",
+            provider_media_id="tmdb:27205",
+            status="cancelling",
+        )
+    )
+
+    assert service.list_recovery_required_requests() == (
+        submitting,
+        cancelling,
+    )
+    assert provider.submissions == []
+    assert provider.status_requests == []
+    assert provider.cancellations == []
+
+
+def test_list_recovery_required_requests_excludes_normal_states(
+    service: MediaRequestService,
+) -> None:
+    service.create_request(make_request())
+
+    assert service.list_recovery_required_requests() == ()
+
+
+def test_list_recovery_required_requests_wraps_repository_failure(
+    service: MediaRequestService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        service.repository,
+        "list",
+        lambda: (_ for _ in ()).throw(
+            MediaRequestRepositoryError("failure")
+        ),
+    )
+
+    with pytest.raises(
+        MediaRequestServiceError,
+        match="requiring reconciliation",
+    ):
+        service.list_recovery_required_requests()
+
+
 def test_list_and_user_lookup_delegate_to_repository(
     service: MediaRequestService,
 ) -> None:

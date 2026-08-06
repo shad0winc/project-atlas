@@ -146,6 +146,14 @@ _ALLOWED_TRANSITIONS: dict[
 }
 
 
+_RECOVERY_REQUIRED_STATUSES = frozenset(
+    {
+        MediaRequestStatus.SUBMITTING,
+        MediaRequestStatus.CANCELLING,
+    }
+)
+
+
 class MediaRequestServiceError(RuntimeError):
     """Raised when media-request orchestration cannot complete safely."""
 
@@ -279,10 +287,7 @@ class MediaRequestService:
 
         request = self.get_request(request_id)
 
-        if request.status in {
-            MediaRequestStatus.SUBMITTING,
-            MediaRequestStatus.CANCELLING,
-        }:
+        if request.status in _RECOVERY_REQUIRED_STATUSES:
             raise MediaRequestServiceError(
                 f"media request requires reconciliation: {request.request_id}",
             )
@@ -413,10 +418,7 @@ class MediaRequestService:
 
         request = self.get_request(request_id)
 
-        if request.status in {
-            MediaRequestStatus.SUBMITTING,
-            MediaRequestStatus.CANCELLING,
-        }:
+        if request.status in _RECOVERY_REQUIRED_STATUSES:
             raise MediaRequestServiceError(
                 f"media request requires reconciliation: {request.request_id}",
             )
@@ -503,6 +505,24 @@ class MediaRequestService:
             raise MediaRequestServiceError(
                 "unable to list media requests",
             ) from exc
+
+    def list_recovery_required_requests(
+        self,
+    ) -> tuple[MediaRequest, ...]:
+        """Return requests whose external mutation outcome is ambiguous."""
+
+        try:
+            requests = self.repository.list()
+        except MediaRequestRepositoryError as exc:
+            raise MediaRequestServiceError(
+                "unable to list media requests requiring reconciliation",
+            ) from exc
+
+        return tuple(
+            request
+            for request in requests
+            if request.status in _RECOVERY_REQUIRED_STATUSES
+        )
 
     def list_user_requests(
         self,
