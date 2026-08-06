@@ -59,6 +59,7 @@ logic.
 - [Stale-State Recovery](STALE_STATE_RECOVERY.md)
 - [Scheduler Recovery](SCHEDULER_RECOVERY.md)
 - [Interrupted-Request Recovery](INTERRUPTED_REQUEST_RECOVERY.md)
+- [Sports Recovery](SPORTS_RECOVERY.md)
 - [Portal](PORTAL.md)
 
 Additional subsystem documents should be added only when their design is mature
@@ -153,3 +154,13 @@ closed instead of being silently replayed.
 
 - [Architecture](INTERRUPTED_REQUEST_RECOVERY.md)
 - [ADR 0016 — Interrupted-Request Recovery Boundaries](../ADR/0016-interrupted-request-recovery-boundaries.md)
+
+
+## Sports Recovery
+
+Sports Recovery hardens the existing optional Sports recorder so process
+adoption and termination require durable Linux process identity rather than PID
+liveness alone.
+
+- [Architecture](SPORTS_RECOVERY.md)
+- [ADR 0017 — Sports Recorder Process Identity](../ADR/0017-sports-recorder-process-identity.md)
