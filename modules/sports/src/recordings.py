@@ -12,6 +12,7 @@ from typing import Any
 from recorder import (
     finalize_recording,
     launch_recording,
+    process_identity_matches,
     process_is_running,
     recording_exit_code,
     stop_recording,
@@ -309,7 +310,12 @@ def recording_status(
         if now >= scheduled_end:
             return "completed"
 
-        if not process_is_running(pid):
+        if not process_identity_matches(
+            pid,
+            recording.get(
+                "process_start_time"
+            ),
+        ):
             return "failed"
 
         return "recording"
@@ -356,6 +362,13 @@ def update_recording_statuses(
 
                 recording["pid"] = int(
                     launch_result["pid"]
+                )
+                recording[
+                    "process_start_time"
+                ] = int(
+                    launch_result[
+                        "process_start_time"
+                    ]
                 )
                 recording["log_file"] = str(
                     launch_result["log_file"]
@@ -413,8 +426,36 @@ def update_recording_statuses(
         ):
             pid = recording.get("pid")
 
+            expected_start_time = recording.get(
+                "process_start_time"
+            )
+
+            if (
+                process_is_running(pid)
+                and not process_identity_matches(
+                    pid,
+                    expected_start_time,
+                )
+            ):
+                current_status = "failed"
+                recording["failed_at"] = (
+                    format_timestamp(now)
+                )
+                recording["failure_reason"] = (
+                    "recorder_process_identity_unverified"
+                )
+                recording["status"] = "failed"
+                recording["updated_at"] = (
+                    format_timestamp(now)
+                )
+                recordings[recording_id] = recording
+                continue
+
             stopped = stop_recording(
-                pid
+                pid,
+                expected_start_time=(
+                    expected_start_time
+                ),
             )
 
             if not stopped:
@@ -516,7 +557,21 @@ def update_recording_statuses(
                 or format_timestamp(now)
             )
 
-            if exit_code is None:
+            if (
+                process_is_running(
+                    recording.get("pid")
+                )
+                and not process_identity_matches(
+                    recording.get("pid"),
+                    recording.get(
+                        "process_start_time"
+                    ),
+                )
+            ):
+                default_failure_reason = (
+                    "recorder_process_identity_unverified"
+                )
+            elif exit_code is None:
                 default_failure_reason = (
                     "recorder_exited_early"
                 )

@@ -152,6 +152,9 @@ def wait_for_recorder(
         recorder.stop_recording(
             pid,
             timeout_seconds=2,
+            expected_start_time=recording.get(
+                "process_start_time"
+            ),
         )
         raise TimeoutError(
             f"Recorder did not exit: {pid}"
@@ -211,6 +214,11 @@ def run_success_test() -> None:
     check(
         bool(launched.get("pid")),
         "Scheduler stored recorder PID",
+    )
+
+    check(
+        bool(launched.get("process_start_time")),
+        "Scheduler stored recorder process identity",
     )
 
     check(
