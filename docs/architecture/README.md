@@ -60,6 +60,7 @@ logic.
 - [Scheduler Recovery](SCHEDULER_RECOVERY.md)
 - [Interrupted-Request Recovery](INTERRUPTED_REQUEST_RECOVERY.md)
 - [Sports Recovery](SPORTS_RECOVERY.md)
+- [Automatic Cleanup Safety](AUTOMATIC_CLEANUP_SAFETY.md)
 - [Portal](PORTAL.md)
 
 Additional subsystem documents should be added only when their design is mature
@@ -164,3 +165,13 @@ liveness alone.
 
 - [Architecture](SPORTS_RECOVERY.md)
 - [ADR 0017 — Sports Recorder Process Identity](../ADR/0017-sports-recorder-process-identity.md)
+
+
+## Automatic Cleanup Safety
+
+Automatic Cleanup Safety separates retention recommendations from destructive
+authorization and keeps the v1.0 cleanup execution boundary fail closed and
+non-destructive while cross-boundary safeguards are verified.
+
+- [Architecture](AUTOMATIC_CLEANUP_SAFETY.md)
+- [ADR 0018 — Cleanup Mutation Authorization](../ADR/0018-cleanup-mutation-authorization.md)
