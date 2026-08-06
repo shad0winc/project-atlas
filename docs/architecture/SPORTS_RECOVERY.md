@@ -184,6 +184,34 @@ M-023.19 does not add:
 - a generic process supervisor; or
 - destructive reconciliation of ambiguous processes.
 
+## Implementation Status
+
+M-023.19 is complete.
+
+The implemented recovery contract now:
+
+- captures Linux process start-time identity when a recorder launches;
+- persists process identity alongside the recorder PID;
+- verifies PID and start-time identity before adopting a live recorder;
+- verifies the same identity before process-group signaling;
+- fails closed when active process identity is missing or mismatched; and
+- preserves existing exit-code, partial-file, finalization, and scheduler
+  behavior.
+
+The full Sports integration runner passed all five suites after hardening.
+
+## Production Validation
+
+Read-only production validation at commit `1924f8eb` found an existing but
+empty recording registry: zero persisted recordings, zero active recordings,
+and zero ambiguous active recordings. No legacy active state requires
+migration.
+
+Both Sports containers were running and healthy, the controller heartbeat was
+fresh, TheSportsDB provider health was healthy, FFmpeg was available, and the
+structured Sports health contract was healthy across controller, provider,
+recorder, recordings, and storage. Production recorder mutations: none.
+
 ## Related Decisions
 
 - [ADR 0015 — Scheduler Recovery Boundaries](../ADR/0015-scheduler-recovery-boundaries.md)

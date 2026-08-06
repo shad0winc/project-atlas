@@ -4665,3 +4665,128 @@ blocks unsafe mutation replay, and exposes recovery-required state through the
 existing Media Requests service boundary. Automatic provider reconciliation
 remains intentionally deferred until a stable non-mutating correlation
 mechanism exists.
+
+---
+
+# 2026-08-06
+
+## M-023.19 — Sports Recovery Verification
+
+### Objective
+
+Verify that the optional Sports module can recover recorder state after
+controller interruption without duplicating a recording, adopting an unrelated
+process, or signaling a process Atlas cannot prove it owns.
+
+### Discovery
+
+The existing Sports module already contained a substantial recovery foundation:
+
+- durable recording state in `recordings.json`;
+- persisted recorder PIDs and output metadata;
+- atomic recording-registry replacement;
+- exit-code sidecars;
+- partial-file finalization;
+- live recorder adoption after controller restart;
+- scheduler success and failure integration coverage; and
+- a dedicated Sports recovery integration test.
+
+Discovery identified one concrete safety gap. Recovery and termination treated
+PID liveness as sufficient recorder ownership evidence. Because Linux can reuse
+a PID after the original process exits, PID-only ownership could associate
+Atlas with an unrelated process.
+
+### Architecture
+
+- Added the Sports Recovery architecture document.
+- Added ADR 0017, Sports Recorder Process Identity.
+- Preserved the existing Sports scheduler, recorder, recording registry, and
+  controller boundaries.
+- Defined durable recorder identity as PID plus Linux process start-time token
+  from `/proc/<pid>/stat` field 22.
+- Defined missing or mismatched identity as ambiguous and fail closed.
+- Explicitly prohibited PID-only recorder adoption and process-group signaling.
+- Rejected a second recovery engine, process supervisor, transaction journal,
+  and destructive reconciliation of ambiguous processes.
+
+### Implementation
+
+At commit `1924f8eb`:
+
+- recorder launch captures and returns the Linux process start-time token;
+- the recording reconciler persists `process_start_time` with the recorder PID;
+- live recorder adoption verifies PID and start-time identity;
+- active recording state fails closed when identity cannot be verified;
+- recorder stop verifies identity before `SIGTERM` or `SIGKILL`;
+- identity is rechecked during the stop sequence; and
+- an unrelated live process is never treated as recorder ownership merely
+  because its PID matches persisted state.
+
+### Automated Validation
+
+Focused Sports Recovery integration proved:
+
+- a controlled live recorder remains active after recovery;
+- the original PID is retained and persisted;
+- duplicate launch does not occur;
+- process identity is verified during recorder adoption;
+- mismatched process identity fails closed;
+- the identity failure remains observable;
+- an unrelated process remains running;
+- mismatched identity blocks recorder stop;
+- the unrelated process receives no signal;
+- missing identity blocks recorder adoption; and
+- completed recorder state still finalizes and persists correctly.
+
+Sports Scheduler integration also passed for both successful and failed
+recordings and proved that new recordings persist process identity.
+
+The complete Sports regression runner passed all five integration suites:
+
+1. maintenance;
+2. provider;
+3. recording;
+4. recovery; and
+5. scheduler.
+
+Python compilation and Git diff hygiene passed.
+
+### Production Validation
+
+Read-only validation at commit `1924f8eb` established:
+
+- the production Sports recording registry exists and contains zero persisted
+  recordings;
+- active recordings: zero;
+- ambiguous active recordings: zero;
+- therefore no legacy PID-only active recording requires migration;
+- `atlas-sports-feed` is running and healthy;
+- `atlas-sports-controller` is running and healthy;
+- controller heartbeat age was 30 seconds during validation;
+- TheSportsDB provider status is healthy with zero consecutive failures;
+- FFmpeg is available at `/usr/bin/ffmpeg` and recorder mode is `ffmpeg`;
+- structured Sports health is healthy across controller, providers, recorder,
+  recordings, and storage;
+- Sports storage was writable with 94.82 percent free; and
+- production recorder mutations and repository mutations were both zero.
+
+### Documentation Reconciliation
+
+The pre-existing `docs/SPORTS.md` and `modules/sports/README.md` still described
+the module as a planned shell with no deployed production services. M-023.19
+reconciles both documents with the repository and production evidence while
+keeping unfinished v1.0 Portal, request, playback, and administration work
+explicit.
+
+### Commits
+
+- `3f620140` — define Sports Recovery architecture and ADR 0017;
+- `1924f8eb` — verify and persist Sports recorder process identity.
+
+### Result
+
+M-023.19 is complete. Sports recovery now uses explicit durable process
+identity rather than PID liveness, rejects ambiguous ownership, protects
+unrelated processes from adoption and signaling, retains existing recording
+recovery behavior, and has been validated against the live production runtime
+without mutating recorder state.

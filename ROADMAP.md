@@ -671,7 +671,13 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
   - [x] Fail closed on outcome-ambiguous provider mutations
   - [x] Expose recovery-required requests through a read-only service boundary
   - [x] Complete read-only production validation
-- [ ] Complete Sports recovery verification
+- [x] Complete Sports recovery verification
+  - [x] Define Sports Recovery architecture and ADR 0017
+  - [x] Persist PID and Linux process start-time recorder identity
+  - [x] Fail closed on missing or mismatched recorder identity
+  - [x] Prove unrelated processes are neither adopted nor signaled
+  - [x] Validate recovery, scheduler, and full Sports regressions
+  - [x] Complete read-only production validation
 - [ ] Verify automatic cleanup safeguards
 - [ ] Verify VPN fail-closed behavior
 - [ ] Verify storage-full behavior

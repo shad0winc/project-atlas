@@ -6,6 +6,9 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Fixed
 
+- Hardened Sports recorder recovery so process adoption and termination require
+  both the persisted PID and Linux process start-time identity. Missing or
+  mismatched identity now fails closed instead of trusting PID liveness alone.
 - Prevented interrupted media-request submission and cancellation from
   silently replaying outcome-ambiguous provider mutations by durably
   persisting `submitting` or `cancelling` intent before external mutation and
@@ -48,6 +51,12 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Added
 
+- Completed M-023.19 Sports Recovery Verification with durable recorder process
+  identity, PID-reuse protection, verified no-signal fail-closed behavior, and
+  read-only production validation.
+- Reconciled the Sports documentation with the deployed feed/controller,
+  provider, subscription, recording, health, scheduler, maintenance, and
+  recovery foundations while keeping unfinished Portal experience explicit.
 - Completed M-023.18 Interrupted-Request Recovery with normalized recovery
   intent states, provider-ID invariants, deterministic fail-closed orchestration,
   and the read-only `MediaRequestService.list_recovery_required_requests()`
