@@ -31,6 +31,7 @@ Project Atlas
 │   ├── Health and observability
 │   ├── Policy, retention, and cleanup
 │   ├── Scheduler and events
+│   │   └── Scheduler Recovery
 │   └── Module platform
 ├── Providers and adapters
 │   ├── Docker Compose
@@ -54,6 +55,7 @@ logic.
 - [Restart Recovery](RESTART_RECOVERY.md)
 - [Service Dependency Verification](SERVICE_DEPENDENCY_VERIFICATION.md)
 - [Stale-State Recovery](STALE_STATE_RECOVERY.md)
+- [Scheduler Recovery](SCHEDULER_RECOVERY.md)
 - [Portal](PORTAL.md)
 
 Additional subsystem documents should be added only when their design is mature
@@ -131,3 +133,11 @@ boundaries.
 - [Service Lifecycle CLI reference](../cli/SERVICE_LIFECYCLE.md)
 - [Python API reference](../api/SERVICE_LIFECYCLE.md)
 - [ADR 0013 — Dependency Verification Boundaries](../ADR/0013-dependency-verification-boundaries.md)
+
+## Scheduler Recovery
+
+Scheduler Recovery hardens the shared scheduler's process-interruption and
+runtime-lock behavior without introducing a second scheduling engine.
+
+- [Architecture](SCHEDULER_RECOVERY.md)
+- [ADR 0015 — Scheduler Recovery Boundaries](../ADR/0015-scheduler-recovery-boundaries.md)
