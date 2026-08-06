@@ -664,7 +664,13 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 - [x] Complete service dependency verification
 - [x] Complete stale-state recovery verification
 - [x] Complete scheduler recovery verification
-- [ ] Complete interrupted-request recovery verification
+- [x] Complete interrupted-request recovery verification
+  - [x] Define Interrupted-Request Recovery architecture and ADR 0016
+  - [x] Add durable `submitting` and `cancelling` request states
+  - [x] Persist mutation intent before provider submission or cancellation
+  - [x] Fail closed on outcome-ambiguous provider mutations
+  - [x] Expose recovery-required requests through a read-only service boundary
+  - [x] Complete read-only production validation
 - [ ] Complete Sports recovery verification
 - [ ] Verify automatic cleanup safeguards
 - [ ] Verify VPN fail-closed behavior

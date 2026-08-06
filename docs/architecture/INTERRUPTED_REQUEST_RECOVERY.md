@@ -213,6 +213,37 @@ M-023.18 does not introduce:
 - time-based assumptions that an ambiguous mutation failed; or
 - replacement of the existing Media Requests domain.
 
+## Implementation Status
+
+M-023.18 is complete.
+
+The implemented contract includes:
+
+- normalized `submitting` and `cancelling` recovery-intent states;
+- provider-request-ID invariants for both intent states;
+- durable intent persistence before provider submission and cancellation;
+- fail-closed retention of ambiguous intent after provider or final-persistence
+  failure;
+- replay blocking while a request requires reconciliation; and
+- read-only `MediaRequestService.list_recovery_required_requests()` visibility.
+
+Final automated validation passed 346 Media Requests regressions.
+
+## Production Validation
+
+Read-only production inspection at commit `0ce8605f` found no existing Atlas
+media-request registry and no non-test repository construction site, so there
+is no deployed request state requiring migration. Jellyseerr was running with
+exit code zero and no lifecycle errors. Service Lifecycle reported it as
+`degraded` only because no Docker healthcheck is configured.
+
+No provider submission, cancellation, refresh, repository initialization, or
+infrastructure mutation was performed during production validation.
+
+Automatic reconciliation remains outside this milestone. A recovery-required
+request is intentionally preserved until Atlas has reliable provider evidence
+or an operator explicitly reconciles the outcome.
+
 ## Related Decisions
 
 - [ADR 0016 — Interrupted-Request Recovery Boundaries](../ADR/0016-interrupted-request-recovery-boundaries.md)

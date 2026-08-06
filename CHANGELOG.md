@@ -6,6 +6,10 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Fixed
 
+- Prevented interrupted media-request submission and cancellation from
+  silently replaying outcome-ambiguous provider mutations by durably
+  persisting `submitting` or `cancelling` intent before external mutation and
+  failing closed until reconciliation.
 - Hardened Scheduler Recovery lock ownership to fail closed when a runtime
   lock is empty, malformed, unreadable, non-positive, or otherwise
   indeterminate, while preserving automatic reclamation for a PID positively
@@ -44,6 +48,13 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Added
 
+- Completed M-023.18 Interrupted-Request Recovery with normalized recovery
+  intent states, provider-ID invariants, deterministic fail-closed orchestration,
+  and the read-only `MediaRequestService.list_recovery_required_requests()`
+  boundary.
+- Validated the completed Media Requests recovery contract with 346 regressions
+  and read-only production inspection. No production request registry currently
+  exists, so no persisted request state requires migration.
 - Completed M-023.15 Service Dependency Verification by hardening and publicly
   exporting `ServiceDependencyNode` and `InfrastructureDependencyGraph`, while
   preserving compatibility through the existing lifecycle service module.

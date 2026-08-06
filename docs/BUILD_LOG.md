@@ -4538,3 +4538,130 @@ production-inspected Scheduler Recovery contract. Provably dead lock owners
 remain automatically recoverable, ambiguous ownership cannot authorize
 concurrent automation, and interrupted tasks preserve factual scheduler state
 until a real terminal execution outcome is recorded.
+
+---
+
+# 2026-08-06
+
+## M-023.18 — Interrupted-Request Recovery Verification
+
+### Objective
+
+Prevent interrupted Atlas media-request mutations from being silently replayed
+when Atlas cannot prove whether an external provider operation completed.
+
+### Discovery
+
+Repository review established that request creation is locally atomic and
+provider refresh is read-only, but submission and cancellation cross a durable
+local/external-provider boundary.
+
+Before M-023.18, provider submission occurred before Atlas persisted the
+provider request ID and resulting request status. If the provider mutation
+succeeded and Atlas was interrupted before the local replacement, the request
+could remain `pending`; repeating submission could repeat the external
+mutation.
+
+Cancellation had the analogous window: provider deletion could succeed while
+Atlas retained an active local request, allowing cancellation to be repeated
+without proof that the first operation failed.
+
+The existing Jellyseerr provider contract does not expose a stable Atlas
+request-ID lookup that can safely reconcile an interrupted submission whose
+provider request ID was never persisted.
+
+### Architecture
+
+- Added the Interrupted-Request Recovery architecture document.
+- Added ADR 0016, Interrupted-Request Recovery Boundaries.
+- Kept the existing Media Requests state machine, repository, service, and
+  provider boundaries authoritative.
+- Defined durable mutation intent before provider-side mutation.
+- Defined ambiguous external outcomes as recovery-required state.
+- Defined provider refresh as retry-safe because it is observational.
+- Kept events best effort and outside the mutation commit protocol.
+- Explicitly rejected exactly-once claims, automatic mutation replay, a second
+  transaction journal, a recovery daemon, and destructive reconciliation.
+
+### Model Contract
+
+- Added normalized `submitting` and `cancelling` statuses.
+- `submitting` requires `provider_request_id` to remain null because Atlas has
+  not durably committed a provider result.
+- `cancelling` requires `provider_request_id` because cancellation targets an
+  already-submitted provider request.
+- Both intent states remain active and non-terminal.
+- Existing normalization, timestamp validation, deterministic `to_dict()`, and
+  public `MediaRequestStatus` export behavior remain intact.
+
+### Service Hardening
+
+- Submission persists `submitting` before calling the provider.
+- Cancellation persists `cancelling` before calling the provider.
+- Failure to persist intent prevents the provider mutation from being invoked.
+- Provider failure after intent persistence leaves the durable intent intact.
+- Invalid or mismatched provider results do not erase ambiguous intent.
+- Failure of the final Atlas persistence step after provider success leaves the
+  durable intent intact.
+- Repeated submit or cancel from a recovery-required state fails closed with an
+  explicit reconciliation error.
+- Successful operations still commit their normalized provider result and emit
+  the existing best-effort events.
+- Added `MediaRequestService.list_recovery_required_requests()` as a read-only,
+  deterministic repository-backed observation boundary.
+
+### Automated Validation
+
+- 94 focused Media Request model tests passed after correcting the generic
+  cancelling-state fixture to supply its required provider request ID.
+- 149 combined model and repository tests passed.
+- 335 broader Media Requests regressions passed for the model slice.
+- 47 focused interrupted-request service tests passed.
+- 57 combined service and event tests passed.
+- 343 broader Media Requests regressions passed for service hardening.
+- Three focused recovery-visibility tests passed.
+- 50 complete Media Request service tests passed.
+- 346 final broader Media Requests regressions passed.
+- Python compilation, Atlas shell syntax, and Git diff hygiene passed.
+
+### Production Validation
+
+Validated read-only at commit `0ce8605f`:
+
+- no existing media-request `requests.json` registry was found beneath the
+  Atlas production configuration root;
+- no non-test `JsonMediaRequestRepository` construction site is currently
+  tracked, so there is no deployed request registry requiring migration;
+- Jellyseerr runtime state was `running` with exit code zero and no lifecycle
+  errors;
+- Service Lifecycle reported Jellyseerr as `degraded` with score 85 solely
+  because the container does not configure a Docker healthcheck;
+- the exact warning was `No Docker health check is configured`;
+- the interrupted-request public model/service boundary passed;
+- all 346 final Media Requests regressions passed;
+- provider mutations: none;
+- repository mutations: none;
+- repository remained clean.
+
+The Jellyseerr degraded score is an existing observability characteristic, not
+an Interrupted-Request Recovery defect. Production submission or cancellation
+was intentionally not performed because the milestone's safety properties are
+deterministically exercised by provider test doubles and do not require an
+unnecessary live external mutation.
+
+### Commits
+
+- `7ff47062` — define Interrupted-Request Recovery architecture and ADR 0016;
+- `7d6bb194` — add durable recovery intent states and model invariants;
+- `46875eaf` — persist provider mutation intent and block ambiguous replay;
+- `0ce8605f` — expose recovery-required requests through a read-only service
+  boundary.
+
+### Result
+
+M-023.18 is complete. Atlas now records externally mutating media-request
+intent before provider I/O, preserves ambiguity instead of guessing an outcome,
+blocks unsafe mutation replay, and exposes recovery-required state through the
+existing Media Requests service boundary. Automatic provider reconciliation
+remains intentionally deferred until a stable non-mutating correlation
+mechanism exists.
