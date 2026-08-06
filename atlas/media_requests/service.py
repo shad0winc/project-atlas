@@ -50,6 +50,21 @@ _ALLOWED_TRANSITIONS: dict[
     MediaRequestStatus.PENDING: frozenset(
         {
             MediaRequestStatus.PENDING,
+            MediaRequestStatus.SUBMITTING,
+            MediaRequestStatus.APPROVED,
+            MediaRequestStatus.SEARCHING,
+            MediaRequestStatus.DOWNLOADING,
+            MediaRequestStatus.IMPORTING,
+            MediaRequestStatus.CANCELLING,
+            MediaRequestStatus.AVAILABLE,
+            MediaRequestStatus.REJECTED,
+            MediaRequestStatus.FAILED,
+            MediaRequestStatus.CANCELLED,
+        }
+    ),
+    MediaRequestStatus.SUBMITTING: frozenset(
+        {
+            MediaRequestStatus.PENDING,
             MediaRequestStatus.APPROVED,
             MediaRequestStatus.SEARCHING,
             MediaRequestStatus.DOWNLOADING,
@@ -66,6 +81,7 @@ _ALLOWED_TRANSITIONS: dict[
             MediaRequestStatus.SEARCHING,
             MediaRequestStatus.DOWNLOADING,
             MediaRequestStatus.IMPORTING,
+            MediaRequestStatus.CANCELLING,
             MediaRequestStatus.AVAILABLE,
             MediaRequestStatus.REJECTED,
             MediaRequestStatus.FAILED,
@@ -77,6 +93,7 @@ _ALLOWED_TRANSITIONS: dict[
             MediaRequestStatus.SEARCHING,
             MediaRequestStatus.DOWNLOADING,
             MediaRequestStatus.IMPORTING,
+            MediaRequestStatus.CANCELLING,
             MediaRequestStatus.AVAILABLE,
             MediaRequestStatus.FAILED,
             MediaRequestStatus.CANCELLED,
@@ -86,6 +103,7 @@ _ALLOWED_TRANSITIONS: dict[
         {
             MediaRequestStatus.DOWNLOADING,
             MediaRequestStatus.IMPORTING,
+            MediaRequestStatus.CANCELLING,
             MediaRequestStatus.AVAILABLE,
             MediaRequestStatus.FAILED,
             MediaRequestStatus.CANCELLED,
@@ -94,8 +112,14 @@ _ALLOWED_TRANSITIONS: dict[
     MediaRequestStatus.IMPORTING: frozenset(
         {
             MediaRequestStatus.IMPORTING,
+            MediaRequestStatus.CANCELLING,
             MediaRequestStatus.AVAILABLE,
             MediaRequestStatus.FAILED,
+            MediaRequestStatus.CANCELLED,
+        }
+    ),
+    MediaRequestStatus.CANCELLING: frozenset(
+        {
             MediaRequestStatus.CANCELLED,
         }
     ),
@@ -255,6 +279,14 @@ class MediaRequestService:
 
         request = self.get_request(request_id)
 
+        if request.status in {
+            MediaRequestStatus.SUBMITTING,
+            MediaRequestStatus.CANCELLING,
+        }:
+            raise MediaRequestServiceError(
+                f"media request requires reconciliation: {request.request_id}",
+            )
+
         if request.provider_request_id is not None:
             raise MediaRequestServiceError(
                 f"media request is already submitted: {request.request_id}",
@@ -279,8 +311,19 @@ class MediaRequestService:
                 f"{request.provider}:{request.media_type.value}",
             )
 
+        self._validate_transition(
+            request.status,
+            MediaRequestStatus.SUBMITTING,
+        )
+        intent = self._replace(
+            replace(
+                request,
+                status=MediaRequestStatus.SUBMITTING,
+            )
+        )
+
         try:
-            result = provider.submit(request)
+            result = provider.submit(intent)
         except (
             MediaRequestProviderError,
             MediaRequestProviderOperationError,
@@ -295,14 +338,14 @@ class MediaRequestService:
             )
 
         self._validate_provider_result(
-            request,
+            intent,
             result.provider,
             result.provider_request_id,
         )
-        self._validate_transition(request.status, result.status)
+        self._validate_transition(intent.status, result.status)
 
         updated = replace(
-            request,
+            intent,
             provider_request_id=result.provider_request_id,
             status=result.status,
             updated_at=result.updated_at,
@@ -370,6 +413,14 @@ class MediaRequestService:
 
         request = self.get_request(request_id)
 
+        if request.status in {
+            MediaRequestStatus.SUBMITTING,
+            MediaRequestStatus.CANCELLING,
+        }:
+            raise MediaRequestServiceError(
+                f"media request requires reconciliation: {request.request_id}",
+            )
+
         if request.provider_request_id is None:
             raise MediaRequestServiceError(
                 f"media request is not submitted: {request.request_id}",
@@ -390,9 +441,20 @@ class MediaRequestService:
                 f"{request.provider}",
             )
 
+        self._validate_transition(
+            request.status,
+            MediaRequestStatus.CANCELLING,
+        )
+        intent = self._replace(
+            replace(
+                request,
+                status=MediaRequestStatus.CANCELLING,
+            )
+        )
+
         try:
             result = provider.cancel(
-                request.provider_request_id,
+                intent.provider_request_id,
             )
         except (
             MediaRequestProviderError,
@@ -412,7 +474,7 @@ class MediaRequestService:
                 "provider cancellation must return cancelled status",
             )
 
-        updated = self._apply_status_result(request, result)
+        updated = self._apply_status_result(intent, result)
 
         self._publish(
             MediaRequestEventType.CANCELLED,

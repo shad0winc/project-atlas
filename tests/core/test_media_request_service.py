@@ -312,7 +312,10 @@ def test_submit_request_calls_provider_and_replaces_record(
 
     updated = service.submit_request(request.request_id)
 
-    assert provider.submissions == [request]
+    assert len(provider.submissions) == 1
+    assert provider.submissions[0].request_id == request.request_id
+    assert provider.submissions[0].status is MediaRequestStatus.SUBMITTING
+    assert provider.submissions[0].provider_request_id is None
     assert updated.provider_request_id == "provider-001"
     assert updated.status is MediaRequestStatus.APPROVED
     assert updated.updated_at == UPDATED
@@ -347,7 +350,9 @@ def test_submit_request_wraps_provider_failure(
     ):
         service.submit_request("request-001")
 
-    assert service.get_request("request-001").provider_request_id is None
+    persisted = service.get_request("request-001")
+    assert persisted.status is MediaRequestStatus.SUBMITTING
+    assert persisted.provider_request_id is None
 
 
 def test_submit_request_requires_submission_result(
@@ -615,6 +620,10 @@ def test_cancel_wraps_provider_failure(
     ):
         service.cancel_request("request-001")
 
+    persisted = service.get_request("request-001")
+    assert persisted.status is MediaRequestStatus.CANCELLING
+    assert persisted.provider_request_id == "provider-001"
+
 
 def test_cancel_requires_cancelled_result(
     service: MediaRequestService,
@@ -633,6 +642,8 @@ def test_cancel_requires_cancelled_result(
         match="must return cancelled",
     ):
         service.cancel_request("request-001")
+
+    assert service.get_request("request-001").status is MediaRequestStatus.CANCELLING
 
 
 def test_list_and_user_lookup_delegate_to_repository(
@@ -669,8 +680,9 @@ def test_get_wraps_repository_failure(
         service.get_request("missing")
 
 
-def test_replace_failure_is_wrapped(
+def test_submit_intent_persistence_failure_blocks_provider(
     service: MediaRequestService,
+    provider: FakeProvider,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     service.create_request(make_request())
@@ -682,8 +694,172 @@ def test_replace_failure_is_wrapped(
         ),
     )
 
-    with pytest.raises(
-        MediaRequestServiceError,
-        match="update",
-    ):
+    with pytest.raises(MediaRequestServiceError, match="update"):
         service.submit_request("request-001")
+
+    assert provider.submissions == []
+    assert service.get_request("request-001").status is MediaRequestStatus.PENDING
+
+
+def test_provider_observes_durable_submitting_intent(
+    service: MediaRequestService,
+    provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service.create_request(make_request())
+    real_submit = provider.submit
+
+    def observe(request: MediaRequest) -> ProviderSubmissionResult:
+        persisted = service.get_request(request.request_id)
+        assert persisted.status is MediaRequestStatus.SUBMITTING
+        assert persisted == request
+        return real_submit(request)
+
+    monkeypatch.setattr(provider, "submit", observe)
+
+    result = service.submit_request("request-001")
+
+    assert result.status is MediaRequestStatus.APPROVED
+
+
+def test_submit_final_persistence_failure_keeps_intent(
+    service: MediaRequestService,
+    provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service.create_request(make_request())
+    real_replace = service.repository.replace
+    calls = 0
+
+    def fail_final(request: MediaRequest) -> MediaRequest:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise MediaRequestRepositoryError("failure")
+        return real_replace(request)
+
+    monkeypatch.setattr(service.repository, "replace", fail_final)
+
+    with pytest.raises(MediaRequestServiceError, match="update"):
+        service.submit_request("request-001")
+
+    assert len(provider.submissions) == 1
+    persisted = service.get_request("request-001")
+    assert persisted.status is MediaRequestStatus.SUBMITTING
+    assert persisted.provider_request_id is None
+
+
+def test_submit_invalid_result_keeps_intent(
+    service: MediaRequestService,
+    provider: FakeProvider,
+) -> None:
+    provider.submission_result = object()
+    service.create_request(make_request())
+
+    with pytest.raises(MediaRequestServiceError, match="ProviderSubmissionResult"):
+        service.submit_request("request-001")
+
+    assert service.get_request("request-001").status is MediaRequestStatus.SUBMITTING
+
+
+def test_submit_replay_is_blocked_from_recovery_intent(
+    service: MediaRequestService,
+    provider: FakeProvider,
+) -> None:
+    provider.submission_error = MediaRequestProviderOperationError("ambiguous")
+    service.create_request(make_request())
+
+    with pytest.raises(MediaRequestServiceError, match="submission failed"):
+        service.submit_request("request-001")
+
+    provider.submission_error = None
+    with pytest.raises(MediaRequestServiceError, match="requires reconciliation"):
+        service.submit_request("request-001")
+
+    assert len(provider.submissions) == 1
+
+
+def test_cancel_intent_persistence_failure_blocks_provider(
+    service: MediaRequestService,
+    provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    submitted = submitted_request(service)
+    monkeypatch.setattr(
+        service.repository,
+        "replace",
+        lambda request: (_ for _ in ()).throw(
+            MediaRequestRepositoryError("failure")
+        ),
+    )
+
+    with pytest.raises(MediaRequestServiceError, match="update"):
+        service.cancel_request("request-001")
+
+    assert provider.cancellations == []
+    assert service.get_request("request-001") == submitted
+
+
+def test_provider_observes_durable_cancelling_intent(
+    service: MediaRequestService,
+    provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    submitted_request(service)
+    real_cancel = provider.cancel
+
+    def observe(provider_request_id: str) -> ProviderStatusResult:
+        persisted = service.get_request("request-001")
+        assert persisted.status is MediaRequestStatus.CANCELLING
+        assert persisted.provider_request_id == provider_request_id
+        return real_cancel(provider_request_id)
+
+    monkeypatch.setattr(provider, "cancel", observe)
+
+    result = service.cancel_request("request-001")
+
+    assert result.status is MediaRequestStatus.CANCELLED
+
+
+def test_cancel_final_persistence_failure_keeps_intent(
+    service: MediaRequestService,
+    provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    submitted_request(service)
+    real_replace = service.repository.replace
+    calls = 0
+
+    def fail_final(request: MediaRequest) -> MediaRequest:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise MediaRequestRepositoryError("failure")
+        return real_replace(request)
+
+    monkeypatch.setattr(service.repository, "replace", fail_final)
+
+    with pytest.raises(MediaRequestServiceError, match="update"):
+        service.cancel_request("request-001")
+
+    assert provider.cancellations == ["provider-001"]
+    persisted = service.get_request("request-001")
+    assert persisted.status is MediaRequestStatus.CANCELLING
+    assert persisted.provider_request_id == "provider-001"
+
+
+def test_cancel_replay_is_blocked_from_recovery_intent(
+    service: MediaRequestService,
+    provider: FakeProvider,
+) -> None:
+    submitted_request(service)
+    provider.cancel_error = MediaRequestProviderOperationError("ambiguous")
+
+    with pytest.raises(MediaRequestServiceError, match="cancellation failed"):
+        service.cancel_request("request-001")
+
+    provider.cancel_error = None
+    with pytest.raises(MediaRequestServiceError, match="requires reconciliation"):
+        service.cancel_request("request-001")
+
+    assert provider.cancellations == ["provider-001"]
