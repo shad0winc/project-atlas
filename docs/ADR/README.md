@@ -69,3 +69,4 @@ The simplified numeric format is the project standard for all future ADRs.
 - [ADR 0016 — Interrupted-Request Recovery Boundaries](0016-interrupted-request-recovery-boundaries.md)
 - [ADR 0017 — Sports Recorder Process Identity](0017-sports-recorder-process-identity.md)
 - [ADR 0018 — Cleanup Mutation Authorization](0018-cleanup-mutation-authorization.md)
+- [ADR 0019 — VPN Fail-Closed Enforcement Boundaries](0019-vpn-fail-closed-enforcement-boundaries.md)

@@ -175,3 +175,11 @@ non-destructive while cross-boundary safeguards are verified.
 
 - [Architecture](AUTOMATIC_CLEANUP_SAFETY.md)
 - [ADR 0018 — Cleanup Mutation Authorization](../ADR/0018-cleanup-mutation-authorization.md)
+
+## VPN Fail-Closed Verification
+
+VPN Fail-Closed Verification separates healthy-path VPN readiness from proof
+that qBittorrent has no non-VPN fallback when the tunnel is unavailable.
+
+- [Architecture](VPN_FAIL_CLOSED.md)
+- [ADR 0019 — VPN Fail-Closed Enforcement Boundaries](../ADR/0019-vpn-fail-closed-enforcement-boundaries.md)
