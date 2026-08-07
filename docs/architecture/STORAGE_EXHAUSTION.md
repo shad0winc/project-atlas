@@ -261,6 +261,61 @@ M-023.22 does not:
 - introduce a new storage daemon; or
 - perform a storage migration.
 
+## Implementation Status
+
+M-023.22 is complete.
+
+The implemented and verified boundaries are:
+
+- shared atomic persistence preserves the last durable state when a temporary
+  write fails with `ENOSPC` and cleans partial temporary state when safe;
+- Media Request registry writes normalize filesystem failures through the
+  repository error contract, allowing orchestration to fail before provider
+  mutation when durable intent cannot be recorded;
+- Sports recording reconciliation tracks only recorders genuinely launched by
+  the current pass and compensates failed registry persistence using the exact
+  PID plus Linux process start-time identity returned by launch;
+- already-running recorders adopted by reconciliation are not signaled as
+  persistence compensation;
+- `atlas backup` creates a same-directory `.partial` archive, validates it,
+  and atomically publishes the canonical `.tar.gz` name only after success;
+- backup listing and retention ignore partial artifacts; and
+- production validation remains read-only and never fills the live filesystem.
+
+### Validation Evidence
+
+Automated milestone validation included:
+
+- 139 focused atomic/persistence tests during Core hardening;
+- 349 broader Media Request regressions;
+- 42 Scheduler persistence regressions;
+- 4 focused Sports storage-exhaustion tests;
+- 4 focused backup storage-safety tests plus 21 Backup CLI regressions; and
+- a final cross-boundary run of 189 storage-exhaustion regressions.
+
+Read-only production validation at commit `c5c56992` observed:
+
+- `/mnt/storage` total bytes: `1967846068224`;
+- free bytes: `1864692621312`;
+- free capacity: 94.76 percent;
+- 10 canonical Atlas backup archives;
+- zero partial Atlas backup artifacts;
+- a valid newest canonical archive and non-empty `BACKUP_INFO.txt` manifest;
+- zero persisted and zero active Sports recordings; and
+- zero production storage-fill, backup, recorder, cleanup, and repository
+  mutations.
+
+### Commits
+
+- `356049f6` — define storage-exhaustion failure boundaries and ADR 0020;
+- `ca52c941` — fail closed on Core `ENOSPC` persistence;
+- `da2f0318` — compensate Sports recorder launch on persistence failure; and
+- `c5c56992` — publish Atlas backup archives transactionally.
+
+The broader v1.0 Backup and Recovery work remains separate. M-023.22 proves
+storage-exhaustion behavior and partial-artifact safety; it does not claim a
+complete restore certification.
+
 ## Related Documents
 
 - [ADR-0020: Storage Exhaustion Failure Boundaries](../ADR/0020-storage-exhaustion-failure-boundaries.md)

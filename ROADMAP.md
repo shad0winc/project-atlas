@@ -694,7 +694,13 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
   - [x] Perform an explicitly approved controlled VPN-loss test
   - [x] Prove direct IPv4 egress is blocked while `tun0` remains absent
   - [x] Verify automatic VPN recovery and post-recovery Atlas health
-- [ ] Verify storage-full behavior
+- [x] Verify storage-full behavior
+  - [x] Define Storage Exhaustion Recovery architecture and ADR 0020
+  - [x] Prove atomic persistence preserves the last durable state on `ENOSPC`
+  - [x] Normalize Media Request storage failures before provider mutation
+  - [x] Compensate newly launched Sports recorders by exact process identity
+  - [x] Publish backup archives only after temporary archive validation
+  - [x] Complete read-only production validation without filling storage
 - [ ] Verify unavailable-provider behavior
 
 ### Deployment Safety

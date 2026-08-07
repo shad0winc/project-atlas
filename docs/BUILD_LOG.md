@@ -5036,3 +5036,139 @@ read-only runtime, and explicitly controlled production failure evidence that
 qBittorrent cannot use the underlying non-VPN egress path while Gluetun's VPN
 tunnel is unavailable, and automatic recovery has been proven without an
 emergency container restart.
+
+---
+
+## M-023.22 — Storage-Full Behavior
+
+### Objective
+
+Define and verify how Atlas fails when required persistence encounters storage
+exhaustion without deliberately filling the production filesystem.
+
+The permanent invariant is:
+
+> Storage exhaustion must not corrupt the last durable state, create an
+> untracked external operation, or present a partial artifact as successful.
+
+Storage pressure remains an observability and persistence condition. It is not
+deletion authorization.
+
+### Architecture
+
+Commit `356049f6` added the Storage Exhaustion Recovery architecture and ADR
+0020, Storage Exhaustion Failure Boundaries.
+
+The architecture distinguishes low capacity, proven exhaustion, and unknown
+storage state; preserves existing atomic-state and subsystem boundaries; and
+explicitly rejects production-disk filling, automatic Media deletion, a second
+persistence framework, and a new storage daemon.
+
+### Core Persistence Hardening
+
+Commit `ca52c941` hardened deterministic `ENOSPC` behavior across Core
+persistence boundaries.
+
+Validation proved:
+
+- failed atomic temporary writes preserve the previous durable target;
+- partial temporary state is removed when safe;
+- Media Request registry filesystem errors become
+  `MediaRequestRepositoryError` while retaining the original `ENOSPC` cause;
+- failed submission-intent persistence blocks the external provider mutation
+  and preserves the prior pending request state; and
+- Operations repository persistence retains its normalized repository error
+  contract and causal `ENOSPC` evidence.
+
+The stage passed 139 focused atomic/persistence tests, 349 broader Media
+Request regressions, and 42 Scheduler persistence regressions.
+
+### Sports External-Process Hardening
+
+Commit `da2f0318` closed the external-process ordering gap discovered during
+M-023.22.
+
+Sports recording reconciliation now tracks only recorder processes genuinely
+started by the current reconciliation pass. If the updated recording registry
+cannot be persisted, Atlas attempts bounded compensation using the exact PID
+and Linux process start-time identity returned by launch.
+
+An adopted existing recorder is never added to the compensation set. Failed
+exact-identity compensation becomes an explicit error rather than authorizing
+an ambiguous signal.
+
+Four deterministic tests proved new-process compensation, adopted-process
+protection, explicit compensation failure, and registry/temp-file preservation
+under simulated `ENOSPC`.
+
+### Backup Artifact Hardening
+
+Commit `c5c56992` changed `atlas backup` from direct final-name creation to
+transactional artifact publication.
+
+New backups are created as `atlas-<timestamp>.tar.gz.partial` on the target
+backup filesystem. Atlas reports available capacity, validates the completed
+temporary archive, and only then atomically renames it to the canonical
+`.tar.gz` name.
+
+Creation, validation, or publication failure returns failure and does not
+publish a canonical completed-backup name. Backup listing and retention see
+only canonical `.tar.gz` artifacts.
+
+Four focused backup storage-safety tests and 21 Backup CLI regressions passed.
+
+### Read-Only Production Validation
+
+Final M-023.22 validation at commit `c5c56992` deliberately did not fill or
+otherwise mutate production storage.
+
+The production observation established:
+
+- storage root: `/mnt/storage`;
+- total bytes: `1967846068224`;
+- used bytes: `3116777472`;
+- free bytes: `1864692621312`;
+- free capacity: 94.76 percent;
+- canonical Atlas backups: 10;
+- partial Atlas backup artifacts: zero;
+- newest canonical backup:
+  `atlas-20260718-041132-663.tar.gz` (`145153` bytes);
+- the newest canonical archive and `BACKUP_INFO.txt` manifest validated;
+- the Sports recording registry contained zero persisted and zero active
+  recordings; and
+- production storage fill, backup mutation, recorder mutation, cleanup
+  mutation, and repository mutation were all zero.
+
+The final cross-boundary regression passed 189 tests spanning atomic
+persistence, Media Request repository/service behavior, Operations
+persistence, Scheduler persistence, Sports recorder compensation, and backup
+publication safety.
+
+Python compilation, backup shell syntax, Git diff hygiene, branch guards,
+commit guards, and working-tree guards all passed.
+
+### Documentation Reconciliation
+
+The v1.0 reliability roadmap now records Storage-Full Behavior as complete and
+keeps unavailable-provider behavior separate and unfinished.
+
+The backup operator document now points to the canonical `atlas backup` CLI
+and documents partial-artifact identity, validation-before-publication,
+capacity observation, canonical retention, and the boundary between M-023.22
+and the still-open full Backup and Recovery certification work.
+
+### Commits
+
+- `356049f6` — define storage exhaustion failure boundaries;
+- `ca52c941` — fail closed on `ENOSPC` persistence;
+- `da2f0318` — fail closed on Sports recorder persistence; and
+- `c5c56992` — publish backup archives atomically.
+
+### Result
+
+M-023.22 is complete. Atlas now preserves last-known-good durable state under
+controlled storage exhaustion, prevents provider mutation when required intent
+cannot be persisted, compensates only exact-identity newly launched Sports
+recorders, prevents partial backups from masquerading as successful artifacts,
+and has read-only production evidence confirming the live storage and backup
+state without deliberately creating a storage-full incident.

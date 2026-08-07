@@ -6,6 +6,21 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Fixed
 
+- Completed M-023.22 Storage-Full Behavior with deterministic `ENOSPC`
+  injection, last-durable-state preservation, exact-identity Sports recorder
+  compensation, and read-only production validation.
+- Normalized Media Request registry persistence failures so unavailable storage
+  fails before provider mutation instead of escaping the repository boundary.
+- Hardened Sports recorder reconciliation so a newly launched recorder is
+  stopped by exact PID plus process-start-time identity if its durable identity
+  cannot be persisted; adopted recorders are never stopped as compensation.
+- Hardened `atlas backup` so archives are created under a `.partial` identity,
+  validated, and atomically published to the canonical `.tar.gz` name only
+  after successful completion.
+- Verified production storage at 94.76 percent free with 10 canonical Atlas
+  backups, zero partial backup artifacts, a valid newest backup manifest, and
+  zero production storage, backup, recorder, cleanup, or repository mutations.
+
 - Hardened automatic cleanup boundaries so cleanup recommendations remain
   non-destructive until a future mutation path performs fresh Atlas policy and
   retention authorization at the exact mutation boundary.
