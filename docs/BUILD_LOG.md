@@ -5172,3 +5172,139 @@ cannot be persisted, compensates only exact-identity newly launched Sports
 recorders, prevents partial backups from masquerading as successful artifacts,
 and has read-only production evidence confirming the live storage and backup
 state without deliberately creating a storage-full incident.
+
+---
+
+## M-023.23 — Unavailable-Provider Behavior
+
+### Objective
+
+Define and verify the v1.0 failure semantics used when an external or
+infrastructure provider is unavailable, unreachable, timed out, unauthorized,
+or returns unusable data.
+
+The permanent invariant is:
+
+> Provider unavailability must remain observable, must not be interpreted as
+> an empty successful response, and must not authorize or replay an external
+> mutation.
+
+### Architecture
+
+Commit `15a502b5` added ADR 0021, Unavailable Provider Failure Semantics, and
+the Unavailable-Provider Behavior architecture.
+
+The architecture preserves provider-specific domain contracts rather than
+introducing a universal provider base class. It separates read-only
+observation, required provider mutation, multi-provider aggregation, and
+provider-assisted safety checks while applying one shared fail-closed rule.
+
+The documented failure classes include transport/timeout failure,
+authentication or authorization failure, invalid provider response,
+authoritative resource absence, and outcome-ambiguous mutation.
+
+### Deterministic Cross-Boundary Safeguards
+
+Commit `faf17404` added a dedicated unavailable-provider safeguard suite.
+
+The focused tests prove:
+
+- Jellyfin URL/transport failure raises `MediaProviderError` instead of
+  returning an empty successful inventory;
+- Jellyfin timeout behavior has the same fail-closed contract;
+- an empty Sports provider input does not erase the existing recording
+  registry;
+- an empty Sports provider input does not erase previously monitored
+  non-finished game state; and
+- a failed Sports provider fetch becomes explicit degraded provider health
+  while subscribed previous-state evidence remains available.
+
+The implementation required no runtime code changes. The discovered production
+paths already satisfied ADR 0021; M-023.23 adds direct regression evidence
+around the previously implicit boundaries.
+
+### Existing Boundaries Revalidated
+
+M-023.23 also revalidated existing subsystem contracts rather than duplicating
+them in a second provider framework.
+
+Media Requests already provide normalized provider health with explicit
+`unavailable` and `unknown` states whose `available` property is false.
+Jellyseerr HTTP/provider failures are normalized, and failed submission or
+cancellation preserves durable `submitting` or `cancelling` intent so an
+outcome-ambiguous provider mutation cannot be silently replayed.
+
+The default cleanup executor remains dry-run-only. Provider preview failure is
+reported as failed or partial preview and `modified` remains zero.
+
+Sports isolates provider fetch failures, records consecutive-failure evidence,
+continues unaffected providers, preserves existing recording plans, and keeps
+non-finished monitored state until authoritative lifecycle or subscription
+evidence justifies transition or removal.
+
+### Automated Validation
+
+The implementation stage passed:
+
+- 5 focused unavailable-provider safeguards;
+- 24 Jellyfin/provider tests plus 13 subtests in the Jellyfin regression run;
+- 203 Media Request provider/recovery tests; and
+- 37 cleanup unavailable-provider/safeguard tests.
+
+Final cross-boundary validation at commit `faf17404` passed 264 tests plus 13
+subtests spanning the dedicated safeguards, Jellyfin provider/preview/scan,
+Media Request provider/HTTP/Jellyseerr/service behavior, and cleanup executor
+and safety boundaries.
+
+### Read-Only Production Validation
+
+Production validation was deliberately observational. No provider was stopped,
+disconnected, reconfigured, or asked to perform a mutation.
+
+The live validation established:
+
+- Jellyfin was running and Docker reported it healthy;
+- Jellyseerr was running and continued to expose the known no-healthcheck
+  runtime characteristic;
+- Service Lifecycle Doctor returned valid JSON containing both Jellyfin and
+  Jellyseerr visibility;
+- persisted TheSportsDB provider health was `healthy` with zero consecutive
+  failures and no last provider error;
+- persisted Sports aggregate health was `healthy`;
+- `MediaProviderError` remains publicly exported;
+- `ProviderHealthStatus.UNAVAILABLE` exposes `available == false`;
+- `ProviderHealthStatus.UNKNOWN` exposes `available == false`; and
+- the repository remained clean.
+
+Provider interruptions, provider mutations, Sports-state mutations, and
+repository mutations were all zero.
+
+### Release-Quality Checks
+
+Python compilation, Git diff hygiene, branch guards, commit guards, and
+working-tree guards passed. The production validator stored observational
+artifacts beneath `/tmp/m023-23-3-unavailable-provider-validation` without
+altering tracked repository state.
+
+### Documentation Reconciliation
+
+The v1.0 Reliability roadmap now records Unavailable-Provider Behavior as
+complete and expands the milestone into the architecture, fail-closed mutation,
+cleanup, Sports preservation, and production-observability evidence that was
+actually verified.
+
+This closes the final open item in the v1.0 Reliability subsection. Deployment
+Safety, Backup and Recovery certification, Security, Quality, Documentation,
+and release-level certification remain separate unfinished v1.0 work.
+
+### Commits
+
+- `15a502b5` — define unavailable-provider failure semantics; and
+- `faf17404` — prove unavailable-provider safeguards.
+
+### Result
+
+M-023.23 is complete. Atlas now has architecture, deterministic regression, and
+read-only production evidence that provider unavailability remains observable,
+does not masquerade as a successful empty response, preserves safety-critical
+state, and cannot implicitly authorize or replay an external mutation.

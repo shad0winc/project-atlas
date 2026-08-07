@@ -197,3 +197,29 @@ M-023.23 is complete only when tests demonstrate that unavailable providers are
 observable across the selected v1.0 boundaries, retained state is not erased by
 outage-shaped empty input, and no provider failure can become implicit mutation
 authorization or automatic replay.
+
+## Implementation Status
+
+M-023.23 is complete.
+
+Implementation and validation established:
+
+- ADR 0021 defines the permanent unavailable-provider failure invariant;
+- Jellyfin transport and timeout failure is explicit provider failure rather
+  than a successful empty inventory;
+- Media Request provider failures preserve durable mutation intent and block
+  outcome-ambiguous replay;
+- cleanup provider-preview failure remains non-destructive with zero
+  modification;
+- Sports provider outage records degraded provider health without discarding
+  existing recording plans or non-finished monitored state; and
+- read-only production validation confirmed live Jellyfin, Jellyseerr, Service
+  Lifecycle, and Sports provider visibility without interrupting a provider.
+
+Final automated validation passed 264 provider-related regressions plus 13
+subtests. Production validation observed healthy Jellyfin and Sports provider
+state, running Jellyseerr with its known missing Docker healthcheck, and zero
+provider, Sports-state, or repository mutations.
+
+The architecture commit is `15a502b5`; the dedicated safeguard-test commit is
+`faf17404`.

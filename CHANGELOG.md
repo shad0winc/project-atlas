@@ -6,6 +6,18 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Fixed
 
+- Completed M-023.23 Unavailable-Provider Behavior with explicit cross-boundary
+  failure semantics, deterministic provider-outage safeguards, and read-only
+  production validation.
+- Proved Jellyfin transport and timeout failures remain provider errors rather
+  than successful empty inventories, while Media Request recovery intent and
+  cleanup preview boundaries continue to fail closed.
+- Proved Sports provider failure records degraded provider health while
+  preserving existing recording plans and non-finished monitored game state.
+- Validated production Jellyfin, Jellyseerr, Service Lifecycle, and Sports
+  provider observability with 264 regressions and 13 subtests and zero provider,
+  Sports-state, or repository mutations.
+
 - Completed M-023.22 Storage-Full Behavior with deterministic `ENOSPC`
   injection, last-durable-state preservation, exact-identity Sports recorder
   compensation, and read-only production validation.

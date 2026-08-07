@@ -701,7 +701,13 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
   - [x] Compensate newly launched Sports recorders by exact process identity
   - [x] Publish backup archives only after temporary archive validation
   - [x] Complete read-only production validation without filling storage
-- [ ] Verify unavailable-provider behavior
+- [x] Verify unavailable-provider behavior
+  - [x] Define Unavailable-Provider Behavior architecture and ADR 0021
+  - [x] Prove provider outages cannot become successful empty responses
+  - [x] Preserve Media Request mutation intent and block ambiguous replay
+  - [x] Preserve cleanup dry-run safety when provider preview fails
+  - [x] Preserve Sports recordings and non-finished state during provider outage
+  - [x] Complete read-only production provider-observability validation
 
 ### Deployment Safety
 
