@@ -185,3 +185,52 @@ M-023.21 does not:
 - [ADR-0005: Docker Networking](../ADR/0005-docker-networking.md)
 - [Startup Policy](STARTUP_POLICY.md)
 - [Service Lifecycle](SERVICE_LIFECYCLE.md)
+
+## Implementation Status
+
+M-023.21 is complete.
+
+Automated verification locks down the production Compose boundary and the root
+Verify failure behavior. qBittorrent shares Gluetun's network namespace, owns
+no independent Compose network or published ports, and waits for Gluetun
+health. Gluetun retains the required tunnel device, network capability,
+firewall configuration, and published qBittorrent ports.
+
+Read-only production validation at commit `097f5099` established that Gluetun
+and qBittorrent shared the same kernel network namespace, `tun0` was active,
+the expected split VPN routes were present, explicit firewall DROP/REJECT
+enforcement existed, healthy qBittorrent egress differed from host egress, and
+Atlas Verify passed. The relevant VPN, Verify, and Startup Policy regression
+set passed 104 tests.
+
+### Controlled Production Validation
+
+With explicit operator approval, the controlled validator sent one `SIGTERM`
+to the dynamically identified `openvpn2.6` child inside Gluetun. No container,
+firewall, route, Compose, qBittorrent, or repository mutation was used to
+create the failure condition.
+
+The controlled failure produced the decisive fail-closed evidence:
+
+- `tun0` disappeared while the Gluetun and qBittorrent containers remained
+  running in the same kernel network namespace;
+- the underlying kernel route to `1.1.1.1` remained available through
+  `172.19.0.1 dev eth0`, so loss of all routes did not manufacture the result;
+- a direct IPv4 request from qBittorrent timed out with exit status 28;
+- `tun0` was still absent after that request, excluding an automatic reconnect
+  from the proof window; and
+- therefore usable non-VPN internet egress was blocked while the required VPN
+  tunnel was unavailable.
+
+Gluetun's supervisor then restored the VPN automatically. The approved
+emergency `docker restart gluetun` fallback was not used. After recovery,
+Gluetun and qBittorrent still shared the same kernel network namespace,
+qBittorrent regained VPN-routed internet egress distinct from the host,
+`atlas verify` passed, 26 focused VPN regressions passed, and release-quality
+checks completed successfully.
+
+The production security invariant is therefore verified by configuration,
+runtime observation, and controlled failure-path evidence:
+
+> qBittorrent has no usable non-VPN internet egress path while its required
+> VPN tunnel is unavailable.

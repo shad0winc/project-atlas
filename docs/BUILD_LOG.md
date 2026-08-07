@@ -4915,3 +4915,124 @@ M-023.20 is complete. Atlas automatic cleanup remains intentionally
 non-destructive, favorite and policy protections are proven across the cleanup
 chain, external destructive automation is disabled in production, and the live
 cleanup workflow has been validated with zero media mutations.
+
+---
+
+## M-023.21 — VPN Fail-Closed Verification
+
+### Objective
+
+Verify the v1.0 security invariant that qBittorrent cannot use a non-VPN
+internet path while its required Gluetun VPN tunnel is unavailable.
+
+The milestone separates startup readiness and healthy-path VPN egress from the
+stronger requirement to prove the actual failure path.
+
+### Discovery
+
+Repository and production discovery established the existing safety topology:
+
+- qBittorrent uses `network_mode: service:gluetun`;
+- qBittorrent has no independent Compose network or direct published ports;
+- Gluetun publishes the qBittorrent Web UI and peer ports;
+- Gluetun owns `NET_ADMIN`, `/dev/net/tun`, and `FIREWALL=on`;
+- qBittorrent waits for `gluetun` with `condition: service_healthy`; and
+- the existing Atlas VPN verifier proves healthy-path egress but does not by
+  itself prove leak prevention after tunnel loss.
+
+### Architecture
+
+Commit `94ea38e9` added:
+
+- `docs/architecture/VPN_FAIL_CLOSED.md`; and
+- ADR 0019, VPN Fail-Closed Enforcement Boundaries.
+
+The permanent security invariant is:
+
+> qBittorrent must have no usable non-VPN internet egress path while its
+> required VPN tunnel is unavailable.
+
+The architecture keeps namespace isolation, tunnel/firewall enforcement,
+startup readiness, healthy-path observation, and controlled failure evidence
+as separate responsibilities. Unknown or contradictory evidence fails closed.
+
+### Automated Verification
+
+Commit `097f5099` added static production Compose verification and a root
+Verify failure-path test.
+
+The tests prove:
+
+- qBittorrent shares only Gluetun's network namespace;
+- qBittorrent has no independent network attachment or published ports;
+- Gluetun owns the VPN firewall and tunnel boundary;
+- qBittorrent ports are published by Gluetun;
+- qBittorrent waits for Gluetun health; and
+- unavailable VPN egress causes Atlas Verify to fail without suppressing
+  later verification sections.
+
+Twenty-six focused VPN/Verify tests passed. Seventy-eight Startup Policy
+regressions also passed, for 104 relevant tests across the combined boundary.
+
+### Read-Only Production Validation
+
+Read-only validation at commit `097f5099` established:
+
+- normalized Compose topology matched the architecture;
+- Gluetun and qBittorrent were running;
+- Gluetun was healthy;
+- both containers shared kernel network namespace `net:[4026532761]`;
+- `tun0` was up and owned the VPN split routes;
+- the underlying namespace also retained an `eth0` default route;
+- Gluetun exposed explicit firewall DROP/REJECT enforcement;
+- healthy qBittorrent egress differed from host egress;
+- Atlas VPN verification passed;
+- 104 relevant regressions passed; and
+- no VPN, firewall, route, container, or repository mutation occurred.
+
+This was strong runtime evidence but, intentionally, was not recorded as final
+failure-path proof.
+
+### Controlled Production Failure Validation
+
+The operator explicitly approved one `SIGTERM` to the dynamically verified
+`openvpn2.6` child and approved `docker restart gluetun` only as an emergency
+recovery fallback if Gluetun's supervisor did not restore the tunnel.
+
+The controlled run established:
+
+- the OpenVPN child identity was verified immediately before signaling;
+- `tun0` disappeared after the single approved signal;
+- Gluetun and qBittorrent remained running in their shared namespace;
+- with `tun0` absent, the kernel still resolved `1.1.1.1` through
+  `172.19.0.1 dev eth0`;
+- a DNS-independent direct IPv4 probe from qBittorrent timed out with curl
+  exit status 28;
+- `tun0` remained absent after the probe, keeping the entire proof window on
+  the failure path;
+- usable non-VPN qBittorrent egress was therefore blocked by the fail-closed
+  boundary rather than by removal of every possible route; and
+- the failure-path contract passed.
+
+Gluetun recovered automatically. The emergency restart fallback was not used.
+After recovery, Gluetun and qBittorrent still shared the same kernel network
+namespace, qBittorrent regained VPN-routed egress distinct from host egress,
+Atlas Verify passed, and 26 focused VPN regressions passed again.
+
+Python compilation, Verify shell syntax, Git diff hygiene, branch guards,
+commit guards, and working-tree guards all passed. qBittorrent, firewall,
+route, Compose, and repository mutations were zero.
+
+### Commits
+
+- `94ea38e9` — define VPN Fail-Closed Verification architecture and ADR 0019;
+- `097f5099` — prove fail-closed production topology and Verify failure
+  behavior.
+
+### Result
+
+M-023.21 is complete. Atlas now has independent configuration, automated,
+read-only runtime, and explicitly controlled production failure evidence that
+qBittorrent cannot use the underlying non-VPN egress path while Gluetun's VPN
+tunnel is unavailable, and automatic recovery has been proven without an
+emergency container restart.

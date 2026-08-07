@@ -54,6 +54,17 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Added
 
+- Completed M-023.21 VPN Fail-Closed Verification with static Compose
+  topology tests, read-only production namespace/firewall inspection, and an
+  explicitly approved controlled OpenVPN failure-path test.
+- Proved qBittorrent cannot use the underlying non-VPN `eth0` route while
+  Gluetun's `tun0` tunnel is unavailable: a direct IPv4 probe timed out while
+  `tun0` remained absent, followed by automatic VPN recovery and clean Atlas
+  verification.
+- Preserved the production safety boundary during validation: no qBittorrent,
+  firewall, route, Compose, or repository mutation was performed, and the
+  emergency Gluetun restart fallback was not required.
+
 - Completed M-023.20 Automatic Cleanup Safeguards with cross-boundary
   favorite, policy-failure, Maintainerr, dry-run, and production preview
   verification.

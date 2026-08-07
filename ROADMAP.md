@@ -686,7 +686,14 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
   - [x] Prove Maintainerr assessment consumes Atlas protection decisions
   - [x] Validate production Maintainerr destructive configuration as disabled
   - [x] Validate the production Atlas cleanup workflow with zero mutations
-- [ ] Verify VPN fail-closed behavior
+- [x] Verify VPN fail-closed behavior
+  - [x] Define VPN Fail-Closed Verification architecture and ADR 0019
+  - [x] Prove qBittorrent has no independent network or published ports
+  - [x] Prove Gluetun owns the shared namespace, tunnel, and firewall boundary
+  - [x] Complete read-only production topology and healthy-egress validation
+  - [x] Perform an explicitly approved controlled VPN-loss test
+  - [x] Prove direct IPv4 egress is blocked while `tun0` remains absent
+  - [x] Verify automatic VPN recovery and post-recovery Atlas health
 - [ ] Verify storage-full behavior
 - [ ] Verify unavailable-provider behavior
 
