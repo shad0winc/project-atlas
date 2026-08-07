@@ -193,3 +193,11 @@ fails because storage capacity is exhausted.
 
 - [Architecture](STORAGE_EXHAUSTION.md)
 - [ADR 0020 — Storage Exhaustion Failure Boundaries](../ADR/0020-storage-exhaustion-failure-boundaries.md)
+## Unavailable-Provider Behavior
+
+Unavailable-Provider Behavior defines the shared failure semantics used when
+an external or infrastructure provider cannot supply trustworthy evidence,
+without introducing a parallel provider framework.
+
+- [Architecture](UNAVAILABLE_PROVIDER_BEHAVIOR.md)
+- [ADR 0021 — Unavailable Provider Failure Semantics](../ADR/0021-unavailable-provider-failure-semantics.md)

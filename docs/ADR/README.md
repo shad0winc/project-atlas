@@ -71,3 +71,4 @@ The simplified numeric format is the project standard for all future ADRs.
 - [ADR 0018 — Cleanup Mutation Authorization](0018-cleanup-mutation-authorization.md)
 - [ADR 0019 — VPN Fail-Closed Enforcement Boundaries](0019-vpn-fail-closed-enforcement-boundaries.md)
 - [ADR 0020 — Storage Exhaustion Failure Boundaries](0020-storage-exhaustion-failure-boundaries.md)
+- [ADR 0021 — Unavailable Provider Failure Semantics](0021-unavailable-provider-failure-semantics.md)
