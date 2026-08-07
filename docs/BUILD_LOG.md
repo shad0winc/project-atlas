@@ -4790,3 +4790,128 @@ identity rather than PID liveness, rejects ambiguous ownership, protects
 unrelated processes from adoption and signaling, retains existing recording
 recovery behavior, and has been validated against the live production runtime
 without mutating recorder state.
+
+---
+
+# 2026-08-07
+
+## M-023.20 — Automatic Cleanup Safeguards
+
+### Objective
+
+Verify that automatic cleanup cannot bypass Atlas favorite protection,
+retention policy, execution-mode restrictions, or provider mutation boundaries.
+
+The milestone intentionally verifies safety before enabling destructive
+automation.
+
+### Discovery
+
+Repository discovery found a mature cleanup foundation:
+
+- favorite-aware policy already feeds `RetentionService`;
+- retention eligibility already feeds `CleanupService`;
+- cleanup scanning and execution-plan models are normalized and tested;
+- `CleanupExecutionService` accepts dry-run mode only;
+- `DefaultCleanupExecutor` accepts dry-run reports only;
+- provider delete operations are dispatched as previews only;
+- dry-run contracts cannot report media modification;
+- cleanup audit and history foundations already exist; and
+- `MaintainerrIntegration` denies policy failure, invalid contracts, and
+  identity mismatch.
+
+Discovery also identified an important architectural distinction. The deployed
+Maintainerr service is separate from the Atlas integration adapter, and the
+repository has no non-test construction site proving that Maintainerr passes
+destructive candidates through Atlas authorization.
+
+Read-only inspection of `/mnt/storage/configs/maintainerr/maintainerr.sqlite`
+found zero collections, zero collection-media rows, zero rule groups, and zero
+rules. Therefore destructive Maintainerr automation is currently disabled.
+
+### Architecture
+
+Commit `55bf23d7` added:
+
+- `docs/architecture/AUTOMATIC_CLEANUP_SAFETY.md`; and
+- ADR 0018, Cleanup Mutation Authorization.
+
+The permanent boundary is:
+
+> A cleanup recommendation is not deletion authorization.
+
+Any future destructive mutation must obtain fresh Atlas policy and retention
+authorization for the exact provider and item at the mutation boundary.
+Missing, stale, mismatched, invalid, or unavailable authorization fails closed.
+
+M-023.20 does not add destructive Atlas cleanup, enable Maintainerr deletion,
+edit the Maintainerr production database, or introduce another cleanup engine.
+
+### Cross-Boundary Verification
+
+Commit `370ebc43` added a dedicated safeguard suite proving the actual service
+chain rather than only its individual units.
+
+Six focused tests proved:
+
+- a favorite becomes policy protection, retention ineligibility, cleanup
+  `KEEP`, execution `SKIPPED`, and no provider preview call;
+- eligible unprotected media may reach preview but remains unmodified;
+- policy failure stops the workflow before provider preview;
+- destructive `execute` mode is rejected before provider preview;
+- Maintainerr assessment denies favorited media through the same Atlas cleanup
+  chain; and
+- removing the final favorite requires a fresh assessment before eligibility
+  can change.
+
+The broader cleanup, retention, favorites, and Maintainerr regression passed
+281 tests and 39 subtests.
+
+### Production Validation
+
+Read-only production validation at commit `370ebc43` established:
+
+- Atlas cleanup planning rejects non-dry-run execution;
+- the default executor rejects non-dry-run execution;
+- the executor contains exactly two provider-preview dispatch boundaries;
+- production Maintainerr collections: zero;
+- production Maintainerr collection-media rows: zero;
+- production Maintainerr rule groups: zero;
+- production Maintainerr rules: zero;
+- destructive Maintainerr configuration is disabled;
+- the live Atlas Jellyfin cleanup execution plan ran in `dry_run` mode;
+- the live plan contained zero items and reported `modified=0`;
+- the live Atlas cleanup workflow completed successfully in `dry_run` mode;
+- workflow total, planned, skipped, and modified counts were all zero;
+- temporary validation audit events: zero;
+- the live provider validation mode was `preview-validated`;
+- 18 safeguard and Maintainerr regression tests passed; and
+- production media mutations and repository mutations were both zero.
+
+Python compilation, cleanup shell syntax, and Git diff hygiene passed.
+
+### Documentation Reconciliation
+
+The historical Maintainerr 72-hour cleanup document previously suggested
+direct destructive actions plus a manual favorite exclusion. That guidance no
+longer represents the supported Atlas safety boundary.
+
+M-023.20 replaces it with explicit non-destructive v1.0 guidance: Maintainerr
+may remain deployed, but destructive collections and rules stay disabled until
+an Atlas-authorized, fresh, auditable mutation path exists.
+
+The roadmap now records the backend favorite-protection, final-favorite
+release, cleanup execution safeguard, and automatic cleanup safeguard proofs as
+complete. Portal favorite integration remains separate unfinished work.
+
+### Commits
+
+- `55bf23d7` — define the automatic cleanup safety boundary and ADR 0018;
+- `370ebc43` — prove automatic cleanup safeguards across service boundaries.
+
+### Result
+
+M-023.20 is complete. Atlas automatic cleanup remains intentionally
+non-destructive, favorite and policy protections are proven across the cleanup
+chain, external destructive automation is disabled in production, and the live
+cleanup workflow has been validated with zero media mutations.

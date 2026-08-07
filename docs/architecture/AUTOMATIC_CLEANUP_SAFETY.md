@@ -169,6 +169,32 @@ M-023.20 verification is intentionally layered:
 5. validate production configuration read-only; and
 6. reconcile documentation and roadmap state only after all checks pass.
 
+## Implementation Status
+
+M-023.20 is complete.
+
+The existing Atlas cleanup implementation required no production-code change.
+Cross-boundary verification proved that favorites become cleanup `KEEP`
+decisions, policy failure stops before provider preview, destructive execution
+mode is rejected, and the current provider boundary remains preview-only.
+
+The dedicated safeguard suite was added at commit `370ebc43`. The broader
+cleanup, retention, favorites, and Maintainerr regression passed 281 tests and
+39 subtests.
+
+## Production Validation
+
+Production validation at commit `370ebc43` confirmed that Maintainerr contains
+zero collections, collection-media rows, rule groups, and rules. Destructive
+Maintainerr automation is therefore disabled.
+
+The live Atlas Jellyfin cleanup execution plan and workflow both ran in
+`dry_run` mode. The workflow completed successfully with zero items and
+`modified=0`. The validation path recorded zero temporary audit events, and 18
+focused safeguard/Maintainerr tests passed.
+
+No production media or repository mutation occurred.
+
 ## Related Decisions
 
 - [ADR 0007 — Atlas Retention Intelligence](../ADR/0007-atlas-retention-intelligence.md)

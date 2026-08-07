@@ -6,6 +6,9 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Fixed
 
+- Hardened automatic cleanup boundaries so cleanup recommendations remain
+  non-destructive until a future mutation path performs fresh Atlas policy and
+  retention authorization at the exact mutation boundary.
 - Hardened Sports recorder recovery so process adoption and termination require
   both the persisted PID and Linux process start-time identity. Missing or
   mismatched identity now fails closed instead of trusting PID liveness alone.
@@ -51,6 +54,12 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Added
 
+- Completed M-023.20 Automatic Cleanup Safeguards with cross-boundary
+  favorite, policy-failure, Maintainerr, dry-run, and production preview
+  verification.
+- Reconciled Maintainerr cleanup guidance with ADR 0018: destructive Maintainerr
+  collections remain disabled until Atlas owns a fresh, auditable mutation
+  authorization boundary.
 - Completed M-023.19 Sports Recovery Verification with durable recorder process
   identity, PID-reuse protection, verified no-signal fail-closed behavior, and
   read-only production validation.

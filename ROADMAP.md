@@ -455,13 +455,13 @@ with backend services.
 - [x] Retention decision foundation
 - [x] Cleanup decision foundation
 - [ ] Connect Portal favorites to Atlas API
-- [ ] Protect favorited media from automatic deletion
-- [ ] Remove protection when the final favorite is removed
+- [x] Protect favorited media from automatic deletion
+- [x] Remove protection when the final favorite is removed
 - [ ] Add personal favorite shortcuts
 - [ ] Complete watched-media retention workflow
 - [ ] Complete request-expiration workflow
 - [ ] Complete deletion audit history
-- [ ] Verify cleanup dry-run and execution safeguards
+- [x] Verify cleanup dry-run and execution safeguards
 
 ### Sports Experience
 
@@ -678,7 +678,14 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
   - [x] Prove unrelated processes are neither adopted nor signaled
   - [x] Validate recovery, scheduler, and full Sports regressions
   - [x] Complete read-only production validation
-- [ ] Verify automatic cleanup safeguards
+- [x] Verify automatic cleanup safeguards
+  - [x] Define Automatic Cleanup Safety architecture and ADR 0018
+  - [x] Preserve dry-run-only Atlas cleanup execution
+  - [x] Prove favorite protection skips the provider preview boundary
+  - [x] Prove unavailable policy state fails before provider action
+  - [x] Prove Maintainerr assessment consumes Atlas protection decisions
+  - [x] Validate production Maintainerr destructive configuration as disabled
+  - [x] Validate the production Atlas cleanup workflow with zero mutations
 - [ ] Verify VPN fail-closed behavior
 - [ ] Verify storage-full behavior
 - [ ] Verify unavailable-provider behavior
