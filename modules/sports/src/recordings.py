@@ -106,19 +106,27 @@ def write_recordings(
         ".tmp"
     )
 
-    temporary_file.write_text(
-        json.dumps(
-            recordings,
-            indent=2,
-            sort_keys=True,
+    try:
+        temporary_file.write_text(
+            json.dumps(
+                recordings,
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
         )
-        + "\n",
-        encoding="utf-8",
-    )
 
-    temporary_file.replace(
-        RECORDINGS_FILE
-    )
+        temporary_file.replace(
+            RECORDINGS_FILE
+        )
+    except Exception:
+        try:
+            temporary_file.unlink()
+        except OSError:
+            pass
+
+        raise
 
 
 def recording_id_for_game(
@@ -338,6 +346,10 @@ def update_recording_statuses(
 
     recordings = load_recordings()
 
+    newly_started_recorders: list[
+        tuple[int, int]
+    ] = []
+
     for recording_id, recording in recordings.items():
         previous_status = str(
             recording.get(
@@ -406,6 +418,16 @@ def update_recording_statuses(
                     or format_timestamp(now)
                 )
                 recording["launch_error"] = None
+
+                if launch_result.get("started") is True:
+                    newly_started_recorders.append(
+                        (
+                            recording["pid"],
+                            recording[
+                                "process_start_time"
+                            ],
+                        )
+                    )
 
             except Exception as exc:
                 current_status = "failed"
@@ -609,8 +631,46 @@ def update_recording_statuses(
 
         recordings[recording_id] = recording
 
-    write_recordings(
-        recordings
-    )
+    try:
+        write_recordings(
+            recordings
+        )
+    except Exception as persistence_error:
+        compensation_failures: list[
+            tuple[int, int]
+        ] = []
+
+        for (
+            pid,
+            process_start_time,
+        ) in reversed(
+            newly_started_recorders
+        ):
+            try:
+                stopped = stop_recording(
+                    pid,
+                    expected_start_time=(
+                        process_start_time
+                    ),
+                )
+            except Exception:
+                stopped = False
+
+            if not stopped:
+                compensation_failures.append(
+                    (
+                        pid,
+                        process_start_time,
+                    )
+                )
+
+        if compensation_failures:
+            raise RuntimeError(
+                "recorder registry persistence failed "
+                "and exact-identity compensation "
+                "was incomplete"
+            ) from persistence_error
+
+        raise
 
     return recordings
