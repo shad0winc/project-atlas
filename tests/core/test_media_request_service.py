@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 from pathlib import Path
 
 import pytest
@@ -920,3 +921,28 @@ def test_cancel_replay_is_blocked_from_recovery_intent(
         service.cancel_request("request-001")
 
     assert provider.cancellations == ["provider-001"]
+
+def test_submit_enospc_blocks_provider_and_preserves_pending_state(
+    service: MediaRequestService,
+    provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original = service.create_request(make_request())
+
+    def fail_write(path: Path, value: object) -> None:
+        raise OSError(errno.ENOSPC, "No space left on device")
+
+    monkeypatch.setattr(
+        "atlas.media_requests.repository.write_json_atomic",
+        fail_write,
+    )
+
+    with pytest.raises(MediaRequestServiceError, match="update") as captured:
+        service.submit_request(original.request_id)
+
+    repository_error = captured.value.__cause__
+    assert isinstance(repository_error, MediaRequestRepositoryError)
+    assert isinstance(repository_error.__cause__, OSError)
+    assert repository_error.__cause__.errno == errno.ENOSPC
+    assert provider.submissions == []
+    assert service.get_request(original.request_id) == original

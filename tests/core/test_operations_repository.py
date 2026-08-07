@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import json
 from pathlib import Path
 
@@ -451,7 +452,10 @@ def test_snapshot_failure_prevents_latest_update(
         value: object,
     ) -> None:
         calls.append(path)
-        raise OSError("disk unavailable")
+        raise OSError(
+            errno.ENOSPC,
+            "No space left on device",
+        )
 
     monkeypatch.setattr(
         "atlas.operations.repository.write_json_atomic",
@@ -461,9 +465,11 @@ def test_snapshot_failure_prevents_latest_update(
     with pytest.raises(
         OperationsRepositoryError,
         match="unable to persist Operations report snapshot",
-    ):
+    ) as captured:
         repository.save(make_report())
 
+    assert isinstance(captured.value.__cause__, OSError)
+    assert captured.value.__cause__.errno == errno.ENOSPC
     assert calls == [
         repository.history_directory
         / "2026-08-03T22-00-00Z.json"

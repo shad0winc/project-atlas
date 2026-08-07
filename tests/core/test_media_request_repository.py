@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import json
 import tempfile
 from pathlib import Path
@@ -703,3 +704,58 @@ def test_registry_requests_are_persisted_in_key_order(
 
     raw = repository.registry_file.read_text(encoding="utf-8")
     assert raw.index('"request-a"') < raw.index('"request-z"')
+
+def test_enospc_is_normalized_and_preserves_registry(
+    repository: JsonMediaRequestRepository,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original = make_request()
+    repository.save(original)
+    committed = repository.registry_file.read_text(encoding="utf-8")
+
+    def fail_write(path: Path, value: object) -> None:
+        raise OSError(errno.ENOSPC, "No space left on device")
+
+    monkeypatch.setattr(
+        "atlas.media_requests.repository.write_json_atomic",
+        fail_write,
+    )
+
+    replacement = make_request(
+        status="approved",
+        updated_at="2026-08-02T20:30:00Z",
+    )
+
+    with pytest.raises(
+        MediaRequestRepositoryError,
+        match="unable to persist media-request registry",
+    ) as captured:
+        repository.replace(replacement)
+
+    assert isinstance(captured.value.__cause__, OSError)
+    assert captured.value.__cause__.errno == errno.ENOSPC
+    assert repository.registry_file.read_text(encoding="utf-8") == committed
+    assert repository.get(original.request_id) == original
+
+
+def test_initialize_normalizes_enospc(
+    repository: JsonMediaRequestRepository,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_write(path: Path, value: object) -> None:
+        raise OSError(errno.ENOSPC, "No space left on device")
+
+    monkeypatch.setattr(
+        "atlas.media_requests.repository.write_json_atomic",
+        fail_write,
+    )
+
+    with pytest.raises(
+        MediaRequestRepositoryError,
+        match="unable to persist media-request registry",
+    ) as captured:
+        repository.initialize()
+
+    assert isinstance(captured.value.__cause__, OSError)
+    assert captured.value.__cause__.errno == errno.ENOSPC
+    assert repository.registry_file.exists() is False

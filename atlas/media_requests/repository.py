@@ -42,8 +42,7 @@ class JsonMediaRequestRepository:
         self.root.mkdir(parents=True, exist_ok=True)
 
         if not self.registry_file.exists():
-            write_json_atomic(
-                self.registry_file,
+            self._write_document(
                 self._empty_document(),
             )
 
@@ -76,8 +75,7 @@ class JsonMediaRequestRepository:
                 )
 
         requests[request.request_id] = request.to_dict()
-        write_json_atomic(
-            self.registry_file,
+        self._write_document(
             self._document(requests),
         )
 
@@ -114,8 +112,7 @@ class JsonMediaRequestRepository:
 
         requests[request.request_id] = request.to_dict()
 
-        write_json_atomic(
-            self.registry_file,
+        self._write_document(
             self._document(requests),
         )
 
@@ -228,12 +225,26 @@ class JsonMediaRequestRepository:
         )
         del requests[normalized_id]
 
-        write_json_atomic(
-            self.registry_file,
+        self._write_document(
             self._document(requests),
         )
 
         return request
+
+    def _write_document(
+        self,
+        document: Mapping[str, Any],
+    ) -> None:
+        try:
+            write_json_atomic(
+                self.registry_file,
+                document,
+            )
+        except OSError as exc:
+            raise MediaRequestRepositoryError(
+                "unable to persist media-request registry: "
+                f"{self.registry_file}",
+            ) from exc
 
     def _load_document(self) -> dict[str, Any]:
         self.initialize()
