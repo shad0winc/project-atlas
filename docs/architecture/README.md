@@ -201,3 +201,11 @@ without introducing a parallel provider framework.
 
 - [Architecture](UNAVAILABLE_PROVIDER_BEHAVIOR.md)
 - [ADR 0021 — Unavailable Provider Failure Semantics](../ADR/0021-unavailable-provider-failure-semantics.md)
+## Production Deployment Safety
+
+Production Deployment Safety defines the branch, maintenance, backup,
+verification, rollback, migration, and tested-release boundaries required for
+controlled changes to the stable Atlas deployment.
+
+- [Architecture](DEPLOYMENT_SAFETY.md)
+- [ADR 0022 — Production Deployment Safety Boundaries](../ADR/0022-production-deployment-safety-boundaries.md)
