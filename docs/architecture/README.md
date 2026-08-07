@@ -61,6 +61,7 @@ logic.
 - [Interrupted-Request Recovery](INTERRUPTED_REQUEST_RECOVERY.md)
 - [Sports Recovery](SPORTS_RECOVERY.md)
 - [Automatic Cleanup Safety](AUTOMATIC_CLEANUP_SAFETY.md)
+- [Storage Exhaustion Recovery](STORAGE_EXHAUSTION.md)
 - [Portal](PORTAL.md)
 
 Additional subsystem documents should be added only when their design is mature
@@ -183,3 +184,12 @@ that qBittorrent has no non-VPN fallback when the tunnel is unavailable.
 
 - [Architecture](VPN_FAIL_CLOSED.md)
 - [ADR 0019 — VPN Fail-Closed Enforcement Boundaries](../ADR/0019-vpn-fail-closed-enforcement-boundaries.md)
+
+## Storage Exhaustion Recovery
+
+Storage Exhaustion Recovery defines how Atlas preserves durable state,
+contains external side effects, and rejects partial success when persistence
+fails because storage capacity is exhausted.
+
+- [Architecture](STORAGE_EXHAUSTION.md)
+- [ADR 0020 — Storage Exhaustion Failure Boundaries](../ADR/0020-storage-exhaustion-failure-boundaries.md)
