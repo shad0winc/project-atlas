@@ -820,3 +820,26 @@ def test_verify_handles_no_enabled_modules(
     )
     assert "module verifier output" not in result.stdout
     assert "Overall Status: PASS" in result.stdout
+
+def test_verify_reports_vpn_egress_failure(
+    tmp_path: Path,
+) -> None:
+    """Unavailable VPN egress must fail root verification."""
+
+    environment = dict(
+        prepare_runtime(tmp_path)
+    )
+
+    environment["ATLAS_TEST_VPN_STATUS"] = "1"
+
+    result = run_verify(environment)
+
+    assert result.returncode == 1
+    assert (
+        "FAIL qBittorrent reachable through VPN namespace"
+        in result.stdout
+    )
+    assert "OK   Ingress verification" in result.stdout
+    assert "OK   Scheduler registry readiness" in result.stdout
+    assert "OK   sports module verification" in result.stdout
+    assert "Overall Status: FAIL" in result.stdout
