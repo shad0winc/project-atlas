@@ -13,6 +13,19 @@ LOG_FILE = Path(
 )
 
 def classify_severity(event_name: str, payload: dict) -> str:
+    if event_name.startswith("request."):
+        if event_name == "request.available":
+            return "success"
+
+        if event_name in {
+            "request.failed",
+            "request.rejected",
+            "request.cancelled",
+        }:
+            return "warning"
+
+        return "info"
+
     if event_name == "atlas.health-changed":
         current = payload.get("current", "Unknown")
 

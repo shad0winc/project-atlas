@@ -1,0 +1,32 @@
+Atlas Infrastructure Summary
+============================
+
+Provider:        docker-compose
+Compose Project: project-atlas
+
+Services
+--------
+Total:       15
+Enabled:     15
+Disabled:    0
+
+Runtime
+-------
+Running:     15
+Stopped:     0
+Restarting:  0
+Failed:      0
+Unknown:     0
+
+Health
+------
+Healthy:     4
+Degraded:    11
+Unhealthy:   0
+Unknown:     0
+
+Overall Score: 89/100
+Status: Degraded
+Attention Required: 11
+
+Evaluated: 2026-08-02T02:41:22.727828Z

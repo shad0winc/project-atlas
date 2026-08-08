@@ -52,9 +52,21 @@ class UserProfileStoreTests(unittest.TestCase):
     def test_rejects_invalid_username_role_birthday_and_jellyfin_id(self) -> None:
         invalid = (
             ("ab", {}, "username must"),
-            ("valid", {"role": "owner"}, "role must"),
-            ("valid", {"birthday": "not-a-date"}, "birthday must"),
-            ("valid", {"jellyfin_user_id": "short"}, "Jellyfin user ID"),
+            (
+                "invalidrole",
+                {"roles": ["not_a_role"]},
+                "profile role must",
+            ),
+            (
+                "invalidbirthday",
+                {"birthday": "not-a-date"},
+                "birthday must",
+            ),
+            (
+                "invalidjellyfin",
+                {"jellyfin_user_id": "short"},
+                "Jellyfin user ID",
+            ),
         )
         for username, arguments, message in invalid:
             with self.subTest(message=message):

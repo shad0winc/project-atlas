@@ -1,0 +1,25 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 64 64"
+  role="img"
+  aria-labelledby="title"
+>
+  <title id="title">Project Atlas</title>
+  <defs>
+    <linearGradient id="atlas-gradient" x1="8" y1="56" x2="56" y2="8">
+      <stop offset="0" stop-color="#1f6feb" />
+      <stop offset="1" stop-color="#58a6ff" />
+    </linearGradient>
+  </defs>
+  <path
+    d="M32 5 57 19.5v25L32 59 7 44.5v-25L32 5Z"
+    fill="#0d1117"
+    stroke="url(#atlas-gradient)"
+    stroke-width="3"
+  />
+  <path
+    d="m32 15 15 34h-8.5l-2.9-7H28l3.1-7.2h1.5L32 33.3 25.2 49H17L32 15Z"
+    fill="url(#atlas-gradient)"
+  />
+  <circle cx="32" cy="32" r="3.2" fill="#3fb950" />
+</svg>

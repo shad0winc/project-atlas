@@ -123,6 +123,9 @@ def build_recording(
 
     if pid is not None:
         recording["pid"] = pid
+        recording["process_start_time"] = (
+            recorder.process_start_time(pid)
+        )
 
     return recording
 
@@ -262,6 +265,12 @@ def run_live_process_recovery_test() -> None:
         "Recorder launcher adopted existing process",
     )
 
+    check(
+        int(adoption["process_start_time"])
+        == int(recovered["process_start_time"]),
+        "Recorder adoption verified process identity",
+    )
+
     for field in (
         "log_file",
         "output_file",
@@ -273,6 +282,127 @@ def run_live_process_recovery_test() -> None:
             == str(recovered[field]),
             f"Recorder adoption preserved {field}",
         )
+
+    stop_process(process)
+
+
+def run_pid_reuse_safety_test() -> None:
+    heading("PID Reuse Safety Test")
+
+    now = datetime.now(timezone.utc)
+
+    process = subprocess.Popen(
+        ["sleep", "30"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+    CLEANUP_PROCESSES.append(process)
+
+    actual_start_time = recorder.process_start_time(
+        process.pid
+    )
+
+    check(
+        actual_start_time is not None,
+        "Controlled unrelated process has identity",
+    )
+
+    recording_id = f"{TEST_ID}-pid-reuse"
+    recording = build_recording(
+        recording_id=recording_id,
+        now=now,
+        status="recording",
+        pid=process.pid,
+    )
+    recording["process_start_time"] = int(
+        actual_start_time
+    ) + 1
+
+    recordings.write_recordings(
+        {recording_id: recording}
+    )
+
+    recovered = recordings.update_recording_statuses(
+        now
+    )[recording_id]
+
+    check(
+        recovered["status"] == "failed",
+        "Mismatched process identity fails closed",
+    )
+
+    check(
+        recovered.get("failure_reason")
+        == "recorder_process_identity_unverified",
+        "Identity failure remains observable",
+    )
+
+    check(
+        recorder.process_is_running(process.pid),
+        "Unrelated process remains running",
+    )
+
+    original_killpg = recorder.os.killpg
+    signal_called = False
+
+    def reject_signal(
+        process_id: int,
+        signal_number: int,
+    ) -> None:
+        nonlocal signal_called
+        signal_called = True
+        raise AssertionError(
+            "Recorder signaled an unrelated process"
+        )
+
+    recorder.os.killpg = reject_signal
+
+    try:
+        stopped = recorder.stop_recording(
+            process.pid,
+            expected_start_time=(
+                recording["process_start_time"]
+            ),
+        )
+    finally:
+        recorder.os.killpg = original_killpg
+
+    check(
+        stopped is False,
+        "Mismatched process identity blocks stop",
+    )
+
+    check(
+        not signal_called,
+        "Unrelated process received no signal",
+    )
+
+    check(
+        recorder.process_is_running(process.pid),
+        "Unrelated process survived stop attempt",
+    )
+
+    ambiguous = dict(recording)
+    ambiguous.pop("process_start_time", None)
+
+    try:
+        recorder.launch_recording(ambiguous)
+    except RuntimeError as exc:
+        check(
+            str(exc)
+            == "recorder_process_identity_unverified",
+            "Missing identity blocks recorder adoption",
+        )
+    else:
+        raise AssertionError(
+            "Missing identity adopted live process"
+        )
+
+    check(
+        recorder.process_is_running(process.pid),
+        "Missing identity caused no process mutation",
+    )
 
     stop_process(process)
 
@@ -448,6 +578,7 @@ def main() -> int:
 
     try:
         run_live_process_recovery_test()
+        run_pid_reuse_safety_test()
         run_completed_process_recovery_test()
 
         print()

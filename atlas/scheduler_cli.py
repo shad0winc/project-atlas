@@ -10,6 +10,9 @@ from typing import Sequence
 
 from atlas.events import publish_event
 from atlas.module_scheduler import sync_module_jobs
+from atlas.operations_scheduler import (
+    register_operations_collection,
+)
 from atlas.scheduler import SchedulerLockedError, TaskScheduler
 
 
@@ -66,6 +69,43 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _print_json(value: object) -> None:
     print(json.dumps(value, indent=2, sort_keys=True))
+
+
+def _sync_scheduler_jobs(
+    scheduler: TaskScheduler,
+    project_directory: Path,
+    registry_file: Path,
+    module_name: str | None,
+) -> dict[str, list[str]]:
+    """Synchronize core and module scheduler jobs."""
+
+    result = sync_module_jobs(
+        scheduler,
+        project_directory,
+        registry_file,
+        module_name,
+    )
+
+    if module_name is not None:
+        return result
+
+    operations_task = register_operations_collection(
+        scheduler,
+    )
+    operations_name = str(
+        operations_task["name"],
+    )
+
+    return {
+        "registered": sorted(
+            {
+                *result["registered"],
+                operations_name,
+            }
+        ),
+        "removed": result["removed"],
+        "skipped": result["skipped"],
+    }
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -125,7 +165,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
             )
             _print_json(
-                sync_module_jobs(
+                _sync_scheduler_jobs(
                     scheduler,
                     project_directory,
                     registry_file,

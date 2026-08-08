@@ -1,0 +1,499 @@
+{
+  "attention": [
+    {
+      "category": "observability",
+      "code": "healthcheck-missing",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "runtime_health": "unknown"
+      },
+      "identifier": "bazarr.healthcheck-missing",
+      "message": "Running service Bazarr does not expose a conclusive runtime health check.",
+      "requires_attention": true,
+      "service_identifier": "bazarr",
+      "severity": "warning"
+    },
+    {
+      "category": "observability",
+      "code": "healthcheck-missing",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "runtime_health": "unknown"
+      },
+      "identifier": "dozzle.healthcheck-missing",
+      "message": "Running service Dozzle does not expose a conclusive runtime health check.",
+      "requires_attention": true,
+      "service_identifier": "dozzle",
+      "severity": "warning"
+    },
+    {
+      "category": "observability",
+      "code": "healthcheck-missing",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "runtime_health": "unknown"
+      },
+      "identifier": "jellyseerr.healthcheck-missing",
+      "message": "Running service Jellyseerr does not expose a conclusive runtime health check.",
+      "requires_attention": true,
+      "service_identifier": "jellyseerr",
+      "severity": "warning"
+    },
+    {
+      "category": "observability",
+      "code": "healthcheck-missing",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "runtime_health": "unknown"
+      },
+      "identifier": "maintainerr.healthcheck-missing",
+      "message": "Running service Maintainerr does not expose a conclusive runtime health check.",
+      "requires_attention": true,
+      "service_identifier": "maintainerr",
+      "severity": "warning"
+    },
+    {
+      "category": "observability",
+      "code": "healthcheck-missing",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "runtime_health": "unknown"
+      },
+      "identifier": "prowlarr.healthcheck-missing",
+      "message": "Running service Prowlarr does not expose a conclusive runtime health check.",
+      "requires_attention": true,
+      "service_identifier": "prowlarr",
+      "severity": "warning"
+    },
+    {
+      "category": "observability",
+      "code": "healthcheck-missing",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "runtime_health": "unknown"
+      },
+      "identifier": "qbittorrent.healthcheck-missing",
+      "message": "Running service Qbittorrent does not expose a conclusive runtime health check.",
+      "requires_attention": true,
+      "service_identifier": "qbittorrent",
+      "severity": "warning"
+    },
+    {
+      "category": "observability",
+      "code": "healthcheck-missing",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "runtime_health": "unknown"
+      },
+      "identifier": "radarr.healthcheck-missing",
+      "message": "Running service Radarr does not expose a conclusive runtime health check.",
+      "requires_attention": true,
+      "service_identifier": "radarr",
+      "severity": "warning"
+    },
+    {
+      "category": "observability",
+      "code": "healthcheck-missing",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "runtime_health": "unknown"
+      },
+      "identifier": "radarr-anime.healthcheck-missing",
+      "message": "Running service Radarr Anime does not expose a conclusive runtime health check.",
+      "requires_attention": true,
+      "service_identifier": "radarr-anime",
+      "severity": "warning"
+    },
+    {
+      "category": "observability",
+      "code": "healthcheck-missing",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "runtime_health": "unknown"
+      },
+      "identifier": "sonarr.healthcheck-missing",
+      "message": "Running service Sonarr does not expose a conclusive runtime health check.",
+      "requires_attention": true,
+      "service_identifier": "sonarr",
+      "severity": "warning"
+    },
+    {
+      "category": "observability",
+      "code": "healthcheck-missing",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "runtime_health": "unknown"
+      },
+      "identifier": "sonarr-anime.healthcheck-missing",
+      "message": "Running service Sonarr Anime does not expose a conclusive runtime health check.",
+      "requires_attention": true,
+      "service_identifier": "sonarr-anime",
+      "severity": "warning"
+    },
+    {
+      "category": "observability",
+      "code": "healthcheck-missing",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "runtime_health": "unknown"
+      },
+      "identifier": "tautulli.healthcheck-missing",
+      "message": "Running service Tautulli does not expose a conclusive runtime health check.",
+      "requires_attention": true,
+      "service_identifier": "tautulli",
+      "severity": "warning"
+    }
+  ],
+  "counts": {
+    "critical": 0,
+    "error": 0,
+    "info": 14,
+    "warning": 11
+  },
+  "evaluated_at": "2026-08-02T02:41:45.068663Z",
+  "findings": [
+    {
+      "category": "observability",
+      "code": "healthcheck-missing",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "runtime_health": "unknown"
+      },
+      "identifier": "bazarr.healthcheck-missing",
+      "message": "Running service Bazarr does not expose a conclusive runtime health check.",
+      "requires_attention": true,
+      "service_identifier": "bazarr",
+      "severity": "warning"
+    },
+    {
+      "category": "observability",
+      "code": "healthcheck-missing",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "runtime_health": "unknown"
+      },
+      "identifier": "dozzle.healthcheck-missing",
+      "message": "Running service Dozzle does not expose a conclusive runtime health check.",
+      "requires_attention": true,
+      "service_identifier": "dozzle",
+      "severity": "warning"
+    },
+    {
+      "category": "observability",
+      "code": "healthcheck-missing",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "runtime_health": "unknown"
+      },
+      "identifier": "jellyseerr.healthcheck-missing",
+      "message": "Running service Jellyseerr does not expose a conclusive runtime health check.",
+      "requires_attention": true,
+      "service_identifier": "jellyseerr",
+      "severity": "warning"
+    },
+    {
+      "category": "observability",
+      "code": "healthcheck-missing",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "runtime_health": "unknown"
+      },
+      "identifier": "maintainerr.healthcheck-missing",
+      "message": "Running service Maintainerr does not expose a conclusive runtime health check.",
+      "requires_attention": true,
+      "service_identifier": "maintainerr",
+      "severity": "warning"
+    },
+    {
+      "category": "observability",
+      "code": "healthcheck-missing",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "runtime_health": "unknown"
+      },
+      "identifier": "prowlarr.healthcheck-missing",
+      "message": "Running service Prowlarr does not expose a conclusive runtime health check.",
+      "requires_attention": true,
+      "service_identifier": "prowlarr",
+      "severity": "warning"
+    },
+    {
+      "category": "observability",
+      "code": "healthcheck-missing",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "runtime_health": "unknown"
+      },
+      "identifier": "qbittorrent.healthcheck-missing",
+      "message": "Running service Qbittorrent does not expose a conclusive runtime health check.",
+      "requires_attention": true,
+      "service_identifier": "qbittorrent",
+      "severity": "warning"
+    },
+    {
+      "category": "observability",
+      "code": "healthcheck-missing",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "runtime_health": "unknown"
+      },
+      "identifier": "radarr.healthcheck-missing",
+      "message": "Running service Radarr does not expose a conclusive runtime health check.",
+      "requires_attention": true,
+      "service_identifier": "radarr",
+      "severity": "warning"
+    },
+    {
+      "category": "observability",
+      "code": "healthcheck-missing",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "runtime_health": "unknown"
+      },
+      "identifier": "radarr-anime.healthcheck-missing",
+      "message": "Running service Radarr Anime does not expose a conclusive runtime health check.",
+      "requires_attention": true,
+      "service_identifier": "radarr-anime",
+      "severity": "warning"
+    },
+    {
+      "category": "observability",
+      "code": "healthcheck-missing",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "runtime_health": "unknown"
+      },
+      "identifier": "sonarr.healthcheck-missing",
+      "message": "Running service Sonarr does not expose a conclusive runtime health check.",
+      "requires_attention": true,
+      "service_identifier": "sonarr",
+      "severity": "warning"
+    },
+    {
+      "category": "observability",
+      "code": "healthcheck-missing",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "runtime_health": "unknown"
+      },
+      "identifier": "sonarr-anime.healthcheck-missing",
+      "message": "Running service Sonarr Anime does not expose a conclusive runtime health check.",
+      "requires_attention": true,
+      "service_identifier": "sonarr-anime",
+      "severity": "warning"
+    },
+    {
+      "category": "observability",
+      "code": "healthcheck-missing",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "runtime_health": "unknown"
+      },
+      "identifier": "tautulli.healthcheck-missing",
+      "message": "Running service Tautulli does not expose a conclusive runtime health check.",
+      "requires_attention": true,
+      "service_identifier": "tautulli",
+      "severity": "warning"
+    },
+    {
+      "category": "configuration",
+      "code": "image-tag-latest",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "image": "lscr.io/linuxserver/bazarr:latest",
+        "tag": "latest"
+      },
+      "identifier": "bazarr.image-tag-latest",
+      "message": "Service Bazarr uses the mutable latest image tag.",
+      "requires_attention": false,
+      "service_identifier": "bazarr",
+      "severity": "info"
+    },
+    {
+      "category": "configuration",
+      "code": "image-tag-latest",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "image": "amir20/dozzle:latest",
+        "tag": "latest"
+      },
+      "identifier": "dozzle.image-tag-latest",
+      "message": "Service Dozzle uses the mutable latest image tag.",
+      "requires_attention": false,
+      "service_identifier": "dozzle",
+      "severity": "info"
+    },
+    {
+      "category": "configuration",
+      "code": "image-tag-latest",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "image": "qmcgaw/gluetun:latest",
+        "tag": "latest"
+      },
+      "identifier": "gluetun.image-tag-latest",
+      "message": "Service Gluetun uses the mutable latest image tag.",
+      "requires_attention": false,
+      "service_identifier": "gluetun",
+      "severity": "info"
+    },
+    {
+      "category": "configuration",
+      "code": "image-tag-latest",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "image": "ghcr.io/gethomepage/homepage:latest",
+        "tag": "latest"
+      },
+      "identifier": "homepage.image-tag-latest",
+      "message": "Service Homepage uses the mutable latest image tag.",
+      "requires_attention": false,
+      "service_identifier": "homepage",
+      "severity": "info"
+    },
+    {
+      "category": "configuration",
+      "code": "image-tag-latest",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "image": "jellyfin/jellyfin:latest",
+        "tag": "latest"
+      },
+      "identifier": "jellyfin.image-tag-latest",
+      "message": "Service Jellyfin uses the mutable latest image tag.",
+      "requires_attention": false,
+      "service_identifier": "jellyfin",
+      "severity": "info"
+    },
+    {
+      "category": "configuration",
+      "code": "image-tag-latest",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "image": "fallenbagel/jellyseerr:latest",
+        "tag": "latest"
+      },
+      "identifier": "jellyseerr.image-tag-latest",
+      "message": "Service Jellyseerr uses the mutable latest image tag.",
+      "requires_attention": false,
+      "service_identifier": "jellyseerr",
+      "severity": "info"
+    },
+    {
+      "category": "configuration",
+      "code": "image-tag-latest",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "image": "ghcr.io/jorenn92/maintainerr:latest",
+        "tag": "latest"
+      },
+      "identifier": "maintainerr.image-tag-latest",
+      "message": "Service Maintainerr uses the mutable latest image tag.",
+      "requires_attention": false,
+      "service_identifier": "maintainerr",
+      "severity": "info"
+    },
+    {
+      "category": "configuration",
+      "code": "image-tag-latest",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "image": "lscr.io/linuxserver/prowlarr:latest",
+        "tag": "latest"
+      },
+      "identifier": "prowlarr.image-tag-latest",
+      "message": "Service Prowlarr uses the mutable latest image tag.",
+      "requires_attention": false,
+      "service_identifier": "prowlarr",
+      "severity": "info"
+    },
+    {
+      "category": "configuration",
+      "code": "image-tag-latest",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "image": "lscr.io/linuxserver/qbittorrent:latest",
+        "tag": "latest"
+      },
+      "identifier": "qbittorrent.image-tag-latest",
+      "message": "Service Qbittorrent uses the mutable latest image tag.",
+      "requires_attention": false,
+      "service_identifier": "qbittorrent",
+      "severity": "info"
+    },
+    {
+      "category": "configuration",
+      "code": "image-tag-latest",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "image": "lscr.io/linuxserver/radarr:latest",
+        "tag": "latest"
+      },
+      "identifier": "radarr.image-tag-latest",
+      "message": "Service Radarr uses the mutable latest image tag.",
+      "requires_attention": false,
+      "service_identifier": "radarr",
+      "severity": "info"
+    },
+    {
+      "category": "configuration",
+      "code": "image-tag-latest",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "image": "lscr.io/linuxserver/radarr:latest",
+        "tag": "latest"
+      },
+      "identifier": "radarr-anime.image-tag-latest",
+      "message": "Service Radarr Anime uses the mutable latest image tag.",
+      "requires_attention": false,
+      "service_identifier": "radarr-anime",
+      "severity": "info"
+    },
+    {
+      "category": "configuration",
+      "code": "image-tag-latest",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "image": "lscr.io/linuxserver/sonarr:latest",
+        "tag": "latest"
+      },
+      "identifier": "sonarr.image-tag-latest",
+      "message": "Service Sonarr uses the mutable latest image tag.",
+      "requires_attention": false,
+      "service_identifier": "sonarr",
+      "severity": "info"
+    },
+    {
+      "category": "configuration",
+      "code": "image-tag-latest",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "image": "lscr.io/linuxserver/sonarr:latest",
+        "tag": "latest"
+      },
+      "identifier": "sonarr-anime.image-tag-latest",
+      "message": "Service Sonarr Anime uses the mutable latest image tag.",
+      "requires_attention": false,
+      "service_identifier": "sonarr-anime",
+      "severity": "info"
+    },
+    {
+      "category": "configuration",
+      "code": "image-tag-latest",
+      "created_at": "2026-08-02T02:41:45.068663Z",
+      "details": {
+        "image": "lscr.io/linuxserver/tautulli:latest",
+        "tag": "latest"
+      },
+      "identifier": "tautulli.image-tag-latest",
+      "message": "Service Tautulli uses the mutable latest image tag.",
+      "requires_attention": false,
+      "service_identifier": "tautulli",
+      "severity": "info"
+    }
+  ],
+  "provider": "docker-compose",
+  "requires_attention": true,
+  "status": "degraded",
+  "total_findings": 25
+}

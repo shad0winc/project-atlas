@@ -1,0 +1,7 @@
+tools/apply/README.md
+tools/archive/README.md
+tools/maintenance/README.md
+tools/migrations/README.md
+tools/README.md
+tools/release/m018_28_service_lifecycle_release_audit.sh
+tools/release/README.md

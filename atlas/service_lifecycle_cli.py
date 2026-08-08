@@ -1,0 +1,1431 @@
+"""Command-line interface for Atlas Service Lifecycle."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+from collections.abc import Mapping, Sequence
+from pathlib import Path
+from typing import TextIO
+
+from atlas.service_lifecycle import (
+    DockerComposeProvider,
+    DoctorReport,
+    DoctorSeverity,
+    ManagedService,
+    ServiceHealth,
+    ServiceLifecycleError,
+    ServiceLifecycleService,
+    ServiceDoctor,
+    ServiceHealthStatus,
+    ServiceImage,
+    ServiceRecoveryObservation,
+    ServiceRecoveryResult,
+    ServiceRestartRecoveryService,
+    ServiceRuntime,
+    ServiceUpdateService,
+    UpdateReport,
+    MaintenanceReport,
+    ServiceMaintenanceHistoryService,
+    ServiceStartupPolicyService,
+    StartupPolicyReport,
+)
+from atlas.service_lifecycle.service import (
+    InfrastructureDependencyGraph,
+    InfrastructureHealthReport,
+    InfrastructureSummary,
+)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="atlas service",
+        description="Inspect Atlas-managed infrastructure services.",
+    )
+
+    subparsers = parser.add_subparsers(
+        dest="command",
+        required=True,
+    )
+
+    list_parser = subparsers.add_parser(
+        "list",
+        help="List configured Atlas-managed services.",
+    )
+    list_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Render machine-readable JSON.",
+    )
+
+    show_parser = subparsers.add_parser(
+        "show",
+        help="Show identity, runtime, image, and health for one service.",
+    )
+    show_parser.add_argument(
+        "identifier",
+        help="Stable managed-service identifier.",
+    )
+    show_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Render machine-readable JSON.",
+    )
+
+    runtime_parser = subparsers.add_parser(
+        "runtime",
+        help="Show normalized runtime state for one service.",
+    )
+    runtime_parser.add_argument(
+        "identifier",
+        help="Stable managed-service identifier.",
+    )
+    runtime_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Render machine-readable JSON.",
+    )
+
+    health_parser = subparsers.add_parser(
+        "health",
+        help="Show aggregate infrastructure health or health for one service.",
+    )
+    health_parser.add_argument(
+        "identifier",
+        nargs="?",
+        help=(
+            "Optional stable managed-service identifier. "
+            "Omit it for aggregate infrastructure health."
+        ),
+    )
+    health_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Render machine-readable JSON.",
+    )
+
+    summary_parser = subparsers.add_parser(
+        "summary",
+        help="Show a concise infrastructure runtime and health summary.",
+    )
+    summary_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Render machine-readable JSON.",
+    )
+
+    graph_parser = subparsers.add_parser(
+        "graph",
+        help="Show managed-service dependency relationships.",
+    )
+    graph_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Render machine-readable JSON.",
+    )
+
+    doctor_parser = subparsers.add_parser(
+        "doctor",
+        help="Run read-only diagnostics for managed services.",
+    )
+    doctor_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Render machine-readable JSON.",
+    )
+
+    startup_policy_parser = subparsers.add_parser(
+        "startup-policy",
+        help="Evaluate read-only service startup policy.",
+    )
+    startup_policy_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Render machine-readable JSON.",
+    )
+
+    recovery_parser = subparsers.add_parser(
+        "recovery",
+        help="Capture and evaluate read-only restart recovery.",
+    )
+    recovery_subparsers = recovery_parser.add_subparsers(
+        dest="recovery_command",
+        required=True,
+    )
+    recovery_observe_parser = recovery_subparsers.add_parser(
+        "observe",
+        help="Capture one immutable service observation.",
+    )
+    recovery_observe_parser.add_argument(
+        "identifier",
+        help="Stable managed-service identifier.",
+    )
+    recovery_observe_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Render machine-readable JSON.",
+    )
+    recovery_evaluate_parser = recovery_subparsers.add_parser(
+        "evaluate",
+        help="Compare a saved observation with current state.",
+    )
+    recovery_evaluate_parser.add_argument(
+        "identifier",
+        help="Stable managed-service identifier.",
+    )
+    recovery_evaluate_parser.add_argument(
+        "--before",
+        required=True,
+        type=Path,
+        help="JSON file containing the before observation.",
+    )
+    recovery_evaluate_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Render machine-readable JSON.",
+    )
+
+    updates_parser = subparsers.add_parser(
+        "updates",
+        help="Show read-only service image update metadata.",
+    )
+    updates_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Render machine-readable JSON.",
+    )
+
+    history_parser = subparsers.add_parser(
+        "history",
+        help="Show read-only service maintenance history.",
+    )
+    history_parser.add_argument(
+        "identifier",
+        nargs="?",
+        help="Optional managed-service identifier.",
+    )
+    history_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="Render machine-readable JSON.",
+    )
+
+    return parser
+
+
+def _service_from_environment() -> ServiceLifecycleService:
+    project_root = Path(__file__).resolve().parents[1]
+
+    compose_file = Path(
+        os.environ.get(
+            "ATLAS_COMPOSE_FILE",
+            str(project_root / "docker-compose.yml"),
+        )
+    ).expanduser()
+
+    project_directory = Path(
+        os.environ.get(
+            "ATLAS_PROJECT_DIR",
+            str(compose_file.parent),
+        )
+    ).expanduser()
+
+    return ServiceLifecycleService(
+        DockerComposeProvider(
+            compose_file=compose_file,
+            project_directory=project_directory,
+        )
+    )
+
+
+def _render_json(
+    services: Sequence[ManagedService],
+    *,
+    output: TextIO,
+) -> None:
+    json.dump(
+        [
+            service.to_dict()
+            for service in services
+        ],
+        output,
+        indent=2,
+        sort_keys=True,
+    )
+    output.write("\n")
+
+
+def _render_human(
+    services: Sequence[ManagedService],
+    *,
+    output: TextIO,
+) -> None:
+    output.write("Atlas Managed Services\n")
+    output.write("======================\n\n")
+
+    if not services:
+        output.write("No managed services were returned.\n")
+        return
+
+    for service in services:
+        dependencies = (
+            ", ".join(service.dependencies)
+            if service.dependencies
+            else "None"
+        )
+
+        output.write(
+            f"- {service.identifier}"
+            f" | container={service.container_name or '-'}"
+            f" | dependencies={dependencies}\n"
+        )
+
+    output.write(f"\nTotal: {len(services)}\n")
+
+
+def _render_show_json(
+    identity: ManagedService,
+    runtime: ServiceRuntime,
+    health: ServiceHealth,
+    *,
+    output: TextIO,
+) -> None:
+    json.dump(
+        {
+            "service": identity.to_dict(),
+            "runtime": runtime.to_dict(),
+            "health": health.to_dict(),
+        },
+        output,
+        indent=2,
+        sort_keys=True,
+    )
+    output.write("\n")
+
+
+def _render_show_human(
+    identity: ManagedService,
+    runtime: ServiceRuntime,
+    health: ServiceHealth,
+    *,
+    output: TextIO,
+) -> None:
+    dependencies = (
+        ", ".join(identity.dependencies)
+        if identity.dependencies
+        else "None"
+    )
+    warnings = (
+        "; ".join(health.warnings)
+        if health.warnings
+        else "None"
+    )
+    errors = (
+        "; ".join(health.errors)
+        if health.errors
+        else "None"
+    )
+
+    output.write("Atlas Managed Service\n")
+    output.write("=====================\n\n")
+
+    output.write("Identity\n")
+    output.write("--------\n")
+    output.write(f"Name: {identity.name}\n")
+    output.write(f"Identifier: {identity.identifier}\n")
+    output.write(f"Provider: {identity.provider}\n")
+    output.write(
+        f"Compose Project: {identity.compose_project or 'None'}\n"
+    )
+    output.write(
+        f"Container: {identity.container_name or 'None'}\n"
+    )
+    output.write(
+        f"Enabled: {'Yes' if identity.enabled else 'No'}\n"
+    )
+    output.write(f"Dependencies: {dependencies}\n")
+
+    output.write("\nRuntime\n")
+    output.write("-------\n")
+    output.write(f"State: {runtime.state}\n")
+    output.write(f"Docker Health: {runtime.health}\n")
+    output.write(f"Running: {'Yes' if runtime.running else 'No'}\n")
+    output.write(f"Restart Count: {runtime.restart_count}\n")
+    output.write(f"Started: {runtime.started_at or 'None'}\n")
+    output.write(f"Finished: {runtime.finished_at or 'None'}\n")
+    output.write(
+        "Exit Code: "
+        f"{runtime.exit_code if runtime.exit_code is not None else 'None'}\n"
+    )
+    output.write(
+        f"Status Message: {runtime.status_message or 'None'}\n"
+    )
+
+    output.write("\nImage\n")
+    output.write("-----\n")
+    output.write(f"Reference: {runtime.image.reference}\n")
+    output.write(
+        f"Repository: {runtime.image.repository or 'None'}\n"
+    )
+    output.write(f"Tag: {runtime.image.tag or 'None'}\n")
+    output.write(f"Digest: {runtime.image.digest or 'None'}\n")
+    output.write(f"Image ID: {runtime.image.image_id or 'None'}\n")
+
+    output.write("\nHealth\n")
+    output.write("------\n")
+    output.write(f"Status: {health.status.value}\n")
+    output.write(f"Score: {health.score}/100\n")
+    output.write(
+        "Action Required: "
+        f"{'Yes' if health.action_required else 'No'}\n"
+    )
+    output.write(f"Warnings: {warnings}\n")
+    output.write(f"Errors: {errors}\n")
+    output.write(f"Evaluated: {health.evaluated_at}\n")
+
+
+def _command_show(
+    identifier: str,
+    *,
+    service: ServiceLifecycleService,
+    as_json: bool,
+    output: TextIO,
+) -> int:
+    identity = service.inspect_service(identifier)
+    runtime = service.inspect_runtime(identifier)
+    health = service.inspect_health(identifier)
+
+    if as_json:
+        _render_show_json(
+            identity,
+            runtime,
+            health,
+            output=output,
+        )
+    else:
+        _render_show_human(
+            identity,
+            runtime,
+            health,
+            output=output,
+        )
+
+    return 0
+
+
+
+def _render_runtime_json(
+    runtime: ServiceRuntime,
+    *,
+    output: TextIO,
+) -> None:
+    json.dump(
+        runtime.to_dict(),
+        output,
+        indent=2,
+        sort_keys=True,
+    )
+    output.write("\n")
+
+
+def _render_runtime_human(
+    runtime: ServiceRuntime,
+    *,
+    output: TextIO,
+) -> None:
+    output.write("Atlas Service Runtime\n")
+    output.write("=====================\n\n")
+    output.write(f"State: {runtime.state}\n")
+    output.write(f"Docker Health: {runtime.health}\n")
+    output.write(f"Running: {'Yes' if runtime.running else 'No'}\n")
+    output.write(f"Healthy: {'Yes' if runtime.healthy else 'No'}\n")
+    output.write(f"Restart Count: {runtime.restart_count}\n")
+    output.write(f"Started: {runtime.started_at or 'None'}\n")
+    output.write(f"Finished: {runtime.finished_at or 'None'}\n")
+    output.write(
+        "Exit Code: "
+        f"{runtime.exit_code if runtime.exit_code is not None else 'None'}\n"
+    )
+    output.write(
+        f"Status Message: {runtime.status_message or 'None'}\n"
+    )
+    output.write(f"Image: {runtime.image.reference}\n")
+
+
+def _command_runtime(
+    identifier: str,
+    *,
+    service: ServiceLifecycleService,
+    as_json: bool,
+    output: TextIO,
+) -> int:
+    runtime = service.inspect_runtime(identifier)
+
+    if as_json:
+        _render_runtime_json(runtime, output=output)
+    else:
+        _render_runtime_human(runtime, output=output)
+
+    return 0
+
+
+def _render_health_json(
+    health: ServiceHealth,
+    *,
+    output: TextIO,
+) -> None:
+    json.dump(
+        health.to_dict(),
+        output,
+        indent=2,
+        sort_keys=True,
+    )
+    output.write("\n")
+
+
+def _render_health_human(
+    health: ServiceHealth,
+    *,
+    output: TextIO,
+) -> None:
+    warnings = "; ".join(health.warnings) if health.warnings else "None"
+    errors = "; ".join(health.errors) if health.errors else "None"
+
+    output.write("Atlas Service Health\n")
+    output.write("====================\n\n")
+    output.write(f"Status: {health.status.value}\n")
+    output.write(f"Score: {health.score}/100\n")
+    output.write(f"Healthy: {'Yes' if health.healthy else 'No'}\n")
+    output.write(
+        "Action Required: "
+        f"{'Yes' if health.action_required else 'No'}\n"
+    )
+    output.write(f"Warnings: {warnings}\n")
+    output.write(f"Errors: {errors}\n")
+    output.write(f"Evaluated: {health.evaluated_at}\n")
+
+
+def _render_health_report_json(
+    report: InfrastructureHealthReport,
+    *,
+    output: TextIO,
+) -> None:
+    json.dump(
+        report.to_dict(),
+        output,
+        indent=2,
+        sort_keys=True,
+    )
+    output.write("\n")
+
+
+def _render_health_report_human(
+    report: InfrastructureHealthReport,
+    *,
+    output: TextIO,
+) -> None:
+    counts = report.counts
+
+    output.write("Atlas Infrastructure Health\n")
+    output.write("===========================\n\n")
+    output.write(f"Overall Score: {report.score}/100\n")
+    output.write(f"Status: {report.status.title()}\n")
+
+    output.write("\nServices\n")
+    output.write("--------\n")
+    output.write(f"Total:       {len(report.entries)}\n")
+    output.write(f"Healthy:     {counts['healthy']}\n")
+    output.write(f"Degraded:    {counts['degraded']}\n")
+    output.write(f"Unhealthy:   {counts['unhealthy']}\n")
+    output.write(f"Unknown:     {counts['unknown']}\n")
+
+    output.write("\nAttention Required\n")
+    output.write("------------------\n")
+    if not report.attention:
+        output.write("None\n")
+    else:
+        for entry in report.attention:
+            output.write(f"- {entry.service.identifier}\n")
+            messages = (
+                tuple(entry.health.errors)
+                + tuple(entry.health.warnings)
+            )
+            if not messages:
+                messages = (
+                    f"Health status is {entry.health.status.value}",
+                )
+            for message in messages:
+                output.write(f"    - {message}\n")
+
+    output.write("\nWarnings\n")
+    output.write("--------\n")
+    if report.warnings:
+        for warning in report.warnings:
+            output.write(f"- {warning}\n")
+    else:
+        output.write("None\n")
+
+    output.write("\nErrors\n")
+    output.write("------\n")
+    if report.errors:
+        for error in report.errors:
+            output.write(f"- {error}\n")
+    else:
+        output.write("None\n")
+
+    output.write(f"\nEvaluated: {report.evaluated_at}\n")
+
+
+def _command_health(
+    identifier: str | None,
+    *,
+    service: ServiceLifecycleService,
+    as_json: bool,
+    output: TextIO,
+) -> int:
+    if identifier is None:
+        report = service.inspect_health_report()
+        if as_json:
+            _render_health_report_json(report, output=output)
+        else:
+            _render_health_report_human(report, output=output)
+        return 0
+
+    health = service.inspect_health(identifier)
+
+    if as_json:
+        _render_health_json(health, output=output)
+    else:
+        _render_health_human(health, output=output)
+
+    return 0
+
+
+def _render_summary_json(
+    summary: InfrastructureSummary,
+    *,
+    output: TextIO,
+) -> None:
+    json.dump(
+        summary.to_dict(),
+        output,
+        indent=2,
+        sort_keys=True,
+    )
+    output.write("\n")
+
+
+def _render_summary_human(
+    summary: InfrastructureSummary,
+    *,
+    output: TextIO,
+) -> None:
+    runtime = summary.runtime_counts
+    health = summary.health.counts
+    service_counts = summary.enabled_counts
+
+    output.write("Atlas Infrastructure Summary\n")
+    output.write("============================\n\n")
+    output.write(f"Provider:        {summary.provider}\n")
+    output.write(
+        f"Compose Project: {summary.compose_project or 'None'}\n"
+    )
+
+    output.write("\nServices\n")
+    output.write("--------\n")
+    output.write(f"Total:       {len(summary.services)}\n")
+    output.write(f"Enabled:     {service_counts['enabled']}\n")
+    output.write(f"Disabled:    {service_counts['disabled']}\n")
+
+    output.write("\nRuntime\n")
+    output.write("-------\n")
+    output.write(f"Running:     {runtime['running']}\n")
+    output.write(f"Stopped:     {runtime['stopped']}\n")
+    output.write(f"Restarting:  {runtime['restarting']}\n")
+    output.write(f"Failed:      {runtime['failed']}\n")
+    output.write(f"Unknown:     {runtime['unknown']}\n")
+
+    output.write("\nHealth\n")
+    output.write("------\n")
+    output.write(f"Healthy:     {health['healthy']}\n")
+    output.write(f"Degraded:    {health['degraded']}\n")
+    output.write(f"Unhealthy:   {health['unhealthy']}\n")
+    output.write(f"Unknown:     {health['unknown']}\n")
+    output.write(f"\nOverall Score: {summary.health.score}/100\n")
+    output.write(f"Status: {summary.health.status.title()}\n")
+    output.write(
+        "Attention Required: "
+        f"{len(summary.health.attention)}\n"
+    )
+    output.write(f"\nEvaluated: {summary.evaluated_at}\n")
+
+
+def _command_summary(
+    *,
+    service: ServiceLifecycleService,
+    as_json: bool,
+    output: TextIO,
+) -> int:
+    summary = service.inspect_summary()
+
+    if as_json:
+        _render_summary_json(summary, output=output)
+    else:
+        _render_summary_human(summary, output=output)
+
+    return 0
+
+
+def _render_graph_json(
+    graph: InfrastructureDependencyGraph,
+    *,
+    output: TextIO,
+) -> None:
+    json.dump(
+        graph.to_dict(),
+        output,
+        indent=2,
+        sort_keys=True,
+    )
+    output.write("\n")
+
+
+def _render_graph_human(
+    graph: InfrastructureDependencyGraph,
+    *,
+    output: TextIO,
+) -> None:
+    output.write("Atlas Service Dependency Graph\n")
+    output.write("==============================\n\n")
+    output.write(f"Provider:        {graph.provider}\n")
+    output.write(
+        f"Compose Project: {graph.compose_project or 'None'}\n"
+    )
+    output.write(f"Services:        {len(graph.nodes)}\n")
+    output.write(f"Relationships:   {graph.edge_count}\n")
+
+    output.write("\nDependencies\n")
+    output.write("------------\n")
+    if not graph.roots:
+        output.write("None\n")
+    else:
+        for node in graph.roots:
+            output.write(f"{node.service.identifier}\n")
+            for index, dependent in enumerate(node.dependents):
+                branch = "└──" if index == len(node.dependents) - 1 else "├──"
+                output.write(f"{branch} {dependent.identifier}\n")
+            output.write("\n")
+
+    output.write("Standalone\n")
+    output.write("----------\n")
+    if graph.standalone:
+        for node in graph.standalone:
+            output.write(f"- {node.service.identifier}\n")
+    else:
+        output.write("None\n")
+
+    output.write("\nUnresolved Dependencies\n")
+    output.write("-----------------------\n")
+    if graph.unresolved:
+        for node in graph.unresolved:
+            output.write(f"- {node.service.identifier}\n")
+            for dependency in node.unresolved_dependencies:
+                output.write(f"    - {dependency}\n")
+    else:
+        output.write("None\n")
+
+    output.write(f"\nEvaluated: {graph.evaluated_at}\n")
+
+
+def _command_graph(
+    *,
+    service: ServiceLifecycleService,
+    as_json: bool,
+    output: TextIO,
+) -> int:
+    graph = service.inspect_graph()
+
+    if as_json:
+        _render_graph_json(graph, output=output)
+    else:
+        _render_graph_human(graph, output=output)
+
+    return 0
+
+
+
+def _render_doctor_json(
+    report: DoctorReport,
+    *,
+    output: TextIO,
+) -> None:
+    json.dump(
+        report.to_dict(),
+        output,
+        indent=2,
+        sort_keys=True,
+    )
+    output.write("\n")
+
+
+def _render_doctor_human(
+    report: DoctorReport,
+    *,
+    output: TextIO,
+) -> None:
+    counts = report.counts
+
+    output.write("Atlas Service Doctor\n")
+    output.write("====================\n\n")
+    output.write(f"Provider: {report.provider}\n")
+    output.write(f"Status: {report.status.title()}\n")
+    output.write(
+        "Attention Required: "
+        f"{'Yes' if report.requires_attention else 'No'}\n"
+    )
+
+    output.write("\nFindings\n")
+    output.write("--------\n")
+    output.write(f"Critical: {counts['critical']}\n")
+    output.write(f"Errors:   {counts['error']}\n")
+    output.write(f"Warnings: {counts['warning']}\n")
+    output.write(f"Info:     {counts['info']}\n")
+    output.write(f"Total:    {len(report.findings)}\n")
+
+    if not report.findings:
+        output.write("\nNo diagnostic findings were reported.\n")
+    else:
+        for severity in DoctorSeverity:
+            findings = tuple(
+                finding
+                for finding in report.findings
+                if finding.severity is severity
+            )
+            if not findings:
+                continue
+
+            output.write(f"\n{severity.value.upper()}\n")
+            output.write(f"{'-' * len(severity.value)}\n")
+            for finding in findings:
+                service_identifier = (
+                    finding.service_identifier or "platform"
+                )
+                output.write(
+                    f"- [{service_identifier}] {finding.message}\n"
+                )
+                output.write(
+                    f"  Code: {finding.code}"
+                    f" | Category: {finding.category.value}\n"
+                )
+
+    output.write(f"\nEvaluated: {report.evaluated_at}\n")
+
+
+def _command_doctor(
+    *,
+    service: ServiceLifecycleService,
+    as_json: bool,
+    output: TextIO,
+) -> int:
+    report = ServiceDoctor(service).diagnose()
+
+    if as_json:
+        _render_doctor_json(report, output=output)
+    else:
+        _render_doctor_human(report, output=output)
+
+    return 0
+
+
+
+
+def _render_startup_policy_json(
+    report: StartupPolicyReport,
+    *,
+    output: TextIO,
+) -> None:
+    json.dump(
+        report.to_dict(),
+        output,
+        indent=2,
+        sort_keys=True,
+    )
+    output.write("\n")
+
+
+def _render_startup_policy_human(
+    report: StartupPolicyReport,
+    *,
+    output: TextIO,
+) -> None:
+    output.write("Atlas Service Startup Policy\n")
+    output.write("============================\n\n")
+    output.write(f"Provider: {report.provider}\n")
+    output.write(f"Status:   {report.status.title()}\n")
+    output.write(
+        f"Passed:   {'Yes' if report.passed else 'No'}\n"
+    )
+    output.write(
+        "Attention Required: "
+        f"{'Yes' if report.requires_attention else 'No'}\n"
+    )
+    output.write(f"Findings: {len(report.findings)}\n")
+    output.write(f"Critical: {report.counts['critical']}\n")
+    output.write(f"Errors:   {report.counts['error']}\n")
+    output.write(f"Warnings: {report.counts['warning']}\n")
+    output.write(f"Info:     {report.counts['info']}\n")
+
+    output.write("\nFindings\n")
+    output.write("--------\n")
+
+    if not report.findings:
+        output.write("None\n")
+    else:
+        for finding in report.findings:
+            service_label = (
+                f"[{finding.service_identifier}] "
+                if finding.service_identifier
+                else ""
+            )
+
+            output.write(
+                f"{finding.severity.value.upper():8} "
+                f"{service_label}{finding.message}\n"
+            )
+            output.write(
+                f"  Code: {finding.code}\n"
+            )
+
+            if finding.recommendation:
+                output.write(
+                    "  Recommendation: "
+                    f"{finding.recommendation}\n"
+                )
+
+    output.write(
+        f"\nEvaluated: {report.evaluated_at}\n"
+    )
+    output.write(
+        "Overall Status: "
+        f"{'PASS' if report.passed else 'FAIL'}\n"
+    )
+
+
+def _command_startup_policy(
+    *,
+    service: ServiceLifecycleService,
+    as_json: bool,
+    output: TextIO,
+) -> int:
+    report = ServiceStartupPolicyService(
+        service,
+    ).inspect()
+
+    if as_json:
+        _render_startup_policy_json(
+            report,
+            output=output,
+        )
+    else:
+        _render_startup_policy_human(
+            report,
+            output=output,
+        )
+
+    return 0 if report.passed else 1
+
+
+
+def _render_recovery_observation_json(
+    observation: ServiceRecoveryObservation,
+    *,
+    output: TextIO,
+) -> None:
+    json.dump(observation.to_dict(), output, indent=2, sort_keys=True)
+    output.write("\n")
+
+
+def _render_recovery_observation_human(
+    observation: ServiceRecoveryObservation,
+    *,
+    output: TextIO,
+) -> None:
+    output.write("Atlas Service Recovery Observation\n")
+    output.write("==================================\n\n")
+    output.write(f"Service:       {observation.service.identifier}\n")
+    output.write(f"Runtime:       {observation.runtime.state}\n")
+    output.write(f"Health:        {observation.health.status.value}\n")
+    output.write(f"Restart Count: {observation.runtime.restart_count}\n")
+    output.write(f"Started:       {observation.runtime.started_at or '-'}\n")
+    output.write(f"Observed:      {observation.observed_at}\n")
+
+
+def _render_recovery_result_json(
+    result: ServiceRecoveryResult,
+    *,
+    output: TextIO,
+) -> None:
+    json.dump(result.to_dict(), output, indent=2, sort_keys=True)
+    output.write("\n")
+
+
+def _render_recovery_result_human(
+    result: ServiceRecoveryResult,
+    *,
+    output: TextIO,
+) -> None:
+    output.write("Atlas Service Restart Recovery\n")
+    output.write("==============================\n\n")
+    output.write(f"Service:          {result.service_identifier}\n")
+    output.write(f"Status:           {result.status.value.replace('-', ' ').title()}\n")
+    output.write(f"Restart Observed: {'Yes' if result.restart_observed else 'No'}\n")
+    output.write(f"Restart Delta:    {result.restart_count_delta}\n")
+    output.write(f"Start Advanced:   {'Yes' if result.start_time_advanced else 'No'}\n")
+    output.write(f"Attention:        {'Yes' if result.requires_attention else 'No'}\n")
+    output.write(f"Reason:           {result.reason}\n")
+    if result.warnings:
+        output.write("\nWarnings\n--------\n")
+        for warning in result.warnings:
+            output.write(f"- {warning}\n")
+    if result.errors:
+        output.write("\nErrors\n------\n")
+        for error in result.errors:
+            output.write(f"- {error}\n")
+    output.write(f"\nEvaluated: {result.evaluated_at}\n")
+    output.write(f"Overall Status: {'PASS' if result.passed else 'FAIL'}\n")
+
+
+def _mapping(value: object, field_name: str) -> Mapping[str, object]:
+    if not isinstance(value, Mapping):
+        raise ServiceLifecycleError(f"{field_name} must be an object")
+    return value
+
+
+def _recovery_observation_from_payload(
+    payload: object,
+) -> ServiceRecoveryObservation:
+    root = _mapping(payload, "recovery observation")
+    service_payload = _mapping(root.get("service"), "service")
+    runtime_payload = _mapping(root.get("runtime"), "runtime")
+    image_payload = _mapping(runtime_payload.get("image"), "runtime.image")
+    health_payload = _mapping(root.get("health"), "health")
+
+    service = ManagedService(
+        identifier=service_payload.get("identifier"),
+        name=service_payload.get("name"),
+        provider=service_payload.get("provider"),
+        enabled=service_payload.get("enabled", True),
+        compose_project=service_payload.get("compose_project"),
+        container_name=service_payload.get("container_name"),
+        dependencies=service_payload.get("dependencies", ()),
+        created_at=service_payload.get("created_at"),
+        updated_at=service_payload.get("updated_at"),
+    )
+    image = ServiceImage(
+        reference=image_payload.get("reference"),
+        repository=image_payload.get("repository"),
+        tag=image_payload.get("tag"),
+        digest=image_payload.get("digest"),
+        image_id=image_payload.get("image_id"),
+        created_at=image_payload.get("created_at"),
+    )
+    runtime = ServiceRuntime(
+        state=runtime_payload.get("state"),
+        health=runtime_payload.get("health"),
+        image=image,
+        restart_count=runtime_payload.get("restart_count", 0),
+        started_at=runtime_payload.get("started_at"),
+        finished_at=runtime_payload.get("finished_at"),
+        exit_code=runtime_payload.get("exit_code"),
+        status_message=runtime_payload.get("status_message"),
+    )
+    health = ServiceHealth(
+        status=health_payload.get("status"),
+        score=health_payload.get("score", 100),
+        warnings=health_payload.get("warnings", ()),
+        errors=health_payload.get("errors", ()),
+        details=health_payload.get("details", {}),
+        evaluated_at=health_payload.get("evaluated_at"),
+    )
+    return ServiceRecoveryObservation(
+        service=service,
+        runtime=runtime,
+        health=health,
+        observed_at=root.get("observed_at"),
+    )
+
+
+def _load_recovery_observation(path: Path) -> ServiceRecoveryObservation:
+    try:
+        with path.open(encoding="utf-8") as stream:
+            payload = json.load(stream)
+    except OSError as exc:
+        raise ServiceLifecycleError(
+            f"could not read recovery observation: {path}: {exc}"
+        ) from exc
+    except json.JSONDecodeError as exc:
+        raise ServiceLifecycleError(
+            f"recovery observation is not valid JSON: {path}"
+        ) from exc
+    return _recovery_observation_from_payload(payload)
+
+
+def _command_recovery_observe(
+    identifier: str,
+    *,
+    service: ServiceLifecycleService,
+    as_json: bool,
+    output: TextIO,
+) -> int:
+    observation = ServiceRestartRecoveryService(service).observe(identifier)
+    if as_json:
+        _render_recovery_observation_json(observation, output=output)
+    else:
+        _render_recovery_observation_human(observation, output=output)
+    return 0
+
+
+def _command_recovery_evaluate(
+    identifier: str,
+    before_path: Path,
+    *,
+    service: ServiceLifecycleService,
+    as_json: bool,
+    output: TextIO,
+) -> int:
+    before = _load_recovery_observation(before_path)
+    result = ServiceRestartRecoveryService(service).inspect(identifier, before)
+    if as_json:
+        _render_recovery_result_json(result, output=output)
+    else:
+        _render_recovery_result_human(result, output=output)
+    return 0 if result.passed else 1
+
+
+def _render_updates_json(
+    report: UpdateReport,
+    *,
+    output: TextIO,
+) -> None:
+    json.dump(
+        report.to_dict(),
+        output,
+        indent=2,
+        sort_keys=True,
+    )
+    output.write("\n")
+
+
+def _render_updates_human(
+    report: UpdateReport,
+    *,
+    output: TextIO,
+) -> None:
+    counts = report.counts
+
+    output.write("Atlas Service Updates\n")
+    output.write("=====================\n\n")
+    output.write(f"Provider: {report.provider}\n")
+    output.write(f"Status: {report.status.replace('-', ' ').title()}\n")
+    output.write(
+        "Attention Required: "
+        f"{'Yes' if report.requires_attention else 'No'}\n"
+    )
+    output.write(f"Services Evaluated: {len(report.updates)}\n")
+
+    output.write("\nCounts\n")
+    output.write("------\n")
+    output.write(f"Updates Available: {counts['update-available']}\n")
+    output.write(f"Mutable Tags:      {counts['mutable-tag']}\n")
+    output.write(f"Unknown:           {counts['unknown']}\n")
+    output.write(f"Unsupported:       {counts['unsupported']}\n")
+    output.write(f"Current:           {counts['current']}\n")
+
+    if report.attention:
+        output.write("\nAttention\n")
+        output.write("---------\n")
+        for update in report.attention:
+            output.write(
+                f"- [{update.service_identifier}] "
+                f"{update.service_name}: {update.status.value}\n"
+            )
+            if update.reason:
+                output.write(f"  {update.reason}\n")
+    else:
+        output.write("\nNo update items require attention.\n")
+
+    output.write("\nAll Services\n")
+    output.write("------------\n")
+    if report.updates:
+        for update in report.updates:
+            output.write(
+                f"- [{update.service_identifier}] "
+                f"{update.status.value} "
+                f"({update.current_image.canonical_reference})\n"
+            )
+    else:
+        output.write("None\n")
+
+    output.write(f"\nEvaluated: {report.evaluated_at}\n")
+
+
+def _command_updates(
+    *,
+    service: ServiceLifecycleService,
+    as_json: bool,
+    output: TextIO,
+) -> int:
+    report = ServiceUpdateService(service).inspect_updates()
+
+    if as_json:
+        _render_updates_json(report, output=output)
+    else:
+        _render_updates_human(report, output=output)
+
+    return 0
+
+
+def _render_history_json(
+    report: MaintenanceReport,
+    *,
+    output: TextIO,
+) -> None:
+    json.dump(
+        report.to_dict(),
+        output,
+        indent=2,
+        sort_keys=True,
+    )
+    output.write("\n")
+
+
+def _render_history_human(
+    report: MaintenanceReport,
+    *,
+    identifier: str | None,
+    output: TextIO,
+) -> None:
+    counts = report.counts
+
+    output.write("Atlas Service Maintenance History\n")
+    output.write("=================================\n\n")
+    output.write(f"Provider: {report.provider}\n")
+    output.write(
+        "Scope: "
+        + (
+            f"Service [{identifier}]"
+            if identifier is not None
+            else "All Managed Services"
+        )
+        + "\n"
+    )
+    output.write(f"Records: {len(report.records)}\n")
+    output.write(
+        "Attention Required: "
+        f"{'Yes' if report.requires_attention else 'No'}\n"
+    )
+
+    output.write("\nResults\n")
+    output.write("-------\n")
+    output.write(f"Success: {counts['success']}\n")
+    output.write(f"Failed:  {counts['failed']}\n")
+    output.write(f"Partial: {counts['partial']}\n")
+    output.write(f"Skipped: {counts['skipped']}\n")
+    output.write(f"Unknown: {counts['unknown']}\n")
+
+    output.write("\nHistory\n")
+    output.write("-------\n")
+    if not report.records:
+        output.write("No maintenance history is available.\n")
+    else:
+        for record in report.records:
+            output.write(
+                f"- {record.started_at} "
+                f"[{record.service_identifier}] "
+                f"{record.action.value}: "
+                f"{record.result.value}\n"
+            )
+            if record.summary:
+                output.write(f"  {record.summary}\n")
+            if record.completed_at is not None:
+                output.write(
+                    f"  Completed: {record.completed_at}"
+                )
+                if record.duration_seconds is not None:
+                    output.write(
+                        f" ({record.duration_seconds:.3f}s)"
+                    )
+                output.write("\n")
+
+    output.write(f"\nGenerated: {report.generated_at}\n")
+
+
+def _command_history(
+    *,
+    service: ServiceLifecycleService,
+    identifier: str | None,
+    as_json: bool,
+    output: TextIO,
+) -> int:
+    history_service = ServiceMaintenanceHistoryService(service)
+
+    if identifier is None:
+        report = history_service.inspect_history()
+        normalized_identifier = None
+    else:
+        managed_service = service.inspect_service(identifier)
+        normalized_identifier = managed_service.identifier
+        report = history_service.inspect_service_history(
+            normalized_identifier,
+        )
+
+    if as_json:
+        _render_history_json(report, output=output)
+    else:
+        _render_history_human(
+            report,
+            identifier=normalized_identifier,
+            output=output,
+        )
+
+    return 0
+
+def main(
+    argv: Sequence[str] | None = None,
+    *,
+    service: ServiceLifecycleService | None = None,
+    output: TextIO | None = None,
+    error: TextIO | None = None,
+) -> int:
+    arguments = build_parser().parse_args(argv)
+    resolved_service = service or _service_from_environment()
+    resolved_output = output or sys.stdout
+    resolved_error = error or sys.stderr
+
+    try:
+        if arguments.command == "list":
+            services = resolved_service.list_services()
+
+            if arguments.as_json:
+                _render_json(
+                    services,
+                    output=resolved_output,
+                )
+            else:
+                _render_human(
+                    services,
+                    output=resolved_output,
+                )
+
+            return 0
+
+        if arguments.command == "show":
+            return _command_show(
+                arguments.identifier,
+                service=resolved_service,
+                as_json=arguments.as_json,
+                output=resolved_output,
+            )
+
+        if arguments.command == "runtime":
+            return _command_runtime(
+                arguments.identifier,
+                service=resolved_service,
+                as_json=arguments.as_json,
+                output=resolved_output,
+            )
+
+        if arguments.command == "health":
+            return _command_health(
+                arguments.identifier,
+                service=resolved_service,
+                as_json=arguments.as_json,
+                output=resolved_output,
+            )
+
+        if arguments.command == "summary":
+            return _command_summary(
+                service=resolved_service,
+                as_json=arguments.as_json,
+                output=resolved_output,
+            )
+
+        if arguments.command == "graph":
+            return _command_graph(
+                service=resolved_service,
+                as_json=arguments.as_json,
+                output=resolved_output,
+            )
+
+        if arguments.command == "doctor":
+            return _command_doctor(
+                service=resolved_service,
+                as_json=arguments.as_json,
+                output=resolved_output,
+            )
+
+        if arguments.command == "startup-policy":
+            return _command_startup_policy(
+                service=resolved_service,
+                as_json=arguments.as_json,
+                output=resolved_output,
+            )
+
+        if arguments.command == "recovery":
+            if arguments.recovery_command == "observe":
+                return _command_recovery_observe(
+                    arguments.identifier,
+                    service=resolved_service,
+                    as_json=arguments.as_json,
+                    output=resolved_output,
+                )
+            return _command_recovery_evaluate(
+                arguments.identifier,
+                arguments.before,
+                service=resolved_service,
+                as_json=arguments.as_json,
+                output=resolved_output,
+            )
+
+        if arguments.command == "updates":
+            return _command_updates(
+                service=resolved_service,
+                as_json=arguments.as_json,
+                output=resolved_output,
+            )
+
+        if arguments.command == "history":
+            return _command_history(
+                service=resolved_service,
+                identifier=arguments.identifier,
+                as_json=arguments.as_json,
+                output=resolved_output,
+            )
+    except ServiceLifecycleError as exc:
+        resolved_error.write(
+            f"Service Lifecycle error: {exc}\n"
+        )
+        return 1
+
+    resolved_error.write(
+        f"Unknown Service Lifecycle command: {arguments.command}\n"
+    )
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

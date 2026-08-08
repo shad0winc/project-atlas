@@ -162,7 +162,7 @@ class RegistrationService:
             "invite_id": invitation["invite_id"],
             "user_id": profile["user_id"],
             "username": profile["username"],
-            "role": profile["role"],
+            "roles": list(profile["roles"]),
             "jellyfin_user_id": profile["jellyfin_user_id"],
         }
         try:

@@ -12,7 +12,19 @@ Core Commands
   atlas help
   atlas version
   atlas status
-  atlas services
+  atlas services [--json]
+  atlas service [help|list|show|runtime|health|summary|graph]
+  atlas service list [--json]
+  atlas service show <identifier> [--json]
+  atlas service runtime <identifier> [--json]
+  atlas service health [--json]
+  atlas service health <identifier> [--json]
+  atlas service summary [--json]
+  atlas service graph [--json]
+  atlas service doctor [--json]
+  atlas service startup-policy [--json]
+  atlas service updates [--json]
+  atlas service history [<identifier>] [--json]
   atlas urls
   atlas git
   atlas test [all|core|sports]
@@ -73,7 +85,13 @@ Maintenance
 -----------
   atlas verify
   atlas doctor
-  atlas update
+  atlas update <core|ingress|all> --migration none
+  atlas deployment status
+  atlas deployment baseline
+  atlas deployment rollback <deployment-id>
+  atlas maintenance status
+  atlas maintenance enable
+  atlas maintenance disable
   atlas backup
   atlas restart
   atlas logs <container>
@@ -87,6 +105,13 @@ Intelligence
   atlas ari history [--json]
   atlas ari growth [--json]
   atlas ari forecast [--json]
+  atlas discovery [help|indexers|categories|applications|health|report]
+  atlas operations [help|report|save|latest|history|compare]
+  atlas operations report [--json] [--report-id REPORT_ID]
+  atlas operations save [--json] [--report-id REPORT_ID]
+  atlas operations latest [--json]
+  atlas operations history [--limit LIMIT] [--json]
+  atlas operations compare [--json] [--include-unchanged]
   atlas retention evaluate <provider> <item-id> [--json]
   atlas cleanup evaluate <provider> <item-id> [--json]
   atlas cleanup scan <provider> [--page-size N] [--json]

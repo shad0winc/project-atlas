@@ -1,0 +1,66 @@
+Atlas Service Updates
+=====================
+
+Provider: docker-compose
+Status: Attention
+Attention Required: Yes
+Services Evaluated: 15
+
+Counts
+------
+Updates Available: 0
+Mutable Tags:      14
+Unknown:           1
+Unsupported:       0
+Current:           0
+
+Attention
+---------
+- [bazarr] Bazarr: mutable-tag
+  The configured image uses the mutable latest tag; registry comparison has not been performed.
+- [dozzle] Dozzle: mutable-tag
+  The configured image uses the mutable latest tag; registry comparison has not been performed.
+- [gluetun] Gluetun: mutable-tag
+  The configured image uses the mutable latest tag; registry comparison has not been performed.
+- [homepage] Homepage: mutable-tag
+  The configured image uses the mutable latest tag; registry comparison has not been performed.
+- [jellyfin] Jellyfin: mutable-tag
+  The configured image uses the mutable latest tag; registry comparison has not been performed.
+- [jellyseerr] Jellyseerr: mutable-tag
+  The configured image uses the mutable latest tag; registry comparison has not been performed.
+- [maintainerr] Maintainerr: mutable-tag
+  The configured image uses the mutable latest tag; registry comparison has not been performed.
+- [prowlarr] Prowlarr: mutable-tag
+  The configured image uses the mutable latest tag; registry comparison has not been performed.
+- [qbittorrent] Qbittorrent: mutable-tag
+  The configured image uses the mutable latest tag; registry comparison has not been performed.
+- [radarr] Radarr: mutable-tag
+  The configured image uses the mutable latest tag; registry comparison has not been performed.
+- [radarr-anime] Radarr Anime: mutable-tag
+  The configured image uses the mutable latest tag; registry comparison has not been performed.
+- [sonarr] Sonarr: mutable-tag
+  The configured image uses the mutable latest tag; registry comparison has not been performed.
+- [sonarr-anime] Sonarr Anime: mutable-tag
+  The configured image uses the mutable latest tag; registry comparison has not been performed.
+- [tautulli] Tautulli: mutable-tag
+  The configured image uses the mutable latest tag; registry comparison has not been performed.
+
+All Services
+------------
+- [bazarr] mutable-tag (lscr.io/linuxserver/bazarr:latest)
+- [dozzle] mutable-tag (amir20/dozzle:latest)
+- [gluetun] mutable-tag (qmcgaw/gluetun:latest)
+- [homepage] mutable-tag (ghcr.io/gethomepage/homepage:latest)
+- [jellyfin] mutable-tag (jellyfin/jellyfin:latest)
+- [jellyseerr] mutable-tag (fallenbagel/jellyseerr:latest)
+- [maintainerr] mutable-tag (ghcr.io/jorenn92/maintainerr:latest)
+- [prowlarr] mutable-tag (lscr.io/linuxserver/prowlarr:latest)
+- [qbittorrent] mutable-tag (lscr.io/linuxserver/qbittorrent:latest)
+- [radarr] mutable-tag (lscr.io/linuxserver/radarr:latest)
+- [radarr-anime] mutable-tag (lscr.io/linuxserver/radarr:latest)
+- [sonarr] mutable-tag (lscr.io/linuxserver/sonarr:latest)
+- [sonarr-anime] mutable-tag (lscr.io/linuxserver/sonarr:latest)
+- [tautulli] mutable-tag (lscr.io/linuxserver/tautulli:latest)
+- [flaresolverr] unknown (ghcr.io/flaresolverr/flaresolverr:v3.5.0)
+
+Evaluated: 2026-08-02T02:41:35.991572Z

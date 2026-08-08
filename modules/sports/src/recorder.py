@@ -399,14 +399,104 @@ def process_is_running(
     return True
 
 
+def process_start_time(
+    pid: int | None,
+) -> int | None:
+    if not pid:
+        return None
+
+    try:
+        process_id = int(pid)
+    except (
+        TypeError,
+        ValueError,
+    ):
+        return None
+
+    if process_id <= 0:
+        return None
+
+    stat_file = Path(
+        f"/proc/{process_id}/stat"
+    )
+
+    try:
+        stat_value = stat_file.read_text(
+            encoding="utf-8"
+        )
+    except (
+        FileNotFoundError,
+        PermissionError,
+        OSError,
+    ):
+        return None
+
+    command_end = stat_value.rfind(")")
+
+    if command_end < 0:
+        return None
+
+    fields = stat_value[
+        command_end + 1:
+    ].strip().split()
+
+    # Fields start at procfs stat field 3 (state).
+    # Process start time is field 22, therefore index 19.
+    if len(fields) <= 19:
+        return None
+
+    try:
+        start_time = int(fields[19])
+    except ValueError:
+        return None
+
+    return start_time if start_time > 0 else None
+
+
+def process_identity_matches(
+    pid: int | None,
+    expected_start_time: int | str | None,
+) -> bool:
+    if expected_start_time is None:
+        return False
+
+    try:
+        expected = int(expected_start_time)
+    except (
+        TypeError,
+        ValueError,
+    ):
+        return False
+
+    if expected <= 0 or not process_is_running(pid):
+        return False
+
+    return process_start_time(pid) == expected
+
+
 def launch_recording(
     recording: dict[str, Any],
 ) -> dict[str, Any]:
     existing_pid = recording.get("pid")
 
     if process_is_running(existing_pid):
+        expected_start_time = recording.get(
+            "process_start_time"
+        )
+
+        if not process_identity_matches(
+            existing_pid,
+            expected_start_time,
+        ):
+            raise RuntimeError(
+                "recorder_process_identity_unverified"
+            )
+
         return {
             "pid": int(existing_pid),
+            "process_start_time": int(
+                expected_start_time
+            ),
             "log_file": str(
                 recording.get(
                     "log_file",
@@ -516,8 +606,26 @@ def launch_recording(
     finally:
         log_handle.close()
 
+    start_time = process_start_time(
+        process.pid
+    )
+
+    if start_time is None:
+        try:
+            os.killpg(
+                process.pid,
+                signal.SIGTERM,
+            )
+        except ProcessLookupError:
+            pass
+
+        raise RuntimeError(
+            "recorder_process_identity_unavailable"
+        )
+
     return {
         "pid": process.pid,
+        "process_start_time": start_time,
         "log_file": str(log_file),
         "output_file": str(output_file),
         "partial_file": str(partial_file),
@@ -531,9 +639,16 @@ def launch_recording(
 def stop_recording(
     pid: int | None,
     timeout_seconds: int = 10,
+    expected_start_time: int | str | None = None,
 ) -> bool:
     if not process_is_running(pid):
         return True
+
+    if not process_identity_matches(
+        pid,
+        expected_start_time,
+    ):
+        return False
 
     process_id = int(pid)
 
@@ -553,9 +668,21 @@ def stop_recording(
         ):
             return True
 
+        if not process_identity_matches(
+            process_id,
+            expected_start_time,
+        ):
+            return True
+
         import time
 
         time.sleep(0.1)
+
+    if not process_identity_matches(
+        process_id,
+        expected_start_time,
+    ):
+        return True
 
     try:
         os.killpg(

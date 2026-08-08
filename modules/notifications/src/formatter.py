@@ -4,6 +4,20 @@ from typing import Any
 
 def notification_route(notification: dict[str, Any]) -> str:
     event_name = notification.get("event", "unknown")
+    payload = notification.get("payload", {})
+
+    if event_name.startswith("request."):
+        routes = {
+            "movie": "movies",
+            "tv": "tv",
+            "anime_movie": "anime_movies",
+            "anime_tv": "anime_tv",
+        }
+
+        return routes.get(
+            str(payload.get("media_type", "")),
+            "system",
+        )
 
     if event_name.startswith("movie."):
         return "movies"
@@ -34,6 +48,17 @@ def notification_title(notification: dict[str, Any]) -> str:
         "storage.threshold-recovered": "Atlas Storage Threshold Recovered",
         "sports.provider-degraded": "Sports Provider Degraded",
         "sports.provider-recovered": "Sports Provider Recovered",
+        "request.created": "Media Request Created",
+        "request.submitted": "Media Request Submitted",
+        "request.pending": "Media Request Pending",
+        "request.approved": "Media Request Approved",
+        "request.searching": "Media Search Started",
+        "request.downloading": "Media Download Started",
+        "request.importing": "Media Import Started",
+        "request.available": "Ready to Watch",
+        "request.rejected": "Media Request Rejected",
+        "request.failed": "Media Request Failed",
+        "request.cancelled": "Media Request Cancelled",
     }
 
     return titles.get(
@@ -45,6 +70,62 @@ def notification_title(notification: dict[str, Any]) -> str:
 def notification_description(notification: dict[str, Any]) -> str:
     event_name = notification.get("event", "unknown")
     payload = notification.get("payload", {})
+
+    if event_name.startswith("request."):
+        title = str(
+            payload.get(
+                "title",
+                "Requested media",
+            )
+        )
+        year = payload.get("year")
+
+        display_title = (
+            f"{title} ({year})"
+            if year is not None
+            else title
+        )
+
+        descriptions = {
+            "request.created": (
+                f"{display_title} was added to Atlas requests."
+            ),
+            "request.submitted": (
+                f"{display_title} was submitted to the media provider."
+            ),
+            "request.pending": (
+                f"{display_title} is waiting for approval."
+            ),
+            "request.approved": (
+                f"{display_title} was approved."
+            ),
+            "request.searching": (
+                f"Atlas is searching for {display_title}."
+            ),
+            "request.downloading": (
+                f"{display_title} is downloading."
+            ),
+            "request.importing": (
+                f"{display_title} is being imported."
+            ),
+            "request.available": (
+                f"{display_title} is ready to watch."
+            ),
+            "request.rejected": (
+                f"{display_title} was rejected."
+            ),
+            "request.failed": (
+                f"The request for {display_title} failed."
+            ),
+            "request.cancelled": (
+                f"The request for {display_title} was cancelled."
+            ),
+        }
+
+        return descriptions.get(
+            event_name,
+            f"Request update for {display_title}.",
+        )
 
     if event_name == "atlas.health-changed":
         previous = payload.get("previous", "Unknown")
@@ -107,6 +188,97 @@ def notification_fields(
 ) -> list[dict[str, Any]]:
     event_name = notification.get("event", "unknown")
     payload = notification.get("payload", {})
+
+    if event_name.startswith("request."):
+        fields = [
+            {
+                "name": "Media",
+                "value": str(
+                    payload.get(
+                        "title",
+                        "Unknown",
+                    )
+                ),
+                "inline": False,
+            },
+            {
+                "name": "Type",
+                "value": str(
+                    payload.get(
+                        "media_type",
+                        "Unknown",
+                    )
+                ).replace("_", " ").title(),
+                "inline": True,
+            },
+            {
+                "name": "Status",
+                "value": str(
+                    payload.get(
+                        "status",
+                        "Unknown",
+                    )
+                ).title(),
+                "inline": True,
+            },
+            {
+                "name": "Provider",
+                "value": str(
+                    payload.get(
+                        "provider",
+                        "Unknown",
+                    )
+                ).title(),
+                "inline": True,
+            },
+            {
+                "name": "Request ID",
+                "value": str(
+                    payload.get(
+                        "request_id",
+                        "Unknown",
+                    )
+                ),
+                "inline": False,
+            },
+        ]
+
+        if payload.get("year") is not None:
+            fields.insert(
+                1,
+                {
+                    "name": "Year",
+                    "value": str(payload["year"]),
+                    "inline": True,
+                },
+            )
+
+        if payload.get("season_number") is not None:
+            fields.append(
+                {
+                    "name": "Season",
+                    "value": str(
+                        payload["season_number"]
+                    ),
+                    "inline": True,
+                },
+            )
+
+        if (
+            event_name == "request.available"
+            and payload.get("available_at")
+        ):
+            fields.append(
+                {
+                    "name": "Available At",
+                    "value": str(
+                        payload["available_at"]
+                    ),
+                    "inline": False,
+                },
+            )
+
+        return fields
 
     if event_name == "atlas.health-changed":
         return [

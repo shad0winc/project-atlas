@@ -1,0 +1,54 @@
+{
+  "health": {
+    "action_required": true,
+    "details": {
+      "docker_health": "unknown",
+      "exit_code": 0,
+      "finished_at": "2026-07-27T01:06:18.397939Z",
+      "image_reference": "lscr.io/linuxserver/bazarr:latest",
+      "restart_count": 0,
+      "runtime_state": "running",
+      "service_identifier": "bazarr",
+      "started_at": "2026-07-27T01:07:40.971843Z",
+      "status_message": "running"
+    },
+    "errors": [],
+    "evaluated_at": "2026-08-02T02:41:36.938887Z",
+    "healthy": false,
+    "score": 85,
+    "status": "degraded",
+    "warnings": [
+      "No Docker health check is configured"
+    ]
+  },
+  "runtime": {
+    "exit_code": 0,
+    "finished_at": "2026-07-27T01:06:18.397939Z",
+    "health": "unknown",
+    "healthy": false,
+    "image": {
+      "created_at": null,
+      "digest": null,
+      "image_id": "sha256:5d916d07404296ec35ee726e13e0e558f05952724cf494a7f009d913fb2b12f3",
+      "reference": "lscr.io/linuxserver/bazarr:latest",
+      "repository": "lscr.io/linuxserver/bazarr",
+      "tag": "latest"
+    },
+    "restart_count": 0,
+    "running": true,
+    "started_at": "2026-07-27T01:07:40.971843Z",
+    "state": "running",
+    "status_message": "running"
+  },
+  "service": {
+    "compose_project": "project-atlas",
+    "container_name": "bazarr",
+    "created_at": null,
+    "dependencies": [],
+    "enabled": true,
+    "identifier": "bazarr",
+    "name": "Bazarr",
+    "provider": "docker-compose",
+    "updated_at": null
+  }
+}

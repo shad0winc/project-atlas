@@ -1,0 +1,21 @@
+Atlas Service Maintenance History
+=================================
+
+Provider: unknown
+Scope: All Managed Services
+Records: 0
+Attention Required: No
+
+Results
+-------
+Success: 0
+Failed:  0
+Partial: 0
+Skipped: 0
+Unknown: 0
+
+History
+-------
+No maintenance history is available.
+
+Generated: 2026-08-02T02:41:36.065680Z

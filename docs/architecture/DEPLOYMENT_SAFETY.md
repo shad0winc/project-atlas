@@ -1,0 +1,309 @@
+# Production Deployment Safety Architecture
+
+## Purpose
+
+This document defines the v1.0 production change-control architecture for
+Project Atlas. It describes how tested source reaches production, how users are
+protected during maintenance, how pre-change recovery evidence is captured,
+and how Atlas decides whether to reopen traffic after an update or rollback.
+
+## Safety Invariant
+
+> Production changes must originate from an explicitly approved and tested
+> release state, preserve a verified recovery boundary before mutation, remain
+> observable during maintenance, and return user traffic only after post-change
+> verification succeeds.
+
+## Discovered Production Topology
+
+At discovery commit `7f82bc8d`:
+
+- `main` and `origin/main` resolve to `791436c7`;
+- v1.0 development HEAD is on `feature/public-ingress`;
+- `main` is an ancestor of the active development branch;
+- Caddy, Atlas API, and Atlas Portal run as the `atlas-ingress` Compose project;
+- Caddy owns ports 80 and 443 and routes `/api/*` to `atlas-api:8000` and all
+  other public traffic to `atlas-portal:3000`;
+- Caddy configuration is a read-only bind mount from `infra/caddy`;
+- Caddy data, config, and logs use writable Atlas-managed storage; and
+- the current Caddy Docker healthcheck reaches the public API health route.
+
+The local repository also contains an annotated `v1.0.0` tag resolving to
+`a67bb8a5` (`feat: add ARI recommendation engine`, 2026-07-09). That tag predates
+the current release-readiness work and is not current v1.0 certification
+evidence.
+
+## Branch and Release Model
+
+| Surface | Purpose | Production deployment |
+| --- | --- | --- |
+| `main` | Stable production source | Allowed after required gates |
+| `feature/*` / `fix/*` / `docs/*` | Focused development | Not directly allowed |
+| `release/<version>` | Frozen certification/stabilization | Validation surface; promoted to `main` before normal production deployment |
+| annotated release tag | Certified immutable release identity | Must point to the certified release commit |
+
+Atlas intentionally does not require a permanent `develop` branch. Focused
+branches provide background-development isolation with less merge ceremony.
+
+### Promotion flow
+
+```text
+focused development
+       |
+       v
+release/<version>  -- certification + release-only fixes
+       |
+       v
+     main          -- production-stable source
+       |
+       v
+certified tag      -- immutable release identity
+```
+
+A production runtime change still requires an explicit maintenance/deployment
+operation after source promotion.
+
+## Legacy Release-Tag Blocker
+
+The existing `v1.0.0` tag cannot certify the eventual v1.0 release because it
+points to an earlier development commit.
+
+Until explicitly reconciled:
+
+- automation must not use it as proof that v1.0 is certified;
+- release documentation must identify the mismatch;
+- it must not be silently moved or deleted; and
+- final v1.0 publication remains blocked.
+
+Reconciliation requires explicit project-owner approval because changing a tag
+may affect external consumers.
+
+## Maintenance Mode
+
+### Ownership
+
+Caddy owns the maintenance boundary. It is the only deployed component upstream
+of both the Portal and API, so it can protect users even when those application
+containers are restarting or unavailable.
+
+### State
+
+Maintenance state lives under Atlas runtime configuration, for example:
+
+```text
+/mnt/storage/configs/atlas/maintenance/enabled
+```
+
+The final implementation owns the exact path through Atlas configuration. Caddy
+receives that state through a read-only mount. The Portal/API do not own the
+flag and tracked Caddy files are never rewritten to toggle runtime state.
+
+The CLI exposes only explicit operations:
+
+```text
+atlas maintenance status
+atlas maintenance enable
+atlas maintenance disable
+```
+
+Enable/disable operations are idempotent. Status is read-only.
+
+### HTTP behavior
+
+While enabled, normal public requests receive HTTP 503 Service Unavailable and
+a bounded maintenance response. A `Retry-After` header should be supplied where
+practical.
+
+Maintenance must cover both Portal and API user traffic. It must not rely on
+either application being healthy enough to render the maintenance response.
+
+### Ingress liveness
+
+Caddy requires a liveness route that bypasses maintenance mode. Docker must be
+able to distinguish:
+
+```text
+Caddy is unhealthy
+```
+
+from:
+
+```text
+Caddy is healthy and intentionally returning maintenance responses
+```
+
+The ingress verifier must test both the liveness contract and, when applicable,
+the maintenance response contract.
+
+## Deployment Lock
+
+Only one production deployment transaction may be active at a time.
+
+The lock is Atlas runtime state, not a Git file. Acquisition must be atomic.
+Lock ownership and stale-lock handling must fail closed when ownership cannot be
+established safely.
+
+The lock is released only after the transaction reaches a defined terminal
+state. Error cleanup must not disable maintenance merely because the shell
+process exits.
+
+## Pre-Update Capture
+
+Before service mutation Atlas captures a deployment manifest containing at
+least:
+
+- deployment identifier and timestamps;
+- source branch/ref and full Git commit;
+- clean/dirty repository result;
+- relevant Compose project/config identity;
+- pre-update container image IDs/digests;
+- backup artifact identity; and
+- migration declaration, when applicable.
+
+Mutable tags such as `latest` are not rollback identities. The captured image
+identity is authoritative for the previous runtime.
+
+## Pre-Update Backup
+
+The deployment transaction invokes the existing atomic `atlas backup` boundary
+and requires a successfully validated canonical archive before continuing.
+
+The deployment record links to that backup artifact.
+
+This requirement does not expand the backup's scope by documentation. If an
+update changes state not protected by the verified Atlas backup, an appropriate
+state-specific backup or recovery path is additionally required. The later
+Backup and Recovery milestone remains responsible for full certification.
+
+## Apply Phase
+
+The apply phase mutates only the approved deployment scope.
+
+It must not execute `docker image prune` while rollback remains possible.
+
+Root service Compose changes and ingress application changes are separate
+deployable surfaces and should be rebuilt/recreated only when the approved
+change requires them.
+
+Application builds must come from the approved source commit. Untracked or
+dirty source fails the deployment gate.
+
+## Post-Update Verification
+
+Required validation is selected by the affected surface and includes the
+existing Atlas tools rather than a second health system:
+
+- `atlas doctor`;
+- `atlas verify`;
+- `scripts/verify-ingress.sh` for public ingress changes;
+- Docker Compose/container health where relevant; and
+- migration-specific assertions when a migration occurred.
+
+All required gates must pass before normal public traffic resumes.
+
+## Failure State
+
+If apply or post-update validation fails:
+
+- maintenance remains enabled;
+- the failure is visible and recorded;
+- the pre-update manifest and backup remain preserved;
+- rollback assets are not pruned; and
+- the operator chooses rollback or explicit forward recovery.
+
+Failure is not converted into success because containers happen to be running.
+
+## Rollback
+
+Rollback uses the captured deployment manifest.
+
+It restores the prior approved source/runtime identities and any state recovery
+defined by the migration plan. It does not guess at previous versions by
+resolving current mutable tags.
+
+After rollback, Atlas reruns the required Doctor, Verify, ingress, and
+migration-specific checks. Maintenance is disabled only after those checks
+pass.
+
+If rollback is unsafe or incomplete, maintenance stays enabled and the result
+becomes an explicit recovery incident.
+
+## Migration Contract
+
+Every production schema or configuration migration has a declaration with:
+
+| Field | Requirement |
+| --- | --- |
+| Source state | Known and validated |
+| Target state | Explicit |
+| Compatibility | Documented |
+| Reversibility | `reversible`, `forward-recovery`, or `irreversible` |
+| Backup | Identified before apply |
+| Validation | Deterministic where practical |
+| Recovery | Defined before production mutation |
+
+Missing migration evidence blocks deployment.
+
+Irreversible migrations require explicit approval and recovery evidence; they
+cannot inherit a generic rollback promise.
+
+## Tested-Release Gate
+
+Deployment Safety uses two complementary gates:
+
+1. repository-hosting CI/branch protection prevents unvalidated source from
+   being promoted into the stable production branch; and
+2. the production deployment command validates its local branch/ref, commit,
+   cleanliness, and approved release state before runtime mutation.
+
+The local deployment gate is required even when CI exists because production
+must verify what it is actually about to deploy.
+
+## Existing `atlas update` Reconciliation
+
+The current command is not the final v1.0 deployment transaction.
+
+Its useful pieces are retained:
+
+- pre-change Doctor;
+- Compose pull/recreate;
+- post-change Doctor; and
+- post-change Verify.
+
+It must be reconciled to add locking, maintenance, pre-update backup, rollback
+capture, tested-source gating, affected ingress validation, and explicit failure
+state. Immediate unused-image pruning moves outside the rollback window.
+
+The standalone `scripts/update.sh` must not remain a weaker alternate path that
+bypasses the canonical deployment safety contract.
+
+## Validation Strategy
+
+Implementation proceeds in bounded stages:
+
+1. maintenance-mode state, Caddy routing, CLI contract, and tests;
+2. guarded deployment transaction with backup and post-change verification;
+3. rollback capture and deterministic failure/recovery tests;
+4. CI/tested-source enforcement; and
+5. controlled production validation.
+
+Automated tests use temporary state and mocked/stubbed Docker operations for
+failure injection. Production validation begins read-only and only performs a
+controlled maintenance/update exercise after explicit approval of the exact
+mutation and rollback plan.
+
+## Completion Boundary
+
+M-023.24 is complete only when:
+
+- the production, background-development, and release branch contracts are
+  documented;
+- maintenance mode protects Portal and API traffic while Caddy remains healthy;
+- pre-update backup and rollback capture occur before deployment mutation;
+- post-update verification gates user traffic;
+- failed deployment/rollback behavior is deterministic and tested;
+- migration contracts fail closed when recovery evidence is missing;
+- untested source cannot use the canonical production deployment path;
+- the premature `v1.0.0` tag is tracked as an unresolved release blocker until
+  explicitly reconciled; and
+- controlled production validation confirms the deployed contract.

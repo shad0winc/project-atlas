@@ -1,0 +1,13 @@
+Atlas Service Runtime
+=====================
+
+State: running
+Docker Health: unknown
+Running: Yes
+Healthy: No
+Restart Count: 0
+Started: 2026-07-27T01:07:40.971843Z
+Finished: 2026-07-27T01:06:18.397939Z
+Exit Code: 0
+Status Message: running
+Image: lscr.io/linuxserver/bazarr:latest

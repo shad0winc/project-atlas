@@ -1,0 +1,35 @@
+atlas.shadowinc.co {
+        import atlas_security_headers
+        import atlas_access_log
+
+        encode zstd gzip
+
+        route {
+                # This endpoint proves ingress liveness even when Atlas is in
+                # intentional maintenance mode. It must not depend on Portal
+                # or API availability.
+                handle /_atlas/ingress-health {
+                        respond "ok" 200
+                }
+
+                @atlas_maintenance {
+                        file {
+                                root /etc/atlas-maintenance
+                                try_files /enabled
+                        }
+                }
+
+                handle @atlas_maintenance {
+                        header Retry-After "300"
+                        respond "Project Atlas is temporarily unavailable for maintenance." 503
+                }
+
+                handle /api/* {
+                        reverse_proxy atlas-api:8000
+                }
+
+                handle {
+                        reverse_proxy atlas-portal:3000
+                }
+        }
+}

@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+ATLAS_DEV_SCRIPT_DIR="$(
+    cd "$(dirname "${BASH_SOURCE[0]}")" &&
+        pwd
+)"
+
+ATLAS_DEV_PROJECT_DIR="$(
+    cd "$ATLAS_DEV_SCRIPT_DIR/../.." &&
+        pwd
+)"
+
+ATLAS_DEV_COMMAND_DIR="$ATLAS_DEV_SCRIPT_DIR/commands"
+
+atlas_dev_error() {
+    printf 'ERROR: %s\n' "$1" >&2
+}
+
+atlas_dev_print_help() {
+    cat <<'HELP'
+Project Atlas Engineering Toolkit
+
+Usage:
+  scripts/dev/atlas-dev <command> [arguments]
+
+Commands:
+  help       Show this help message
+  discover   Run a repository discovery workflow
+  validate   Run engineering validation
+  test       Run Engineering Toolkit contract tests
+
+Examples:
+  scripts/dev/atlas-dev help
+  scripts/dev/atlas-dev discover
+  scripts/dev/atlas-dev validate
+  scripts/dev/atlas-dev test
+
+Additional Engineering Toolkit commands will continue to be
+introduced incrementally as Project Atlas evolves.
+HELP
+}
+
+atlas_dev_verify_repository() {
+    if [[ ! -d "$ATLAS_DEV_PROJECT_DIR/.git" ]]; then
+        atlas_dev_error \
+            "Repository metadata was not found at $ATLAS_DEV_PROJECT_DIR/.git."
+        return 1
+    fi
+
+    if [[ ! -f "$ATLAS_DEV_PROJECT_DIR/scripts/atlas" ]]; then
+        atlas_dev_error \
+            "Atlas runtime CLI was not found at scripts/atlas."
+        return 1
+    fi
+}
+
+atlas_dev_command_path() {
+    local command_name="$1"
+
+    printf '%s/%s.sh\n' \
+        "$ATLAS_DEV_COMMAND_DIR" \
+        "$command_name"
+}
+
+atlas_dev_dispatch() {
+    local command_name="${1:-help}"
+    local command_file
+
+    case "$command_name" in
+        help|-h|--help)
+            atlas_dev_print_help
+            return 0
+            ;;
+    esac
+
+    if [[ ! "$command_name" =~ ^[a-z][a-z0-9-]*$ ]]; then
+        atlas_dev_error "Invalid developer command: $command_name"
+        printf '\n' >&2
+        atlas_dev_print_help >&2
+        return 2
+    fi
+
+    command_file="$(atlas_dev_command_path "$command_name")"
+
+    if [[ ! -f "$command_file" ]]; then
+        atlas_dev_error "Unknown or unavailable developer command: $command_name"
+        printf '\n' >&2
+        atlas_dev_print_help >&2
+        return 2
+    fi
+
+    if [[ ! -x "$command_file" ]]; then
+        atlas_dev_error "Developer command is not executable: $command_file"
+        return 1
+    fi
+
+    shift
+
+    "$command_file" "$@"
+}
+
+main() {
+    atlas_dev_verify_repository
+    cd "$ATLAS_DEV_PROJECT_DIR"
+    atlas_dev_dispatch "$@"
+}
+
+main "$@"

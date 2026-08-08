@@ -45,6 +45,13 @@ ARI is the operational intelligence subsystem of Project Atlas.
 
 It continuously evaluates platform health, analyzes historical operational data, forecasts future capacity requirements, and provides actionable recommendations.
 
+The original ARI analytics and forecast capabilities are operational. Atlas has
+hardened those capabilities behind typed, independently tested domain services.
+The typed snapshot reader, comparison service, analytics timeline, and
+timeline-based forecast service are implemented and validated. Future work will
+focus on forecast refinement, confidence reporting, and additional forecasting
+strategies without changing the established timeline contract.
+
 ---
 
 # Engine Architecture
@@ -219,3 +226,94 @@ Project Atlas prioritizes:
 - Automation before manual intervention
 - Intelligence through operational data
 - Documentation as a first-class feature
+
+# Atlas API Contract Foundation
+
+## Status
+
+**Implemented — Shared Contract and Adapter Foundation Complete**
+
+Implemented capabilities include:
+
+- canonical API and schema version constants;
+- a stable vendor media type;
+- immutable transport-neutral API errors;
+- immutable success and failure response envelopes;
+- normalized UTC response timestamps;
+- validated response reconstruction;
+- deterministic JSON-compatible serialization;
+- mapping, sequence, enum, dataclass, datetime, and `to_dict()` support;
+- explicit rejection of unsupported and framework-specific values;
+- stable public exports through `atlas.api`;
+- Pydantic and OpenAPI envelope schemas under `apps/api`;
+- reusable FastAPI success and failure envelope helpers;
+- opt-in adoption for new HTTP routes;
+- backward compatibility for existing unwrapped endpoint responses;
+- cross-contract validation with Operations reports and comparisons;
+- dedicated shared-contract, integration, adapter, schema, and endpoint
+  regression tests.
+
+The shared API contract layer is **Level 4 — Observable**.
+
+Its contracts are deterministic, versioned, test-backed, and ready for use by
+new HTTP endpoints. The layer remains independent of FastAPI, Pydantic,
+Starlette, routers, HTTP request objects, and status codes.
+
+The existing FastAPI application owns HTTP routing, request parsing,
+authentication, authorization, Pydantic validation, and OpenAPI generation.
+
+Operations HTTP routes, broader envelope adoption, endpoint migration, and
+Portal visualization remain planned extensions.
+
+---
+
+# Atlas Operations Reporting
+
+## Status
+
+**Implemented — Persistent CLI Complete**
+
+Implemented capabilities include:
+
+- immutable Operations findings, sections, summaries, and reports;
+- schema-validated report deserialization;
+- read-only System and Docker collectors;
+- guarded Docker execution and normalized provider snapshots;
+- runtime, health, restart, OOM, exit, and governance findings;
+- deterministic aggregation and collector failure isolation;
+- automatic runtime-context discovery;
+- detailed human-readable and stable JSON reports;
+- immutable timestamped report snapshots;
+- atomic `latest.json` persistence;
+- duplicate-snapshot protection;
+- newest-first repository history support;
+- configurable bounded history inspection;
+- concise human-readable history output;
+- stable wrapped JSON history output;
+- immutable finding-change and aggregate comparison contracts;
+- deterministic added, removed, changed, and unchanged detection;
+- derived status, score, attention, and change summaries;
+- concise human and stable JSON comparison rendering;
+- shared `TaskScheduler` integration;
+- canonical hourly `operations.collect` registration;
+- idempotent core-task synchronization with runtime-state preservation;
+- isolated scheduled-collection subprocess execution;
+- core-task isolation from optional-module event routing;
+- configurable scheduled repository roots through
+  `ATLAS_OPERATIONS_DIRECTORY`;
+- public `atlas operations report`, `save`, `latest`, `history`, and
+  `compare` commands;
+- public scheduler synchronization, inspection, execution, and history
+  workflows for scheduled Operations collection;
+- validated compatibility with the shared transport-neutral API contract;
+- deterministic serialization through shared API response envelopes;
+- dedicated unit, integration, regression, corruption, atomic-write,
+  comparison, renderer, scheduler, subprocess, shell, API-contract, and live
+  validation.
+
+The subsystem is **Level 4 — Observable** with durable report
+persistence and automated scheduled collection.
+
+Operations HTTP route exposure, notifications, and Portal visualization
+remain planned extensions. The shared API contract and FastAPI adapter
+foundations are implemented, but no Operations endpoint is claimed complete.
