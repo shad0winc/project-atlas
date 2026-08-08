@@ -46,9 +46,11 @@ services:
 
     group_add:
       - "20000"
+      - "20001"
 
     volumes:
       - /mnt/storage/configs/atlas/users:/mnt/storage/configs/atlas/users:ro
+      - /mnt/storage/configs/atlas/runtime/events.jsonl:/mnt/storage/configs/atlas/runtime/events.jsonl:rw
 
     expose:
       - "8000"
@@ -56,6 +58,7 @@ services:
     environment:
       ATLAS_JELLYFIN_URL: "http://jellyfin:8096"
       ATLAS_USERS_DIR: "/mnt/storage/configs/atlas/users"
+      ATLAS_SECURITY_AUDIT_PATH: "/mnt/storage/configs/atlas/runtime/events.jsonl"
       ATLAS_JWT_SECRET: "${ATLAS_JWT_SECRET:?ATLAS_JWT_SECRET is required}"
       ATLAS_JWT_ISSUER: "${ATLAS_JWT_ISSUER:-project-atlas}"
       ATLAS_JWT_AUDIENCE: "${ATLAS_JWT_AUDIENCE:-atlas-portal}"

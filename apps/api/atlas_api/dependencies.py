@@ -106,6 +106,15 @@ def get_login_attempt_limiter() -> LoginAttemptLimiter:
 
 
 @lru_cache(maxsize=1)
+def get_security_audit_writer():
+    """Return the process-wide credential-safe security audit writer."""
+
+    from atlas_api.security.audit import SecurityAuditWriter
+
+    return SecurityAuditWriter.from_environment()
+
+
+@lru_cache(maxsize=1)
 def get_authentication_service() -> AuthenticationService:
     """Return the fully composed Atlas authentication service."""
 
