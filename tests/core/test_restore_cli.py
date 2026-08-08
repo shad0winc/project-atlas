@@ -139,7 +139,7 @@ def test_restore_apply_fails_closed_without_mutation(tmp_path: Path) -> None:
     result = _run_restore("apply", str(marker))
 
     assert result.returncode == 2
-    assert "live restore apply is not implemented or authorized" in result.stderr
+    assert "restore apply requires <staging-root> --confirm-live" in result.stderr
     assert not marker.exists()
 
 

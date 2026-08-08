@@ -8,12 +8,16 @@ Usage:
   atlas restore stage <archive>
   atlas restore validate-stage <staging-root>
   atlas restore plan <staging-root>
+  atlas restore apply <staging-root> --confirm-live
+  atlas restore resume <restore-id> --confirm-live
+  atlas restore abort <restore-id> --confirm-live
   atlas restore --help
 
-Recovery inspection, verification, and planning are read-only. `stage` validates
-archive members and extracts only into a new private directory beneath `/tmp`;
-it never targets live Atlas state. `plan` validates the staged state and maps
-only declared surfaces to canonical destinations. Live apply remains unavailable.
+Recovery inspection, verification, staging, and planning are read-only. Live
+apply requires certified `main`, a verified deployment baseline, the shared
+deployment lock, maintenance isolation, a durable pre-restore recovery point,
+quiesced writers, explicit `--confirm-live`, and post-restore verification.
+Held failures are recovered explicitly with `resume` or `abort`.
 HELP
 }
 
@@ -453,6 +457,401 @@ atlas_restore_validate_live_consumers() {
   return "$status"
 }
 
+# M-023.25.7.3.2 fail-closed live restore transaction.
+
+atlas_restore_transaction_root() {
+  local identifier="$1"
+
+  atlas_deployment_valid_id "$identifier" || return 1
+  printf '%s/restores/%s\n' "$ATLAS_RUNTIME_CONFIG_DIR" "$identifier"
+}
+
+atlas_restore_pending_recovery_point_file() {
+  local identifier="$1"
+
+  atlas_deployment_valid_id "$identifier" || return 1
+  printf '%s/restores/.%s.recovery-point\n' \
+    "$ATLAS_RUNTIME_CONFIG_DIR" "$identifier"
+}
+
+atlas_restore_preserve_recovery_point() {
+  local identifier="$1"
+  local backup_file="$2"
+  local pending temporary
+
+  [[ -f "$backup_file" && ! -L "$backup_file" ]] || return 1
+  pending="$(atlas_restore_pending_recovery_point_file "$identifier")" || return 1
+  mkdir -p "$(dirname "$pending")"
+  temporary="$(mktemp "${pending}.XXXXXX")" || return 1
+  chmod 0600 "$temporary"
+  printf '%s\n' "$backup_file" > "$temporary"
+  mv -f -- "$temporary" "$pending"
+}
+
+atlas_restore_attach_recovery_point() {
+  local identifier="$1"
+  local transaction="$2"
+  local pending
+
+  pending="$(atlas_restore_pending_recovery_point_file "$identifier")" || return 1
+  [[ -d "$transaction" && ! -L "$transaction" && -f "$pending" ]] || return 1
+  mv -- "$pending" "$transaction/pre-restore-backup"
+  chmod 0600 "$transaction/pre-restore-backup"
+}
+
+atlas_restore_transaction_recovery_point() {
+  local identifier="$1"
+  local transaction="$2"
+  local pending file backup_file
+
+  file="$transaction/pre-restore-backup"
+  if [[ ! -f "$file" ]]; then
+    pending="$(atlas_restore_pending_recovery_point_file "$identifier")" || return 1
+    file="$pending"
+  fi
+
+  [[ -f "$file" && ! -L "$file" ]] || {
+    echo 'ERROR: restore transaction recovery point is unavailable.' >&2
+    return 1
+  }
+  IFS= read -r backup_file < "$file"
+  [[ -f "$backup_file" && ! -L "$backup_file" ]] || {
+    echo 'ERROR: recorded pre-restore backup is unavailable.' >&2
+    return 1
+  }
+
+  atlas_restore_load_recovery_library
+  atlas_backup_recovery_validate_archive "$backup_file" || {
+    echo 'ERROR: recorded pre-restore backup is invalid.' >&2
+    return 1
+  }
+  printf '%s\n' "$backup_file"
+}
+
+atlas_restore_write_transaction_metadata() {
+  local transaction="$1"
+  local identifier="$2"
+  local baseline_record="$3"
+  local staged_root="$4"
+  local staged_digest="$5"
+  local metadata="$transaction/restore-metadata"
+  local temporary
+
+  [[ -d "$transaction" && ! -L "$transaction" ]] || return 1
+  temporary="$(mktemp "$transaction/.restore-metadata.XXXXXX")" || return 1
+  chmod 0600 "$temporary"
+  {
+    printf 'restore_id=%s\n' "$identifier"
+    printf 'baseline_id=%s\n' "$(basename "$baseline_record")"
+    printf 'source_commit=%s\n' "$(git -C "$ATLAS_PROJECT_DIR" rev-parse HEAD)"
+    printf 'staging_root=%s\n' "$staged_root"
+    printf 'staged_digest=%s\n' "$staged_digest"
+    printf 'created_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  } > "$temporary"
+  mv -f -- "$temporary" "$metadata"
+}
+
+atlas_restore_verify_runtime_boundary() {
+  atlas_command_doctor || return 1
+  atlas_command_verify || return 1
+  "$ATLAS_PROJECT_DIR/scripts/verify-ingress.sh" || return 1
+}
+
+atlas_restore_verify_maintenance_isolation() {
+  "$ATLAS_PROJECT_DIR/scripts/verify-ingress.sh"
+}
+
+atlas_restore_cleanup_before_mutation() {
+  local identifier="$1"
+
+  atlas_restore_start_writers || {
+    echo 'CRITICAL: restore pre-mutation cleanup could not restart writers.' >&2
+    return 1
+  }
+  atlas_restore_wait_for_writers || {
+    echo 'CRITICAL: restore pre-mutation cleanup writers are not ready.' >&2
+    return 1
+  }
+  atlas_maintenance_disable || {
+    echo 'CRITICAL: restore pre-mutation cleanup could not reopen maintenance.' >&2
+    return 1
+  }
+  atlas_deployment_release_lock "$identifier" || return 1
+}
+
+atlas_restore_report_held_failure() {
+  local identifier="$1"
+  local message="$2"
+
+  atlas_maintenance_enable >/dev/null 2>&1 || true
+  printf 'ERROR: %s\n' "$message" >&2
+  printf 'Restore transaction retained: %s\n' "$identifier" >&2
+  echo 'Maintenance: retained' >&2
+  echo 'Shared deployment lock: retained' >&2
+  echo "Recovery: atlas restore resume $identifier --confirm-live" >&2
+  echo "       or atlas restore abort $identifier --confirm-live" >&2
+  return 1
+}
+
+atlas_restore_complete_applied_transaction() {
+  local identifier="$1"
+  local transaction="$2"
+
+  atlas_restore_start_writers || {
+    atlas_restore_report_held_failure \
+      "$identifier" 'restored state applied but writers could not start.'
+    return 1
+  }
+  atlas_restore_wait_for_writers || {
+    atlas_restore_report_held_failure \
+      "$identifier" 'restored state applied but writers did not become ready.'
+    return 1
+  }
+
+  atlas_restore_verify_runtime_boundary || {
+    atlas_restore_report_held_failure \
+      "$identifier" 'post-restore verification failed under maintenance.'
+    return 1
+  }
+
+  atlas_maintenance_disable || {
+    atlas_restore_report_held_failure \
+      "$identifier" 'unable to reopen public ingress after restore.'
+    return 1
+  }
+
+  if ! atlas_restore_verify_runtime_boundary; then
+    atlas_maintenance_enable >/dev/null 2>&1 || true
+    atlas_restore_report_held_failure \
+      "$identifier" 'public post-restore verification failed.'
+    return 1
+  fi
+
+  atlas_backup_recovery_finalize_applied_state "$transaction" || {
+    atlas_maintenance_enable >/dev/null 2>&1 || true
+    atlas_restore_report_held_failure \
+      "$identifier" 'restore verification passed but transaction finalization failed.'
+    return 1
+  }
+
+  atlas_deployment_release_lock "$identifier" || {
+    atlas_maintenance_enable >/dev/null 2>&1 || true
+    echo 'CRITICAL: verified restore could not release the shared deployment lock.' >&2
+    return 1
+  }
+
+  printf 'Live restore complete: %s\n' "$identifier"
+}
+
+atlas_restore_apply_live() {
+  local requested="$1"
+  local baseline_record identifier transaction staged_digest
+  local recovery_point
+
+  baseline_record="$(atlas_restore_require_production_preflight "$requested")" || return 1
+  atlas_restore_load_recovery_library
+  staged_digest="$(atlas_backup_recovery_staged_state_digest "$requested")" || return 1
+  identifier="$(atlas_deployment_new_id restore)" || return 1
+  transaction="$(atlas_restore_transaction_root "$identifier")" || return 1
+
+  atlas_deployment_acquire_lock "$identifier" || return 1
+
+  if ! atlas_maintenance_enable; then
+    atlas_deployment_release_lock "$identifier" || true
+    return 1
+  fi
+
+  if ! atlas_restore_verify_maintenance_isolation; then
+    atlas_maintenance_disable || true
+    atlas_deployment_release_lock "$identifier" || true
+    echo 'ERROR: maintenance isolation verification failed before restore.' >&2
+    return 1
+  fi
+
+  if ! atlas_restore_stop_writers; then
+    atlas_restore_cleanup_before_mutation "$identifier" || true
+    return 1
+  fi
+
+  if ! atlas_restore_create_pre_restore_recovery_point "$identifier"; then
+    atlas_restore_cleanup_before_mutation "$identifier" || true
+    return 1
+  fi
+  recovery_point="$ATLAS_RESTORE_RECOVERY_POINT"
+
+  if ! atlas_restore_preserve_recovery_point "$identifier" "$recovery_point"; then
+    atlas_restore_cleanup_before_mutation "$identifier" || true
+    return 1
+  fi
+
+  if ! atlas_backup_recovery_apply_staged_state "$requested" "$transaction"; then
+    if [[ -d "$transaction" ]]; then
+      atlas_restore_attach_recovery_point "$identifier" "$transaction" || true
+      atlas_restore_write_transaction_metadata \
+        "$transaction" "$identifier" "$baseline_record" \
+        "$requested" "$staged_digest" || true
+    fi
+    atlas_restore_start_writers >/dev/null 2>&1 || true
+    atlas_restore_wait_for_writers >/dev/null 2>&1 || true
+    atlas_restore_report_held_failure \
+      "$identifier" 'transactional state application failed.'
+    return 1
+  fi
+
+  atlas_restore_attach_recovery_point "$identifier" "$transaction" || {
+    atlas_restore_report_held_failure \
+      "$identifier" 'unable to attach the pre-restore recovery point.'
+    return 1
+  }
+  atlas_restore_write_transaction_metadata \
+    "$transaction" "$identifier" "$baseline_record" \
+    "$requested" "$staged_digest" || {
+      atlas_restore_report_held_failure \
+        "$identifier" 'unable to record restore transaction metadata.'
+      return 1
+    }
+
+  if ! atlas_restore_validate_live_consumers; then
+    if atlas_backup_recovery_revert_applied_state "$transaction"; then
+      atlas_restore_start_writers >/dev/null 2>&1 || true
+      atlas_restore_wait_for_writers >/dev/null 2>&1 || true
+    fi
+    atlas_restore_report_held_failure \
+      "$identifier" 'restored live state failed consumer validation.'
+    return 1
+  fi
+
+  atlas_restore_complete_applied_transaction "$identifier" "$transaction"
+}
+
+atlas_restore_require_held_transaction() {
+  local identifier="$1"
+  local transaction status
+
+  atlas_deployment_valid_id "$identifier" || {
+    echo 'ERROR: invalid restore transaction identifier.' >&2
+    return 2
+  }
+  atlas_deployment_validate_source || return 1
+  transaction="$(atlas_restore_transaction_root "$identifier")" || return 1
+  [[ -d "$transaction" && ! -L "$transaction" && -f "$transaction/status" ]] || {
+    echo 'ERROR: restore transaction is unavailable.' >&2
+    return 1
+  }
+  atlas_deployment_lock_matches "$identifier" || {
+    echo 'ERROR: restore transaction does not own the shared deployment lock.' >&2
+    return 1
+  }
+  [[ -f "$(atlas_maintenance_flag)" ]] || {
+    echo 'ERROR: held restore recovery requires maintenance mode.' >&2
+    return 1
+  }
+  status="$(<"$transaction/status")"
+  case "$status" in
+    applied-awaiting-verification|reverted)
+      ;;
+    *)
+      printf 'ERROR: restore transaction is not recoverable from status: %s\n' \
+        "$status" >&2
+      return 1
+      ;;
+  esac
+  atlas_restore_transaction_recovery_point "$identifier" "$transaction" >/dev/null || return 1
+  printf '%s\n' "$transaction"
+}
+
+atlas_restore_resume_live() {
+  local identifier="$1"
+  local transaction status
+
+  transaction="$(atlas_restore_require_held_transaction "$identifier")" || return 1
+  status="$(<"$transaction/status")"
+  [[ "$status" == 'applied-awaiting-verification' ]] || {
+    echo 'ERROR: only an applied restore transaction can be resumed.' >&2
+    return 1
+  }
+
+  atlas_restore_stop_writers || {
+    atlas_restore_report_held_failure \
+      "$identifier" 'unable to quiesce writers for restore resume.'
+    return 1
+  }
+  atlas_restore_validate_live_consumers || {
+    atlas_restore_start_writers >/dev/null 2>&1 || true
+    atlas_restore_wait_for_writers >/dev/null 2>&1 || true
+    atlas_restore_report_held_failure \
+      "$identifier" 'live state remains invalid; resume refused.'
+    return 1
+  }
+
+  atlas_restore_complete_applied_transaction "$identifier" "$transaction"
+}
+
+atlas_restore_abort_live() {
+  local identifier="$1"
+  local transaction status
+
+  transaction="$(atlas_restore_require_held_transaction "$identifier")" || return 1
+  status="$(<"$transaction/status")"
+
+  atlas_restore_stop_writers || {
+    atlas_restore_report_held_failure \
+      "$identifier" 'unable to quiesce writers for restore abort.'
+    return 1
+  }
+
+  if [[ "$status" == 'applied-awaiting-verification' ]]; then
+    atlas_backup_recovery_revert_applied_state "$transaction" || {
+      atlas_restore_report_held_failure \
+        "$identifier" 'unable to revert the applied restore state.'
+      return 1
+    }
+  fi
+
+  atlas_restore_validate_live_consumers || {
+    atlas_restore_start_writers >/dev/null 2>&1 || true
+    atlas_restore_wait_for_writers >/dev/null 2>&1 || true
+    atlas_restore_report_held_failure \
+      "$identifier" 'reverted live state failed consumer validation.'
+    return 1
+  }
+
+  atlas_restore_start_writers || {
+    atlas_restore_report_held_failure \
+      "$identifier" 'reverted restore writers could not start.'
+    return 1
+  }
+  atlas_restore_wait_for_writers || {
+    atlas_restore_report_held_failure \
+      "$identifier" 'reverted restore writers did not become ready.'
+    return 1
+  }
+  atlas_restore_verify_runtime_boundary || {
+    atlas_restore_report_held_failure \
+      "$identifier" 'reverted restore failed verification under maintenance.'
+    return 1
+  }
+
+  atlas_maintenance_disable || {
+    atlas_restore_report_held_failure \
+      "$identifier" 'unable to reopen public ingress after restore abort.'
+    return 1
+  }
+  if ! atlas_restore_verify_runtime_boundary; then
+    atlas_maintenance_enable >/dev/null 2>&1 || true
+    atlas_restore_report_held_failure \
+      "$identifier" 'public verification failed after restore abort.'
+    return 1
+  fi
+
+  printf '%s\n' 'aborted' > "$transaction/status"
+  atlas_deployment_release_lock "$identifier" || {
+    atlas_maintenance_enable >/dev/null 2>&1 || true
+    return 1
+  }
+  printf 'Live restore aborted and previous state retained: %s\n' "$identifier"
+}
+
 atlas_command_restore() {
   atlas_print_header
 
@@ -508,10 +907,25 @@ atlas_command_restore() {
       atlas_restore_usage
       ;;
     apply)
-      echo 'ERROR: live restore apply is not implemented or authorized.' >&2
-      echo 'Use: atlas restore inspect <archive>' >&2
-      echo '     atlas restore verify <archive>' >&2
-      return 2
+      [[ "$#" -eq 3 && "${3:-}" == '--confirm-live' ]] || {
+        echo 'ERROR: restore apply requires <staging-root> --confirm-live.' >&2
+        return 2
+      }
+      atlas_restore_apply_live "$2"
+      ;;
+    resume)
+      [[ "$#" -eq 3 && "${3:-}" == '--confirm-live' ]] || {
+        echo 'ERROR: restore resume requires <restore-id> --confirm-live.' >&2
+        return 2
+      }
+      atlas_restore_resume_live "$2"
+      ;;
+    abort)
+      [[ "$#" -eq 3 && "${3:-}" == '--confirm-live' ]] || {
+        echo 'ERROR: restore abort requires <restore-id> --confirm-live.' >&2
+        return 2
+      }
+      atlas_restore_abort_live "$2"
       ;;
     '')
       atlas_restore_usage >&2

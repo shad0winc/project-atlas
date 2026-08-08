@@ -286,9 +286,12 @@ def test_public_stage_command_uses_tmp_and_preserves_live_boundary(
         subprocess.run(["rm", "-rf", "--", str(staged)], check=False)
 
 
-def test_live_apply_remains_unavailable() -> None:
+def test_live_apply_requires_explicit_confirmation() -> None:
     content = RESTORE_COMMAND.read_text(encoding="utf-8")
-    assert "live restore apply is not implemented or authorized" in content
+    assert "restore apply requires <staging-root> --confirm-live" in content
+    assert "atlas_restore_apply_live()" in content
+    assert "atlas_restore_resume_live()" in content
+    assert "atlas_restore_abort_live()" in content
     assert "atlas_backup_recovery_stage_archive" in content
 
 

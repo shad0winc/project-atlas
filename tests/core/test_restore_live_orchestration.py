@@ -265,9 +265,10 @@ atlas_restore_validate_live_consumers
     ]
 
 
-def test_cli_apply_remains_blocked_in_orchestration_checkpoint() -> None:
+def test_cli_apply_requires_explicit_confirmation_after_orchestration_checkpoint() -> None:
     content = RESTORE_COMMAND.read_text(encoding="utf-8")
 
-    assert "live restore apply is not implemented or authorized" in content
+    assert "restore apply requires <staging-root> --confirm-live" in content
     assert "atlas_restore_require_production_preflight()" in content
     assert "atlas_restore_validate_live_consumers()" in content
+    assert "atlas_restore_apply_live()" in content
