@@ -6,6 +6,24 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Fixed
 
+- Completed M-023.25 Backup and Recovery with a versioned state-complete
+  recovery format, explicit authoritative-state ownership, protected archive
+  publication, isolated restore staging, consumer validation, transactional
+  live replacement, and fail-closed resume/abort recovery.
+- Added explicit production restore authorization: live apply requires a clean
+  certified `main` checkout equal to `origin/main`, a verified deployment
+  baseline, the shared deployment/update lock, maintenance isolation, a
+  validated pre-restore recovery point, and `--confirm-live`.
+- Proved the certified live recovery path with restore transaction
+  `restore-20260808T174153Z-3004055`: API, Sports, and Notifications writers
+  were quiesced and restarted healthy, Atlas health returned to 100 percent,
+  public ingress reopened at 24 of 24 checks, maintenance was disabled, and the
+  shared lock was released.
+- Preserved the single-host recovery boundary: Atlas recovery archives protect
+  declared Atlas configuration and state, but do not claim media-library,
+  third-party application database, off-host, or storage-device disaster
+  recovery.
+
 - Completed M-023.24 Deployment Safety with protected release promotion,
   transactional production updates, Caddy-owned maintenance mode, verified
   deployment baselines, and explicit rollback/forward-recovery boundaries.

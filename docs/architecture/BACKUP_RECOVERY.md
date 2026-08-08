@@ -50,8 +50,9 @@ state exists outside the project tree.
 | Media libraries | media storage | outside Atlas backup scope |
 
 Media requests store durable data in `<repository-root>/requests.json`; the
-root is caller-injected. M-023.25 must resolve and declare the canonical
-production repository root before request-state coverage is marked complete.
+root is caller-injected. M-023.25 established the canonical production root as
+`ATLAS_REQUESTS_DIR=${ATLAS_RUNTIME_CONFIG_DIR}/requests` and treats the
+`requests.json` surface as explicitly optional when no request registry exists.
 
 ## Recovery-Capable Archive
 
@@ -109,8 +110,10 @@ the `sportyfin` root.
 ## Retention State
 
 ARI observations and retention-related state live under `ATLAS_ARI_DIR`.
-M-023.25 must prove that the selected state can be restored and consumed; it
-must not equate backing up retention Python code with protecting runtime state.
+M-023.25 proved staged and live consumption of the selected state. The
+validator follows ARI history compatibility semantics, accepting compatible
+reports while skipping recorded legacy/incompatible history rather than
+misclassifying old schema as current-state corruption.
 
 ## Event and Subscriber State
 
@@ -138,18 +141,30 @@ recursive directory capture. Existing historical archives are not rewritten.
 
 ## CLI Contract
 
-Read-only operations include:
+Read-only backup/restore operations include:
 
 ```text
 atlas backup --list
 atlas backup --help
 atlas restore inspect <archive>
 atlas restore verify <archive>
+atlas restore validate-stage <staging-root>
+atlas restore plan <staging-root>
+```
+
+Isolated `atlas restore stage <archive>` writes only to a private temporary
+staging root. Live mutation is separately authorized through:
+
+```text
+atlas restore apply <staging-root> --confirm-live
+atlas restore resume <restore-id> --confirm-live
+atlas restore abort <restore-id> --confirm-live
 ```
 
 Unknown arguments fail without creating a partial archive, publishing a final
-archive, or invoking retention. Restore apply is introduced only after staged
-validation is implemented and tested.
+archive, invoking retention, or mutating live state. Production apply also
+requires clean certified `main` equal to `origin/main`, a verified deployment
+baseline, shared-lock ownership, and successful staged validation.
 
 ## Backup Transaction
 
@@ -191,23 +206,30 @@ roots. Extraction always occurs into isolated staging before live replacement.
 
 ## Isolated Restore Proof
 
-For every roadmap surface, tests will create representative state, create and
-validate a recovery-capable backup, restore it into an empty isolated root,
-load/validate the restored state, and compare authoritative state with its
-source. Production is not modified by this proof.
+Representative tests create state, validate recovery-capable archives, stage
+them into isolated roots, load the result through real Atlas consumers, and
+prove staged and live state remain unchanged during validation. Path traversal,
+symbolic links, missing required state, checksum damage, and transactional
+mid-apply failure all have explicit regression coverage.
 
 ## Controlled Production Proof
 
-Only after isolated restore and failure-boundary tests pass may M-023.25 perform
-a bounded production recovery validation. It must begin and end with certified
-source, clean Git, a verified deployment baseline, known maintenance state, and
-successful Doctor/specialized verification.
+M-023.25 performed the bounded production validation only after isolated and
+failure-boundary tests passed. Protected source `483085fa` captured a fresh
+current-state archive, staged and consumer-validated it, and completed restore
+`restore-20260808T174153Z-3004055`. The API, Sports controller, and Notifications
+writer were observably restarted and healthy. Final Atlas Health was 100
+percent; normal public ingress passed 24/24; maintenance was disabled; the
+shared lock was absent; and the verified deployment baseline remained current.
 
 ## Recovery-Time Expectations
 
-M-023.25 will measure archive validation, isolated restore, live state apply,
-service verification, and total operator recovery time. These are expectations
-for the tested single-host topology, not universal guarantees.
+The controlled restore began with transaction timestamp 17:41:53 UTC and all
+three controlled writers had restarted at 17:43:02 UTC, approximately 69
+seconds to writer restart. Full health, module, and ingress verification
+completed immediately afterward. This is single-host evidence rather than an
+SLO; operators should reserve at least a 5-10 minute maintenance window and
+scale that allowance with state size and verification cost.
 
 ## Single-Host Limitation
 
@@ -222,14 +244,20 @@ M-023.25 does not claim media-library backup, complete third-party Docker-volume
 recovery, encrypted off-host transport, multi-host failover, or restoration of
 host-specific Docker images from deployment metadata.
 
-## Implementation Sequence
+## Implementation Status
 
-1. architecture and ADR;
-2. recovery manifest and fail-closed CLI semantics;
-3. state-complete backup collection;
-4. staged validation-first restore;
-5. deterministic isolated restore testing;
-6. controlled production recovery validation; and
-7. documentation reconciliation and roadmap completion.
+M-023.25 is complete. The implementation progressed through architecture,
+versioned recovery metadata, canonical state ownership, consistency-aware
+snapshotting, state-complete archive validation, read-only restore inspection,
+isolated staging, consumer validation, restore planning, bounded transactional
+replacement, fail-closed live orchestration, protected release promotion, and
+controlled production recovery before documentation reconciliation.
 
-Roadmap items remain unchecked until their corresponding behavior is proved.
+The final Core regression passed 2,947 tests plus 104 subtests before protected
+promotion through `feature/backup-recovery -> release/v1.0.0 -> main`. The
+certified feature, release merge, and production merge were `02738ee3`,
+`c8a947c0`, and `483085fa` respectively.
+
+Every Backup and Recovery roadmap item is now backed by implementation,
+automated regression, controlled runtime evidence, and an explicit scope
+statement.

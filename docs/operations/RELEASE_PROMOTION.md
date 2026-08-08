@@ -80,6 +80,22 @@ be synchronized deliberately. `atlas update` then independently requires:
 - an explicit migration declaration; and
 - the remaining deployment transaction gates.
 
+## Production Recovery Source
+
+Protected promotion is also part of the live-restore authorization boundary.
+`atlas restore apply` refuses production mutation unless the checkout is clean
+`main` exactly equal to `origin/main`; `--confirm-live` cannot override an
+uncertified feature or release checkout. M-023.25 explicitly exercised that
+rejection on `feature/backup-recovery` and proved no lock, maintenance, writer,
+backup-retention, deployment-baseline, or repository mutation began.
+
+After promotion through the required feature -> release -> main path, the same
+certified tree completed the controlled live restore from production `main`.
+Live restore additionally requires a verified deployment baseline, the shared
+deployment/update lock, staged recovery validation, a fresh pre-restore
+recovery point, maintenance isolation, writer quiescence, and explicit
+`--confirm-live`.
+
 ## Migration Boundary
 
 The current automatic transaction accepts only an explicit:
