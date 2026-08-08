@@ -412,14 +412,20 @@ class TaskScheduler:
             try:
                 owner = int(self.path.read_text(encoding="utf-8").strip())
             except (OSError, ValueError):
-                self.path.unlink(missing_ok=True)
-                return True
+                return False
+
+            if owner <= 0:
+                return False
+
             try:
                 os.kill(owner, 0)
             except ProcessLookupError:
-                self.path.unlink(missing_ok=True)
+                try:
+                    self.path.unlink(missing_ok=True)
+                except OSError:
+                    return False
                 return True
-            except PermissionError:
+            except (PermissionError, OSError):
                 return False
             return False
 

@@ -39,10 +39,11 @@ atlas_command_backup() {
   timestamp="$(date +%Y%m%d-%H%M%S-%3N)"
 
   local backup_file="${backup_dir}/atlas-${timestamp}.tar.gz"
+  local partial_file="${backup_file}.partial"
   local manifest
   manifest="$ATLAS_PROJECT_DIR/.atlas-backup-manifest.tmp"
 
-  trap 'rm -f "$manifest"' RETURN
+  trap 'rm -f "$manifest" "$partial_file"' RETURN
 
   cat > "$manifest" <<EOF_MANIFEST
 Project Atlas Backup
@@ -60,11 +61,24 @@ EOF_MANIFEST
   echo "Creating Atlas backup..."
   echo
 
-  tar \
+  local available_kib
+
+  if available_kib="$(
+    df -Pk "$backup_dir" 2>/dev/null |
+      awk 'NR == 2 {print $4}'
+  )" && [[ "$available_kib" =~ ^[0-9]+$ ]]; then
+    echo "Available backup storage: ${available_kib} KiB"
+  else
+    echo "Available backup storage: unknown"
+  fi
+
+  echo
+
+  if ! tar \
     --exclude='.git' \
     --exclude='backups' \
     --transform='s|\.atlas-backup-manifest\.tmp|BACKUP_INFO.txt|' \
-    -czf "$backup_file" \
+    -czf "$partial_file" \
     -C "$ATLAS_PROJECT_DIR" \
     docker-compose.yml \
     docker-compose.sports.yml \
@@ -78,6 +92,20 @@ EOF_MANIFEST
     modules \
     scripts \
     .atlas-backup-manifest.tmp
+  then
+    echo "ERROR: backup archive creation failed; partial artifact removed." >&2
+    return 1
+  fi
+
+  if ! tar -tzf "$partial_file" >/dev/null 2>&1; then
+    echo "ERROR: backup archive validation failed; partial artifact removed." >&2
+    return 1
+  fi
+
+  if ! mv -- "$partial_file" "$backup_file"; then
+    echo "ERROR: backup publication failed; partial artifact removed." >&2
+    return 1
+  fi
 
   echo "Backup complete"
   echo

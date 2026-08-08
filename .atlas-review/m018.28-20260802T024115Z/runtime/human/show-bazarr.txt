@@ -1,0 +1,40 @@
+Atlas Managed Service
+=====================
+
+Identity
+--------
+Name: Bazarr
+Identifier: bazarr
+Provider: docker-compose
+Compose Project: project-atlas
+Container: bazarr
+Enabled: Yes
+Dependencies: None
+
+Runtime
+-------
+State: running
+Docker Health: unknown
+Running: Yes
+Restart Count: 0
+Started: 2026-07-27T01:07:40.971843Z
+Finished: 2026-07-27T01:06:18.397939Z
+Exit Code: 0
+Status Message: running
+
+Image
+-----
+Reference: lscr.io/linuxserver/bazarr:latest
+Repository: lscr.io/linuxserver/bazarr
+Tag: latest
+Digest: None
+Image ID: sha256:5d916d07404296ec35ee726e13e0e558f05952724cf494a7f009d913fb2b12f3
+
+Health
+------
+Status: degraded
+Score: 85/100
+Action Required: Yes
+Warnings: No Docker health check is configured
+Errors: None
+Evaluated: 2026-08-02T02:41:19.610058Z

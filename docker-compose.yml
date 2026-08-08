@@ -45,6 +45,28 @@ services:
       - ${CONFIG}/prowlarr:/config
     restart: unless-stopped
 
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:v3.5.0
+    container_name: flaresolverr
+    networks: [atlas]
+    environment:
+      - LOG_LEVEL=info
+      - LOG_HTML=false
+      - CAPTCHA_SOLVER=none
+      - TZ=${TZ}
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8191', timeout=5).read()\"",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
   sonarr:
     image: lscr.io/linuxserver/sonarr:latest
     container_name: sonarr
@@ -129,6 +151,12 @@ services:
       - SERVER_REGIONS=${VPN_REGION}
       - TZ=${TZ}
       - FIREWALL=on
+    healthcheck:
+      test: ["CMD", "/gluetun-entrypoint", "healthcheck"]
+      interval: 5s
+      timeout: 5s
+      retries: 1
+      start_period: 10s
     restart: unless-stopped
 
   qbittorrent:
@@ -146,7 +174,7 @@ services:
     restart: unless-stopped
     depends_on:
       gluetun:
-        condition: service_started
+        condition: service_healthy
 
   jellyseerr:
     image: fallenbagel/jellyseerr:latest

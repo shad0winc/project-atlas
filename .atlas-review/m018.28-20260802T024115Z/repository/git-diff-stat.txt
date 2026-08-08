@@ -1,0 +1,19 @@
+ CHANGELOG.md                                       |  13 +
+ atlas/service_lifecycle/__init__.py                |  30 +-
+ atlas/service_lifecycle/doctor.py                  | 410 +----------
+ atlas/service_lifecycle/provider.py                |  52 +-
+ .../service_lifecycle/providers/docker_compose.py  |  77 ++
+ atlas/service_lifecycle/service.py                 | 811 +--------------------
+ atlas/service_lifecycle_cli.py                     | 236 ++++++
+ docs/BUILD_LOG.md                                  | 310 ++++++++
+ docs/ENGINEERING_CHECKLIST.md                      |   2 +
+ docs/architecture/README.md                        |   5 +
+ docs/architecture/SERVICE_LIFECYCLE.md             | 207 ++++++
+ scripts/commands/help.sh                           |   2 +
+ scripts/commands/service.sh                        |  12 +
+ tests/core/test_docker_compose_provider.py         |  90 +++
+ tests/core/test_service_lifecycle_cli.py           | 318 ++++++++
+ tests/core/test_service_lifecycle_doctor.py        |  28 +
+ tests/core/test_service_lifecycle_provider.py      |  26 +
+ tests/core/test_service_lifecycle_service.py       |  32 +
+ 18 files changed, 1441 insertions(+), 1220 deletions(-)

@@ -1,0 +1,72 @@
+Atlas Service Doctor
+====================
+
+Provider: docker-compose
+Status: Degraded
+Attention Required: Yes
+
+Findings
+--------
+Critical: 0
+Errors:   0
+Warnings: 11
+Info:     14
+Total:    25
+
+INFO
+----
+- [bazarr] Service Bazarr uses the mutable latest image tag.
+  Code: image-tag-latest | Category: configuration
+- [dozzle] Service Dozzle uses the mutable latest image tag.
+  Code: image-tag-latest | Category: configuration
+- [gluetun] Service Gluetun uses the mutable latest image tag.
+  Code: image-tag-latest | Category: configuration
+- [homepage] Service Homepage uses the mutable latest image tag.
+  Code: image-tag-latest | Category: configuration
+- [jellyfin] Service Jellyfin uses the mutable latest image tag.
+  Code: image-tag-latest | Category: configuration
+- [jellyseerr] Service Jellyseerr uses the mutable latest image tag.
+  Code: image-tag-latest | Category: configuration
+- [maintainerr] Service Maintainerr uses the mutable latest image tag.
+  Code: image-tag-latest | Category: configuration
+- [prowlarr] Service Prowlarr uses the mutable latest image tag.
+  Code: image-tag-latest | Category: configuration
+- [qbittorrent] Service Qbittorrent uses the mutable latest image tag.
+  Code: image-tag-latest | Category: configuration
+- [radarr] Service Radarr uses the mutable latest image tag.
+  Code: image-tag-latest | Category: configuration
+- [radarr-anime] Service Radarr Anime uses the mutable latest image tag.
+  Code: image-tag-latest | Category: configuration
+- [sonarr] Service Sonarr uses the mutable latest image tag.
+  Code: image-tag-latest | Category: configuration
+- [sonarr-anime] Service Sonarr Anime uses the mutable latest image tag.
+  Code: image-tag-latest | Category: configuration
+- [tautulli] Service Tautulli uses the mutable latest image tag.
+  Code: image-tag-latest | Category: configuration
+
+WARNING
+-------
+- [bazarr] Running service Bazarr does not expose a conclusive runtime health check.
+  Code: healthcheck-missing | Category: observability
+- [dozzle] Running service Dozzle does not expose a conclusive runtime health check.
+  Code: healthcheck-missing | Category: observability
+- [jellyseerr] Running service Jellyseerr does not expose a conclusive runtime health check.
+  Code: healthcheck-missing | Category: observability
+- [maintainerr] Running service Maintainerr does not expose a conclusive runtime health check.
+  Code: healthcheck-missing | Category: observability
+- [prowlarr] Running service Prowlarr does not expose a conclusive runtime health check.
+  Code: healthcheck-missing | Category: observability
+- [qbittorrent] Running service Qbittorrent does not expose a conclusive runtime health check.
+  Code: healthcheck-missing | Category: observability
+- [radarr] Running service Radarr does not expose a conclusive runtime health check.
+  Code: healthcheck-missing | Category: observability
+- [radarr-anime] Running service Radarr Anime does not expose a conclusive runtime health check.
+  Code: healthcheck-missing | Category: observability
+- [sonarr] Running service Sonarr does not expose a conclusive runtime health check.
+  Code: healthcheck-missing | Category: observability
+- [sonarr-anime] Running service Sonarr Anime does not expose a conclusive runtime health check.
+  Code: healthcheck-missing | Category: observability
+- [tautulli] Running service Tautulli does not expose a conclusive runtime health check.
+  Code: healthcheck-missing | Category: observability
+
+Evaluated: 2026-08-02T02:41:27.737357Z

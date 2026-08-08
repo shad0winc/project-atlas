@@ -1,0 +1,944 @@
+{
+  "attention_required": [
+    {
+      "health": {
+        "action_required": true,
+        "details": {
+          "docker_health": "unknown",
+          "exit_code": 0,
+          "finished_at": "2026-07-27T01:06:18.397939Z",
+          "image_reference": "lscr.io/linuxserver/bazarr:latest",
+          "restart_count": 0,
+          "runtime_state": "running",
+          "service_identifier": "bazarr",
+          "started_at": "2026-07-27T01:07:40.971843Z",
+          "status_message": "running"
+        },
+        "errors": [],
+        "evaluated_at": "2026-08-02T02:41:42.566084Z",
+        "healthy": false,
+        "score": 85,
+        "status": "degraded",
+        "warnings": [
+          "No Docker health check is configured"
+        ]
+      },
+      "requires_attention": true,
+      "service": {
+        "compose_project": "project-atlas",
+        "container_name": "bazarr",
+        "created_at": null,
+        "dependencies": [],
+        "enabled": true,
+        "identifier": "bazarr",
+        "name": "Bazarr",
+        "provider": "docker-compose",
+        "updated_at": null
+      }
+    },
+    {
+      "health": {
+        "action_required": true,
+        "details": {
+          "docker_health": "unknown",
+          "exit_code": 0,
+          "finished_at": "2026-07-27T01:06:15.263815Z",
+          "image_reference": "amir20/dozzle:latest",
+          "restart_count": 0,
+          "runtime_state": "running",
+          "service_identifier": "dozzle",
+          "started_at": "2026-07-27T01:07:40.687223Z",
+          "status_message": "running"
+        },
+        "errors": [],
+        "evaluated_at": "2026-08-02T02:41:42.722919Z",
+        "healthy": false,
+        "score": 85,
+        "status": "degraded",
+        "warnings": [
+          "No Docker health check is configured"
+        ]
+      },
+      "requires_attention": true,
+      "service": {
+        "compose_project": "project-atlas",
+        "container_name": "dozzle",
+        "created_at": null,
+        "dependencies": [],
+        "enabled": true,
+        "identifier": "dozzle",
+        "name": "Dozzle",
+        "provider": "docker-compose",
+        "updated_at": null
+      }
+    },
+    {
+      "health": {
+        "action_required": true,
+        "details": {
+          "docker_health": "unknown",
+          "exit_code": 0,
+          "finished_at": "2026-07-27T01:06:15.353197Z",
+          "image_reference": "fallenbagel/jellyseerr:latest",
+          "restart_count": 0,
+          "runtime_state": "running",
+          "service_identifier": "jellyseerr",
+          "started_at": "2026-07-27T01:07:40.962468Z",
+          "status_message": "running"
+        },
+        "errors": [],
+        "evaluated_at": "2026-08-02T02:41:43.517595Z",
+        "healthy": false,
+        "score": 85,
+        "status": "degraded",
+        "warnings": [
+          "No Docker health check is configured"
+        ]
+      },
+      "requires_attention": true,
+      "service": {
+        "compose_project": "project-atlas",
+        "container_name": "jellyseerr",
+        "created_at": null,
+        "dependencies": [
+          "jellyfin",
+          "radarr",
+          "sonarr"
+        ],
+        "enabled": true,
+        "identifier": "jellyseerr",
+        "name": "Jellyseerr",
+        "provider": "docker-compose",
+        "updated_at": null
+      }
+    },
+    {
+      "health": {
+        "action_required": true,
+        "details": {
+          "docker_health": "unknown",
+          "exit_code": 0,
+          "finished_at": "2026-07-27T01:06:15.462011Z",
+          "image_reference": "ghcr.io/jorenn92/maintainerr:latest",
+          "restart_count": 0,
+          "runtime_state": "running",
+          "service_identifier": "maintainerr",
+          "started_at": "2026-07-27T01:07:41.007702Z",
+          "status_message": "running"
+        },
+        "errors": [],
+        "evaluated_at": "2026-08-02T02:41:43.678074Z",
+        "healthy": false,
+        "score": 85,
+        "status": "degraded",
+        "warnings": [
+          "No Docker health check is configured"
+        ]
+      },
+      "requires_attention": true,
+      "service": {
+        "compose_project": "project-atlas",
+        "container_name": "maintainerr",
+        "created_at": null,
+        "dependencies": [
+          "jellyfin",
+          "radarr",
+          "sonarr"
+        ],
+        "enabled": true,
+        "identifier": "maintainerr",
+        "name": "Maintainerr",
+        "provider": "docker-compose",
+        "updated_at": null
+      }
+    },
+    {
+      "health": {
+        "action_required": true,
+        "details": {
+          "docker_health": "unknown",
+          "exit_code": 0,
+          "finished_at": "2026-07-27T01:06:19.456548Z",
+          "image_reference": "lscr.io/linuxserver/prowlarr:latest",
+          "restart_count": 0,
+          "runtime_state": "running",
+          "service_identifier": "prowlarr",
+          "started_at": "2026-07-27T01:07:40.968116Z",
+          "status_message": "running"
+        },
+        "errors": [],
+        "evaluated_at": "2026-08-02T02:41:43.839962Z",
+        "healthy": false,
+        "score": 85,
+        "status": "degraded",
+        "warnings": [
+          "No Docker health check is configured"
+        ]
+      },
+      "requires_attention": true,
+      "service": {
+        "compose_project": "project-atlas",
+        "container_name": "prowlarr",
+        "created_at": null,
+        "dependencies": [],
+        "enabled": true,
+        "identifier": "prowlarr",
+        "name": "Prowlarr",
+        "provider": "docker-compose",
+        "updated_at": null
+      }
+    },
+    {
+      "health": {
+        "action_required": true,
+        "details": {
+          "docker_health": "unknown",
+          "exit_code": 0,
+          "finished_at": "2026-07-27T01:06:19.229028Z",
+          "image_reference": "lscr.io/linuxserver/qbittorrent:latest",
+          "restart_count": 0,
+          "runtime_state": "running",
+          "service_identifier": "qbittorrent",
+          "started_at": "2026-07-27T01:07:41.103171Z",
+          "status_message": "running"
+        },
+        "errors": [],
+        "evaluated_at": "2026-08-02T02:41:43.997276Z",
+        "healthy": false,
+        "score": 85,
+        "status": "degraded",
+        "warnings": [
+          "No Docker health check is configured"
+        ]
+      },
+      "requires_attention": true,
+      "service": {
+        "compose_project": "project-atlas",
+        "container_name": "qbittorrent",
+        "created_at": null,
+        "dependencies": [
+          "gluetun"
+        ],
+        "enabled": true,
+        "identifier": "qbittorrent",
+        "name": "Qbittorrent",
+        "provider": "docker-compose",
+        "updated_at": null
+      }
+    },
+    {
+      "health": {
+        "action_required": true,
+        "details": {
+          "docker_health": "unknown",
+          "exit_code": 0,
+          "finished_at": "2026-07-27T01:06:19.431713Z",
+          "image_reference": "lscr.io/linuxserver/radarr:latest",
+          "restart_count": 0,
+          "runtime_state": "running",
+          "service_identifier": "radarr",
+          "started_at": "2026-07-27T01:07:40.987247Z",
+          "status_message": "running"
+        },
+        "errors": [],
+        "evaluated_at": "2026-08-02T02:41:44.148949Z",
+        "healthy": false,
+        "score": 85,
+        "status": "degraded",
+        "warnings": [
+          "No Docker health check is configured"
+        ]
+      },
+      "requires_attention": true,
+      "service": {
+        "compose_project": "project-atlas",
+        "container_name": "radarr",
+        "created_at": null,
+        "dependencies": [],
+        "enabled": true,
+        "identifier": "radarr",
+        "name": "Radarr",
+        "provider": "docker-compose",
+        "updated_at": null
+      }
+    },
+    {
+      "health": {
+        "action_required": true,
+        "details": {
+          "docker_health": "unknown",
+          "exit_code": 0,
+          "finished_at": "2026-07-27T01:06:19.648635Z",
+          "image_reference": "lscr.io/linuxserver/radarr:latest",
+          "restart_count": 0,
+          "runtime_state": "running",
+          "service_identifier": "radarr-anime",
+          "started_at": "2026-07-27T01:07:40.969967Z",
+          "status_message": "running"
+        },
+        "errors": [],
+        "evaluated_at": "2026-08-02T02:41:44.304366Z",
+        "healthy": false,
+        "score": 85,
+        "status": "degraded",
+        "warnings": [
+          "No Docker health check is configured"
+        ]
+      },
+      "requires_attention": true,
+      "service": {
+        "compose_project": "project-atlas",
+        "container_name": "radarr-anime",
+        "created_at": null,
+        "dependencies": [],
+        "enabled": true,
+        "identifier": "radarr-anime",
+        "name": "Radarr Anime",
+        "provider": "docker-compose",
+        "updated_at": null
+      }
+    },
+    {
+      "health": {
+        "action_required": true,
+        "details": {
+          "docker_health": "unknown",
+          "exit_code": 0,
+          "finished_at": "2026-07-27T01:06:19.335812Z",
+          "image_reference": "lscr.io/linuxserver/sonarr:latest",
+          "restart_count": 0,
+          "runtime_state": "running",
+          "service_identifier": "sonarr",
+          "started_at": "2026-07-27T01:07:40.980662Z",
+          "status_message": "running"
+        },
+        "errors": [],
+        "evaluated_at": "2026-08-02T02:41:44.467473Z",
+        "healthy": false,
+        "score": 85,
+        "status": "degraded",
+        "warnings": [
+          "No Docker health check is configured"
+        ]
+      },
+      "requires_attention": true,
+      "service": {
+        "compose_project": "project-atlas",
+        "container_name": "sonarr",
+        "created_at": null,
+        "dependencies": [],
+        "enabled": true,
+        "identifier": "sonarr",
+        "name": "Sonarr",
+        "provider": "docker-compose",
+        "updated_at": null
+      }
+    },
+    {
+      "health": {
+        "action_required": true,
+        "details": {
+          "docker_health": "unknown",
+          "exit_code": 0,
+          "finished_at": "2026-07-27T01:06:19.139471Z",
+          "image_reference": "lscr.io/linuxserver/sonarr:latest",
+          "restart_count": 0,
+          "runtime_state": "running",
+          "service_identifier": "sonarr-anime",
+          "started_at": "2026-07-27T01:07:40.982626Z",
+          "status_message": "running"
+        },
+        "errors": [],
+        "evaluated_at": "2026-08-02T02:41:44.622054Z",
+        "healthy": false,
+        "score": 85,
+        "status": "degraded",
+        "warnings": [
+          "No Docker health check is configured"
+        ]
+      },
+      "requires_attention": true,
+      "service": {
+        "compose_project": "project-atlas",
+        "container_name": "sonarr-anime",
+        "created_at": null,
+        "dependencies": [],
+        "enabled": true,
+        "identifier": "sonarr-anime",
+        "name": "Sonarr Anime",
+        "provider": "docker-compose",
+        "updated_at": null
+      }
+    },
+    {
+      "health": {
+        "action_required": true,
+        "details": {
+          "docker_health": "unknown",
+          "exit_code": 0,
+          "finished_at": "2026-07-27T01:06:18.444946Z",
+          "image_reference": "lscr.io/linuxserver/tautulli:latest",
+          "restart_count": 0,
+          "runtime_state": "running",
+          "service_identifier": "tautulli",
+          "started_at": "2026-07-27T01:07:40.966218Z",
+          "status_message": "running"
+        },
+        "errors": [],
+        "evaluated_at": "2026-08-02T02:41:44.785373Z",
+        "healthy": false,
+        "score": 85,
+        "status": "degraded",
+        "warnings": [
+          "No Docker health check is configured"
+        ]
+      },
+      "requires_attention": true,
+      "service": {
+        "compose_project": "project-atlas",
+        "container_name": "tautulli",
+        "created_at": null,
+        "dependencies": [
+          "jellyfin"
+        ],
+        "enabled": true,
+        "identifier": "tautulli",
+        "name": "Tautulli",
+        "provider": "docker-compose",
+        "updated_at": null
+      }
+    }
+  ],
+  "compose_project": "project-atlas",
+  "evaluated_at": "2026-08-02T02:41:40.038779Z",
+  "health_counts": {
+    "degraded": 11,
+    "healthy": 4,
+    "unhealthy": 0,
+    "unknown": 0
+  },
+  "provider": "docker-compose",
+  "runtime_counts": {
+    "failed": 0,
+    "restarting": 0,
+    "running": 15,
+    "stopped": 0,
+    "unknown": 0
+  },
+  "score": 89,
+  "service_counts": {
+    "disabled": 0,
+    "enabled": 15
+  },
+  "services": [
+    {
+      "category": "running",
+      "runtime": {
+        "exit_code": 0,
+        "finished_at": "2026-07-27T01:06:18.397939Z",
+        "health": "unknown",
+        "healthy": false,
+        "image": {
+          "created_at": null,
+          "digest": null,
+          "image_id": "sha256:5d916d07404296ec35ee726e13e0e558f05952724cf494a7f009d913fb2b12f3",
+          "reference": "lscr.io/linuxserver/bazarr:latest",
+          "repository": "lscr.io/linuxserver/bazarr",
+          "tag": "latest"
+        },
+        "restart_count": 0,
+        "running": true,
+        "started_at": "2026-07-27T01:07:40.971843Z",
+        "state": "running",
+        "status_message": "running"
+      },
+      "service": {
+        "compose_project": "project-atlas",
+        "container_name": "bazarr",
+        "created_at": null,
+        "dependencies": [],
+        "enabled": true,
+        "identifier": "bazarr",
+        "name": "Bazarr",
+        "provider": "docker-compose",
+        "updated_at": null
+      }
+    },
+    {
+      "category": "running",
+      "runtime": {
+        "exit_code": 0,
+        "finished_at": "2026-07-27T01:06:15.263815Z",
+        "health": "unknown",
+        "healthy": false,
+        "image": {
+          "created_at": null,
+          "digest": null,
+          "image_id": "sha256:43d933ebda116990c920e054d68a1aed286ab01fd31657983c53bbdf46cc0aa8",
+          "reference": "amir20/dozzle:latest",
+          "repository": "amir20/dozzle",
+          "tag": "latest"
+        },
+        "restart_count": 0,
+        "running": true,
+        "started_at": "2026-07-27T01:07:40.687223Z",
+        "state": "running",
+        "status_message": "running"
+      },
+      "service": {
+        "compose_project": "project-atlas",
+        "container_name": "dozzle",
+        "created_at": null,
+        "dependencies": [],
+        "enabled": true,
+        "identifier": "dozzle",
+        "name": "Dozzle",
+        "provider": "docker-compose",
+        "updated_at": null
+      }
+    },
+    {
+      "category": "running",
+      "runtime": {
+        "exit_code": 0,
+        "finished_at": null,
+        "health": "healthy",
+        "healthy": true,
+        "image": {
+          "created_at": null,
+          "digest": null,
+          "image_id": "sha256:139dfee1c6f89249c8d665d1333a42e8ec74ec0a86bc6bb1c8461e10d3a66a47",
+          "reference": "ghcr.io/flaresolverr/flaresolverr:v3.5.0",
+          "repository": "ghcr.io/flaresolverr/flaresolverr",
+          "tag": "v3.5.0"
+        },
+        "restart_count": 0,
+        "running": true,
+        "started_at": "2026-08-01T00:59:58.513576Z",
+        "state": "running",
+        "status_message": "running"
+      },
+      "service": {
+        "compose_project": "project-atlas",
+        "container_name": "flaresolverr",
+        "created_at": null,
+        "dependencies": [],
+        "enabled": true,
+        "identifier": "flaresolverr",
+        "name": "Flaresolverr",
+        "provider": "docker-compose",
+        "updated_at": null
+      }
+    },
+    {
+      "category": "running",
+      "runtime": {
+        "exit_code": 0,
+        "finished_at": "2026-07-27T01:06:15.308127Z",
+        "health": "healthy",
+        "healthy": true,
+        "image": {
+          "created_at": null,
+          "digest": null,
+          "image_id": "sha256:b0ee2135e6ba52ad3f102aae9663707cd1c9531485117067a380d3b2b6dd991d",
+          "reference": "qmcgaw/gluetun:latest",
+          "repository": "qmcgaw/gluetun",
+          "tag": "latest"
+        },
+        "restart_count": 0,
+        "running": true,
+        "started_at": "2026-07-27T01:07:40.701020Z",
+        "state": "running",
+        "status_message": "running"
+      },
+      "service": {
+        "compose_project": "project-atlas",
+        "container_name": "gluetun",
+        "created_at": null,
+        "dependencies": [],
+        "enabled": true,
+        "identifier": "gluetun",
+        "name": "Gluetun",
+        "provider": "docker-compose",
+        "updated_at": null
+      }
+    },
+    {
+      "category": "running",
+      "runtime": {
+        "exit_code": 0,
+        "finished_at": "2026-07-27T01:06:15.264747Z",
+        "health": "healthy",
+        "healthy": true,
+        "image": {
+          "created_at": null,
+          "digest": null,
+          "image_id": "sha256:a0b71c8e757298d02560186bab9fbe3fc2d375c523a62cc1019177b37e48aa28",
+          "reference": "ghcr.io/gethomepage/homepage:latest",
+          "repository": "ghcr.io/gethomepage/homepage",
+          "tag": "latest"
+        },
+        "restart_count": 0,
+        "running": true,
+        "started_at": "2026-07-27T01:07:40.989791Z",
+        "state": "running",
+        "status_message": "running"
+      },
+      "service": {
+        "compose_project": "project-atlas",
+        "container_name": "homepage",
+        "created_at": null,
+        "dependencies": [],
+        "enabled": true,
+        "identifier": "homepage",
+        "name": "Homepage",
+        "provider": "docker-compose",
+        "updated_at": null
+      }
+    },
+    {
+      "category": "running",
+      "runtime": {
+        "exit_code": 0,
+        "finished_at": "2026-07-27T01:06:15.423005Z",
+        "health": "healthy",
+        "healthy": true,
+        "image": {
+          "created_at": null,
+          "digest": null,
+          "image_id": "sha256:aefb67e6a7ff1debdd154a78a7bbb780fd0c873d8639210a7f6a2016ad2b35db",
+          "reference": "jellyfin/jellyfin:latest",
+          "repository": "jellyfin/jellyfin",
+          "tag": "latest"
+        },
+        "restart_count": 0,
+        "running": true,
+        "started_at": "2026-07-27T01:07:40.995745Z",
+        "state": "running",
+        "status_message": "running"
+      },
+      "service": {
+        "compose_project": "project-atlas",
+        "container_name": "jellyfin",
+        "created_at": null,
+        "dependencies": [],
+        "enabled": true,
+        "identifier": "jellyfin",
+        "name": "Jellyfin",
+        "provider": "docker-compose",
+        "updated_at": null
+      }
+    },
+    {
+      "category": "running",
+      "runtime": {
+        "exit_code": 0,
+        "finished_at": "2026-07-27T01:06:15.353197Z",
+        "health": "unknown",
+        "healthy": false,
+        "image": {
+          "created_at": null,
+          "digest": null,
+          "image_id": "sha256:4538137bc5af902dece165f2bf73776d9cf4eafb6dd714670724af8f3eb77764",
+          "reference": "fallenbagel/jellyseerr:latest",
+          "repository": "fallenbagel/jellyseerr",
+          "tag": "latest"
+        },
+        "restart_count": 0,
+        "running": true,
+        "started_at": "2026-07-27T01:07:40.962468Z",
+        "state": "running",
+        "status_message": "running"
+      },
+      "service": {
+        "compose_project": "project-atlas",
+        "container_name": "jellyseerr",
+        "created_at": null,
+        "dependencies": [
+          "jellyfin",
+          "radarr",
+          "sonarr"
+        ],
+        "enabled": true,
+        "identifier": "jellyseerr",
+        "name": "Jellyseerr",
+        "provider": "docker-compose",
+        "updated_at": null
+      }
+    },
+    {
+      "category": "running",
+      "runtime": {
+        "exit_code": 0,
+        "finished_at": "2026-07-27T01:06:15.462011Z",
+        "health": "unknown",
+        "healthy": false,
+        "image": {
+          "created_at": null,
+          "digest": null,
+          "image_id": "sha256:bee84707edaf589cda3d18b6813cbfe3a137b52786210c3a28190e10910c1240",
+          "reference": "ghcr.io/jorenn92/maintainerr:latest",
+          "repository": "ghcr.io/jorenn92/maintainerr",
+          "tag": "latest"
+        },
+        "restart_count": 0,
+        "running": true,
+        "started_at": "2026-07-27T01:07:41.007702Z",
+        "state": "running",
+        "status_message": "running"
+      },
+      "service": {
+        "compose_project": "project-atlas",
+        "container_name": "maintainerr",
+        "created_at": null,
+        "dependencies": [
+          "jellyfin",
+          "radarr",
+          "sonarr"
+        ],
+        "enabled": true,
+        "identifier": "maintainerr",
+        "name": "Maintainerr",
+        "provider": "docker-compose",
+        "updated_at": null
+      }
+    },
+    {
+      "category": "running",
+      "runtime": {
+        "exit_code": 0,
+        "finished_at": "2026-07-27T01:06:19.456548Z",
+        "health": "unknown",
+        "healthy": false,
+        "image": {
+          "created_at": null,
+          "digest": null,
+          "image_id": "sha256:3e9bd62ca90c97c5df75b7012e10a29f6926e62807deeddc1dc89e6e2fd141e1",
+          "reference": "lscr.io/linuxserver/prowlarr:latest",
+          "repository": "lscr.io/linuxserver/prowlarr",
+          "tag": "latest"
+        },
+        "restart_count": 0,
+        "running": true,
+        "started_at": "2026-07-27T01:07:40.968116Z",
+        "state": "running",
+        "status_message": "running"
+      },
+      "service": {
+        "compose_project": "project-atlas",
+        "container_name": "prowlarr",
+        "created_at": null,
+        "dependencies": [],
+        "enabled": true,
+        "identifier": "prowlarr",
+        "name": "Prowlarr",
+        "provider": "docker-compose",
+        "updated_at": null
+      }
+    },
+    {
+      "category": "running",
+      "runtime": {
+        "exit_code": 0,
+        "finished_at": "2026-07-27T01:06:19.229028Z",
+        "health": "unknown",
+        "healthy": false,
+        "image": {
+          "created_at": null,
+          "digest": null,
+          "image_id": "sha256:163f3384db6cba9f68eaa83ca5f4209298b6029ba2d07b5e67562d0715baf5b9",
+          "reference": "lscr.io/linuxserver/qbittorrent:latest",
+          "repository": "lscr.io/linuxserver/qbittorrent",
+          "tag": "latest"
+        },
+        "restart_count": 0,
+        "running": true,
+        "started_at": "2026-07-27T01:07:41.103171Z",
+        "state": "running",
+        "status_message": "running"
+      },
+      "service": {
+        "compose_project": "project-atlas",
+        "container_name": "qbittorrent",
+        "created_at": null,
+        "dependencies": [
+          "gluetun"
+        ],
+        "enabled": true,
+        "identifier": "qbittorrent",
+        "name": "Qbittorrent",
+        "provider": "docker-compose",
+        "updated_at": null
+      }
+    },
+    {
+      "category": "running",
+      "runtime": {
+        "exit_code": 0,
+        "finished_at": "2026-07-27T01:06:19.431713Z",
+        "health": "unknown",
+        "healthy": false,
+        "image": {
+          "created_at": null,
+          "digest": null,
+          "image_id": "sha256:39da107b5a9371fdaa651bd188049b863716a815385eb3a30d41071b7e1aeb33",
+          "reference": "lscr.io/linuxserver/radarr:latest",
+          "repository": "lscr.io/linuxserver/radarr",
+          "tag": "latest"
+        },
+        "restart_count": 0,
+        "running": true,
+        "started_at": "2026-07-27T01:07:40.987247Z",
+        "state": "running",
+        "status_message": "running"
+      },
+      "service": {
+        "compose_project": "project-atlas",
+        "container_name": "radarr",
+        "created_at": null,
+        "dependencies": [],
+        "enabled": true,
+        "identifier": "radarr",
+        "name": "Radarr",
+        "provider": "docker-compose",
+        "updated_at": null
+      }
+    },
+    {
+      "category": "running",
+      "runtime": {
+        "exit_code": 0,
+        "finished_at": "2026-07-27T01:06:19.648635Z",
+        "health": "unknown",
+        "healthy": false,
+        "image": {
+          "created_at": null,
+          "digest": null,
+          "image_id": "sha256:39da107b5a9371fdaa651bd188049b863716a815385eb3a30d41071b7e1aeb33",
+          "reference": "lscr.io/linuxserver/radarr:latest",
+          "repository": "lscr.io/linuxserver/radarr",
+          "tag": "latest"
+        },
+        "restart_count": 0,
+        "running": true,
+        "started_at": "2026-07-27T01:07:40.969967Z",
+        "state": "running",
+        "status_message": "running"
+      },
+      "service": {
+        "compose_project": "project-atlas",
+        "container_name": "radarr-anime",
+        "created_at": null,
+        "dependencies": [],
+        "enabled": true,
+        "identifier": "radarr-anime",
+        "name": "Radarr Anime",
+        "provider": "docker-compose",
+        "updated_at": null
+      }
+    },
+    {
+      "category": "running",
+      "runtime": {
+        "exit_code": 0,
+        "finished_at": "2026-07-27T01:06:19.335812Z",
+        "health": "unknown",
+        "healthy": false,
+        "image": {
+          "created_at": null,
+          "digest": null,
+          "image_id": "sha256:633e0e66d85ce4e9172608a37d3d24e124b3e485fc0d946f533c3bb5875227e9",
+          "reference": "lscr.io/linuxserver/sonarr:latest",
+          "repository": "lscr.io/linuxserver/sonarr",
+          "tag": "latest"
+        },
+        "restart_count": 0,
+        "running": true,
+        "started_at": "2026-07-27T01:07:40.980662Z",
+        "state": "running",
+        "status_message": "running"
+      },
+      "service": {
+        "compose_project": "project-atlas",
+        "container_name": "sonarr",
+        "created_at": null,
+        "dependencies": [],
+        "enabled": true,
+        "identifier": "sonarr",
+        "name": "Sonarr",
+        "provider": "docker-compose",
+        "updated_at": null
+      }
+    },
+    {
+      "category": "running",
+      "runtime": {
+        "exit_code": 0,
+        "finished_at": "2026-07-27T01:06:19.139471Z",
+        "health": "unknown",
+        "healthy": false,
+        "image": {
+          "created_at": null,
+          "digest": null,
+          "image_id": "sha256:633e0e66d85ce4e9172608a37d3d24e124b3e485fc0d946f533c3bb5875227e9",
+          "reference": "lscr.io/linuxserver/sonarr:latest",
+          "repository": "lscr.io/linuxserver/sonarr",
+          "tag": "latest"
+        },
+        "restart_count": 0,
+        "running": true,
+        "started_at": "2026-07-27T01:07:40.982626Z",
+        "state": "running",
+        "status_message": "running"
+      },
+      "service": {
+        "compose_project": "project-atlas",
+        "container_name": "sonarr-anime",
+        "created_at": null,
+        "dependencies": [],
+        "enabled": true,
+        "identifier": "sonarr-anime",
+        "name": "Sonarr Anime",
+        "provider": "docker-compose",
+        "updated_at": null
+      }
+    },
+    {
+      "category": "running",
+      "runtime": {
+        "exit_code": 0,
+        "finished_at": "2026-07-27T01:06:18.444946Z",
+        "health": "unknown",
+        "healthy": false,
+        "image": {
+          "created_at": null,
+          "digest": null,
+          "image_id": "sha256:fb1a686e4b676af3bd8f6e1a5a0097ee1540015768e9bbd4445e130d703a68cd",
+          "reference": "lscr.io/linuxserver/tautulli:latest",
+          "repository": "lscr.io/linuxserver/tautulli",
+          "tag": "latest"
+        },
+        "restart_count": 0,
+        "running": true,
+        "started_at": "2026-07-27T01:07:40.966218Z",
+        "state": "running",
+        "status_message": "running"
+      },
+      "service": {
+        "compose_project": "project-atlas",
+        "container_name": "tautulli",
+        "created_at": null,
+        "dependencies": [
+          "jellyfin"
+        ],
+        "enabled": true,
+        "identifier": "tautulli",
+        "name": "Tautulli",
+        "provider": "docker-compose",
+        "updated_at": null
+      }
+    }
+  ],
+  "status": "degraded",
+  "total_services": 15
+}

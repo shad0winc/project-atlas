@@ -12,6 +12,7 @@ from typing import Any
 from recorder import (
     finalize_recording,
     launch_recording,
+    process_identity_matches,
     process_is_running,
     recording_exit_code,
     stop_recording,
@@ -105,19 +106,27 @@ def write_recordings(
         ".tmp"
     )
 
-    temporary_file.write_text(
-        json.dumps(
-            recordings,
-            indent=2,
-            sort_keys=True,
+    try:
+        temporary_file.write_text(
+            json.dumps(
+                recordings,
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
         )
-        + "\n",
-        encoding="utf-8",
-    )
 
-    temporary_file.replace(
-        RECORDINGS_FILE
-    )
+        temporary_file.replace(
+            RECORDINGS_FILE
+        )
+    except Exception:
+        try:
+            temporary_file.unlink()
+        except OSError:
+            pass
+
+        raise
 
 
 def recording_id_for_game(
@@ -309,7 +318,12 @@ def recording_status(
         if now >= scheduled_end:
             return "completed"
 
-        if not process_is_running(pid):
+        if not process_identity_matches(
+            pid,
+            recording.get(
+                "process_start_time"
+            ),
+        ):
             return "failed"
 
         return "recording"
@@ -331,6 +345,10 @@ def update_recording_statuses(
         )
 
     recordings = load_recordings()
+
+    newly_started_recorders: list[
+        tuple[int, int]
+    ] = []
 
     for recording_id, recording in recordings.items():
         previous_status = str(
@@ -356,6 +374,13 @@ def update_recording_statuses(
 
                 recording["pid"] = int(
                     launch_result["pid"]
+                )
+                recording[
+                    "process_start_time"
+                ] = int(
+                    launch_result[
+                        "process_start_time"
+                    ]
                 )
                 recording["log_file"] = str(
                     launch_result["log_file"]
@@ -394,6 +419,16 @@ def update_recording_statuses(
                 )
                 recording["launch_error"] = None
 
+                if launch_result.get("started") is True:
+                    newly_started_recorders.append(
+                        (
+                            recording["pid"],
+                            recording[
+                                "process_start_time"
+                            ],
+                        )
+                    )
+
             except Exception as exc:
                 current_status = "failed"
 
@@ -413,8 +448,36 @@ def update_recording_statuses(
         ):
             pid = recording.get("pid")
 
+            expected_start_time = recording.get(
+                "process_start_time"
+            )
+
+            if (
+                process_is_running(pid)
+                and not process_identity_matches(
+                    pid,
+                    expected_start_time,
+                )
+            ):
+                current_status = "failed"
+                recording["failed_at"] = (
+                    format_timestamp(now)
+                )
+                recording["failure_reason"] = (
+                    "recorder_process_identity_unverified"
+                )
+                recording["status"] = "failed"
+                recording["updated_at"] = (
+                    format_timestamp(now)
+                )
+                recordings[recording_id] = recording
+                continue
+
             stopped = stop_recording(
-                pid
+                pid,
+                expected_start_time=(
+                    expected_start_time
+                ),
             )
 
             if not stopped:
@@ -516,7 +579,21 @@ def update_recording_statuses(
                 or format_timestamp(now)
             )
 
-            if exit_code is None:
+            if (
+                process_is_running(
+                    recording.get("pid")
+                )
+                and not process_identity_matches(
+                    recording.get("pid"),
+                    recording.get(
+                        "process_start_time"
+                    ),
+                )
+            ):
+                default_failure_reason = (
+                    "recorder_process_identity_unverified"
+                )
+            elif exit_code is None:
                 default_failure_reason = (
                     "recorder_exited_early"
                 )
@@ -554,8 +631,46 @@ def update_recording_statuses(
 
         recordings[recording_id] = recording
 
-    write_recordings(
-        recordings
-    )
+    try:
+        write_recordings(
+            recordings
+        )
+    except Exception as persistence_error:
+        compensation_failures: list[
+            tuple[int, int]
+        ] = []
+
+        for (
+            pid,
+            process_start_time,
+        ) in reversed(
+            newly_started_recorders
+        ):
+            try:
+                stopped = stop_recording(
+                    pid,
+                    expected_start_time=(
+                        process_start_time
+                    ),
+                )
+            except Exception:
+                stopped = False
+
+            if not stopped:
+                compensation_failures.append(
+                    (
+                        pid,
+                        process_start_time,
+                    )
+                )
+
+        if compensation_failures:
+            raise RuntimeError(
+                "recorder registry persistence failed "
+                "and exact-identity compensation "
+                "was incomplete"
+            ) from persistence_error
+
+        raise
 
     return recordings

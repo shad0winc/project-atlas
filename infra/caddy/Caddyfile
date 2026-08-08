@@ -1,0 +1,6 @@
+{
+	admin off
+}
+
+import /etc/caddy/snippets/*.caddy
+import /etc/caddy/sites/*.caddy

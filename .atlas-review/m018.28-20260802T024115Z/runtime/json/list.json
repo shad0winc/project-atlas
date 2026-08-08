@@ -1,0 +1,179 @@
+[
+  {
+    "compose_project": "project-atlas",
+    "container_name": "bazarr",
+    "created_at": null,
+    "dependencies": [],
+    "enabled": true,
+    "identifier": "bazarr",
+    "name": "Bazarr",
+    "provider": "docker-compose",
+    "updated_at": null
+  },
+  {
+    "compose_project": "project-atlas",
+    "container_name": "dozzle",
+    "created_at": null,
+    "dependencies": [],
+    "enabled": true,
+    "identifier": "dozzle",
+    "name": "Dozzle",
+    "provider": "docker-compose",
+    "updated_at": null
+  },
+  {
+    "compose_project": "project-atlas",
+    "container_name": "flaresolverr",
+    "created_at": null,
+    "dependencies": [],
+    "enabled": true,
+    "identifier": "flaresolverr",
+    "name": "Flaresolverr",
+    "provider": "docker-compose",
+    "updated_at": null
+  },
+  {
+    "compose_project": "project-atlas",
+    "container_name": "gluetun",
+    "created_at": null,
+    "dependencies": [],
+    "enabled": true,
+    "identifier": "gluetun",
+    "name": "Gluetun",
+    "provider": "docker-compose",
+    "updated_at": null
+  },
+  {
+    "compose_project": "project-atlas",
+    "container_name": "homepage",
+    "created_at": null,
+    "dependencies": [],
+    "enabled": true,
+    "identifier": "homepage",
+    "name": "Homepage",
+    "provider": "docker-compose",
+    "updated_at": null
+  },
+  {
+    "compose_project": "project-atlas",
+    "container_name": "jellyfin",
+    "created_at": null,
+    "dependencies": [],
+    "enabled": true,
+    "identifier": "jellyfin",
+    "name": "Jellyfin",
+    "provider": "docker-compose",
+    "updated_at": null
+  },
+  {
+    "compose_project": "project-atlas",
+    "container_name": "jellyseerr",
+    "created_at": null,
+    "dependencies": [
+      "jellyfin",
+      "radarr",
+      "sonarr"
+    ],
+    "enabled": true,
+    "identifier": "jellyseerr",
+    "name": "Jellyseerr",
+    "provider": "docker-compose",
+    "updated_at": null
+  },
+  {
+    "compose_project": "project-atlas",
+    "container_name": "maintainerr",
+    "created_at": null,
+    "dependencies": [
+      "jellyfin",
+      "radarr",
+      "sonarr"
+    ],
+    "enabled": true,
+    "identifier": "maintainerr",
+    "name": "Maintainerr",
+    "provider": "docker-compose",
+    "updated_at": null
+  },
+  {
+    "compose_project": "project-atlas",
+    "container_name": "prowlarr",
+    "created_at": null,
+    "dependencies": [],
+    "enabled": true,
+    "identifier": "prowlarr",
+    "name": "Prowlarr",
+    "provider": "docker-compose",
+    "updated_at": null
+  },
+  {
+    "compose_project": "project-atlas",
+    "container_name": "qbittorrent",
+    "created_at": null,
+    "dependencies": [
+      "gluetun"
+    ],
+    "enabled": true,
+    "identifier": "qbittorrent",
+    "name": "Qbittorrent",
+    "provider": "docker-compose",
+    "updated_at": null
+  },
+  {
+    "compose_project": "project-atlas",
+    "container_name": "radarr",
+    "created_at": null,
+    "dependencies": [],
+    "enabled": true,
+    "identifier": "radarr",
+    "name": "Radarr",
+    "provider": "docker-compose",
+    "updated_at": null
+  },
+  {
+    "compose_project": "project-atlas",
+    "container_name": "radarr-anime",
+    "created_at": null,
+    "dependencies": [],
+    "enabled": true,
+    "identifier": "radarr-anime",
+    "name": "Radarr Anime",
+    "provider": "docker-compose",
+    "updated_at": null
+  },
+  {
+    "compose_project": "project-atlas",
+    "container_name": "sonarr",
+    "created_at": null,
+    "dependencies": [],
+    "enabled": true,
+    "identifier": "sonarr",
+    "name": "Sonarr",
+    "provider": "docker-compose",
+    "updated_at": null
+  },
+  {
+    "compose_project": "project-atlas",
+    "container_name": "sonarr-anime",
+    "created_at": null,
+    "dependencies": [],
+    "enabled": true,
+    "identifier": "sonarr-anime",
+    "name": "Sonarr Anime",
+    "provider": "docker-compose",
+    "updated_at": null
+  },
+  {
+    "compose_project": "project-atlas",
+    "container_name": "tautulli",
+    "created_at": null,
+    "dependencies": [
+      "jellyfin"
+    ],
+    "enabled": true,
+    "identifier": "tautulli",
+    "name": "Tautulli",
+    "provider": "docker-compose",
+    "updated_at": null
+  }
+]

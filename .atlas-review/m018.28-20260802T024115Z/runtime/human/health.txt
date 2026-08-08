@@ -1,0 +1,58 @@
+Atlas Infrastructure Health
+===========================
+
+Overall Score: 89/100
+Status: Degraded
+
+Services
+--------
+Total:       15
+Healthy:     4
+Degraded:    11
+Unhealthy:   0
+Unknown:     0
+
+Attention Required
+------------------
+- bazarr
+    - No Docker health check is configured
+- dozzle
+    - No Docker health check is configured
+- jellyseerr
+    - No Docker health check is configured
+- maintainerr
+    - No Docker health check is configured
+- prowlarr
+    - No Docker health check is configured
+- qbittorrent
+    - No Docker health check is configured
+- radarr
+    - No Docker health check is configured
+- radarr-anime
+    - No Docker health check is configured
+- sonarr
+    - No Docker health check is configured
+- sonarr-anime
+    - No Docker health check is configured
+- tautulli
+    - No Docker health check is configured
+
+Warnings
+--------
+- bazarr: No Docker health check is configured
+- dozzle: No Docker health check is configured
+- jellyseerr: No Docker health check is configured
+- maintainerr: No Docker health check is configured
+- prowlarr: No Docker health check is configured
+- qbittorrent: No Docker health check is configured
+- radarr: No Docker health check is configured
+- radarr-anime: No Docker health check is configured
+- sonarr: No Docker health check is configured
+- sonarr-anime: No Docker health check is configured
+- tautulli: No Docker health check is configured
+
+Errors
+------
+None
+
+Evaluated: 2026-08-02T02:41:19.992192Z

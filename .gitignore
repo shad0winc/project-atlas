@@ -22,3 +22,36 @@ __pycache__/
 
 # Local Python virtual environment
 .venv/
+
+# Atlas Portal / Node.js
+apps/portal/node_modules/
+apps/portal/.next/
+apps/portal/out/
+apps/portal/npm-debug.log*
+apps/portal/yarn-debug.log*
+apps/portal/yarn-error.log*
+apps/portal/.env
+apps/portal/.env.local
+apps/portal/.env.*.local
+
+# Atlas Portal generated files
+apps/portal/.next/
+apps/portal/out/
+apps/portal/next-env.d.ts
+apps/portal/*.tsbuildinfo
+
+# Python package metadata
+*.egg-info/
+
+# Project Atlas local backups and generated repository audits
+.atlas-backups/
+DOCS_INDEX.txt
+FILE_INDEX.txt
+PROJECT_TREE.txt
+project-atlas-export.zip
+
+# Generated validation and development evidence
+/artifacts/
+
+# Generated reports
+reports/

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_DIR="/opt/project-atlas"
+PROJECT_DIR="${ATLAS_PROJECT_DIR:-/opt/project-atlas}"
 ATLAS_CONFIG_FILE="$PROJECT_DIR/config/atlas.conf"
 ATLAS_MODULE_CONFIG_FILE="$PROJECT_DIR/config/modules/modules.conf"
 ATLAS_CLI_ROOT="$PROJECT_DIR/scripts"
@@ -31,6 +31,7 @@ source "$ATLAS_CLI_ROOT/commands/help.sh"
 source "$ATLAS_CLI_ROOT/commands/version.sh"
 source "$ATLAS_CLI_ROOT/commands/status.sh"
 source "$ATLAS_CLI_ROOT/commands/services.sh"
+source "$ATLAS_CLI_ROOT/commands/service.sh"
 source "$ATLAS_CLI_ROOT/commands/urls.sh"
 source "$ATLAS_CLI_ROOT/commands/git.sh"
 source "$ATLAS_CLI_ROOT/commands/restart.sh"
@@ -44,6 +45,8 @@ source "$ATLAS_CLI_ROOT/commands/event.sh"
 source "$ATLAS_CLI_ROOT/commands/verify.sh"
 source "$ATLAS_CLI_ROOT/commands/doctor.sh"
 source "$ATLAS_CLI_ROOT/commands/update.sh"
+source "$ATLAS_CLI_ROOT/commands/maintenance.sh"
+source "$ATLAS_CLI_ROOT/commands/deployment.sh"
 source "$ATLAS_CLI_ROOT/commands/backup.sh"
 source "$ATLAS_CLI_ROOT/commands/test.sh"
 source "$ATLAS_CLI_ROOT/commands/health.sh"
@@ -53,6 +56,8 @@ source "$ATLAS_CLI_ROOT/commands/invite.sh"
 source "$ATLAS_CLI_ROOT/commands/favorite.sh"
 source "$ATLAS_CLI_ROOT/commands/retention.sh"
 source "$ATLAS_CLI_ROOT/commands/cleanup.sh"
+source "$ATLAS_CLI_ROOT/commands/discovery.sh"
+source "$ATLAS_CLI_ROOT/commands/operations.sh"
 
 atlas_initialize
 
@@ -80,7 +85,11 @@ case "$command" in
     ;;
 
   services)
-    atlas_command_services
+    atlas_command_services "${@:2}"
+    ;;
+
+  service)
+    atlas_command_service "${@:2}"
     ;;
 
   urls)
@@ -119,6 +128,14 @@ case "$command" in
     atlas_command_cleanup "${@:2}"
     ;;
 
+  discovery)
+    atlas_command_discovery "${@:2}"
+    ;;
+
+  operations)
+    atlas_command_operations "${@:2}"
+    ;;
+
   module)
     atlas_command_module "${@:2}"
     ;;
@@ -132,7 +149,15 @@ case "$command" in
     ;;
 
   update)
-    atlas_command_update
+    atlas_command_update "${@:2}"
+    ;;
+
+  deployment)
+    atlas_command_deployment "${@:2}"
+    ;;
+
+  maintenance)
+    atlas_command_maintenance "${@:2}"
     ;;
 
   backup)
