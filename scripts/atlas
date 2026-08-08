@@ -45,6 +45,7 @@ source "$ATLAS_CLI_ROOT/commands/event.sh"
 source "$ATLAS_CLI_ROOT/commands/verify.sh"
 source "$ATLAS_CLI_ROOT/commands/doctor.sh"
 source "$ATLAS_CLI_ROOT/commands/update.sh"
+source "$ATLAS_CLI_ROOT/commands/maintenance.sh"
 source "$ATLAS_CLI_ROOT/commands/backup.sh"
 source "$ATLAS_CLI_ROOT/commands/test.sh"
 source "$ATLAS_CLI_ROOT/commands/health.sh"
@@ -148,6 +149,10 @@ case "$command" in
 
   update)
     atlas_command_update
+    ;;
+
+  maintenance)
+    atlas_command_maintenance "${@:2}"
     ;;
 
   backup)

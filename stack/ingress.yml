@@ -70,7 +70,7 @@ services:
         - >-
           curl --fail --silent --show-error --output /dev/null
           --resolve atlas.shadowinc.co:443:127.0.0.1
-          https://atlas.shadowinc.co/api/v1/health
+          https://atlas.shadowinc.co/_atlas/ingress-health
       interval: 30s
       timeout: 5s
       start_period: 20s
@@ -89,6 +89,7 @@ services:
 
     volumes:
       - ../infra/caddy:/etc/caddy:ro
+      - /mnt/storage/configs/atlas/maintenance:/etc/atlas-maintenance:ro
       - ../infra/caddy/site:/srv:ro
       - /mnt/storage/configs/atlas/caddy/data:/data
       - /mnt/storage/configs/atlas/caddy/config:/config

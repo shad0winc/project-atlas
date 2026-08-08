@@ -86,6 +86,9 @@ Maintenance
   atlas verify
   atlas doctor
   atlas update
+  atlas maintenance status
+  atlas maintenance enable
+  atlas maintenance disable
   atlas backup
   atlas restart
   atlas logs <container>
