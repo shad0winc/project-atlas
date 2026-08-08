@@ -1,0 +1,93 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+WORKFLOW = PROJECT_ROOT / ".github" / "workflows" / "release-gate.yml"
+PROCEDURE = PROJECT_ROOT / "docs" / "operations" / "RELEASE_PROMOTION.md"
+
+
+def workflow_text() -> str:
+    return WORKFLOW.read_text(encoding="utf-8")
+
+
+def test_release_gate_targets_main_and_release_branches() -> None:
+    content = workflow_text()
+
+    assert "pull_request:" in content
+    assert "push:" in content
+    assert "- main" in content
+    assert "- 'release/**'" in content
+
+
+def test_release_gate_has_read_only_repository_permissions() -> None:
+    content = workflow_text()
+
+    assert "permissions:\n  contents: read" in content
+
+
+def test_release_gate_runs_complete_core_regression() -> None:
+    content = workflow_text()
+
+    assert "python -m pytest tests/core -q" in content
+    assert "python -m compileall -q atlas modules/sports/src tests" in content
+
+
+def test_release_gate_runs_api_regression() -> None:
+    content = workflow_text()
+
+    assert "python -m pip install -e './apps/api[test]'" in content
+    assert "python -m pytest apps/api/tests -q" in content
+
+
+def test_release_gate_runs_sports_integration() -> None:
+    content = workflow_text()
+
+    assert "python modules/sports/tests/run_tests.py" in content
+
+
+def test_release_gate_runs_portal_quality_and_build() -> None:
+    content = workflow_text()
+
+    for command in (
+        "npm ci",
+        "npm run lint",
+        "npm run typecheck",
+        "npm test",
+        "npm run build",
+    ):
+        assert command in content
+
+
+def test_release_contract_rejects_image_pruning() -> None:
+    content = workflow_text()
+
+    assert "docker image prune" in content
+    assert "deployment path prunes rollback images" in content
+
+
+def test_final_gate_depends_on_every_validation_surface() -> None:
+    content = workflow_text()
+    gate = content.split("  release-gate:\n", 1)[1]
+
+    assert "if: ${{ always() }}" in gate
+    for job in ("core", "api", "sports", "portal", "contracts"):
+        assert f"      - {job}\n" in gate
+    assert "Atlas release gate: PASS" in gate
+
+
+def test_branch_protection_procedure_does_not_claim_external_state() -> None:
+    content = PROCEDURE.read_text(encoding="utf-8")
+
+    assert "repository hosting must be inspected" in content
+    assert "`release-gate` status check is required" in content
+    assert "force pushes are blocked" in content
+    assert "branch deletion is blocked" in content
+
+
+def test_procedure_preserves_legacy_v1_tag_blocker() -> None:
+    content = PROCEDURE.read_text(encoding="utf-8")
+
+    assert "historical `v1.0.0` tag remains a separate release blocker" in content
+    assert "does not reinterpret, move, delete" in content
