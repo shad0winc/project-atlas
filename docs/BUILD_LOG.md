@@ -5469,3 +5469,180 @@ transactional deployment boundary, user-visible maintenance isolation, exact
 pre-mutation rollback-image retention, deterministic failed-update state,
 explicit forward recovery, and controlled production evidence for both normal
 and maintenance traffic states.
+
+---
+
+## M-023.25 — Backup and Recovery Certification
+
+### Objective
+
+Turn Atlas backup from a useful configuration archive into an explicit,
+state-complete Atlas recovery boundary and prove that the corresponding restore
+transaction can recover the declared production state without bypassing source
+certification, deployment mutual exclusion, maintenance isolation, or consumer
+verification.
+
+### Architecture and State Ownership
+
+ADR 0023 and the Backup and Recovery architecture established two governing
+rules: an archive is not recoverable merely because it exists, and unvalidated
+backup content is never extracted directly over live production state.
+
+The canonical recovery registry now owns 11 state surfaces: users, optional
+identity invitations, favorites, optional Media Requests, scheduler state,
+runtime events, runtime subscribers, retention/ARI state, Sports
+subscriptions, Sports recording metadata, and the Sports scheduler. Related
+event/subscriber and Sports state is captured through declared consistency
+groups rather than independent best-effort copies.
+
+Media Requests gained the canonical `ATLAS_REQUESTS_DIR` root. Production had
+no request registry during certification, so that declared optional surface was
+correctly represented as `absent-optional` instead of being manufactured.
+
+### State-Complete Backup
+
+Recovery Format 1 added `RECOVERY_FORMAT`, `RECOVERY_MANIFEST.tsv`, and
+`SHA256SUMS` to the protected atomic backup publication contract. Required
+state is allowlisted, recovery-critical files are checksummed, unsafe or
+incomplete archives fail validation, partial/final recovery archives are
+owner-only, and retention runs only after successful publication.
+
+The backup CLI was also made fail closed: help and listing are read-only and an
+unknown option no longer falls through to backup creation.
+
+A controlled production-shaped capture proved all nine present required/state
+surfaces and the two absent optional surfaces could be captured consistently.
+The final fresh round-trip source archive was:
+
+`/tmp/project-atlas-m023-25-live-roundtrip.9PRa7F/atlas-20260808-172136-835.tar.gz`
+
+with SHA-256
+`dcc0895d30e06c8561c6ed95a9a010a212485b25d49ee6d90cdfbafe7ea5f6d8`.
+
+### Validation-First Restore
+
+The restore CLI progressed deliberately from read-only inspection to isolated
+staging before live mutation was exposed:
+
+- `atlas restore inspect <archive>` reports metadata without asserting
+  validity;
+- `atlas restore verify <archive>` validates Format 1 integrity and state
+  completeness;
+- `atlas restore stage <archive>` rejects unsafe members and extracts only to
+  a private isolated root;
+- `atlas restore validate-stage <staging-root>` loads staged state through real
+  Atlas consumer contracts without mutation; and
+- `atlas restore plan <staging-root>` reports every live action and safety
+  dependency before mutation.
+
+ARI retention validation discovered real legacy history that is intentionally
+incompatible with the current strict report model. The validator was repaired
+to follow the production `ARIAnalytics(service).load_history()` compatibility
+contract while still requiring `service.latest()` to satisfy the strict
+current-state contract. The real staged recovery state then passed with 46
+compatible reports and 11 legacy/incompatible history reports skipped.
+
+### Transactional Live Replacement
+
+Bounded replacement primitives provide explicit apply, revert, and finalize
+phases. Optional-absent state removes a prior live optional surface only as a
+recorded transaction action. Deterministic injected mid-transaction failure
+proved every already-applied surface returns to its displaced state.
+
+Live orchestration then added the production ceremony around that replacement:
+
+1. require clean certified `main` exactly matching `origin/main`;
+2. require a verified deployment baseline and validated staging root;
+3. acquire the shared deployment/update lock;
+4. enable and verify maintenance isolation;
+5. create and validate a fresh pre-restore recovery point;
+6. stop the exact writer set (`atlas-api`, `atlas-sports-controller`, and
+   `atlas-notifications-worker`);
+7. transactionally publish and validate the staged state;
+8. restart and verify writers and consumers;
+9. run Atlas, module, and ingress verification;
+10. reopen and reverify public ingress; and
+11. finalize state replacement and release the lock.
+
+If verification fails after mutation begins, maintenance and the shared lock
+remain held. `atlas restore resume <restore-id> --confirm-live` and
+`atlas restore abort <restore-id> --confirm-live` are the only deliberate
+resolution paths; shell cleanup does not silently reopen production.
+
+### Automated Validation
+
+Incremental focused suites covered registry structure, snapshot consistency,
+archive integrity, CLI safety, archive-member safety, staged consumer
+validation, restore planning, bounded state replacement, writer orchestration,
+and live transaction failure/recovery behavior.
+
+The final fail-closed live recovery implementation passed 41 focused restore
+tests. The complete Core regression then passed 2,947 tests plus 104 subtests,
+with shell syntax and Git diff hygiene clean.
+
+### Protected Certification
+
+Feature commit `02738ee3` was certified through the protected promotion path.
+Pull request 5 merged it into `release/v1.0.0` as `c8a947c0`; all six required
+pull-request checks and the release push gate passed. Pull request 6 then
+promoted the certified release into `main` as `483085fa`, and the post-merge
+main push gate passed.
+
+The feature, release, and main trees were byte-identical at certification.
+Before promotion, an explicitly confirmed live apply from the feature branch
+was rejected because production mutation requires `main`. The rejection left
+the deployment baseline, lock, maintenance state, backup inventory, writer
+process identities, and repository unchanged.
+
+### Controlled Production Recovery
+
+Production was deliberately synchronized to certified `main` `483085fa` while
+verified deployment baseline `baseline-20260808T043132Z-2166158` remained
+authoritative. Doctor was 100 percent healthy and normal ingress passed 24/24
+before the exercise.
+
+The fresh current-state archive above was verified, staged at a private
+temporary root, consumer-validated, and planned before mutation. Live restore
+transaction `restore-20260808T174153Z-3004055` then:
+
+- enabled maintenance and passed 27/27 maintenance-aware ingress checks;
+- created pre-restore production recovery point
+  `atlas-20260808-134255-455.tar.gz` with SHA-256
+  `12c15ece97baab3533ace72c8c1a6c601781bf3a4f2c8389f93503db171680d9`;
+- validated the recovery point as Format 1 state-complete;
+- quiesced and restarted the API, Sports controller, and Notifications worker;
+- validated the published live state through the real consumers;
+- returned Atlas Health to 100 percent;
+- reopened normal public ingress and passed 24/24 checks;
+- released the shared deployment lock and disabled maintenance; and
+- preserved the verified deployment baseline and clean certified repository.
+
+The retained restore audit record is
+`/mnt/storage/configs/atlas/restores/restore-20260808T174153Z-3004055`.
+Production backup retention remained at its explicit ceiling of 10 canonical
+archives.
+
+The transaction timestamp was 17:41:53 UTC and the three controlled writers
+were restarted at 17:43:02 UTC, approximately 69 seconds to writer restart on
+the tested topology. Full verification completed immediately afterward. This
+is evidence rather than an SLO; the operator guide reserves at least a 5-10
+minute maintenance window and scales the allowance with state size.
+
+### Recovery Scope
+
+M-023.25 certifies the declared Atlas configuration and authoritative state
+surfaces. It does not contain the media library or claim complete recovery for
+Jellyfin, Radarr, Sonarr, qBittorrent, or other third-party application
+databases. Local archives under `/mnt/storage/backups/atlas` also share the
+single host/storage failure domain. Independent/off-host storage, immutable or
+encrypted copies, and full-platform disaster recovery remain later
+infrastructure work.
+
+### Result
+
+M-023.25 is complete. Every Backup and Recovery roadmap item now has an
+explicit state owner, implementation contract, regression evidence, controlled
+production proof, recovery-time expectation, and documented scope limitation.
+Atlas can create, validate, stage, plan, transactionally apply, verify, resume,
+or abort state recovery without bypassing protected source promotion or the
+shared production mutation boundary.

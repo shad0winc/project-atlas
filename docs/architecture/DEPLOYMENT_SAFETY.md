@@ -170,10 +170,13 @@ and requires a successfully validated canonical archive before continuing.
 
 The deployment record links to that backup artifact.
 
-This requirement does not expand the backup's scope by documentation. If an
-update changes state not protected by the verified Atlas backup, an appropriate
-state-specific backup or recovery path is additionally required. The later
-Backup and Recovery milestone remains responsible for full certification.
+M-023.25 subsequently certified Format 1 state-complete Atlas backups and the
+corresponding live restore transaction for the declared Atlas state surfaces.
+Deployment/update and live restore use the same exclusive `update.lock`, so
+they cannot simultaneously claim production mutation ownership. A deployment
+that changes data outside the declared Atlas recovery surfaces still requires
+release-specific compatibility and recovery evidence; state completeness does
+not silently widen to media libraries or third-party application databases.
 
 ## Apply Phase
 
