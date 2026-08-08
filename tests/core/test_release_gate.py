@@ -77,13 +77,17 @@ def test_final_gate_depends_on_every_validation_surface() -> None:
     assert "Atlas release gate: PASS" in gate
 
 
-def test_branch_protection_procedure_does_not_claim_external_state() -> None:
+def test_branch_protection_procedure_records_verified_external_state() -> None:
     content = PROCEDURE.read_text(encoding="utf-8")
 
-    assert "repository hosting must be inspected" in content
-    assert "`release-gate` status check is required" in content
-    assert "force pushes are blocked" in content
-    assert "branch deletion is blocked" in content
+    assert "Repository hosting was inspected during M-023.24" in content
+    assert "promotion ruleset was configured for `main` and `release/**`" in content
+    assert "the aggregate `release-gate` status check to pass" in content
+    assert "protected branches to be up to date before merge" in content
+    assert "force pushes to be blocked" in content
+    assert "branch deletion to be blocked" in content
+    assert "an empty default bypass list" in content
+    assert "Atlas Release Gate / release-gate" in content
 
 
 def test_procedure_preserves_legacy_v1_tag_blocker() -> None:
