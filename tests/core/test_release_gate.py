@@ -257,3 +257,40 @@ def test_runner_context_is_scoped_to_sports_execution_step() -> None:
         "${{ runner.temp }}/atlas-sports/recordings/recordings.json"
         in execution
     )
+
+# M-023.24.5 modern GitHub Actions contract
+
+
+def test_release_gate_uses_modern_github_actions() -> None:
+    from pathlib import Path
+
+    workflow = Path(
+        ".github/workflows/release-gate.yml"
+    ).read_text(encoding="utf-8")
+
+    assert workflow.count(
+        "actions/checkout@v7"
+    ) == 5
+
+    assert workflow.count(
+        "actions/setup-python@v7"
+    ) == 3
+
+    assert workflow.count(
+        "actions/setup-node@v7"
+    ) == 1
+
+    legacy_versions = (
+        "actions/checkout@v4",
+        "actions/checkout@v5",
+        "actions/checkout@v6",
+        "actions/setup-python@v4",
+        "actions/setup-python@v5",
+        "actions/setup-python@v6",
+        "actions/setup-node@v4",
+        "actions/setup-node@v5",
+        "actions/setup-node@v6",
+    )
+
+    for legacy_version in legacy_versions:
+        assert legacy_version not in workflow
