@@ -86,7 +86,7 @@ def test_scheduler_executes_real_operations_callback(
     )
 
     assert result.task == "operations.collect"
-    assert result.result == "success"
+    assert result.result == "success", result.error
     assert result.return_code == 0
     assert result.error is None
     assert result.event_error is None

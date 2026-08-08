@@ -316,3 +316,50 @@ def test_public_context_exports() -> None:
         operations.OperationsContextError
         is OperationsContextError
     )
+
+
+# M-023.24.5 Operations project-root portability
+
+
+def test_host_provider_uses_configured_project_root(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "ATLAS_PROJECT_DIR",
+        str(tmp_path),
+    )
+
+    provider = HostOperationsContextProvider()
+
+    assert provider.project_root == tmp_path
+
+
+def test_host_provider_defaults_to_production_project_root(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv(
+        "ATLAS_PROJECT_DIR",
+        raising=False,
+    )
+
+    provider = HostOperationsContextProvider()
+
+    assert provider.project_root == Path(
+        "/opt/project-atlas"
+    )
+
+
+def test_host_provider_rejects_empty_project_root(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "ATLAS_PROJECT_DIR",
+        "   ",
+    )
+
+    with pytest.raises(
+        OperationsContextError,
+        match="ATLAS_PROJECT_DIR cannot be empty",
+    ):
+        HostOperationsContextProvider()

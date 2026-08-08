@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+import os
 from pathlib import Path
 import subprocess
 from typing import Any, Protocol
@@ -104,11 +105,33 @@ CommandExecutor = Callable[
 ]
 
 
+def _default_project_root() -> Path:
+    """Return the configured Atlas project root."""
+
+    configured = os.environ.get(
+        "ATLAS_PROJECT_DIR",
+    )
+
+    if configured is None:
+        return Path("/opt/project-atlas")
+
+    normalized = configured.strip()
+
+    if not normalized:
+        raise OperationsContextError(
+            "ATLAS_PROJECT_DIR cannot be empty",
+        )
+
+    return Path(normalized)
+
+
 @dataclass(frozen=True, slots=True)
 class HostOperationsContextProvider:
     """Collect Operations metadata from the local Atlas installation."""
 
-    project_root: Path = Path("/opt/project-atlas")
+    project_root: Path = field(
+        default_factory=_default_project_root,
+    )
     hostname_provider: HostnameProvider = field(
         default_factory=HostSystemProvider,
         repr=False,
