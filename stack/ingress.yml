@@ -42,11 +42,20 @@ services:
 
     networks:
       - atlas-ingress
+      - atlas-identity
+
+    group_add:
+      - "20000"
+
+    volumes:
+      - /mnt/storage/configs/atlas/users:/mnt/storage/configs/atlas/users:ro
 
     expose:
       - "8000"
 
     environment:
+      ATLAS_JELLYFIN_URL: "http://jellyfin:8096"
+      ATLAS_USERS_DIR: "/mnt/storage/configs/atlas/users"
       ATLAS_JWT_SECRET: "${ATLAS_JWT_SECRET:?ATLAS_JWT_SECRET is required}"
       ATLAS_JWT_ISSUER: "${ATLAS_JWT_ISSUER:-project-atlas}"
       ATLAS_JWT_AUDIENCE: "${ATLAS_JWT_AUDIENCE:-atlas-portal}"
@@ -124,3 +133,6 @@ networks:
   atlas-ingress:
     external: true
     name: atlas-ingress
+  atlas-identity:
+    external: true
+    name: atlas-identity

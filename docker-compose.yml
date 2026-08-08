@@ -4,12 +4,17 @@ networks:
   atlas:
     name: atlas
     driver: bridge
+  atlas-identity:
+    name: atlas-identity
+    driver: bridge
 
 services:
   jellyfin:
     image: jellyfin/jellyfin:latest
     container_name: jellyfin
-    networks: [atlas]
+    networks:
+      - atlas
+      - atlas-identity
     ports:
       - "${JELLYFIN_PORT:-8096}:8096"
     volumes:
