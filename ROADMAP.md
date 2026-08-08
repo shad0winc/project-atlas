@@ -733,16 +733,16 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 
 ### Backup and Recovery
 
-- [ ] Verify Atlas configuration backups
-- [ ] Verify identity-state backups
-- [ ] Verify favorites-state backups
-- [ ] Verify request-state backups
-- [ ] Verify scheduler-state backups
-- [ ] Verify Sports-state backups
-- [ ] Verify retention-state backups
-- [ ] Complete restore test
-- [ ] Document recovery time expectations
-- [ ] Document single-host backup limitations
+- [x] Verify Atlas configuration backups
+- [x] Verify identity-state backups
+- [x] Verify favorites-state backups
+- [x] Verify request-state backups
+- [x] Verify scheduler-state backups
+- [x] Verify Sports-state backups
+- [x] Verify retention-state backups
+- [x] Complete restore test
+- [x] Document recovery time expectations
+- [x] Document single-host backup limitations
 
 ### Security
 

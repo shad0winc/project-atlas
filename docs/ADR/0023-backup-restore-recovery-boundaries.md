@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for M-023.25 implementation.
+Accepted and validated by M-023.25.
 
 ## Context
 
@@ -197,6 +197,28 @@ Backups under `/mnt/storage/backups/atlas` share the host/storage domain with
 Atlas. They protect against many configuration and software failures but not
 loss or corruption of that storage device. Final M-023.25 documentation must
 state this limitation and recommend an independent storage domain.
+
+## M-023.25 Validation Evidence
+
+The decision is implemented and production-validated. Format 1 now captures
+explicit recovery metadata, checksum-covered allowlisted state, owner-only
+archives, and state-completeness semantics. Restore provides read-only
+inspection/verification, isolated safe staging, consumer validation, an
+operator-visible plan, transactional live replacement, and explicit
+`--confirm-live` apply/resume/abort boundaries.
+
+The final automated Core regression passed 2,947 tests plus 104 subtests. A
+controlled exercise from protected production source `483085fa` then completed
+restore `restore-20260808T174153Z-3004055`. The transaction created and
+validated a pre-restore state-complete recovery point, isolated public traffic,
+quiesced the API/Sports/Notifications writers, applied and consumed the staged
+state, restarted all three writers healthy, restored normal ingress at 24/24,
+and released maintenance and the shared deployment lock. The deployment
+baseline remained verified and unchanged.
+
+The exercise validates Atlas state recovery only within the declared scope. It
+does not change the single-host, media-library, third-party application data,
+or off-host disaster-recovery exclusions in this decision.
 
 ## Consequences
 
