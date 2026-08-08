@@ -2,7 +2,21 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-[ -f .env ] || cp .env.example .env
+if [[ -L .env ]]; then
+  echo "ERROR: .env must not be a symbolic link." >&2
+  exit 1
+fi
+
+if [[ ! -e .env ]]; then
+  install -m 0600 .env.example .env
+fi
+
+if [[ ! -f .env ]]; then
+  echo "ERROR: .env must be a regular file." >&2
+  exit 1
+fi
+
+chmod 0600 .env
 
 set -a
 source .env

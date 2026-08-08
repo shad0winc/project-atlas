@@ -5,6 +5,14 @@ PROJECT_DIR="/opt/project-atlas"
 
 module_id="notifications"
 MODULE_DIR="$PROJECT_DIR/modules/$module_id"
+MODULE_ENV_FILE="$MODULE_DIR/.env"
+
+if [[ ! -f "$MODULE_ENV_FILE" || -L "$MODULE_ENV_FILE" ]]; then
+  echo "ERROR: Notifications module environment must be a regular non-symlink file." >&2
+  exit 1
+fi
+
+chmod 0600 "$MODULE_ENV_FILE"
 
 cd "$PROJECT_DIR"
 
