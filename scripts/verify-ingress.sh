@@ -4,6 +4,9 @@ set -euo pipefail
 PROJECT_DIR="${ATLAS_PROJECT_DIR:-/opt/project-atlas}"
 COMPOSE_FILE="$PROJECT_DIR/stack/ingress.yml"
 COMPOSE_PROJECT="atlas-ingress"
+RUNTIME_CONFIG_DIR="${ATLAS_RUNTIME_CONFIG_DIR:-/mnt/storage/configs/atlas}"
+MAINTENANCE_DIR="${ATLAS_MAINTENANCE_DIR:-$RUNTIME_CONFIG_DIR/maintenance}"
+MAINTENANCE_FLAG="$MAINTENANCE_DIR/enabled"
 
 EXPECTED_CADDY_MEMORY=536870912
 EXPECTED_CADDY_CPUS=1000000000
@@ -206,37 +209,102 @@ check_command \
     caddy validate \
     --config /etc/caddy/Caddyfile
 
-check_command \
-  "Portal route reachable through Caddy" \
-  docker exec \
-    atlas-caddy \
-    curl \
-      --fail \
+if [[ -f "$MAINTENANCE_FLAG" ]]; then
+  check_command \
+    "Caddy maintenance liveness reachable" \
+    docker exec \
+      atlas-caddy \
+      curl \
+        --fail \
+        --silent \
+        --show-error \
+        --output /dev/null \
+        --resolve atlas.shadowinc.co:443:127.0.0.1 \
+        https://atlas.shadowinc.co/_atlas/ingress-health
+
+  check_command \
+    "Portal backend reachable during maintenance" \
+    docker exec \
+      atlas-caddy \
+      curl \
+        --fail \
+        --silent \
+        --show-error \
+        --output /dev/null \
+        http://atlas-portal:3000/
+
+  api_response="$(
+    docker exec \
+      atlas-caddy \
+      curl \
+        --fail \
+        --silent \
+        --show-error \
+        http://atlas-api:8000/api/v1/health \
+      2>/dev/null ||
+      true
+  )"
+
+  if printf '%s' "$api_response" | grep -q '"status":"ok"'; then
+    pass "API backend reachable during maintenance"
+  else
+    fail "API backend reachable during maintenance"
+  fi
+
+  portal_status="$(
+    docker exec atlas-caddy curl \
       --silent \
       --show-error \
       --output /dev/null \
+      --write-out '%{http_code}' \
       --resolve atlas.shadowinc.co:443:127.0.0.1 \
-      https://atlas.shadowinc.co/
+      https://atlas.shadowinc.co/ \
+      2>/dev/null || true
+  )"
+  check_equal "Portal public maintenance isolation" "503" "$portal_status"
 
-api_response="$(
-  docker exec \
-    atlas-caddy \
-    curl \
-      --fail \
+  api_status="$(
+    docker exec atlas-caddy curl \
       --silent \
       --show-error \
+      --output /dev/null \
+      --write-out '%{http_code}' \
       --resolve atlas.shadowinc.co:443:127.0.0.1 \
       https://atlas.shadowinc.co/api/v1/health \
-    2>/dev/null ||
-    true
-)"
-
-if printf '%s' "$api_response" |
-  grep -q '"status":"ok"'
-then
-  pass "API route reachable through Caddy"
+      2>/dev/null || true
+  )"
+  check_equal "API public maintenance isolation" "503" "$api_status"
 else
-  fail "API route reachable through Caddy"
+  check_command \
+    "Portal route reachable through Caddy" \
+    docker exec \
+      atlas-caddy \
+      curl \
+        --fail \
+        --silent \
+        --show-error \
+        --output /dev/null \
+        --resolve atlas.shadowinc.co:443:127.0.0.1 \
+        https://atlas.shadowinc.co/
+
+  api_response="$(
+    docker exec \
+      atlas-caddy \
+      curl \
+        --fail \
+        --silent \
+        --show-error \
+        --resolve atlas.shadowinc.co:443:127.0.0.1 \
+        https://atlas.shadowinc.co/api/v1/health \
+      2>/dev/null ||
+      true
+  )"
+
+  if printf '%s' "$api_response" | grep -q '"status":"ok"'; then
+    pass "API route reachable through Caddy"
+  else
+    fail "API route reachable through Caddy"
+  fi
 fi
 
 printf '\nPassed: %s\n' "$passed"

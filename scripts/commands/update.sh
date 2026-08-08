@@ -140,14 +140,23 @@ atlas_command_update() {
     return 1
   fi
 
-  if ! atlas_deployment_complete_update "$identifier"; then
-    atlas_update_fail_after_maintenance "$identifier" 'new production baseline capture failed.'
-    return 1
-  fi
-
   if ! atlas_command_maintenance disable; then
     echo 'ERROR: deployment verified, but maintenance could not be disabled.' >&2
     echo 'Deployment lock remains held for operator recovery.' >&2
+    return 1
+  fi
+
+  if ! atlas_update_post_verify "$scope"; then
+    atlas_command_maintenance enable || true
+    atlas_update_fail_after_maintenance "$identifier" \
+      'public post-maintenance verification failed.'
+    return 1
+  fi
+
+  if ! atlas_deployment_complete_update "$identifier"; then
+    atlas_command_maintenance enable || true
+    atlas_update_fail_after_maintenance "$identifier" \
+      'new production baseline capture failed.'
     return 1
   fi
 

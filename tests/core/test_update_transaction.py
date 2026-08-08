@@ -117,6 +117,11 @@ def run_update(
     }
     atlas_command_verify() {
       echo verify >> "$ATLAS_TEST_EVENTS"
+      if [[ "${ATLAS_TEST_VERIFY_FAIL_AFTER_DISABLE:-0}" == "1" ]] &&
+        grep -Fxq 'maintenance:disable' "$ATLAS_TEST_EVENTS"
+      then
+        return 1
+      fi
       return "${ATLAS_TEST_VERIFY_STATUS:-0}"
     }
     atlas_command_maintenance() {
@@ -130,6 +135,10 @@ def run_update(
 
     atlas_deployment_archive_source() {
       cp "$ATLAS_TEST_ARCHIVE" "$2"
+    }
+    atlas_deployment_preserve_rollback_images() {
+      echo preserve-rollback-images >> "$ATLAS_TEST_EVENTS"
+      return 0
     }
     atlas_deployment_verify_runtime() { return 0; }
     atlas_deployment_capture_images() {
@@ -209,10 +218,15 @@ def test_core_update_orders_backup_before_apply_and_reopens_on_success(tmp_path:
 
     assert result.returncode == 0, result.stderr
     events = event_lines(environment)
-    assert events[0:3] == ["doctor", "maintenance:enable", "backup"]
-    assert events[3].startswith("docker compose")
+    assert events[0:4] == [
+        "preserve-rollback-images",
+        "doctor",
+        "maintenance:enable",
+        "backup",
+    ]
     assert events[4].startswith("docker compose")
-    assert events[-3:] == ["doctor", "verify", "maintenance:disable"]
+    assert events[5].startswith("docker compose")
+    assert events[-3:] == ["maintenance:disable", "doctor", "verify"]
     assert not lock_path(environment).exists()
     assert not any("image prune" in event for event in events)
 
@@ -224,7 +238,12 @@ def test_backup_failure_keeps_maintenance_and_lock(tmp_path: Path) -> None:
     result = run_update(environment)
 
     assert result.returncode != 0
-    assert event_lines(environment) == ["doctor", "maintenance:enable", "backup"]
+    assert event_lines(environment) == [
+        "preserve-rollback-images",
+        "doctor",
+        "maintenance:enable",
+        "backup",
+    ]
     assert lock_path(environment).is_dir()
     assert "Maintenance mode remains enabled" in result.stderr
 
@@ -252,8 +271,44 @@ def test_ingress_scope_builds_ingress_and_runs_ingress_verifier(tmp_path: Path) 
     assert any("pull caddy" in event for event in events)
     assert any("build portal api" in event for event in events)
     assert any("up -d" in event for event in events)
-    assert "ingress-verify" in events
-    assert events[-1] == "maintenance:disable"
+    assert events.count("ingress-verify") == 2
+    disable = events.index("maintenance:disable")
+    assert events.index("ingress-verify") < disable
+    assert events.index("ingress-verify", disable + 1) > disable
+
+
+def test_update_preserves_rollback_images_before_runtime_mutation(tmp_path: Path) -> None:
+    environment = prepare_runtime(tmp_path)
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode == 0, result.stderr
+    events = event_lines(environment)
+    preserve = events.index("preserve-rollback-images")
+    first_compose = next(
+        index for index, event in enumerate(events) if event.startswith("docker compose")
+    )
+    assert preserve < first_compose
+
+
+def test_failed_public_reopen_reenables_maintenance_and_keeps_lock(tmp_path: Path) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_VERIFY_STATUS"] = "0"
+    environment["ATLAS_TEST_VERIFY_FAIL_AFTER_DISABLE"] = "1"
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode != 0
+    events = event_lines(environment)
+    disable = events.index("maintenance:disable")
+    assert "verify" in events[disable + 1 :]
+    assert "maintenance:enable" in events[disable + 1 :]
+    assert lock_path(environment).is_dir()
+    current = (
+        Path(environment["ATLAS_RUNTIME_CONFIG_DIR"]) / "deployments" / "current"
+    ).read_text(encoding="utf-8")
+    assert current == "baseline-test\n"
+    assert "public post-maintenance verification failed" in result.stderr
 
 
 def test_unknown_scope_is_rejected_before_runtime_mutation(tmp_path: Path) -> None:

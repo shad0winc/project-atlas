@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
+import subprocess
+import textwrap
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -42,6 +45,70 @@ def test_baseline_archives_source_and_exact_image_identity() -> None:
     assert "{{.Config.Image}}|{{.Image}}" in content
     assert "core-source.tar.gz" in content
     assert "ingress-source.tar.gz" in content
+
+
+def test_prepare_update_preserves_exact_rollback_image_references(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline-test"
+    transaction = tmp_path / "update-test"
+    bin_dir = tmp_path / "bin"
+    tags = tmp_path / "tags"
+    baseline.mkdir()
+    transaction.mkdir()
+    bin_dir.mkdir()
+    (baseline / "images.tsv").write_text(
+        "core|docker-compose.yml|atlas|core|core-container|core:test|sha256:core\n"
+        "ingress|stack/ingress.yml|atlas-ingress|portal|atlas-portal|atlas-portal:local|sha256:portal\n",
+        encoding="utf-8",
+    )
+    docker = bin_dir / "docker"
+    docker.write_text(
+        textwrap.dedent(
+            r"""
+            #!/usr/bin/env bash
+            set -euo pipefail
+            if [[ "$1 $2" == "image inspect" && "${3:-}" != "--format" ]]; then
+              exit 0
+            fi
+            if [[ "$1 $2" == "image tag" ]]; then
+              printf '%s|%s\n' "$4" "$3" >> "$ATLAS_TEST_TAGS"
+              exit 0
+            fi
+            if [[ "$1 $2 $3" == "image inspect --format" ]]; then
+              awk -F'|' -v tag="$5" '$1 == tag {print $2; exit}' "$ATLAS_TEST_TAGS"
+              exit 0
+            fi
+            exit 1
+            """
+        ).lstrip(),
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "PATH": f"{bin_dir}:{environment['PATH']}",
+            "ATLAS_TEST_DEPLOYMENT": str(DEPLOYMENT),
+            "ATLAS_TEST_TAGS": str(tags),
+        }
+    )
+    harness = r'''
+    set -euo pipefail
+    source "$ATLAS_TEST_DEPLOYMENT"
+    atlas_deployment_preserve_rollback_images "$1" "$2"
+    '''
+    result = subprocess.run(
+        ["bash", "-c", textwrap.dedent(harness), "test", str(baseline), str(transaction)],
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    retained = (transaction / "rollback-images.tsv").read_text(encoding="utf-8").splitlines()
+    assert retained == [
+        "sha256:core|atlas-rollback:update-test-1",
+        "sha256:portal|atlas-rollback:update-test-2",
+    ]
 
 
 def test_runtime_drift_is_fail_closed() -> None:
@@ -113,5 +180,7 @@ def test_rollback_reopens_traffic_only_after_verification() -> None:
     doctor = section.index("atlas_command_doctor")
     verify = section.index("atlas_command_verify")
     disable = section.index("atlas_command_maintenance disable")
+    public_verify = section.index("atlas_command_verify", disable)
     release = section.rindex("atlas_deployment_release_lock")
-    assert doctor < verify < disable < release
+    set_current = section.index("atlas_deployment_set_current", disable)
+    assert doctor < verify < disable < public_verify < set_current < release
