@@ -7,11 +7,13 @@ Usage:
   atlas restore verify <archive>
   atlas restore stage <archive>
   atlas restore validate-stage <staging-root>
+  atlas restore plan <staging-root>
   atlas restore --help
 
-Recovery inspection and verification are read-only. `stage` validates archive
-members and extracts only into a new private directory beneath `/tmp`; it never
-targets live Atlas state. Live restore/apply remains intentionally unavailable.
+Recovery inspection, verification, and planning are read-only. `stage` validates
+archive members and extracts only into a new private directory beneath `/tmp`;
+it never targets live Atlas state. `plan` validates the staged state and maps
+only declared surfaces to canonical destinations. Live apply remains unavailable.
 HELP
 }
 
@@ -167,6 +169,62 @@ atlas_restore_validate_stage() {
   echo 'Atlas Staged Restore Consumer Validation: PASS'
 }
 
+atlas_restore_plan() {
+  local requested="$1"
+  local root before after
+
+  [[ -n "$requested" ]] || {
+    echo 'ERROR: isolated staging root is required.' >&2
+    return 2
+  }
+
+  root="$(realpath -e -- "$requested" 2>/dev/null)" || {
+    echo 'ERROR: isolated staging root is unavailable.' >&2
+    return 1
+  }
+
+  [[ "$root" == "$requested" &&
+     "$root" == /tmp/project-atlas-restore.* &&
+     -d "$root" && ! -L "$root" ]] || {
+    echo 'ERROR: restore plan requires an isolated /tmp staging root.' >&2
+    return 1
+  }
+
+  atlas_restore_load_recovery_library
+  atlas_backup_recovery_validate_staged_restore "$root" || return 1
+  before="$(atlas_backup_recovery_staged_state_digest "$root")" || return 1
+
+  atlas_backup_recovery_validate_staged_consumers "$root" || {
+    echo 'Atlas Restore Plan: FAIL' >&2
+    return 1
+  }
+
+  echo 'Atlas Restore Plan'
+  echo
+  printf 'Surface\tAction\tKind\tConsistency group\tStaged source\tLive destination\n'
+  atlas_backup_recovery_restore_plan "$root" || {
+    echo 'Atlas Restore Plan: FAIL' >&2
+    return 1
+  }
+
+  after="$(atlas_backup_recovery_staged_state_digest "$root")" || return 1
+  [[ "$before" == "$after" ]] || {
+    echo 'ERROR: restore planning mutated staged recovery state.' >&2
+    return 1
+  }
+
+  atlas_backup_recovery_validate_staged_restore "$root" || return 1
+
+  echo
+  echo 'Writer quiesce set: atlas-api, atlas-sports-controller, atlas-notifications-worker'
+  echo 'Deployment/update mutual exclusion: required'
+  echo 'Maintenance before live mutation: required'
+  echo 'Pre-restore recovery point: required'
+  echo 'Staged state mutation: none'
+  echo 'Live state mutation: none'
+  echo 'Atlas Restore Plan: PASS'
+}
+
 atlas_restore_load_recovery_library() {
   local recovery_library
 
@@ -218,6 +276,14 @@ atlas_command_restore() {
         return 2
       }
       atlas_restore_validate_stage "$2"
+      ;;
+    plan)
+      [[ "$#" -eq 2 ]] || {
+        echo 'ERROR: restore plan requires exactly one staging root.' >&2
+        atlas_restore_usage >&2
+        return 2
+      }
+      atlas_restore_plan "$2"
       ;;
     --help|-h|help)
       [[ "$#" -eq 1 ]] || {

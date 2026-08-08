@@ -1018,6 +1018,143 @@ atlas_backup_recovery_stage_archive() {
   printf '%s\n' "$stage"
 }
 
+# M-023.25.7.1 validated live-destination planning.
+#
+# Planning remains read-only. It joins the validated archive manifest to the
+# canonical recovery registry and rejects destinations that escape the Atlas
+# configuration root, traverse symbolic links, or conflict with the declared
+# surface kind. Optional-absent state is planned as an explicit removal.
+
+atlas_backup_recovery_validate_restore_destination() {
+  local destination="$1"
+  local kind="$2"
+
+  : "${ATLAS_CONFIG_ROOT:?ATLAS_CONFIG_ROOT is required}"
+
+  python3 - "$ATLAS_CONFIG_ROOT" "$destination" "$kind" <<'PY_DESTINATION'
+import os
+import stat
+import sys
+from pathlib import Path
+
+root_text, destination_text, kind = sys.argv[1:]
+
+if kind not in {"file", "directory"}:
+    raise SystemExit("ERROR: restore destination kind is invalid")
+
+root = Path(root_text)
+destination = Path(destination_text)
+
+if not root.is_absolute() or not destination.is_absolute():
+    raise SystemExit("ERROR: restore destination must be absolute")
+
+try:
+    lexical_common = Path(os.path.commonpath((root, destination)))
+except ValueError:
+    raise SystemExit("ERROR: restore destination is outside Atlas configuration")
+
+if lexical_common != root or destination == root:
+    raise SystemExit("ERROR: restore destination is outside Atlas configuration")
+
+current = destination
+while True:
+    if current.exists() or current.is_symlink():
+        info = current.lstat()
+        if stat.S_ISLNK(info.st_mode):
+            raise SystemExit(
+                f"ERROR: restore destination traverses symbolic link: {current}"
+            )
+    if current == root or current.parent == current:
+        break
+    current = current.parent
+
+root_resolved = root.resolve(strict=False)
+destination_resolved = destination.resolve(strict=False)
+
+try:
+    resolved_common = Path(
+        os.path.commonpath((root_resolved, destination_resolved))
+    )
+except ValueError:
+    raise SystemExit("ERROR: restore destination is outside Atlas configuration")
+
+if resolved_common != root_resolved or destination_resolved == root_resolved:
+    raise SystemExit("ERROR: restore destination is outside Atlas configuration")
+
+if destination.exists():
+    if destination.is_symlink():
+        raise SystemExit(
+            f"ERROR: restore destination is symbolic: {destination}"
+        )
+    if kind == "file" and not destination.is_file():
+        raise SystemExit(
+            f"ERROR: restore destination kind mismatch: {destination}"
+        )
+    if kind == "directory" and not destination.is_dir():
+        raise SystemExit(
+            f"ERROR: restore destination kind mismatch: {destination}"
+        )
+PY_DESTINATION
+}
+
+atlas_backup_recovery_restore_plan() {
+  local root="$1"
+  local surface destination archive_path requirement kind group policy extra
+  local action staged_path
+  local row_count=0
+  declare -A policy_by_surface=()
+
+  atlas_backup_recovery_validate_staged_restore "$root" || return 1
+
+  while IFS=$'\t' read -r surface archive_path requirement policy extra; do
+    [[ "$surface" == 'surface' ]] && continue
+    [[ -n "$surface" ]] || continue
+    [[ -z "$extra" ]] || {
+      echo 'ERROR: staged restore manifest row has unexpected fields.' >&2
+      return 1
+    }
+    policy_by_surface["$surface"]="$policy"
+  done < "$root/RECOVERY_MANIFEST.tsv"
+
+  while IFS=$'\t' read -r \
+    surface destination archive_path requirement kind group
+  do
+    policy="${policy_by_surface[$surface]:-}"
+    case "$policy" in
+      captured)
+        action='replace'
+        staged_path="$root/$archive_path"
+        ;;
+      absent-optional)
+        [[ "$requirement" == 'optional' ]] || {
+          printf 'ERROR: required restore surface cannot be absent: %s\n' \
+            "$surface" >&2
+          return 1
+        }
+        action='remove-if-present'
+        staged_path='-'
+        ;;
+      *)
+        printf 'ERROR: invalid restore-plan policy: %s\n' "$surface" >&2
+        return 1
+        ;;
+    esac
+
+    atlas_backup_recovery_validate_restore_destination \
+      "$destination" "$kind" || return 1
+
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "$surface" "$action" "$kind" "$group" "$staged_path" "$destination"
+    row_count=$((row_count + 1))
+  done < <(atlas_backup_recovery_surface_rows)
+
+  [[ "$row_count" -eq 11 ]] || {
+    printf 'ERROR: restore plan expected 11 surfaces, found %s.\n' \
+      "$row_count" >&2
+    return 1
+  }
+}
+
 # M-023.25.6 consumer-level staged-state validation.
 
 atlas_backup_recovery_staged_state_digest() {

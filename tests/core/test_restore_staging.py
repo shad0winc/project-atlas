@@ -290,3 +290,75 @@ def test_live_apply_remains_unavailable() -> None:
     content = RESTORE_COMMAND.read_text(encoding="utf-8")
     assert "live restore apply is not implemented or authorized" in content
     assert "atlas_backup_recovery_stage_archive" in content
+
+
+def _restore_plan(
+    root: Path,
+    env: dict[str, str],
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            "bash",
+            "-c",
+            'set -euo pipefail; source "$RECOVERY_LIBRARY"; '
+            'atlas_backup_recovery_restore_plan "$STAGE_ROOT"',
+        ],
+        cwd=PROJECT_ROOT,
+        env={**env, "STAGE_ROOT": str(root)},
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+
+
+def test_restore_plan_maps_only_declared_surfaces(tmp_path: Path) -> None:
+    archive, env = _build_archive(tmp_path)
+    parent = tmp_path / "staging"
+    parent.mkdir()
+    staged_result = _stage(archive, parent, env)
+    assert staged_result.returncode == 0, staged_result.stderr
+    staged = Path(staged_result.stdout.strip())
+
+    try:
+        result = _restore_plan(staged, env)
+
+        assert result.returncode == 0, result.stderr
+        rows = [line.split("\t") for line in result.stdout.splitlines() if line]
+        assert len(rows) == 11
+        by_surface = {row[0]: row for row in rows}
+        assert set(by_surface) == {surface for surface, *_ in SURFACES}
+        assert by_surface["users"][1] == "replace"
+        assert by_surface["users"][2] == "directory"
+        assert by_surface["identity-invitations"][1] == "remove-if-present"
+        assert by_surface["requests"][1] == "remove-if-present"
+        assert by_surface["runtime-events"][3] == "runtime-events"
+        assert by_surface["runtime-subscribers"][3] == "runtime-events"
+        assert by_surface["sports-recordings"][3] == "sports"
+        assert by_surface["users"][5] == env["ATLAS_USERS_DIR"]
+        assert by_surface["scheduler"][5] == env["ATLAS_SCHEDULER_STATE_FILE"]
+        assert all(row[5].startswith(env["ATLAS_CONFIG_ROOT"] + "/") for row in rows)
+    finally:
+        subprocess.run(["rm", "-rf", "--", str(staged)], check=False)
+
+
+def test_restore_plan_rejects_symbolic_destination_ancestor(tmp_path: Path) -> None:
+    archive, env = _build_archive(tmp_path)
+    parent = tmp_path / "staging"
+    parent.mkdir()
+    staged_result = _stage(archive, parent, env)
+    assert staged_result.returncode == 0, staged_result.stderr
+    staged = Path(staged_result.stdout.strip())
+
+    config_root = Path(env["ATLAS_CONFIG_ROOT"])
+    config_root.mkdir(parents=True, exist_ok=True)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (config_root / "atlas").symlink_to(elsewhere, target_is_directory=True)
+
+    try:
+        result = _restore_plan(staged, env)
+        assert result.returncode != 0
+        assert "symbolic link" in result.stderr
+    finally:
+        subprocess.run(["rm", "-rf", "--", str(staged)], check=False)
