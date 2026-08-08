@@ -31,6 +31,23 @@ export async function refreshAtlasTokens(refreshToken: string): Promise<AtlasTok
   });
 }
 
+export async function logoutAtlasSession(refreshToken: string): Promise<void> {
+  const normalizedToken = refreshToken.trim();
+
+  if (!normalizedToken) {
+    throw new Error("Atlas refresh token cannot be empty.");
+  }
+
+  await atlasApiRequest<void>("/auth/logout", {
+    method: "POST",
+    body: {
+      refresh_token: normalizedToken
+    },
+    cache: "no-store",
+    retryAuthentication: false
+  });
+}
+
 export async function readCurrentAtlasUser(accessToken: string): Promise<AtlasCurrentUserResponse> {
   const normalizedToken = accessToken.trim();
 
