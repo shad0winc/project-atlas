@@ -432,7 +432,7 @@ atlas_backup_recovery_snapshot_state() {
   do
     if [[ -e "$destination/$archive" ]]; then
       printf '%s\t%s\t%s\t%s\n' \
-        "$surface" "$archive" "$requirement" 'captured-unverified'
+        "$surface" "$archive" "$requirement" 'captured'
     elif [[ "$requirement" == 'optional' && ! -e "$source" ]]; then
       printf '%s\t%s\t%s\t%s\n' \
         "$surface" "$archive" "$requirement" 'absent-optional'
@@ -442,4 +442,313 @@ atlas_backup_recovery_snapshot_state() {
       return 1
     fi
   done < <(atlas_backup_recovery_surface_rows)
+}
+
+
+# M-023.25.3.3 state-complete archive integrity support.
+
+atlas_backup_recovery_write_snapshot_checksums() {
+  local snapshot_root="$1"
+  local destination="$2"
+  local path relative digest count=0
+
+  [[ -d "$snapshot_root/state" ]] || {
+    echo 'ERROR: recovery snapshot state directory is unavailable.' >&2
+    return 1
+  }
+
+  : > "$destination"
+  chmod 0600 "$destination"
+
+  while IFS= read -r -d '' path; do
+    [[ ! -L "$path" ]] || {
+      printf 'ERROR: checksum source is a symbolic link: %s\n' "$path" >&2
+      return 1
+    }
+
+    relative="${path#"$snapshot_root"/}"
+
+    [[ "$relative" == state/* &&
+       "$relative" != *$'\n'* &&
+       "$relative" != *$'\t'* ]] || {
+      printf 'ERROR: unsafe recovery checksum path: %s\n' "$relative" >&2
+      return 1
+    }
+
+    digest="$(sha256sum -- "$path" | awk '{print $1}')" || return 1
+    printf '%s  %s\n' "$digest" "$relative" >> "$destination"
+    count=$((count + 1))
+  done < <(
+    find "$snapshot_root/state" -type f -print0 |
+      LC_ALL=C sort -z
+  )
+
+  [[ "$count" -gt 0 ]] || {
+    echo 'ERROR: recovery snapshot contains no checksum-eligible state.' >&2
+    return 1
+  }
+}
+
+atlas_backup_recovery_archive_member_present() {
+  local listing="$1"
+  local wanted="$2"
+  local member
+
+  while IFS= read -r member; do
+    [[ "$member" == "$wanted" ||
+       "$member" == "$wanted/" ||
+       "$member" == "$wanted/"* ]] && return 0
+  done <<< "$listing"
+
+  return 1
+}
+
+atlas_backup_recovery_validate_archive() {
+  local archive="$1"
+  local listing recovery_format manifest checksums backup_info
+  local header body line surface archive_path requirement policy extra
+  local expected_path expected_requirement expected_kind
+  local checksum member actual matched captured_path
+  local row_count=0 project_rows=0 checksum_count=0
+  declare -A registry_path=()
+  declare -A registry_requirement=()
+  declare -A registry_kind=()
+  declare -A seen_surface=()
+  declare -A captured_paths=()
+  declare -A checksum_members=()
+
+  [[ -f "$archive" && ! -L "$archive" ]] || {
+    echo 'ERROR: recovery archive is not a regular file.' >&2
+    return 1
+  }
+
+  atlas_backup_recovery_validate_registry || return 1
+
+  listing="$(tar -tzf "$archive")" || {
+    echo 'ERROR: recovery archive is unreadable.' >&2
+    return 1
+  }
+
+  while IFS=$'\t' read -r \
+    surface _source archive_path requirement expected_kind _group
+  do
+    registry_path["$surface"]="$archive_path"
+    registry_requirement["$surface"]="$requirement"
+    registry_kind["$surface"]="$expected_kind"
+  done < <(atlas_backup_recovery_surface_rows)
+
+  recovery_format="$(tar -xOzf "$archive" RECOVERY_FORMAT 2>/dev/null)" || {
+    echo 'ERROR: recovery archive is missing RECOVERY_FORMAT.' >&2
+    return 1
+  }
+
+  [[ "$recovery_format" == '1' ]] || {
+    echo 'ERROR: unsupported recovery archive format.' >&2
+    return 1
+  }
+
+  backup_info="$(tar -xOzf "$archive" BACKUP_INFO.txt 2>/dev/null)" || {
+    echo 'ERROR: recovery archive is missing BACKUP_INFO.txt.' >&2
+    return 1
+  }
+
+  grep -Fxq 'Recovery state: state-complete' <<< "$backup_info" || {
+    echo 'ERROR: recovery archive does not declare state completeness.' >&2
+    return 1
+  }
+
+  grep -Fxq 'Recovery capability: restore-unverified' <<< "$backup_info" || {
+    echo 'ERROR: recovery archive restore-verification state is invalid.' >&2
+    return 1
+  }
+
+  manifest="$(tar -xOzf "$archive" RECOVERY_MANIFEST.tsv 2>/dev/null)" || {
+    echo 'ERROR: recovery archive is missing RECOVERY_MANIFEST.tsv.' >&2
+    return 1
+  }
+
+  header="${manifest%%$'\n'*}"
+  [[ "$header" == $'surface\tarchive_path\trequirement\tpolicy' ]] || {
+    echo 'ERROR: recovery manifest header is invalid.' >&2
+    return 1
+  }
+
+  body="${manifest#*$'\n'}"
+
+  while IFS=$'\t' read -r \
+    surface archive_path requirement policy extra
+  do
+    [[ -n "$surface" ]] || continue
+    [[ -z "$extra" ]] || {
+      echo 'ERROR: recovery manifest row has unexpected fields.' >&2
+      return 1
+    }
+
+    row_count=$((row_count + 1))
+
+    if [[ "$surface" == 'project-configuration' ]]; then
+      [[ "$archive_path" == '.' &&
+         "$requirement" == 'required' &&
+         "$policy" == 'configuration-only' ]] || {
+        echo 'ERROR: project-configuration recovery row is invalid.' >&2
+        return 1
+      }
+      project_rows=$((project_rows + 1))
+      continue
+    fi
+
+    [[ -n "${registry_path[$surface]+x}" ]] || {
+      printf 'ERROR: undeclared recovery manifest surface: %s\n' \
+        "$surface" >&2
+      return 1
+    }
+
+    [[ -z "${seen_surface[$surface]+x}" ]] || {
+      printf 'ERROR: duplicate recovery manifest surface: %s\n' \
+        "$surface" >&2
+      return 1
+    }
+
+    expected_path="${registry_path[$surface]}"
+    expected_requirement="${registry_requirement[$surface]}"
+    expected_kind="${registry_kind[$surface]}"
+
+    [[ "$archive_path" == "$expected_path" &&
+       "$requirement" == "$expected_requirement" ]] || {
+      printf 'ERROR: recovery manifest contract mismatch: %s\n' \
+        "$surface" >&2
+      return 1
+    }
+
+    case "$policy" in
+      captured)
+        atlas_backup_recovery_archive_member_present \
+          "$listing" "$archive_path" || {
+            printf 'ERROR: captured recovery surface is absent: %s\n' \
+              "$surface" >&2
+            return 1
+          }
+        captured_paths["$archive_path"]="$expected_kind"
+        ;;
+      absent-optional)
+        [[ "$requirement" == 'optional' ]] || {
+          printf 'ERROR: required recovery surface declared absent: %s\n' \
+            "$surface" >&2
+          return 1
+        }
+        if atlas_backup_recovery_archive_member_present \
+          "$listing" "$archive_path"
+        then
+          printf 'ERROR: optional-absent surface has archived content: %s\n' \
+            "$surface" >&2
+          return 1
+        fi
+        ;;
+      *)
+        printf 'ERROR: invalid recovery capture policy: %s\n' "$policy" >&2
+        return 1
+        ;;
+    esac
+
+    seen_surface["$surface"]=1
+  done <<< "$body"
+
+  [[ "$project_rows" -eq 1 && "$row_count" -eq 12 ]] || {
+    echo 'ERROR: recovery manifest row count is invalid.' >&2
+    return 1
+  }
+
+  for surface in "${!registry_path[@]}"; do
+    [[ -n "${seen_surface[$surface]+x}" ]] || {
+      printf 'ERROR: recovery manifest omitted surface: %s\n' "$surface" >&2
+      return 1
+    }
+  done
+
+  checksums="$(tar -xOzf "$archive" SHA256SUMS 2>/dev/null)" || {
+    echo 'ERROR: recovery archive is missing SHA256SUMS.' >&2
+    return 1
+  }
+
+  while IFS= read -r line; do
+    [[ -n "$line" ]] || continue
+
+    checksum="${line%%  *}"
+    member="${line#*  }"
+
+    [[ "$checksum" =~ ^[0-9a-f]{64}$ &&
+       "$member" != "$line" &&
+       "$member" == state/* &&
+       "$member" != /* &&
+       "/$member/" != *'/../'* ]] || {
+      echo 'ERROR: invalid recovery checksum row.' >&2
+      return 1
+    }
+
+    [[ -z "${checksum_members[$member]+x}" ]] || {
+      printf 'ERROR: duplicate recovery checksum member: %s\n' \
+        "$member" >&2
+      return 1
+    }
+
+    atlas_backup_recovery_archive_member_present "$listing" "$member" || {
+      printf 'ERROR: checksummed recovery member is absent: %s\n' \
+        "$member" >&2
+      return 1
+    }
+
+    matched=false
+    for captured_path in "${!captured_paths[@]}"; do
+      if [[ "$member" == "$captured_path" ||
+            "$member" == "$captured_path/"* ]]
+      then
+        matched=true
+        break
+      fi
+    done
+
+    [[ "$matched" == true ]] || {
+      printf 'ERROR: checksummed state is outside declared surfaces: %s\n' \
+        "$member" >&2
+      return 1
+    }
+
+    actual="$(tar -xOzf "$archive" "$member" 2>/dev/null | sha256sum | awk '{print $1}')" || {
+      printf 'ERROR: unable to verify recovery checksum: %s\n' "$member" >&2
+      return 1
+    }
+
+    [[ "$actual" == "$checksum" ]] || {
+      printf 'ERROR: recovery checksum mismatch: %s\n' "$member" >&2
+      return 1
+    }
+
+    checksum_members["$member"]=1
+    checksum_count=$((checksum_count + 1))
+  done <<< "$checksums"
+
+  [[ "$checksum_count" -gt 0 ]] || {
+    echo 'ERROR: recovery checksum manifest is empty.' >&2
+    return 1
+  }
+
+  while IFS= read -r member; do
+    [[ "$member" == state/* && "$member" != */ ]] || continue
+
+    [[ -n "${checksum_members[$member]+x}" ]] || {
+      printf 'ERROR: archived state file lacks checksum coverage: %s\n' \
+        "$member" >&2
+      return 1
+    }
+  done <<< "$listing"
+
+  for captured_path in "${!captured_paths[@]}"; do
+    if [[ "${captured_paths[$captured_path]}" == 'file' ]]; then
+      [[ -n "${checksum_members[$captured_path]+x}" ]] || {
+        printf 'ERROR: captured recovery file lacks checksum: %s\n' \
+          "$captured_path" >&2
+        return 1
+      }
+    fi
+  done
 }

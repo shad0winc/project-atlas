@@ -178,5 +178,6 @@ def test_backup_command_packages_staged_state_without_claiming_completeness() ->
 
     assert 'atlas_backup_recovery_snapshot_state "$snapshot_root"' in content
     assert '-C "$snapshot_root" \\\n    state' in content
-    assert "Recovery capability: configuration-only" in content
-    assert "configuration-only; not state-complete" in content
+    assert "Recovery state: state-complete" in content
+    assert "Recovery capability: restore-unverified" in content
+    assert "state-complete; restore-unverified" in content

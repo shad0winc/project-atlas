@@ -306,6 +306,7 @@ def test_successful_backup_is_owner_only_and_declares_recovery_metadata(
     assert "BACKUP_INFO.txt" in members
     assert "RECOVERY_FORMAT" in members
     assert "RECOVERY_MANIFEST.tsv" in members
+    assert "SHA256SUMS" in members
 
     recovery_format = subprocess.run(
         ["tar", "-xOzf", str(archive), "RECOVERY_FORMAT"],
@@ -343,13 +344,15 @@ def test_successful_backup_is_owner_only_and_declares_recovery_metadata(
     ).stdout
 
     assert "Recovery format: 1" in backup_info
-    assert "Recovery capability: configuration-only" in backup_info
-    assert "Format 1 (configuration-only; not state-complete)" in result.stdout
+    assert "Recovery state: state-complete" in backup_info
+    assert "Recovery capability: restore-unverified" in backup_info
+    assert "Format 1 (state-complete; restore-unverified)" in result.stdout
 
     for temporary in (
         ".atlas-backup-manifest.tmp",
         ".atlas-backup-recovery-format.tmp",
         ".atlas-backup-recovery-manifest.tmp",
+        ".atlas-backup-recovery-checksums.tmp",
     ):
         assert not (project / temporary).exists()
 

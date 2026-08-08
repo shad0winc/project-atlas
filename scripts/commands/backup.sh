@@ -8,9 +8,9 @@ Usage:
   atlas backup --list
   atlas backup --help
 
-Creates an atomic Project Atlas configuration backup. Recovery metadata in
-M-023.25.2 identifies these archives as configuration-only until authoritative
-runtime-state coverage and restore validation are implemented.
+Creates an atomic Project Atlas backup with consistency-checked authoritative
+state. State completeness and content integrity are validated before publication;
+restore verification remains a separate recovery milestone.
 HELP
 }
 
@@ -117,13 +117,15 @@ atlas_command_backup() {
   local manifest="$ATLAS_PROJECT_DIR/.atlas-backup-manifest.tmp"
   local recovery_format="$ATLAS_PROJECT_DIR/.atlas-backup-recovery-format.tmp"
   local recovery_manifest="$ATLAS_PROJECT_DIR/.atlas-backup-recovery-manifest.tmp"
+  local recovery_checksums="$ATLAS_PROJECT_DIR/.atlas-backup-recovery-checksums.tmp"
   local cleanup_command
 
   printf -v cleanup_command \
-    'rm -f -- %q %q %q %q; rm -rf -- %q; umask %q; trap - RETURN' \
+    'rm -f -- %q %q %q %q %q; rm -rf -- %q; umask %q; trap - RETURN' \
     "$manifest" \
     "$recovery_format" \
     "$recovery_manifest" \
+    "$recovery_checksums" \
     "$partial_file" \
     "$snapshot_root" \
     "$previous_umask"
@@ -137,7 +139,8 @@ Version: $(cat "$ATLAS_PROJECT_DIR/VERSION")
 Branch: $(git -C "$ATLAS_PROJECT_DIR" branch --show-current)
 Commit: $(git -C "$ATLAS_PROJECT_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)
 Recovery format: 1
-Recovery capability: configuration-only
+Recovery state: state-complete
+Recovery capability: restore-unverified
 
 Notes:
 ${notes:-None}
@@ -161,6 +164,12 @@ EOF_MANIFEST
     return 1
   fi
 
+  atlas_backup_recovery_write_snapshot_checksums \
+    "$snapshot_root" "$recovery_checksums" || {
+      echo 'ERROR: recovery-state checksum generation failed.' >&2
+      return 1
+    }
+
   echo 'Creating Atlas backup...'
   echo
 
@@ -183,6 +192,7 @@ EOF_MANIFEST
     --transform='s|\.atlas-backup-manifest\.tmp|BACKUP_INFO.txt|' \
     --transform='s|\.atlas-backup-recovery-format\.tmp|RECOVERY_FORMAT|' \
     --transform='s|\.atlas-backup-recovery-manifest\.tmp|RECOVERY_MANIFEST.tsv|' \
+    --transform='s|\.atlas-backup-recovery-checksums\.tmp|SHA256SUMS|' \
     -czf "$partial_file" \
     -C "$ATLAS_PROJECT_DIR" \
     docker-compose.yml \
@@ -199,6 +209,7 @@ EOF_MANIFEST
     .atlas-backup-manifest.tmp \
     .atlas-backup-recovery-format.tmp \
     .atlas-backup-recovery-manifest.tmp \
+    .atlas-backup-recovery-checksums.tmp \
     -C "$snapshot_root" \
     state
   then
@@ -216,21 +227,10 @@ EOF_MANIFEST
     return 1
   fi
 
-  [[ "$(tar -xOzf "$partial_file" RECOVERY_FORMAT)" == '1' ]] || {
-    echo 'ERROR: backup recovery-format validation failed.' >&2
+  if ! atlas_backup_recovery_validate_archive "$partial_file"; then
+    echo 'ERROR: state-complete recovery archive validation failed.' >&2
     return 1
-  }
-
-  tar -xOzf "$partial_file" RECOVERY_MANIFEST.tsv >/dev/null 2>&1 || {
-    echo 'ERROR: backup recovery-manifest validation failed.' >&2
-    return 1
-  }
-
-  tar -tzf "$partial_file" 2>/dev/null |
-    grep -qE '^state(/|$)' || {
-      echo 'ERROR: backup recovery-state payload validation failed.' >&2
-      return 1
-    }
+  fi
 
   if ! mv -- "$partial_file" "$backup_file"; then
     echo 'ERROR: backup publication failed; partial artifact removed.' >&2
@@ -252,7 +252,7 @@ EOF_MANIFEST
   echo "  $(du -h "$backup_file" | awk '{print $1}')"
   echo
   echo 'Recovery:'
-  echo '  Format 1 (configuration-only; not state-complete)'
+  echo '  Format 1 (state-complete; restore-unverified)'
   echo
   echo 'Retention:'
   echo '  Keeping newest 10 backups'
