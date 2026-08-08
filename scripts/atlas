@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_DIR="/opt/project-atlas"
+PROJECT_DIR="${ATLAS_PROJECT_DIR:-/opt/project-atlas}"
 ATLAS_CONFIG_FILE="$PROJECT_DIR/config/atlas.conf"
 ATLAS_MODULE_CONFIG_FILE="$PROJECT_DIR/config/modules/modules.conf"
 ATLAS_CLI_ROOT="$PROJECT_DIR/scripts"

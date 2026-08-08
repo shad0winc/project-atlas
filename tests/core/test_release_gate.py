@@ -91,3 +91,77 @@ def test_procedure_preserves_legacy_v1_tag_blocker() -> None:
 
     assert "historical `v1.0.0` tag remains a separate release blocker" in content
     assert "does not reinterpret, move, delete" in content
+
+
+# M-023.24.5 clean-runner portability contracts
+
+
+def test_atlas_cli_supports_explicit_project_root() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    content = (root / "scripts" / "atlas").read_text(
+        encoding="utf-8",
+    )
+
+    assert (
+        'PROJECT_DIR="${ATLAS_PROJECT_DIR:-/opt/project-atlas}"'
+        in content
+    )
+
+
+def test_release_gate_core_uses_checkout_project_root() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    content = (
+        root / ".github" / "workflows" / "release-gate.yml"
+    ).read_text(encoding="utf-8")
+
+    core = content.split("  core:\n", 1)[1].split(
+        "  api:\n",
+        1,
+    )[0]
+
+    assert "ATLAS_PROJECT_DIR: ${{ github.workspace }}" in core
+
+
+def test_release_gate_sports_matches_python_runtime() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    content = (
+        root / ".github" / "workflows" / "release-gate.yml"
+    ).read_text(encoding="utf-8")
+
+    sports = content.split("  sports:\n", 1)[1].split(
+        "  portal:\n",
+        1,
+    )[0]
+
+    assert "python-version: '3.13'" in sports
+
+
+def test_release_gate_installs_sports_ffmpeg_dependency() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+
+    workflow = (
+        root / ".github" / "workflows" / "release-gate.yml"
+    ).read_text(encoding="utf-8")
+
+    dockerfile = (
+        root / "modules" / "sports" / "Dockerfile"
+    ).read_text(encoding="utf-8")
+
+    sports = workflow.split("  sports:\n", 1)[1].split(
+        "  portal:\n",
+        1,
+    )[0]
+
+    assert "ffmpeg" in dockerfile
+    assert (
+        "sudo apt-get install -y --no-install-recommends ffmpeg"
+        in sports
+    )
