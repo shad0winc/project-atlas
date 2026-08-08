@@ -6,6 +6,7 @@ Usage:
   atlas restore inspect <archive>
   atlas restore verify <archive>
   atlas restore stage <archive>
+  atlas restore validate-stage <staging-root>
   atlas restore --help
 
 Recovery inspection and verification are read-only. `stage` validates archive
@@ -119,6 +120,53 @@ atlas_restore_stage() {
   echo 'Atlas Restore Staging: PASS'
 }
 
+atlas_restore_validate_stage() {
+  local requested="$1"
+  local root before after
+
+  [[ -n "$requested" ]] || {
+    echo 'ERROR: isolated staging root is required.' >&2
+    return 2
+  }
+
+  root="$(realpath -e -- "$requested" 2>/dev/null)" || {
+    echo 'ERROR: isolated staging root is unavailable.' >&2
+    return 1
+  }
+
+  [[ "$root" == "$requested" &&
+     "$root" == /tmp/project-atlas-restore.* &&
+     -d "$root" && ! -L "$root" ]] || {
+    echo 'ERROR: validate-stage requires an isolated /tmp staging root.' >&2
+    return 1
+  }
+
+  atlas_restore_load_recovery_library
+  atlas_backup_recovery_validate_staged_restore "$root" || return 1
+
+  before="$(atlas_backup_recovery_staged_state_digest "$root")" || return 1
+
+  echo 'Atlas Staged Restore Consumer Validation'
+  echo
+  atlas_backup_recovery_validate_staged_consumers "$root" || {
+    echo 'Atlas Staged Restore Consumer Validation: FAIL' >&2
+    return 1
+  }
+
+  after="$(atlas_backup_recovery_staged_state_digest "$root")" || return 1
+  [[ "$before" == "$after" ]] || {
+    echo 'ERROR: consumer validation mutated staged recovery state.' >&2
+    return 1
+  }
+
+  atlas_backup_recovery_validate_staged_restore "$root" || return 1
+
+  echo
+  echo 'Staged state mutation: none'
+  echo 'Live state mutation: none'
+  echo 'Atlas Staged Restore Consumer Validation: PASS'
+}
+
 atlas_restore_load_recovery_library() {
   local recovery_library
 
@@ -162,6 +210,14 @@ atlas_command_restore() {
         return 2
       }
       atlas_restore_stage "$2"
+      ;;
+    validate-stage)
+      [[ "$#" -eq 2 ]] || {
+        echo 'ERROR: restore validate-stage requires exactly one staging root.' >&2
+        atlas_restore_usage >&2
+        return 2
+      }
+      atlas_restore_validate_stage "$2"
       ;;
     --help|-h|help)
       [[ "$#" -eq 1 ]] || {

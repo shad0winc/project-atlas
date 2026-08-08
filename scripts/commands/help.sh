@@ -96,6 +96,7 @@ Maintenance
   atlas restore inspect <archive>
   atlas restore verify <archive>
   atlas restore stage <archive>
+  atlas restore validate-stage <staging-root>
   atlas restart
   atlas logs <container>
 

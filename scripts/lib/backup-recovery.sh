@@ -1017,3 +1017,54 @@ atlas_backup_recovery_stage_archive() {
 
   printf '%s\n' "$stage"
 }
+
+# M-023.25.6 consumer-level staged-state validation.
+
+atlas_backup_recovery_staged_state_digest() {
+  local root="$1"
+
+  python3 - "$root" <<'PY_STAGED_DIGEST'
+import hashlib
+import os
+import stat
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1]) / "state"
+if not root.is_dir() or root.is_symlink():
+    raise SystemExit("ERROR: staged state directory is unavailable")
+
+digest = hashlib.sha256()
+for path in sorted(root.rglob("*"), key=lambda item: item.as_posix()):
+    relative = path.relative_to(root).as_posix()
+    info = path.lstat()
+    if stat.S_ISLNK(info.st_mode):
+        raise SystemExit(f"ERROR: staged state contains symbolic link: {relative}")
+    if stat.S_ISDIR(info.st_mode):
+        row = f"directory\t{relative}\t{stat.S_IMODE(info.st_mode):o}\n".encode()
+        digest.update(row)
+        continue
+    if stat.S_ISREG(info.st_mode):
+        row = f"file\t{relative}\t{stat.S_IMODE(info.st_mode):o}\t{info.st_size}\t".encode()
+        digest.update(row)
+        digest.update(hashlib.sha256(path.read_bytes()).hexdigest().encode())
+        digest.update(b"\n")
+        continue
+    raise SystemExit(f"ERROR: unsupported staged state entry: {relative}")
+print(digest.hexdigest())
+PY_STAGED_DIGEST
+}
+
+atlas_backup_recovery_validate_staged_consumers() {
+  local root="$1"
+  local project_root="${ATLAS_PROJECT_DIR:-/opt/project-atlas}"
+  local validator
+
+  validator="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/validate-recovery-state.py"
+  [[ -f "$validator" && ! -L "$validator" ]] || {
+    echo 'ERROR: staged recovery consumer validator is unavailable.' >&2
+    return 1
+  }
+
+  python3 "$validator" "$root" "$project_root"
+}
