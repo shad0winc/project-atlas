@@ -128,6 +128,7 @@ def get_authentication_service() -> AuthenticationService:
         get_jwt_service(),
         refresh_sessions=get_refresh_session_registry(),
         login_attempts=get_login_attempt_limiter(),
+        audit_publisher=get_security_audit_writer().publish,
     )
 
 

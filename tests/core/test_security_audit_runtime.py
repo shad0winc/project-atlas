@@ -43,3 +43,4 @@ def test_security_audit_writer_is_composed_as_process_dependency() -> None:
 
     assert "def get_security_audit_writer():" in content
     assert "SecurityAuditWriter.from_environment()" in content
+    assert "audit_publisher=get_security_audit_writer().publish" in content
