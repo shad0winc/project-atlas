@@ -29,6 +29,7 @@ from atlas_api.auth.provider import (
     JellyfinAuthenticationProvider,
 )
 from atlas_api.auth.service import AuthenticationService
+from atlas_api.auth.sessions import RefreshSessionRegistry
 from atlas_api.core.settings import AtlasAPISettings
 from atlas_api.services import (
     DashboardMediaSummaryService,
@@ -90,6 +91,13 @@ def get_jellyfin_authentication_client() -> JellyfinAuthenticationClient:
 
 
 @lru_cache(maxsize=1)
+def get_refresh_session_registry() -> RefreshSessionRegistry:
+    """Return process-local single-use refresh-session state."""
+
+    return RefreshSessionRegistry()
+
+
+@lru_cache(maxsize=1)
 def get_authentication_service() -> AuthenticationService:
     """Return the fully composed Atlas authentication service."""
 
@@ -101,6 +109,7 @@ def get_authentication_service() -> AuthenticationService:
     return AuthenticationService(
         provider,
         get_jwt_service(),
+        get_refresh_session_registry(),
     )
 
 

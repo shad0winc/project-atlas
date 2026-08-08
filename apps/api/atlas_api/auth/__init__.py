@@ -18,6 +18,7 @@ from .models import (
     TokenType,
 )
 from .service import AuthenticationProvider, AuthenticationService
+from .sessions import RefreshSessionRegistry
 
 __all__ = [
     "AuthenticatedUser",
@@ -30,6 +31,7 @@ __all__ = [
     "InvalidTokenError",
     "JWTService",
     "PasswordHasher",
+    "RefreshSessionRegistry",
     "TokenClaims",
     "TokenError",
     "TokenPair",

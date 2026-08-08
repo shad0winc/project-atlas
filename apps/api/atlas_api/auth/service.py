@@ -10,6 +10,7 @@ from atlas_api.auth.models import (
     TokenType,
 )
 from atlas_api.auth.provider import AuthenticationProvider
+from atlas_api.auth.sessions import RefreshSessionRegistry
 
 
 class AuthenticationService:
@@ -19,9 +20,15 @@ class AuthenticationService:
         self,
         provider: AuthenticationProvider,
         jwt_service: JWTService,
+        refresh_sessions: RefreshSessionRegistry | None = None,
     ) -> None:
         self._provider = provider
         self._jwt_service = jwt_service
+        self._refresh_sessions = (
+            refresh_sessions
+            if refresh_sessions is not None
+            else RefreshSessionRegistry()
+        )
 
     def login(self, username: str, password: str) -> TokenPair:
         """Authenticate credentials and issue an Atlas token pair."""
@@ -43,10 +50,7 @@ class AuthenticationService:
                 "Username or password is incorrect."
             )
 
-        return TokenPair(
-            access_token=self._jwt_service.create_access_token(user),
-            refresh_token=self._jwt_service.create_refresh_token(user),
-        )
+        return self._issue_token_pair(user)
 
     def refresh(
         self,
@@ -65,7 +69,46 @@ class AuthenticationService:
                 "Refresh token does not belong to this user."
             )
 
+        if not self._refresh_sessions.consume(claims):
+            raise InvalidCredentialsError(
+                "Refresh token is no longer active."
+            )
+
+        return self._issue_token_pair(user)
+
+    def logout(
+        self,
+        refresh_token: str,
+        user: AuthenticatedUser,
+    ) -> None:
+        """Revoke a structurally valid refresh session if active."""
+
+        claims = self._jwt_service.decode_token(
+            refresh_token,
+            expected_type=TokenType.REFRESH,
+        )
+
+        if claims.subject != user.user_id:
+            raise InvalidCredentialsError(
+                "Refresh token does not belong to this user."
+            )
+
+        self._refresh_sessions.revoke(claims)
+
+    def _issue_token_pair(
+        self,
+        user: AuthenticatedUser,
+    ) -> TokenPair:
+        access_token = self._jwt_service.create_access_token(user)
+        refresh_token = self._jwt_service.create_refresh_token(user)
+        refresh_claims = self._jwt_service.decode_token(
+            refresh_token,
+            expected_type=TokenType.REFRESH,
+        )
+
+        self._refresh_sessions.register(refresh_claims)
+
         return TokenPair(
-            access_token=self._jwt_service.create_access_token(user),
-            refresh_token=self._jwt_service.create_refresh_token(user),
+            access_token=access_token,
+            refresh_token=refresh_token,
         )

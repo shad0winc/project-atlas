@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from atlas_api.auth.exceptions import (
     AuthenticationProviderError,
@@ -113,6 +113,41 @@ def refresh_tokens(
         refresh_token=tokens.refresh_token,
         token_type=tokens.token_type,
     )
+
+
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Revoke an Atlas refresh session",
+)
+def logout(
+    request: RefreshRequest,
+    authentication: AuthenticationService = Depends(
+        get_authentication_service
+    ),
+    jwt_service: JWTService = Depends(get_jwt_service),
+    profiles=Depends(get_user_profile_store),
+) -> Response:
+    """Revoke the supplied refresh session without exposing its state."""
+
+    try:
+        user = resolve_refresh_user(
+            request.refresh_token,
+            jwt_service=jwt_service,
+            profiles=profiles,
+        )
+        authentication.logout(
+            request.refresh_token,
+            user,
+        )
+    except (InvalidCredentialsError, TokenError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token is invalid or expired.",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from error
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(
