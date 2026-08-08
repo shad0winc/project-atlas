@@ -29,6 +29,14 @@ class RegistrationPortal:
         path = str(environ.get("PATH_INFO", "/"))
         if path == "/health" and method == "GET":
             return self._respond(start_response, "200 OK", b"healthy\n", "text/plain; charset=utf-8")
+        if path == "/registration-token.js" and method == "GET":
+            body = (_TEMPLATE_DIR / "registration-token.js").read_bytes()
+            return self._respond(
+                start_response,
+                "200 OK",
+                body,
+                "application/javascript; charset=utf-8",
+            )
         if path != "/register":
             return self._page(start_response, "404 Not Found", "error.html", title="Not found", message="The requested page was not found.")
         if method == "GET":
@@ -38,20 +46,28 @@ class RegistrationPortal:
         return self._page(start_response, "405 Method Not Allowed", "error.html", title="Method not allowed", message="This request method is not supported.", extra_headers=[("Allow", "GET, POST")])
 
     def _get_register(self, environ: Mapping[str, Any], start_response: StartResponse) -> Iterable[bytes]:
-        token = _single(parse_qs(str(environ.get("QUERY_STRING", ""))), "token")
-        if not token:
-            return self._page(start_response, "400 Bad Request", "error.html", title="Invalid invitation", message="This invitation link is missing its token.")
-        try:
-            invitation = self.invitations.verify_token(token)
-        except InvitationError as exc:
-            return self._page(start_response, "410 Gone", "error.html", title="Invitation unavailable", message=str(exc))
+        query_token = _single(
+            parse_qs(str(environ.get("QUERY_STRING", ""))),
+            "token",
+        )
+        if query_token:
+            return self._page(
+                start_response,
+                "400 Bad Request",
+                "error.html",
+                title="Unsafe invitation link",
+                message=(
+                    "Invitation credentials must not be supplied in the query string. "
+                    "Request a new invitation link."
+                ),
+            )
         return self._page(
             start_response,
             "200 OK",
             "register.html",
-            token=token,
-            email=invitation.get("email") or "Not specified",
-            role=invitation["role"],
+            token="",
+            email="Not specified",
+            role="user",
             username="",
             display_name="",
             error="",
@@ -109,7 +125,7 @@ class RegistrationPortal:
             ("X-Content-Type-Options", "nosniff"),
             ("X-Frame-Options", "DENY"),
             ("Referrer-Policy", "no-referrer"),
-            ("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'"),
+            ("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'"),
         ]
         headers.extend(extra_headers or [])
         start_response(status, headers)

@@ -31,7 +31,8 @@ class InvitationCliTests(unittest.TestCase):
         self.assertEqual((code, error), (0, ""))
         result = json.loads(output)
         self.assertEqual(result["email"], "friend@example.com")
-        self.assertIn("/register?token=atlas_inv_", result["registration_url"])
+        self.assertIn("/register#token=atlas_inv_", result["registration_url"])
+        self.assertNotIn("?token=", result["registration_url"])
         persisted = (self.identity / "invitations" / "active" / f"{result['invite_id']}.json").read_text()
         self.assertNotIn(result["token"], persisted)
 

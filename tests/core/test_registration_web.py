@@ -52,20 +52,38 @@ class RegistrationWebTests(unittest.TestCase):
         body = b"".join(app(environ, start)).decode()
         return captured, body
 
-    def test_get_valid_invitation_renders_form_without_exposing_hash(self):
+    def test_get_registration_form_never_receives_or_reflects_fragment_token(self):
         app = RegistrationPortal(self.invitations, FakeRegistrationService())
-        response, body = self.request(app, "GET", "/register", query="token=" + self.issue.token)
+        response, body = self.request(app, "GET", "/register")
         self.assertEqual("200 OK", response["status"])
-        self.assertIn("friend@example.com", body)
-        self.assertIn(self.issue.token, body)
+        self.assertNotIn(self.issue.token, body)
         self.assertNotIn(self.issue.invitation["token_hash"], body)
+        self.assertIn('name="token" value=""', body)
+        self.assertIn('src="/registration-token.js"', body)
         self.assertEqual("no-store", response["headers"]["Cache-Control"])
+        self.assertEqual("no-referrer", response["headers"]["Referrer-Policy"])
 
-    def test_invalid_invitation_returns_friendly_gone_page(self):
+    def test_query_string_invitation_credential_is_rejected_without_reflection(self):
         app = RegistrationPortal(self.invitations, FakeRegistrationService())
-        response, body = self.request(app, "GET", "/register", query="token=bad")
-        self.assertEqual("410 Gone", response["status"])
-        self.assertIn("invalid invitation token", body)
+        response, body = self.request(
+            app,
+            "GET",
+            "/register",
+            query="token=" + self.issue.token,
+        )
+        self.assertEqual("400 Bad Request", response["status"])
+        self.assertNotIn(self.issue.token, body)
+        self.assertIn("must not be supplied in the query string", body)
+
+    def test_fragment_bootstrap_script_moves_credential_to_post_field_and_cleans_history(self):
+        app = RegistrationPortal(self.invitations, FakeRegistrationService())
+        response, body = self.request(app, "GET", "/registration-token.js")
+        self.assertEqual("200 OK", response["status"])
+        self.assertIn("window.location.hash", body)
+        self.assertIn('fragment.get("token")', body)
+        self.assertIn("tokenInput.value = fragmentToken", body)
+        self.assertIn("window.history.replaceState", body)
+        self.assertNotIn("fetch(", body)
 
     def test_password_mismatch_does_not_call_registration_service(self):
         service = FakeRegistrationService()
