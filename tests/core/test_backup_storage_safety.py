@@ -33,6 +33,7 @@ def _make_project(tmp_path: Path) -> tuple[Path, Path]:
     for name, content in files.items():
         (project / name).write_text(content, encoding="utf-8")
 
+    _write_recovery_state(project)
     return project, backups
 
 
@@ -58,6 +59,8 @@ atlas_command_backup "$@"
             "BACKUP_COMMAND": str(BACKUP_COMMAND),
         }
     )
+
+    environment.update(_recovery_environment(project))
 
     if path_prefix is not None:
         environment["PATH"] = f"{path_prefix}:{environment['PATH']}"
@@ -213,6 +216,8 @@ atlas_command_backup "$@"
         }
     )
 
+    environment.update(_recovery_environment(project))
+
     return subprocess.run(
         ["bash", "-c", command, "atlas-backup-test", *arguments],
         cwd=PROJECT_ROOT,
@@ -347,3 +352,40 @@ def test_successful_backup_is_owner_only_and_declares_recovery_metadata(
         ".atlas-backup-recovery-manifest.tmp",
     ):
         assert not (project / temporary).exists()
+
+
+# M-023.25.3.2 state-snapshot fixtures
+
+def _recovery_environment(project: Path) -> dict[str, str]:
+    state = project / "recovery-state"
+    runtime = state / "atlas"
+    return {
+        "ATLAS_CONFIG_ROOT": str(state),
+        "ATLAS_RUNTIME_CONFIG_DIR": str(runtime),
+        "ATLAS_USERS_DIR": str(runtime / "users"),
+        "ATLAS_IDENTITY_DIR": str(runtime / "identity"),
+        "ATLAS_REQUESTS_DIR": str(runtime / "requests"),
+        "ATLAS_SCHEDULER_STATE_FILE": str(runtime / "scheduler" / "tasks.json"),
+        "ATLAS_ARI_DIR": str(runtime / "ari"),
+        "SPORTS_CONFIG_DIR": str(state / "sportyfin"),
+    }
+
+
+def _write_recovery_state(project: Path) -> None:
+    env = _recovery_environment(project)
+
+    files = {
+        Path(env["ATLAS_USERS_DIR"]) / "users.json": '{"users": []}\n',
+        Path(env["ATLAS_IDENTITY_DIR"]) / "favorites" / "favorites.json": '{}\n',
+        Path(env["ATLAS_SCHEDULER_STATE_FILE"]): '{"tasks": []}\n',
+        Path(env["ATLAS_RUNTIME_CONFIG_DIR"]) / "runtime" / "events.jsonl": "",
+        Path(env["ATLAS_RUNTIME_CONFIG_DIR"]) / "runtime" / "subscribers" / "test.cursor": "0\n",
+        Path(env["ATLAS_ARI_DIR"]) / "state.json": '{}\n',
+        Path(env["SPORTS_CONFIG_DIR"]) / "state" / "subscriptions.json": '[]\n',
+        Path(env["SPORTS_CONFIG_DIR"]) / "recordings" / "recordings.json": '[]\n',
+        Path(env["ATLAS_RUNTIME_CONFIG_DIR"]) / "runtime" / "scheduler" / "sports.json": '{}\n',
+    }
+
+    for state_path, state_content in files.items():
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_path.write_text(state_content, encoding="utf-8")

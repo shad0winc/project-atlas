@@ -79,6 +79,15 @@ atlas_command_backup() {
       ;;
   esac
 
+  # Resolve and validate the canonical recovery-state registry before any
+  # backup artifact is created.
+  local recovery_library
+  recovery_library="$(
+    cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd
+  )/lib/backup-recovery.sh"
+  source "$recovery_library"
+  atlas_backup_recovery_validate_registry || return 1
+
   # Recovery archives can contain identity/configuration information. Protect
   # every subsequently created temporary/final artifact from group/other read.
   local previous_umask
@@ -86,6 +95,19 @@ atlas_command_backup() {
   umask 077
 
   mkdir -p "$backup_dir"
+
+  local snapshot_root
+  snapshot_root="$(
+    mktemp -d "$backup_dir/.atlas-state-snapshot.XXXXXX"
+  )" || {
+    echo 'ERROR: unable to create private recovery snapshot directory.' >&2
+    return 1
+  }
+  chmod 0700 "$snapshot_root" || {
+    rm -rf -- "$snapshot_root"
+    echo 'ERROR: unable to protect recovery snapshot directory.' >&2
+    return 1
+  }
 
   local timestamp
   timestamp="$(date +%Y%m%d-%H%M%S-%3N)"
@@ -98,11 +120,12 @@ atlas_command_backup() {
   local cleanup_command
 
   printf -v cleanup_command \
-    'rm -f -- %q %q %q %q; umask %q; trap - RETURN' \
+    'rm -f -- %q %q %q %q; rm -rf -- %q; umask %q; trap - RETURN' \
     "$manifest" \
     "$recovery_format" \
     "$recovery_manifest" \
     "$partial_file" \
+    "$snapshot_root" \
     "$previous_umask"
   trap "$cleanup_command" RETURN
 
@@ -129,6 +152,14 @@ EOF_MANIFEST
   printf '%s\t%s\t%s\t%s\n' \
     'project-configuration' '.' 'required' 'configuration-only' \
     >> "$recovery_manifest"
+
+  echo 'Capturing authoritative recovery state...'
+  if ! atlas_backup_recovery_snapshot_state "$snapshot_root" \
+    >> "$recovery_manifest"
+  then
+    echo 'ERROR: authoritative recovery-state snapshot failed.' >&2
+    return 1
+  fi
 
   echo 'Creating Atlas backup...'
   echo
@@ -167,7 +198,9 @@ EOF_MANIFEST
     scripts \
     .atlas-backup-manifest.tmp \
     .atlas-backup-recovery-format.tmp \
-    .atlas-backup-recovery-manifest.tmp
+    .atlas-backup-recovery-manifest.tmp \
+    -C "$snapshot_root" \
+    state
   then
     echo 'ERROR: backup archive creation failed; partial artifact removed.' >&2
     return 1
@@ -192,6 +225,12 @@ EOF_MANIFEST
     echo 'ERROR: backup recovery-manifest validation failed.' >&2
     return 1
   }
+
+  tar -tzf "$partial_file" 2>/dev/null |
+    grep -qE '^state(/|$)' || {
+      echo 'ERROR: backup recovery-state payload validation failed.' >&2
+      return 1
+    }
 
   if ! mv -- "$partial_file" "$backup_file"; then
     echo 'ERROR: backup publication failed; partial artifact removed.' >&2
