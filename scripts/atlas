@@ -148,7 +148,7 @@ case "$command" in
     ;;
 
   update)
-    atlas_command_update
+    atlas_command_update "${@:2}"
     ;;
 
   maintenance)

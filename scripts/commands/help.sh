@@ -85,7 +85,7 @@ Maintenance
 -----------
   atlas verify
   atlas doctor
-  atlas update
+  atlas update [core|ingress|all]
   atlas maintenance status
   atlas maintenance enable
   atlas maintenance disable
