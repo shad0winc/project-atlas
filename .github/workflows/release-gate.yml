@@ -59,10 +59,6 @@ jobs:
     name: Sports
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      SPORTS_MEDIA_DIR: ${{ runner.temp }}/atlas-sports/media
-      SPORTS_RECORDING_LOG_DIR: ${{ runner.temp }}/atlas-sports/logs
-      SPORTS_RECORDINGS_FILE: ${{ runner.temp }}/atlas-sports/recordings/recordings.json
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -75,6 +71,10 @@ jobs:
       - name: Compile Sports
         run: python -m compileall -q modules/sports/src modules/sports/tests
       - name: Run Sports integration suite
+        env:
+          SPORTS_MEDIA_DIR: ${{ runner.temp }}/atlas-sports/media
+          SPORTS_RECORDING_LOG_DIR: ${{ runner.temp }}/atlas-sports/logs
+          SPORTS_RECORDINGS_FILE: ${{ runner.temp }}/atlas-sports/recordings/recordings.json
         run: python modules/sports/tests/run_tests.py
 
   portal:

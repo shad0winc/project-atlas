@@ -212,3 +212,48 @@ def test_release_gate_sports_uses_isolated_runner_storage() -> None:
         "${{ runner.temp }}/atlas-sports/recordings/recordings.json"
         in sports
     )
+
+
+# M-023.24.5 runner-context placement contract
+
+
+def test_runner_context_is_scoped_to_sports_execution_step() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    content = (
+        root / ".github" / "workflows" / "release-gate.yml"
+    ).read_text(encoding="utf-8")
+
+    sports = content.split("  sports:\n", 1)[1].split(
+        "  portal:\n",
+        1,
+    )[0]
+
+    job_header = sports.split(
+        "      - uses:",
+        1,
+    )[0]
+
+    assert "${{ runner.temp }}" not in job_header
+
+    execution = sports.split(
+        "      - name: Run Sports integration suite\n",
+        1,
+    )[1]
+
+    assert (
+        "SPORTS_MEDIA_DIR: "
+        "${{ runner.temp }}/atlas-sports/media"
+        in execution
+    )
+    assert (
+        "SPORTS_RECORDING_LOG_DIR: "
+        "${{ runner.temp }}/atlas-sports/logs"
+        in execution
+    )
+    assert (
+        "SPORTS_RECORDINGS_FILE: "
+        "${{ runner.temp }}/atlas-sports/recordings/recordings.json"
+        in execution
+    )
