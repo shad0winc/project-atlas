@@ -180,13 +180,23 @@ def _validate_runtime(runtime_root: Path) -> str:
 
 
 def _validate_retention(root: Path) -> str:
+    from atlas.ari.analytics import ARIAnalytics
     from atlas.ari.service import ARIService
 
     service = ARIService(root)
-    snapshots = service.list_snapshots()
-    for snapshot in snapshots:
-        service.load(snapshot)
-    return f"{len(snapshots)} ARI reports"
+
+    # The current report is authoritative when present and must satisfy the
+    # current ARI model. Historical reports intentionally use the analytics
+    # compatibility boundary, which records old/incompatible snapshots as
+    # skipped instead of treating preserved history as current-state damage.
+    if service.latest_path().is_file():
+        service.latest()
+
+    history = ARIAnalytics(service).load_history()
+    return (
+        f"{len(history.reports)} compatible reports, "
+        f"{len(history.skipped)} legacy/incompatible skipped"
+    )
 
 
 def _load_sports_modules(project_root: Path, subscriptions: Path, recordings: Path):
@@ -260,7 +270,9 @@ def main() -> int:
     sys.path.insert(0, str(project_root))
     try:
         results = validate(root, project_root)
-    except (RecoveryStateValidationError, OSError, ValueError, TypeError) as exc:
+    except Exception as exc:
+        # Validation is a fail-closed CLI boundary. Consumer-specific errors
+        # are reported uniformly rather than escaping as Python tracebacks.
         print(f"ERROR: staged recovery consumer validation failed: {exc}", file=sys.stderr)
         return 1
     for surface, status, detail in results:

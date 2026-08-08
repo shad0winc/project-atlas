@@ -174,3 +174,30 @@ atlas_command_restore validate-stage {str(tmp_path)!r}
     )
     assert result.returncode != 0
     assert "isolated /tmp staging root" in result.stderr
+
+
+def test_consumer_validation_preserves_legacy_ari_history(tmp_path: Path) -> None:
+    root = _staged_root(tmp_path)
+    history = root / "state/retention/snapshots/legacy.json"
+    history.parent.mkdir(parents=True)
+    history.write_text('{"legacy": true}\n', encoding="utf-8")
+    before = _snapshot(root)
+
+    result = _validate(root)
+
+    assert result.returncode == 0, result.stderr
+    assert "PASS retention" in result.stdout
+    assert "1 legacy/incompatible skipped" in result.stdout
+    assert _snapshot(root) == before
+
+
+def test_consumer_validation_rejects_invalid_current_ari_state(tmp_path: Path) -> None:
+    root = _staged_root(tmp_path)
+    latest = root / "state/retention/latest.json"
+    latest.write_text('{"legacy": true}\n', encoding="utf-8")
+
+    result = _validate(root)
+
+    assert result.returncode != 0
+    assert "staged recovery consumer validation failed" in result.stderr
+    assert "Traceback" not in result.stderr
