@@ -259,23 +259,36 @@ Deployment Safety uses two complementary gates:
 The local deployment gate is required even when CI exists because production
 must verify what it is actually about to deploy.
 
-## Existing `atlas update` Reconciliation
+## Implemented `atlas update` Transaction
 
-The current command is not the final v1.0 deployment transaction.
+The canonical `atlas update <core|ingress|all> --migration none` path now
+implements the v1.0 deployment transaction. It requires clean synchronized
+`main`, an existing verified production baseline, exact runtime identity, an
+exclusive deployment lock, an explicit no-migration declaration, maintenance
+mode, and a validated pre-update Atlas backup before service mutation.
 
-Its useful pieces are retained:
+Before pull or build operations, every image in the previous verified baseline
+receives a transaction-scoped `atlas-rollback:` reference. Atlas verifies that
+each recovery reference resolves to the exact captured image ID. This prevents
+a local Portal or API rebuild from making the prior image unreachable merely
+because `atlas-portal:local` or `atlas-api:local` moved to a new image.
 
-- pre-change Doctor;
-- Compose pull/recreate;
-- post-change Doctor; and
-- post-change Verify.
+Post-change verification is intentionally two-phase:
 
-It must be reconciled to add locking, maintenance, pre-update backup, rollback
-capture, tested-source gating, affected ingress validation, and explicit failure
-state. Immediate unused-image pruning moves outside the rollback window.
+1. while maintenance is enabled, Atlas verifies container/resource contracts,
+   Caddy configuration and liveness, direct Portal/API backend health, and
+   HTTP 503 isolation on both public application paths; and
+2. after maintenance is disabled, Atlas repeats the affected verification
+   against normal public ingress before publishing the candidate deployment as
+   the current verified baseline.
 
-The standalone `scripts/update.sh` must not remain a weaker alternate path that
-bypasses the canonical deployment safety contract.
+If the second phase fails, maintenance is re-enabled, the deployment remains
+failed, the previous verified baseline remains current, and the deployment lock
+remains held for explicit recovery.
+
+The standalone `scripts/update.sh` delegates to the canonical Atlas CLI and no
+longer provides a weaker alternate deployment path. Update paths do not prune
+rollback images.
 
 ## Validation Strategy
 
@@ -307,3 +320,44 @@ M-023.24 is complete only when:
 - the premature `v1.0.0` tag is tracked as an unresolved release blocker until
   explicitly reconciled; and
 - controlled production validation confirms the deployed contract.
+
+## Implementation Status
+
+M-023.24 is complete.
+
+The first controlled production `atlas update all --migration none` exercise
+proved the transaction's fail-closed behavior and exposed two recovery defects
+that deterministic pre-production tests had not revealed. The update reached a
+healthy new runtime but correctly stayed in maintenance because the public
+ingress verifier interpreted the intentional maintenance HTTP 503 response as
+an application failure. The subsequent rollback attempt then refused before
+mutation because the exact pre-update locally built API image was no longer
+available after its mutable `:local` tag moved.
+
+Atlas did not reinterpret either failure as success. The failed transaction
+remained recorded, maintenance and the deployment lock remained held, and the
+previous verified baseline remained authoritative. After read-only diagnosis,
+an explicitly controlled forward recovery verified the healthy runtime,
+reopened ingress, established verified baseline
+`baseline-20260808T033011Z-2093776`, released the lock, and retained the failed
+transaction as audit evidence.
+
+Repair commit `83ff0641` made ingress verification maintenance-aware, added the
+second public verification boundary, and preserved exact pre-update images with
+durable rollback references. Validation then established:
+
+- 35 focused deployment-recovery tests passed;
+- the complete Core regression passed 2,878 tests plus 104 subtests;
+- normal production ingress passed 24 of 24 checks before maintenance;
+- live maintenance-mode verification passed 27 of 27 checks, including healthy
+  Portal/API backends and exact HTTP 503 public isolation;
+- reopened public ingress passed 24 of 24 checks;
+- all 19 images in the verified production baseline were retained by exact ID
+  through temporary rollback references; and
+- validation removed its temporary tags and left the verified baseline,
+  failed-transaction audit record, repository, maintenance state, and lock
+  invariants clean.
+
+The historical premature `v1.0.0` tag remains intentionally untouched and is
+still an explicit release-certification blocker. Its reconciliation belongs to
+final v1.0 release work, not Deployment Safety.

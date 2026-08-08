@@ -42,19 +42,29 @@ check rather than coupling repository policy to every individual job name.
 Repository configuration is an external production control and is not proven
 merely because a workflow file exists.
 
-Before M-023.24 can be completed, repository hosting must be inspected and the
-following rules enabled for `main` and the `release/**` release surface where
-supported:
+Repository hosting was inspected during M-023.24 and an active production
+promotion ruleset was configured for `main` and `release/**`. The enforced
+boundary requires:
 
-- changes are merged through pull requests;
-- the `release-gate` status check is required;
-- required checks must pass before merge;
-- force pushes are blocked;
-- branch deletion is blocked; and
-- bypass permissions are restricted to deliberate recovery/administrative use.
+- changes to be merged through pull requests;
+- the aggregate `release-gate` status check to pass;
+- protected branches to be up to date before merge;
+- force pushes to be blocked;
+- branch deletion to be blocked; and
+- an empty default bypass list.
 
-Protection should be verified after the workflow has produced its first status
-check so the exact check identity can be selected without guessing.
+The required check identity was selected only after the workflow had produced
+the real `Atlas Release Gate / release-gate` check. Feature source was promoted
+through `release/v1.0.0` and then through a second protected pull request into
+`main`; pull-request and push runs of the release gate passed on the certified
+path.
+
+Release-scoped fixes discovered before final certification continue through
+the same model: a focused `fix/*` branch is reviewed into the active
+`release/<version>` certification surface, the aggregate gate must pass, and
+the resulting release state is promoted to `main` through another protected
+pull request. A passing development branch is never itself a production
+deployment source.
 
 ## Production Deployment Source
 

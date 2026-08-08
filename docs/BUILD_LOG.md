@@ -5308,3 +5308,164 @@ M-023.23 is complete. Atlas now has architecture, deterministic regression, and
 read-only production evidence that provider unavailability remains observable,
 does not masquerade as a successful empty response, preserves safety-critical
 state, and cannot implicitly authorize or replay an external mutation.
+
+---
+
+## M-023.24 — Production Deployment Safety
+
+### Objective
+
+Make production source promotion and runtime deployment explicit, tested,
+recoverable transactions before v1.0 certification. The boundary must keep
+unfinished source out of production, protect users during maintenance, capture
+recovery evidence before mutation, fail closed on ambiguous migration or
+runtime state, and preserve enough exact evidence for rollback or deliberate
+forward recovery.
+
+### Architecture and Protected Promotion
+
+ADR 0022 and the Deployment Safety architecture define `main` as the stable
+production source, focused feature/fix branches as development surfaces, and
+`release/<version>` as the temporary certification surface. No permanent
+`develop` branch was introduced.
+
+GitHub repository rules were configured for `main` and `release/**` with pull
+requests, strict required status checks, blocked force pushes, blocked branch
+deletion, and no default bypass. The stable required check is the aggregate
+`release-gate` job.
+
+The release workflow validates Core Python, API, Sports, Portal, and shell
+deployment contracts independently before the aggregate gate succeeds. Clean
+runner failures discovered missing Sports `ffmpeg`, host-specific runtime
+paths, and a hard-coded Operations project root. Those portability defects were
+corrected before certification. The workflow Actions were also moved to the
+current supported major versions used by the project.
+
+Feature source was certified through pull request 1 into `release/v1.0.0` and
+then promoted through pull request 2 into `main`. Both pull-request and push
+release gates passed. The promoted production source became merge commit
+`d2fa67fa`.
+
+### Transactional Deployment Boundary
+
+The production CLI now provides Caddy-owned maintenance mode, deployment status
+and baseline capture, a transactional `atlas update`, and explicit recorded
+rollback. The update boundary requires synchronized clean `main`, an exact
+verified runtime baseline, an exclusive lock, `--migration none`, a validated
+pre-update Atlas backup, affected-surface application, post-change verification,
+and a verified new baseline before completing.
+
+Rollback restores source from recorded archives outside the live Git worktree,
+uses exact recorded image identities with `--no-build --pull never`, and blocks
+automatic recovery for state-changing migrations without release-specific
+evidence.
+
+### First Production Baseline and Controlled Update
+
+The initial verified baseline was
+`baseline-20260808T031022Z-2062686`. Production Doctor, Atlas Verify, and ingress
+verification were healthy before mutation.
+
+An explicitly approved `atlas update all --migration none` created transaction
+`update-20260808T031433Z-2068627` and validated pre-update backup
+`atlas-20260807-231434-044.tar.gz`. The update applied successfully and the new
+API, Portal, and Caddy containers were healthy, but post-update ingress
+verification failed while maintenance was correctly returning HTTP 503.
+
+Atlas failed closed: the transaction became `failed`, maintenance remained
+enabled, the deployment lock remained owned by the failed transaction, and the
+previous verified baseline remained current.
+
+### Recovery Defects Discovered
+
+Read-only diagnosis established that the runtime itself was healthy and exposed
+two deployment-recovery contract defects.
+
+First, the public ingress verifier could not distinguish intentional maintenance
+HTTP 503 isolation from an unavailable Portal/API. The update and rollback
+paths therefore could not satisfy public-route verification before maintenance
+was disabled.
+
+Second, baseline capture recorded exact Docker image IDs but did not create a
+durable reference to them. Rebuilding `atlas-api:local` and
+`atlas-portal:local` moved those mutable tags. A guarded rollback attempt then
+correctly refused before changing runtime because the exact pre-update API image
+was unavailable. Seventeen of 19 baseline image IDs remained available; the two
+missing identities were precisely the locally built API and Portal images.
+
+No fake rebuild or best-effort substitution was accepted as rollback.
+
+### Controlled Forward Recovery
+
+Because exact rollback was impossible but the candidate runtime was internally
+healthy, recovery proceeded forward under explicit approval. While the failed
+transaction lock and maintenance boundary remained intact, Atlas verified the
+runtime, disabled maintenance, proved public ingress, captured new verified
+baseline `baseline-20260808T033011Z-2093776`, reran final verification, and only
+then released the lock.
+
+The failed transaction remains `failed` as permanent runtime audit evidence.
+The forward-recovery operation did not rewrite its outcome.
+
+### M-023.24.6 Recovery-Contract Repair
+
+Commit `83ff0641` repaired both discovered boundaries.
+
+Before pull or build mutation, the update transaction now attaches a unique
+`atlas-rollback:` tag to every image in the previous verified baseline and
+verifies the tag resolves to the exact captured ID. This gives locally built
+images a durable recovery reference even after their ordinary mutable tag is
+replaced.
+
+Ingress verification now has two explicit modes. Normal mode retains the public
+Portal/API checks. Maintenance mode instead proves Caddy liveness, direct
+Portal/API backend health, and exact HTTP 503 isolation at both public paths.
+After maintenance is disabled, update and rollback repeat public verification
+before publishing the recovered/candidate baseline or releasing the lock. A
+failed reopening re-enables maintenance and leaves the previous verified
+baseline authoritative.
+
+### Automated Validation
+
+The focused deployment-recovery suite passed 35 tests. The complete Core suite
+passed 2,878 tests plus 104 subtests. Shell syntax, Python compilation, exact
+changed-file guards, artifact hygiene, and Git diff hygiene passed.
+
+### Controlled Production Contract Validation
+
+Production validation explicitly exercised the repaired boundaries without
+performing another update, pull, build, restart, or container recreation.
+
+The live sequence proved:
+
+- normal ingress: 24 passed, zero failed;
+- maintenance mode: 27 passed, zero failed;
+- Caddy liveness remained reachable during maintenance;
+- direct Portal and API backends remained reachable during maintenance;
+- public Portal and API both returned the required HTTP 503 isolation;
+- reopened normal ingress: 24 passed, zero failed;
+- all 19 baseline images acquired recovery references resolving to their exact
+  image IDs; and
+- every temporary validation recovery tag was removed afterward.
+
+Final invariants showed maintenance disabled, no deployment lock, verified
+baseline `baseline-20260808T033011Z-2093776` still current, failed transaction
+`update-20260808T031433Z-2068627` still recorded as `failed`, and a clean repair
+branch.
+
+### Remaining Release Boundary
+
+The historical annotated `v1.0.0` tag at `a67bb8a5` remains intentionally
+untouched. It predates the current certification line and remains an explicit
+final-release blocker. M-023.24 does not reinterpret or silently move it.
+
+Backup and Recovery certification, Security, Quality, Documentation completion,
+and final release certification remain separate v1.0 work.
+
+### Result
+
+M-023.24 is complete. Atlas now has protected source promotion, a tested
+transactional deployment boundary, user-visible maintenance isolation, exact
+pre-mutation rollback-image retention, deterministic failed-update state,
+explicit forward recovery, and controlled production evidence for both normal
+and maintenance traffic states.
