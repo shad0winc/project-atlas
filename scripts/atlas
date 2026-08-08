@@ -161,7 +161,7 @@ case "$command" in
     ;;
 
   backup)
-    atlas_command_backup "${2:-}" "${3:-}"
+    atlas_command_backup "${@:2}"
     ;;
 
   restart)

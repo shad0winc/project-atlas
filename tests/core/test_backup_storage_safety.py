@@ -188,3 +188,162 @@ def test_backup_listing_ignores_partial_artifacts(
     assert result.returncode == 0
     assert "No backups found." in result.stdout
     assert ".partial" not in result.stdout
+
+
+# M-023.25.2 recovery metadata / CLI safety contracts
+
+def _run_backup_arguments(
+    project: Path,
+    backups: Path,
+    *arguments: str,
+) -> subprocess.CompletedProcess[str]:
+    command = """
+set -euo pipefail
+atlas_print_header() { :; }
+source "$BACKUP_COMMAND"
+atlas_command_backup "$@"
+"""
+
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "ATLAS_PROJECT_DIR": str(project),
+            "ATLAS_BACKUP_DIR": str(backups),
+            "BACKUP_COMMAND": str(BACKUP_COMMAND),
+        }
+    )
+
+    return subprocess.run(
+        ["bash", "-c", command, "atlas-backup-test", *arguments],
+        cwd=PROJECT_ROOT,
+        env=environment,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+
+
+def test_backup_help_is_read_only(tmp_path: Path) -> None:
+    project, backups = _make_project(tmp_path)
+
+    result = _run_backup_arguments(project, backups, "--help")
+
+    assert result.returncode == 0, result.stderr
+    assert "Usage:" in result.stdout
+    assert "atlas backup --help" in result.stdout
+    assert list(backups.glob("atlas-*.tar.gz")) == []
+    assert list(backups.glob("*.partial")) == []
+
+
+def test_unknown_backup_argument_fails_without_mutation(tmp_path: Path) -> None:
+    project, backups = _make_project(tmp_path)
+
+    existing = []
+    for index in range(11):
+        path = backups / f"atlas-20260808-000000-{index:03d}.tar.gz"
+        path.write_text("historical\n", encoding="utf-8")
+        existing.append(path)
+
+    result = _run_backup_arguments(project, backups, "--unknown")
+
+    assert result.returncode == 2
+    assert "unknown backup option" in result.stderr
+    assert all(path.exists() for path in existing)
+    assert len(list(backups.glob("atlas-*.tar.gz"))) == 11
+    assert list(backups.glob("*.partial")) == []
+
+
+def test_backup_rejects_extra_arguments_without_mutation(tmp_path: Path) -> None:
+    project, backups = _make_project(tmp_path)
+
+    result = _run_backup_arguments(
+        project,
+        backups,
+        "--notes",
+        "expected note",
+        "unexpected",
+    )
+
+    assert result.returncode == 2
+    assert list(backups.glob("atlas-*.tar.gz")) == []
+    assert list(backups.glob("*.partial")) == []
+
+
+def test_successful_backup_is_owner_only_and_declares_recovery_metadata(
+    tmp_path: Path,
+) -> None:
+    project, backups = _make_project(tmp_path)
+
+    result = _run_backup_arguments(
+        project,
+        backups,
+        "--notes",
+        "recovery-contract-test",
+    )
+
+    assert result.returncode == 0, result.stderr
+
+    archives = list(backups.glob("atlas-*.tar.gz"))
+    assert len(archives) == 1
+    archive = archives[0]
+
+    assert archive.stat().st_mode & 0o777 == 0o600
+
+    members = subprocess.run(
+        ["tar", "-tzf", str(archive)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=True,
+    ).stdout.splitlines()
+
+    assert "BACKUP_INFO.txt" in members
+    assert "RECOVERY_FORMAT" in members
+    assert "RECOVERY_MANIFEST.tsv" in members
+
+    recovery_format = subprocess.run(
+        ["tar", "-xOzf", str(archive), "RECOVERY_FORMAT"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=True,
+    ).stdout
+
+    assert recovery_format == "1\n"
+
+    recovery_manifest = subprocess.run(
+        ["tar", "-xOzf", str(archive), "RECOVERY_MANIFEST.tsv"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=True,
+    ).stdout
+
+    assert (
+        "surface\tarchive_path\trequirement\tpolicy\n"
+        in recovery_manifest
+    )
+    assert (
+        "project-configuration\t.\trequired\tconfiguration-only\n"
+        in recovery_manifest
+    )
+
+    backup_info = subprocess.run(
+        ["tar", "-xOzf", str(archive), "BACKUP_INFO.txt"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=True,
+    ).stdout
+
+    assert "Recovery format: 1" in backup_info
+    assert "Recovery capability: configuration-only" in backup_info
+    assert "Format 1 (configuration-only; not state-complete)" in result.stdout
+
+    for temporary in (
+        ".atlas-backup-manifest.tmp",
+        ".atlas-backup-recovery-format.tmp",
+        ".atlas-backup-recovery-manifest.tmp",
+    ):
+        assert not (project / temporary).exists()
