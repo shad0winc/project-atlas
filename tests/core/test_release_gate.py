@@ -165,3 +165,50 @@ def test_release_gate_installs_sports_ffmpeg_dependency() -> None:
         "sudo apt-get install -y --no-install-recommends ffmpeg"
         in sports
     )
+
+
+# M-023.24.5 isolated runner state contracts
+
+
+def test_shared_config_preserves_explicit_project_root() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    content = (
+        root / "config" / "atlas.conf"
+    ).read_text(encoding="utf-8")
+
+    assert (
+        'ATLAS_PROJECT_DIR="${ATLAS_PROJECT_DIR:-/opt/project-atlas}"'
+        in content
+    )
+
+
+def test_release_gate_sports_uses_isolated_runner_storage() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    content = (
+        root / ".github" / "workflows" / "release-gate.yml"
+    ).read_text(encoding="utf-8")
+
+    sports = content.split("  sports:\n", 1)[1].split(
+        "  portal:\n",
+        1,
+    )[0]
+
+    assert (
+        "SPORTS_MEDIA_DIR: "
+        "${{ runner.temp }}/atlas-sports/media"
+        in sports
+    )
+    assert (
+        "SPORTS_RECORDING_LOG_DIR: "
+        "${{ runner.temp }}/atlas-sports/logs"
+        in sports
+    )
+    assert (
+        "SPORTS_RECORDINGS_FILE: "
+        "${{ runner.temp }}/atlas-sports/recordings/recordings.json"
+        in sports
+    )
