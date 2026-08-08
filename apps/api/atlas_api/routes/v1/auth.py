@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from atlas_api.auth.exceptions import (
     AuthenticationProviderError,
+    AuthenticationRateLimitError,
     InvalidCredentialsError,
     TokenError,
 )
@@ -56,6 +57,14 @@ def login(
             request.username,
             request.password,
         )
+    except AuthenticationRateLimitError as error:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many authentication attempts. Try again later.",
+            headers={
+                "Retry-After": str(error.retry_after_seconds),
+            },
+        ) from error
     except InvalidCredentialsError as error:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from atlas_api.auth.exceptions import InvalidCredentialsError
+from atlas_api.auth.exceptions import (
+    AuthenticationRateLimitError,
+    InvalidCredentialsError,
+)
 from atlas_api.auth.jwt import JWTService
 from atlas_api.auth.models import (
     AuthenticatedUser,
@@ -11,6 +14,7 @@ from atlas_api.auth.models import (
 )
 from atlas_api.auth.provider import AuthenticationProvider
 from atlas_api.auth.sessions import RefreshSessionRegistry
+from atlas_api.auth.throttling import LoginAttemptLimiter
 
 
 class AuthenticationService:
@@ -21,6 +25,7 @@ class AuthenticationService:
         provider: AuthenticationProvider,
         jwt_service: JWTService,
         refresh_sessions: RefreshSessionRegistry | None = None,
+        login_attempts: LoginAttemptLimiter | None = None,
     ) -> None:
         self._provider = provider
         self._jwt_service = jwt_service
@@ -28,6 +33,11 @@ class AuthenticationService:
             refresh_sessions
             if refresh_sessions is not None
             else RefreshSessionRegistry()
+        )
+        self._login_attempts = (
+            login_attempts
+            if login_attempts is not None
+            else LoginAttemptLimiter()
         )
 
     def login(self, username: str, password: str) -> TokenPair:
@@ -40,16 +50,26 @@ class AuthenticationService:
                 "Username and password are required."
             )
 
+        retry_after = self._login_attempts.retry_after(
+            normalized_username
+        )
+        if retry_after is not None:
+            raise AuthenticationRateLimitError(retry_after)
+
         user = self._provider.authenticate(
             normalized_username,
             password,
         )
 
         if user is None:
+            self._login_attempts.record_failure(
+                normalized_username
+            )
             raise InvalidCredentialsError(
                 "Username or password is incorrect."
             )
 
+        self._login_attempts.reset(normalized_username)
         return self._issue_token_pair(user)
 
     def refresh(

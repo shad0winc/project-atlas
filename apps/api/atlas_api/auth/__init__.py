@@ -3,6 +3,7 @@
 from .exceptions import (
     AuthenticationError,
     AuthenticationProviderError,
+    AuthenticationRateLimitError,
     ExpiredTokenError,
     InvalidCredentialsError,
     InvalidTokenError,
@@ -19,17 +20,20 @@ from .models import (
 )
 from .service import AuthenticationProvider, AuthenticationService
 from .sessions import RefreshSessionRegistry
+from .throttling import LoginAttemptLimiter
 
 __all__ = [
     "AuthenticatedUser",
     "AuthenticationError",
     "AuthenticationProvider",
     "AuthenticationProviderError",
+    "AuthenticationRateLimitError",
     "AuthenticationService",
     "ExpiredTokenError",
     "InvalidCredentialsError",
     "InvalidTokenError",
     "JWTService",
+    "LoginAttemptLimiter",
     "PasswordHasher",
     "RefreshSessionRegistry",
     "TokenClaims",

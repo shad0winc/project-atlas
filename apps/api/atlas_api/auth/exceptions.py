@@ -9,6 +9,17 @@ class InvalidCredentialsError(AuthenticationError):
     """Raised when supplied credentials cannot be authenticated."""
 
 
+class AuthenticationRateLimitError(AuthenticationError):
+    """Raised when credential attempts are temporarily throttled."""
+
+    def __init__(self, retry_after_seconds: int) -> None:
+        if retry_after_seconds <= 0:
+            raise ValueError("Retry-after seconds must be positive.")
+
+        self.retry_after_seconds = retry_after_seconds
+        super().__init__("Too many authentication attempts.")
+
+
 class AuthenticationProviderError(AuthenticationError):
     """Raised when an authentication provider cannot complete a request."""
 

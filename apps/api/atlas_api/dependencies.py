@@ -30,6 +30,7 @@ from atlas_api.auth.provider import (
 )
 from atlas_api.auth.service import AuthenticationService
 from atlas_api.auth.sessions import RefreshSessionRegistry
+from atlas_api.auth.throttling import LoginAttemptLimiter
 from atlas_api.core.settings import AtlasAPISettings
 from atlas_api.services import (
     DashboardMediaSummaryService,
@@ -98,6 +99,13 @@ def get_refresh_session_registry() -> RefreshSessionRegistry:
 
 
 @lru_cache(maxsize=1)
+def get_login_attempt_limiter() -> LoginAttemptLimiter:
+    """Return process-local account login-attempt state."""
+
+    return LoginAttemptLimiter()
+
+
+@lru_cache(maxsize=1)
 def get_authentication_service() -> AuthenticationService:
     """Return the fully composed Atlas authentication service."""
 
@@ -109,7 +117,8 @@ def get_authentication_service() -> AuthenticationService:
     return AuthenticationService(
         provider,
         get_jwt_service(),
-        get_refresh_session_registry(),
+        refresh_sessions=get_refresh_session_registry(),
+        login_attempts=get_login_attempt_limiter(),
     )
 
 
