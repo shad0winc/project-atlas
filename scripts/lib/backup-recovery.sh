@@ -1155,6 +1155,290 @@ atlas_backup_recovery_restore_plan() {
   }
 }
 
+# M-023.25.7.2 bounded state replacement.
+#
+# These primitives deliberately do not expose live restore through the CLI.
+# They operate only on registry-declared destinations, retain displaced state
+# until verification is finalized, and can reverse an applied transaction.
+# Production orchestration (lock, maintenance, writer quiescing, backup, and
+# verification) is layered on top only after this engine is proved in isolation.
+
+atlas_backup_recovery_validate_apply_plan() {
+  local plan_file="$1"
+  local transaction_root="$2"
+
+  python3 - "$plan_file" "$transaction_root" <<'PY_APPLY_PLAN'
+import os
+import sys
+from pathlib import Path
+
+plan_file = Path(sys.argv[1])
+transaction = Path(sys.argv[2]).resolve(strict=False)
+
+rows: list[tuple[str, Path]] = []
+for raw in plan_file.read_text(encoding="utf-8").splitlines():
+    if not raw:
+        continue
+    fields = raw.split("\t")
+    if len(fields) != 6:
+        raise SystemExit("ERROR: restore apply plan row is malformed")
+    surface, _action, _kind, _group, _staged, destination_text = fields
+    destination = Path(destination_text).resolve(strict=False)
+    rows.append((surface, destination))
+
+if len(rows) != 11:
+    raise SystemExit("ERROR: restore apply plan must contain 11 surfaces")
+
+for index, (surface, destination) in enumerate(rows):
+    if transaction == destination or transaction in destination.parents:
+        raise SystemExit(
+            f"ERROR: restore transaction overlaps destination: {surface}"
+        )
+    if destination in transaction.parents:
+        raise SystemExit(
+            f"ERROR: restore destination contains transaction state: {surface}"
+        )
+    for other_surface, other in rows[index + 1 :]:
+        if destination == other or destination in other.parents or other in destination.parents:
+            raise SystemExit(
+                "ERROR: restore destinations overlap: "
+                f"{surface}, {other_surface}"
+            )
+PY_APPLY_PLAN
+}
+
+atlas_backup_recovery_apply_plan_row() {
+  local surface="$1"
+  local action="$2"
+  local kind="$3"
+  local staged_path="$4"
+  local destination="$5"
+  local transaction_root="$6"
+  local backup_path="$transaction_root/live-rollback/$surface"
+  local incoming_path="$transaction_root/incoming/$surface"
+  local old_present=false
+
+  atlas_backup_recovery_validate_restore_destination \
+    "$destination" "$kind" || return 1
+
+  [[ ! -e "$backup_path" && ! -L "$backup_path" &&
+     ! -e "$incoming_path" && ! -L "$incoming_path" ]] || {
+    printf 'ERROR: restore transaction path already exists: %s\n' \
+      "$surface" >&2
+    return 1
+  }
+
+  mkdir -p "$(dirname "$backup_path")" "$(dirname "$incoming_path")"
+
+  if [[ -e "$destination" || -L "$destination" ]]; then
+    mv -- "$destination" "$backup_path" || {
+      printf 'ERROR: unable to preserve live recovery surface: %s\n' \
+        "$surface" >&2
+      return 1
+    }
+    old_present=true
+  fi
+
+  case "$action" in
+    replace)
+      if ! cp -a -- "$staged_path" "$incoming_path"; then
+        [[ "$old_present" == true ]] && mv -- "$backup_path" "$destination" || true
+        printf 'ERROR: unable to prepare replacement surface: %s\n' \
+          "$surface" >&2
+        return 1
+      fi
+
+      mkdir -p "$(dirname "$destination")"
+      if ! mv -- "$incoming_path" "$destination"; then
+        rm -rf -- "$incoming_path"
+        if [[ "$old_present" == true ]]; then
+          mv -- "$backup_path" "$destination" || {
+            printf 'CRITICAL: unable to restore displaced surface: %s\n' \
+              "$surface" >&2
+            return 1
+          }
+        fi
+        printf 'ERROR: unable to publish replacement surface: %s\n' \
+          "$surface" >&2
+        return 1
+      fi
+      ;;
+    remove-if-present)
+      [[ "$staged_path" == '-' ]] || {
+        if [[ -e "$destination" || -L "$destination" ]]; then
+          rm -rf -- "$destination"
+        fi
+        [[ "$old_present" == true ]] && mv -- "$backup_path" "$destination" || true
+        echo 'ERROR: optional-absent restore row has staged content.' >&2
+        return 1
+      }
+      ;;
+    *)
+      if [[ -e "$destination" || -L "$destination" ]]; then
+        rm -rf -- "$destination"
+      fi
+      [[ "$old_present" == true ]] && mv -- "$backup_path" "$destination" || true
+      printf 'ERROR: unsupported restore action: %s\n' "$action" >&2
+      return 1
+      ;;
+  esac
+}
+
+atlas_backup_recovery_after_surface_apply() {
+  # Intentional no-op seam for deterministic mid-transaction failure tests.
+  :
+}
+
+atlas_backup_recovery_revert_applied_state() {
+  local transaction_root="$1"
+  local applied="$transaction_root/applied.tsv"
+  local surface kind destination backup_path old_present
+  local -a rows=()
+  local index
+
+  [[ -d "$transaction_root" && ! -L "$transaction_root" && -f "$applied" ]] || {
+    echo 'ERROR: restore rollback transaction is unavailable.' >&2
+    return 1
+  }
+
+  mapfile -t rows < "$applied"
+
+  for ((index = ${#rows[@]} - 1; index >= 0; index--)); do
+    IFS=$'\t' read -r \
+      surface kind destination backup_path old_present \
+      <<< "${rows[$index]}"
+
+    atlas_backup_recovery_validate_restore_destination \
+      "$destination" "$kind" || return 1
+
+    case "$kind" in
+      file)
+        [[ ! -e "$destination" && ! -L "$destination" ]] || \
+          rm -f -- "$destination" || return 1
+        ;;
+      directory)
+        [[ ! -e "$destination" && ! -L "$destination" ]] || \
+          rm -rf -- "$destination" || return 1
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+
+    if [[ "$old_present" == 'true' ]]; then
+      [[ -e "$backup_path" && ! -L "$backup_path" ]] || {
+        printf 'CRITICAL: preserved restore surface is unavailable: %s\n' \
+          "$surface" >&2
+        return 1
+      }
+      mkdir -p "$(dirname "$destination")"
+      mv -- "$backup_path" "$destination" || return 1
+    fi
+  done
+
+  printf '%s\n' 'reverted' > "$transaction_root/status"
+}
+
+atlas_backup_recovery_apply_staged_state() {
+  local root="$1"
+  local transaction_root="$2"
+  local plan plan_file applied
+  local surface action kind group staged_path destination
+  local backup_path old_present
+  local index=0
+
+  atlas_backup_recovery_validate_staged_restore "$root" || return 1
+
+  [[ ! -e "$transaction_root" && ! -L "$transaction_root" ]] || {
+    echo 'ERROR: restore transaction root already exists.' >&2
+    return 1
+  }
+  atlas_backup_recovery_validate_restore_destination \
+    "$transaction_root" directory || return 1
+
+  mkdir -p "$transaction_root/live-rollback" "$transaction_root/incoming"
+  chmod 0700 \
+    "$transaction_root" \
+    "$transaction_root/live-rollback" \
+    "$transaction_root/incoming"
+
+  plan="$(atlas_backup_recovery_restore_plan "$root")" || {
+    echo 'ERROR: unable to resolve restore application plan.' >&2
+    return 1
+  }
+
+  plan_file="$transaction_root/plan.tsv"
+  applied="$transaction_root/applied.tsv"
+  printf '%s\n' "$plan" > "$plan_file"
+  : > "$applied"
+  chmod 0600 "$plan_file" "$applied"
+
+  atlas_backup_recovery_validate_apply_plan \
+    "$plan_file" "$transaction_root" || return 1
+
+  while IFS=$'\t' read -r \
+    surface action kind group staged_path destination
+  do
+    index=$((index + 1))
+    backup_path="$transaction_root/live-rollback/$surface"
+    if [[ -e "$destination" && ! -L "$destination" ]]; then
+      old_present=true
+    else
+      old_present=false
+    fi
+
+    if ! atlas_backup_recovery_apply_plan_row \
+      "$surface" "$action" "$kind" "$staged_path" \
+      "$destination" "$transaction_root"
+    then
+      atlas_backup_recovery_revert_applied_state "$transaction_root" || {
+        echo 'CRITICAL: restore application failed and automatic revert was incomplete.' >&2
+      }
+      return 1
+    fi
+
+    printf '%s\t%s\t%s\t%s\t%s\n' \
+      "$surface" "$kind" "$destination" "$backup_path" "$old_present" \
+      >> "$applied"
+
+    if ! atlas_backup_recovery_after_surface_apply "$surface" "$index"; then
+      printf 'ERROR: restore application interrupted after surface: %s\n' \
+        "$surface" >&2
+      atlas_backup_recovery_revert_applied_state "$transaction_root" || {
+        echo 'CRITICAL: restore interruption revert was incomplete.' >&2
+      }
+      return 1
+    fi
+  done <<< "$plan"
+
+  [[ "$index" -eq 11 ]] || {
+    echo 'ERROR: restore application did not apply all declared surfaces.' >&2
+    atlas_backup_recovery_revert_applied_state "$transaction_root" || true
+    return 1
+  }
+
+  rm -rf -- "$transaction_root/incoming"
+  printf '%s\n' 'applied-awaiting-verification' > "$transaction_root/status"
+}
+
+atlas_backup_recovery_finalize_applied_state() {
+  local transaction_root="$1"
+  local status
+
+  atlas_backup_recovery_validate_restore_destination \
+    "$transaction_root" directory || return 1
+
+  [[ -f "$transaction_root/status" ]] || return 1
+  status="$(<"$transaction_root/status")"
+  [[ "$status" == 'applied-awaiting-verification' ]] || {
+    printf 'ERROR: restore transaction is not finalizable: %s\n' "$status" >&2
+    return 1
+  }
+
+  rm -rf -- "$transaction_root/live-rollback" "$transaction_root/incoming"
+  printf '%s\n' 'verified' > "$transaction_root/status"
+}
+
 # M-023.25.6 consumer-level staged-state validation.
 
 atlas_backup_recovery_staged_state_digest() {
