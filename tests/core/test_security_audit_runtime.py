@@ -44,3 +44,19 @@ def test_security_audit_writer_is_composed_as_process_dependency() -> None:
     assert "def get_security_audit_writer():" in content
     assert "SecurityAuditWriter.from_environment()" in content
     assert "audit_publisher=get_security_audit_writer().publish" in content
+
+
+def test_authorization_dependencies_receive_security_audit_writer() -> None:
+    path = (
+        PROJECT_ROOT
+        / "apps"
+        / "api"
+        / "atlas_api"
+        / "security"
+        / "dependencies.py"
+    )
+    content = path.read_text(encoding="utf-8")
+
+    assert "get_security_audit_writer" in content
+    assert "audit_writer=Depends(get_security_audit_writer)" in content
+    assert '"security.authorization.denied"' in content
