@@ -185,13 +185,7 @@ def test_operations_report_endpoint_does_not_mutate_report() -> None:
 
 def test_openapi_registers_operations_report_endpoint() -> None:
     app = create_app()
-    response = TestClient(app).get(
-        "/api/openapi.json"
-    )
-
-    assert response.status_code == 200
-
-    operation = response.json()["paths"][
+    operation = app.openapi()["paths"][
         "/api/v1/operations/report"
     ]["get"]
 

@@ -24,6 +24,15 @@ atlas.shadowinc.co {
                         respond "Project Atlas is temporarily unavailable for maintenance." 503
                 }
 
+                # API documentation and schema metadata are intentionally
+                # unavailable at public ingress. FastAPI also disables these
+                # routes so this boundary remains fail-closed if proxy routing
+                # changes later.
+                @atlas_api_metadata path /api/docs /api/docs/* /api/openapi.json /api/redoc /api/redoc/*
+                handle @atlas_api_metadata {
+                        respond "Not Found" 404
+                }
+
                 handle /api/* {
                         reverse_proxy atlas-api:8000
                 }

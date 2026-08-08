@@ -283,13 +283,7 @@ def test_latest_endpoint_does_not_collect_live_report() -> None:
 
 def test_openapi_registers_latest_success_and_failure() -> None:
     app = create_app()
-    response = TestClient(app).get(
-        "/api/openapi.json"
-    )
-
-    assert response.status_code == 200
-
-    operation = response.json()["paths"][
+    operation = app.openapi()["paths"][
         "/api/v1/operations/latest"
     ]["get"]
 

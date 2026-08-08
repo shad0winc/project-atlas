@@ -24,9 +24,9 @@ def create_app() -> FastAPI:
         title="Atlas API",
         description="Public HTTP API for Project Atlas.",
         version="0.1.0",
-        docs_url="/api/docs",
+        docs_url=None,
         redoc_url=None,
-        openapi_url="/api/openapi.json",
+        openapi_url=None,
         lifespan=_lifespan,
     )
 

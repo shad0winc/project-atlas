@@ -316,13 +316,7 @@ def test_history_endpoint_does_not_mutate_reports() -> None:
 
 def test_openapi_registers_history_query_contract() -> None:
     app = create_app()
-    response = TestClient(app).get(
-        "/api/openapi.json"
-    )
-
-    assert response.status_code == 200
-
-    operation = response.json()["paths"][
+    operation = app.openapi()["paths"][
         "/api/v1/operations/history"
     ]["get"]
 
