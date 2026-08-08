@@ -238,6 +238,221 @@ atlas_restore_load_recovery_library() {
   source "$recovery_library"
 }
 
+# M-023.25.7.3.1 production restore orchestration primitives.
+#
+# Live apply remains unavailable at the CLI in this checkpoint. These helpers
+# prove the exact writer boundary, certified-production preflight, durable
+# pre-restore recovery point, and consumer validation of the live state that
+# was actually published. The mutating command is layered on only after these
+# primitives have dedicated failure/recovery coverage.
+
+atlas_restore_writer_containers() {
+  printf '%s\n' \
+    'atlas-api' \
+    'atlas-sports-controller' \
+    'atlas-notifications-worker'
+}
+
+atlas_restore_writer_state() {
+  local container="$1"
+
+  docker inspect --format \
+    '{{if not .State.Running}}stopped{{else if .State.Health}}{{.State.Health.Status}}{{else}}running{{end}}' \
+    "$container"
+}
+
+atlas_restore_require_writers_running() {
+  local container state
+
+  while IFS= read -r container; do
+    state="$(atlas_restore_writer_state "$container" 2>/dev/null)" || {
+      printf 'ERROR: restore writer is unavailable: %s\n' "$container" >&2
+      return 1
+    }
+    case "$state" in
+      running|healthy)
+        ;;
+      *)
+        printf 'ERROR: restore writer is not ready: %s (%s)\n' \
+          "$container" "$state" >&2
+        return 1
+        ;;
+    esac
+  done < <(atlas_restore_writer_containers)
+}
+
+atlas_restore_stop_writers() {
+  local container
+
+  while IFS= read -r container; do
+    docker stop --time 30 "$container" >/dev/null || {
+      printf 'ERROR: unable to quiesce restore writer: %s\n' \
+        "$container" >&2
+      return 1
+    }
+  done < <(atlas_restore_writer_containers)
+}
+
+atlas_restore_start_writers() {
+  local container
+
+  while IFS= read -r container; do
+    docker start "$container" >/dev/null || {
+      printf 'ERROR: unable to start restore writer: %s\n' \
+        "$container" >&2
+      return 1
+    }
+  done < <(atlas_restore_writer_containers)
+}
+
+atlas_restore_wait_for_writers() {
+  local timeout_seconds="${ATLAS_RESTORE_WRITER_TIMEOUT_SECONDS:-120}"
+  local deadline container state pending
+
+  [[ "$timeout_seconds" =~ ^[1-9][0-9]*$ ]] || {
+    echo 'ERROR: restore writer timeout must be a positive integer.' >&2
+    return 1
+  }
+
+  deadline=$((SECONDS + timeout_seconds))
+  while (( SECONDS < deadline )); do
+    pending=false
+    while IFS= read -r container; do
+      state="$(atlas_restore_writer_state "$container" 2>/dev/null || true)"
+      case "$state" in
+        running|healthy)
+          ;;
+        unhealthy)
+          printf 'ERROR: restore writer became unhealthy: %s\n' \
+            "$container" >&2
+          return 1
+          ;;
+        *)
+          pending=true
+          ;;
+      esac
+    done < <(atlas_restore_writer_containers)
+
+    [[ "$pending" == false ]] && return 0
+    sleep 2
+  done
+
+  echo 'ERROR: restore writers did not become ready before timeout.' >&2
+  return 1
+}
+
+atlas_restore_require_production_preflight() {
+  local requested="$1"
+  local root before after current_record
+
+  root="$(realpath -e -- "$requested" 2>/dev/null)" || {
+    echo 'ERROR: live restore requires an existing isolated staging root.' >&2
+    return 1
+  }
+
+  [[ "$root" == "$requested" &&
+     "$root" == /tmp/project-atlas-restore.* &&
+     -d "$root" && ! -L "$root" ]] || {
+    echo 'ERROR: live restore requires an isolated /tmp staging root.' >&2
+    return 1
+  }
+
+  atlas_deployment_validate_source || return 1
+  current_record="$(atlas_deployment_require_current_record)" || return 1
+  [[ -d "$current_record" ]] || return 1
+
+  [[ ! -f "$(atlas_maintenance_flag)" ]] || {
+    echo 'ERROR: live restore requires maintenance mode to be disabled at preflight.' >&2
+    return 1
+  }
+
+  [[ ! -e "$(atlas_deployment_lock_dir)" ]] || {
+    echo 'ERROR: live restore requires the shared deployment lock to be free.' >&2
+    return 1
+  }
+
+  atlas_restore_load_recovery_library
+  atlas_backup_recovery_validate_staged_restore "$root" || return 1
+  before="$(atlas_backup_recovery_staged_state_digest "$root")" || return 1
+  atlas_backup_recovery_validate_staged_consumers "$root" || return 1
+  after="$(atlas_backup_recovery_staged_state_digest "$root")" || return 1
+  [[ "$before" == "$after" ]] || {
+    echo 'ERROR: live-restore preflight mutated staged recovery state.' >&2
+    return 1
+  }
+
+  atlas_restore_require_writers_running || return 1
+  printf '%s\n' "$current_record"
+}
+
+atlas_restore_create_pre_restore_recovery_point() {
+  local identifier="$1"
+  local output backup_file
+
+  atlas_deployment_valid_id "$identifier" || {
+    echo 'ERROR: invalid restore transaction identifier.' >&2
+    return 1
+  }
+
+  output="$(
+    atlas_command_backup \
+      --notes "Pre-restore recovery point for $identifier"
+  )" || {
+    echo 'ERROR: pre-restore recovery point failed.' >&2
+    return 1
+  }
+  printf '%s\n' "$output"
+
+  backup_file="$(
+    awk '
+      /^File:$/ {getline; sub(/^[[:space:]]+/, ""); print; exit}
+    ' <<< "$output"
+  )"
+
+  [[ -n "$backup_file" && -f "$backup_file" && ! -L "$backup_file" ]] || {
+    echo 'ERROR: backup command did not publish a recovery point.' >&2
+    return 1
+  }
+
+  atlas_restore_load_recovery_library
+  atlas_backup_recovery_validate_archive "$backup_file" || {
+    echo 'ERROR: pre-restore recovery point failed validation.' >&2
+    return 1
+  }
+
+  ATLAS_RESTORE_RECOVERY_POINT="$backup_file"
+  export ATLAS_RESTORE_RECOVERY_POINT
+}
+
+atlas_restore_validate_live_consumers() {
+  local snapshot_root manifest status=0
+
+  atlas_restore_load_recovery_library
+  snapshot_root="$(
+    mktemp -d /tmp/project-atlas-live-restore-verify.XXXXXX
+  )" || return 1
+  chmod 0700 "$snapshot_root"
+  manifest="$snapshot_root/RECOVERY_MANIFEST.tsv"
+
+  printf '%s\t%s\t%s\t%s\n' \
+    'surface' 'archive_path' 'requirement' 'policy' \
+    > "$manifest"
+  printf '%s\t%s\t%s\t%s\n' \
+    'project-configuration' '.' 'required' 'configuration-only' \
+    >> "$manifest"
+
+  if ! atlas_backup_recovery_snapshot_state "$snapshot_root" >> "$manifest"; then
+    echo 'ERROR: unable to capture live state for restore verification.' >&2
+    status=1
+  elif ! atlas_backup_recovery_validate_staged_consumers "$snapshot_root"; then
+    echo 'ERROR: restored live state failed consumer validation.' >&2
+    status=1
+  fi
+
+  rm -rf -- "$snapshot_root"
+  return "$status"
+}
+
 atlas_command_restore() {
   atlas_print_header
 
