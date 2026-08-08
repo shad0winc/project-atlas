@@ -46,6 +46,13 @@ services:
     expose:
       - "8000"
 
+    environment:
+      ATLAS_JWT_SECRET: "${ATLAS_JWT_SECRET:?ATLAS_JWT_SECRET is required}"
+      ATLAS_JWT_ISSUER: "${ATLAS_JWT_ISSUER:-project-atlas}"
+      ATLAS_JWT_AUDIENCE: "${ATLAS_JWT_AUDIENCE:-atlas-portal}"
+      ATLAS_ACCESS_TOKEN_MINUTES: "${ATLAS_ACCESS_TOKEN_MINUTES:-15}"
+      ATLAS_REFRESH_TOKEN_DAYS: "${ATLAS_REFRESH_TOKEN_DAYS:-30}"
+
     security_opt:
       - no-new-privileges:true
 
