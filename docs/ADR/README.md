@@ -73,3 +73,4 @@ The simplified numeric format is the project standard for all future ADRs.
 - [ADR 0020 — Storage Exhaustion Failure Boundaries](0020-storage-exhaustion-failure-boundaries.md)
 - [ADR 0021 — Unavailable Provider Failure Semantics](0021-unavailable-provider-failure-semantics.md)
 - [ADR 0022 — Production Deployment Safety Boundaries](0022-production-deployment-safety-boundaries.md)
+- [ADR 0023 — Backup and Restore Recovery Boundaries](0023-backup-restore-recovery-boundaries.md)
