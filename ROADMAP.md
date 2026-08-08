@@ -711,17 +711,25 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 
 ### Deployment Safety
 
-- [ ] Define stable production branch
-- [ ] Define background development branch strategy
-- [ ] Define release branch workflow
-- [ ] Define maintenance-window procedure
-- [ ] Define pre-update backup procedure
-- [ ] Define post-update verification procedure
-- [ ] Define rollback procedure
-- [ ] Define schema migration procedure
-- [ ] Define configuration migration procedure
-- [ ] Prevent untested patches from reaching production
-- [ ] Add production maintenance mode
+- [x] Define stable production branch
+- [x] Define background development branch strategy
+- [x] Define release branch workflow
+- [x] Define maintenance-window procedure
+- [x] Define pre-update backup procedure
+- [x] Define post-update verification procedure
+- [x] Define rollback procedure
+- [x] Define schema migration procedure
+- [x] Define configuration migration procedure
+- [x] Prevent untested patches from reaching production
+- [x] Add production maintenance mode
+  - [x] Require protected `feature/fix -> release/<version> -> main` promotion
+  - [x] Require the aggregate `release-gate` status check on protected sources
+  - [x] Capture verified source archives and exact running image identities
+  - [x] Preserve rollback image identities before pull/build mutation
+  - [x] Keep maintenance and the deployment lock on failed post-change checks
+  - [x] Verify healthy backends plus public HTTP 503 isolation during maintenance
+  - [x] Reverify public ingress after maintenance before publishing a new baseline
+  - [x] Complete controlled production failure, recovery, and repair validation
 
 ### Backup and Recovery
 

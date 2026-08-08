@@ -6,6 +6,22 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Fixed
 
+- Completed M-023.24 Deployment Safety with protected release promotion,
+  transactional production updates, Caddy-owned maintenance mode, verified
+  deployment baselines, and explicit rollback/forward-recovery boundaries.
+- Corrected the production verification contract discovered during the first
+  controlled update: maintenance-aware ingress verification now proves backend
+  health and public HTTP 503 isolation before traffic is reopened, followed by
+  a second public verification before a candidate baseline becomes current.
+- Preserved exact pre-update Docker image identities with transaction-scoped
+  rollback tags before pull/build mutation so locally built Portal and API
+  images cannot become unavailable merely because their mutable tags move.
+- Exercised the failure path in production without hiding the incident: the
+  failed update remained recorded as `failed`, controlled forward recovery
+  established a new verified baseline, and the repaired contracts subsequently
+  passed 27 maintenance-mode ingress checks, 24 reopened-ingress checks, and
+  exact retention of all 19 baseline image identities.
+
 - Completed M-023.23 Unavailable-Provider Behavior with explicit cross-boundary
   failure semantics, deterministic provider-outage safeguards, and read-only
   production validation.

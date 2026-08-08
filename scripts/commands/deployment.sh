@@ -217,6 +217,35 @@ atlas_deployment_create_source_pair() {
   cp -- "$record/core-source.tar.gz" "$record/ingress-source.tar.gz"
 }
 
+atlas_deployment_preserve_rollback_images() {
+  local baseline="$1"
+  local transaction="$2"
+  local output="$transaction/rollback-images.tsv"
+  local temporary="$transaction/.rollback-images.tsv.partial"
+  local transaction_id
+  local image_id
+  local recovery_tag
+  local index=0
+
+  [[ -s "$baseline/images.tsv" ]] || return 1
+  transaction_id="$(basename "$transaction")"
+  atlas_deployment_valid_id "$transaction_id" || return 1
+  : > "$temporary"
+
+  while IFS='|' read -r _ _ _ _ _ _ image_id; do
+    [[ -n "$image_id" ]] || return 1
+    index=$((index + 1))
+    recovery_tag="atlas-rollback:${transaction_id}-${index}"
+    docker image inspect "$image_id" >/dev/null 2>&1 || return 1
+    docker image tag "$image_id" "$recovery_tag" || return 1
+    [[ "$(docker image inspect --format '{{.Id}}' "$recovery_tag")" == "$image_id" ]] || return 1
+    printf '%s|%s\n' "$image_id" "$recovery_tag" >> "$temporary"
+  done < "$baseline/images.tsv"
+
+  [[ "$index" -gt 0 && -s "$temporary" ]] || return 1
+  mv -f -- "$temporary" "$output"
+}
+
 atlas_deployment_require_current_record() {
   local identifier
   local record
@@ -322,6 +351,7 @@ created_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 EOF
 
   cp -- "$previous_record/images.tsv" "$record/pre-images.tsv"
+  atlas_deployment_preserve_rollback_images "$previous_record" "$record" || return 1
 
   if [[ "$scope" == 'core' || "$scope" == 'all' ]]; then
     atlas_deployment_archive_source "$target_commit" "$record/core-source.tar.gz" || return 1
@@ -516,9 +546,31 @@ atlas_deployment_rollback() {
     "$ATLAS_PROJECT_DIR/scripts/verify-ingress.sh" || return 1
   fi
 
-  atlas_deployment_set_current "$previous_id" || return 1
-  atlas_deployment_set_status "$transaction" rolled_back || return 1
   atlas_command_maintenance disable || return 1
+
+  atlas_command_doctor || {
+    atlas_command_maintenance enable || true
+    return 1
+  }
+  atlas_command_verify || {
+    atlas_command_maintenance enable || true
+    return 1
+  }
+  if [[ "$scope" == 'ingress' || "$scope" == 'all' ]]; then
+    "$ATLAS_PROJECT_DIR/scripts/verify-ingress.sh" || {
+      atlas_command_maintenance enable || true
+      return 1
+    }
+  fi
+
+  atlas_deployment_set_current "$previous_id" || {
+    atlas_command_maintenance enable || true
+    return 1
+  }
+  atlas_deployment_set_status "$transaction" rolled_back || {
+    atlas_command_maintenance enable || true
+    return 1
+  }
   atlas_deployment_release_lock "$identifier" || return 1
 
   printf 'Rollback complete: %s -> %s\n' "$identifier" "$previous_id"

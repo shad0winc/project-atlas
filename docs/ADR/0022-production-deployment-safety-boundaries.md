@@ -146,6 +146,13 @@ has a known safe runtime or deliberately approves recovery behavior.
 The transaction must not prune old images before the rollback decision is
 closed.
 
+Captured image IDs are evidence, but an ID without a durable Docker reference
+is not sufficient retention. Before any pull or build can move a mutable image
+tag, the transaction must attach a transaction-scoped rollback tag to every
+captured image and verify that the tag resolves to the exact captured ID. This
+is especially important for locally built images such as the Atlas Portal and
+API, whose ordinary `:local` tags are replaced by a successful rebuild.
+
 ## Backup Boundary
 
 `atlas backup` is the required pre-update repository/configuration artifact
@@ -188,6 +195,14 @@ Rollback is not declared successful until the same required post-change health
 and verification gates pass. If rollback cannot safely restore a changed state,
 the system remains in maintenance mode and recovery becomes an explicit
 operator procedure.
+
+Verification has two distinct traffic states. While maintenance is enabled,
+ingress verification must prove that Caddy and both application backends are
+healthy while public Portal and API requests are intentionally isolated with
+HTTP 503. After maintenance is disabled, Atlas must verify the normal public
+Portal and API paths again before publishing the candidate as the current
+verified baseline or releasing the deployment lock. A failure after reopening
+re-enables maintenance and leaves the previous verified baseline authoritative.
 
 ## Consequences
 
