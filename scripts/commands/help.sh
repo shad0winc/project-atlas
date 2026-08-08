@@ -93,6 +93,14 @@ Maintenance
   atlas maintenance enable
   atlas maintenance disable
   atlas backup
+  atlas restore inspect <archive>
+  atlas restore verify <archive>
+  atlas restore stage <archive>
+  atlas restore validate-stage <staging-root>
+  atlas restore plan <staging-root>
+  atlas restore apply <staging-root> --confirm-live
+  atlas restore resume <restore-id> --confirm-live
+  atlas restore abort <restore-id> --confirm-live
   atlas restart
   atlas logs <container>
 

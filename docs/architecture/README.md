@@ -63,6 +63,7 @@ logic.
 - [Automatic Cleanup Safety](AUTOMATIC_CLEANUP_SAFETY.md)
 - [Storage Exhaustion Recovery](STORAGE_EXHAUSTION.md)
 - [Portal](PORTAL.md)
+- [Backup and Recovery](BACKUP_RECOVERY.md)
 
 Additional subsystem documents should be added only when their design is mature
 enough to serve as a stable implementation and integration reference.
@@ -209,3 +210,13 @@ controlled changes to the stable Atlas deployment.
 
 - [Architecture](DEPLOYMENT_SAFETY.md)
 - [ADR 0022 — Production Deployment Safety Boundaries](../ADR/0022-production-deployment-safety-boundaries.md)
+
+## Backup and Recovery
+
+Backup and Recovery defines explicit state coverage, versioned recovery
+metadata, protected archive publication, staged validation-first restoration,
+and the boundary between local configuration backup and actual disaster
+recovery.
+
+- [Architecture](BACKUP_RECOVERY.md)
+- [ADR 0023 — Backup and Restore Recovery Boundaries](../ADR/0023-backup-restore-recovery-boundaries.md)
