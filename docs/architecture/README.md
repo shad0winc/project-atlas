@@ -64,6 +64,7 @@ logic.
 - [Storage Exhaustion Recovery](STORAGE_EXHAUSTION.md)
 - [Portal](PORTAL.md)
 - [Backup and Recovery](BACKUP_RECOVERY.md)
+- [Security](SECURITY.md)
 
 Additional subsystem documents should be added only when their design is mature
 enough to serve as a stable implementation and integration reference.
@@ -220,3 +221,12 @@ recovery.
 
 - [Architecture](BACKUP_RECOVERY.md)
 - [ADR 0023 — Backup and Restore Recovery Boundaries](../ADR/0023-backup-restore-recovery-boundaries.md)
+
+## Security
+
+Security defines the v1.0 authentication, authorization, browser session,
+invitation, reverse-proxy, secret, audit, dependency, network-exposure, and
+least-privilege boundaries validated by M-023.26.
+
+- [Architecture](SECURITY.md)
+- [ADR 0024 — Security Trust Boundaries](../ADR/0024-security-trust-boundaries.md)
