@@ -5,12 +5,12 @@ atlas_restore_usage() {
 Usage:
   atlas restore inspect <archive>
   atlas restore verify <archive>
+  atlas restore stage <archive>
   atlas restore --help
 
-Read-only recovery commands. `inspect` reports archive metadata without
-claiming recovery validity. `verify` requires the state-complete recovery
-contract, manifest, and checksums to pass. Live restore/apply is intentionally
-unavailable until the staged restore transaction is implemented and tested.
+Recovery inspection and verification are read-only. `stage` validates archive
+members and extracts only into a new private directory beneath `/tmp`; it never
+targets live Atlas state. Live restore/apply remains intentionally unavailable.
 HELP
 }
 
@@ -96,6 +96,29 @@ atlas_restore_verify() {
   echo 'Atlas Restore Verification: PASS'
 }
 
+atlas_restore_stage() {
+  local archive="$1"
+  local stage_root
+
+  atlas_restore_require_archive "$archive" || return $?
+  atlas_restore_load_recovery_library
+
+  stage_root="$(atlas_backup_recovery_stage_archive "$archive" /tmp)" || {
+    echo 'Atlas Restore Staging: FAIL' >&2
+    return 1
+  }
+
+  echo 'Atlas Restore Staging'
+  echo
+  printf 'Archive: %s\n' "$archive"
+  printf 'Staging root: %s\n' "$stage_root"
+  echo 'Archive member safety: PASS'
+  echo 'Staged integrity: PASS'
+  echo 'Live state mutation: none'
+  echo
+  echo 'Atlas Restore Staging: PASS'
+}
+
 atlas_restore_load_recovery_library() {
   local recovery_library
 
@@ -131,6 +154,14 @@ atlas_command_restore() {
       }
       atlas_restore_load_recovery_library
       atlas_restore_verify "$2"
+      ;;
+    stage)
+      [[ "$#" -eq 2 ]] || {
+        echo 'ERROR: restore stage requires exactly one archive.' >&2
+        atlas_restore_usage >&2
+        return 2
+      }
+      atlas_restore_stage "$2"
       ;;
     --help|-h|help)
       [[ "$#" -eq 1 ]] || {

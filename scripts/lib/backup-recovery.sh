@@ -752,3 +752,268 @@ atlas_backup_recovery_validate_archive() {
     fi
   done
 }
+
+# M-023.25.5 isolated staged restore support.
+#
+# Archive validation and member safety are completed before any extraction.
+# Extraction is restricted to a newly-created private staging directory and
+# never targets an authoritative Atlas state path.
+
+atlas_backup_recovery_validate_safe_members() {
+  local archive="$1"
+
+  python3 - "$archive" <<'PY_SAFE_MEMBERS'
+import sys
+import tarfile
+
+archive_path = sys.argv[1]
+allowed_roots = {
+    "BACKUP_INFO.txt",
+    "RECOVERY_FORMAT",
+    "RECOVERY_MANIFEST.tsv",
+    "SHA256SUMS",
+    "docker-compose.yml",
+    "docker-compose.sports.yml",
+    ".env.example",
+    "VERSION",
+    "CHARTER.md",
+    "ROADMAP.md",
+    "CHANGELOG.md",
+    "config",
+    "docs",
+    "modules",
+    "scripts",
+    "state",
+}
+
+seen: set[str] = set()
+
+try:
+    archive = tarfile.open(archive_path, mode="r:gz")
+except (OSError, tarfile.TarError) as exc:
+    raise SystemExit(f"ERROR: unable to inspect recovery archive members: {exc}")
+
+with archive:
+    for member in archive.getmembers():
+        name = member.name
+        raw = name[:-1] if name.endswith("/") else name
+
+        if (
+            not raw
+            or name.startswith("/")
+            or "\\" in name
+            or "\n" in name
+            or "\r" in name
+            or "\t" in name
+            or "\x00" in name
+        ):
+            raise SystemExit(f"ERROR: unsafe recovery archive member path: {name!r}")
+
+        pieces = raw.split("/")
+        if any(piece in {"", ".", ".."} for piece in pieces):
+            raise SystemExit(f"ERROR: unsafe recovery archive member path: {name!r}")
+
+        if pieces[0] not in allowed_roots:
+            raise SystemExit(f"ERROR: undeclared recovery archive member: {name}")
+
+        if raw in seen:
+            raise SystemExit(f"ERROR: duplicate recovery archive member: {name}")
+        seen.add(raw)
+
+        if not (member.isfile() or member.isdir()):
+            raise SystemExit(
+                f"ERROR: unsupported recovery archive member type: {name}"
+            )
+PY_SAFE_MEMBERS
+}
+
+atlas_backup_recovery_extract_private() {
+  local archive="$1"
+  local destination="$2"
+
+  python3 - "$archive" "$destination" <<'PY_EXTRACT_PRIVATE'
+import sys
+import tarfile
+
+archive_path, destination = sys.argv[1:]
+
+def private_filter(member: tarfile.TarInfo, _path: str) -> tarfile.TarInfo:
+    mode = 0o700 if member.isdir() else 0o600
+    return member.replace(
+        uid=None,
+        gid=None,
+        uname=None,
+        gname=None,
+        mode=mode,
+    )
+
+try:
+    with tarfile.open(archive_path, mode="r:gz") as archive:
+        archive.extractall(path=destination, filter=private_filter)
+except (OSError, tarfile.TarError) as exc:
+    raise SystemExit(f"ERROR: unable to stage recovery archive: {exc}")
+PY_EXTRACT_PRIVATE
+}
+
+atlas_backup_recovery_validate_staged_restore() {
+  local root="$1"
+  local surface source archive_path requirement kind group policy extra
+  local header
+  declare -A policy_by_surface=()
+
+  [[ -d "$root" && ! -L "$root" ]] || {
+    echo 'ERROR: staged restore root is not a private directory.' >&2
+    return 1
+  }
+
+  for metadata in RECOVERY_FORMAT RECOVERY_MANIFEST.tsv SHA256SUMS BACKUP_INFO.txt; do
+    [[ -f "$root/$metadata" && ! -L "$root/$metadata" ]] || {
+      printf 'ERROR: staged restore metadata is unavailable: %s\n' \
+        "$metadata" >&2
+      return 1
+    }
+  done
+
+  [[ "$(<"$root/RECOVERY_FORMAT")" == '1' ]] || {
+    echo 'ERROR: staged restore recovery format is unsupported.' >&2
+    return 1
+  }
+
+  header="$(head -n 1 "$root/RECOVERY_MANIFEST.tsv")"
+  [[ "$header" == $'surface\tarchive_path\trequirement\tpolicy' ]] || {
+    echo 'ERROR: staged restore manifest header is invalid.' >&2
+    return 1
+  }
+
+  while IFS=$'\t' read -r surface archive_path requirement policy extra; do
+    [[ "$surface" == 'surface' ]] && continue
+    [[ -n "$surface" ]] || continue
+    [[ -z "$extra" ]] || {
+      echo 'ERROR: staged restore manifest row has unexpected fields.' >&2
+      return 1
+    }
+    policy_by_surface["$surface"]="$policy"
+  done < "$root/RECOVERY_MANIFEST.tsv"
+
+  while IFS=$'\t' read -r \
+    surface source archive_path requirement kind group
+  do
+    policy="${policy_by_surface[$surface]:-}"
+    case "$policy" in
+      captured)
+        [[ ! -L "$root/$archive_path" ]] || {
+          printf 'ERROR: staged recovery surface is symbolic: %s\n' \
+            "$surface" >&2
+          return 1
+        }
+        if [[ "$kind" == 'file' ]]; then
+          [[ -f "$root/$archive_path" ]] || {
+            printf 'ERROR: staged recovery file is unavailable: %s\n' \
+              "$surface" >&2
+            return 1
+          }
+        else
+          [[ -d "$root/$archive_path" ]] || {
+            printf 'ERROR: staged recovery directory is unavailable: %s\n' \
+              "$surface" >&2
+            return 1
+          }
+        fi
+        ;;
+      absent-optional)
+        [[ "$requirement" == 'optional' && \
+           ! -e "$root/$archive_path" && \
+           ! -L "$root/$archive_path" ]] || {
+          printf 'ERROR: staged optional-absent surface is invalid: %s\n' \
+            "$surface" >&2
+          return 1
+        }
+        ;;
+      *)
+        printf 'ERROR: staged restore policy is invalid: %s\n' \
+          "$surface" >&2
+        return 1
+        ;;
+    esac
+  done < <(atlas_backup_recovery_surface_rows)
+
+  if find "$root/state" -type l -print -quit | grep -q .; then
+    echo 'ERROR: staged recovery state contains a symbolic link.' >&2
+    return 1
+  fi
+
+  (
+    cd "$root" || exit 1
+    sha256sum --check --strict SHA256SUMS >/dev/null
+  ) || {
+    echo 'ERROR: staged recovery checksum verification failed.' >&2
+    return 1
+  }
+}
+
+atlas_backup_recovery_stage_archive() {
+  local archive="$1"
+  local parent="${2:-/tmp}"
+  local before after stage source _surface _archive _requirement _kind _group
+  local project_root="${ATLAS_PROJECT_DIR:-/opt/project-atlas}"
+
+  [[ -f "$archive" && ! -L "$archive" ]] || {
+    echo 'ERROR: staged restore archive is not a regular file.' >&2
+    return 1
+  }
+
+  [[ "$parent" == /* && -d "$parent" && ! -L "$parent" ]] || {
+    echo 'ERROR: staged restore parent must be an absolute real directory.' >&2
+    return 1
+  }
+
+  before="$(sha256sum -- "$archive" | awk '{print $1}')" || return 1
+
+  atlas_backup_recovery_validate_archive "$archive" || return 1
+  atlas_backup_recovery_validate_safe_members "$archive" || return 1
+
+  stage="$(mktemp -d "$parent/project-atlas-restore.XXXXXX")" || return 1
+  chmod 0700 "$stage" || {
+    rm -rf -- "$stage"
+    return 1
+  }
+
+  if [[ "$stage" == "$project_root" || "$stage" == "$project_root/"* ]]; then
+    rm -rf -- "$stage"
+    echo 'ERROR: staged restore overlaps the Atlas project tree.' >&2
+    return 1
+  fi
+
+  while IFS=$'\t' read -r \
+    _surface source _archive _requirement _kind _group
+  do
+    if [[ "$stage" == "$source" || "$stage" == "$source/"* ]]; then
+      rm -rf -- "$stage"
+      echo 'ERROR: staged restore overlaps authoritative Atlas state.' >&2
+      return 1
+    fi
+  done < <(atlas_backup_recovery_surface_rows)
+
+  if ! atlas_backup_recovery_extract_private "$archive" "$stage"; then
+    rm -rf -- "$stage"
+    return 1
+  fi
+
+  after="$(sha256sum -- "$archive" | awk '{print $1}')" || {
+    rm -rf -- "$stage"
+    return 1
+  }
+
+  [[ "$before" == "$after" ]] || {
+    rm -rf -- "$stage"
+    echo 'ERROR: recovery archive changed during staging.' >&2
+    return 1
+  }
+
+  if ! atlas_backup_recovery_validate_staged_restore "$stage"; then
+    rm -rf -- "$stage"
+    return 1
+  fi
+
+  printf '%s\n' "$stage"
+}

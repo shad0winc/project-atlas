@@ -66,6 +66,7 @@ def test_restore_help_is_read_only(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
     assert "atlas restore inspect <archive>" in result.stdout
     assert "atlas restore verify <archive>" in result.stdout
+    assert "atlas restore stage <archive>" in result.stdout
     assert not marker.exists()
 
 
