@@ -8,6 +8,7 @@ import textwrap
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 UPDATE = PROJECT_ROOT / "scripts" / "commands" / "update.sh"
+DEPLOYMENT = PROJECT_ROOT / "scripts" / "commands" / "deployment.sh"
 STANDALONE = PROJECT_ROOT / "scripts" / "update.sh"
 
 
@@ -79,6 +80,24 @@ def prepare_runtime(tmp_path: Path, *, branch: str = "main") -> dict[str, str]:
             "ATLAS_TEST_UPDATE": str(UPDATE),
         }
     )
+    deployment_root = runtime / "deployments"
+    baseline = deployment_root / "records" / "baseline-test"
+    baseline.mkdir(parents=True)
+    (deployment_root / "current").write_text("baseline-test\n", encoding="utf-8")
+    (baseline / "status").write_text("verified\n", encoding="utf-8")
+    (baseline / "metadata").write_text(
+        "type=baseline\ndeployment_id=baseline-test\n"
+        "source_commit=abc123\ncore_commit=abc123\n"
+        "ingress_commit=abc123\nscope=all\nmigration=none\n",
+        encoding="utf-8",
+    )
+    (baseline / "images.tsv").write_text(
+        "core|docker-compose.yml|atlas|core|core-container|core:test|sha256:core\n"
+        "ingress|stack/ingress.yml|atlas-ingress|caddy|atlas-caddy|caddy:test|sha256:caddy\n",
+        encoding="utf-8",
+    )
+    (baseline / "core-source.tar.gz").write_bytes(b"archive")
+    (baseline / "ingress-source.tar.gz").write_bytes(b"archive")
     return environment
 
 
@@ -88,6 +107,7 @@ def run_update(
 ) -> subprocess.CompletedProcess[str]:
     harness = r"""
     set -u
+    source "$ATLAS_TEST_DEPLOYMENT"
     source "$ATLAS_TEST_UPDATE"
 
     atlas_print_header() { :; }
@@ -108,8 +128,27 @@ def run_update(
       return "${ATLAS_TEST_BACKUP_STATUS:-0}"
     }
 
-    atlas_command_update "$1"
+    atlas_deployment_archive_source() {
+      cp "$ATLAS_TEST_ARCHIVE" "$2"
+    }
+    atlas_deployment_verify_runtime() { return 0; }
+    atlas_deployment_capture_images() {
+      cp "$ATLAS_TEST_IMAGES" "$1/images.tsv"
+    }
+    atlas_deployment_record_backup() {
+      printf "%s\n" "$2" > "$(atlas_deployment_record_dir "$1")/backup_file"
+    }
+    atlas_update_latest_backup() { printf "%s\n" "$ATLAS_TEST_BACKUP_FILE"; }
+    atlas_command_update "$1" --migration none
     """
+    baseline = Path(environment["ATLAS_RUNTIME_CONFIG_DIR"]) / "deployments" / "records" / "baseline-test"
+    environment = dict(environment)
+    environment["ATLAS_TEST_DEPLOYMENT"] = str(DEPLOYMENT)
+    environment["ATLAS_TEST_ARCHIVE"] = str(baseline / "core-source.tar.gz")
+    environment["ATLAS_TEST_IMAGES"] = str(baseline / "images.tsv")
+    backup = Path(environment["ATLAS_RUNTIME_CONFIG_DIR"]) / "test-backup.tar.gz"
+    backup.write_bytes(b"backup")
+    environment["ATLAS_TEST_BACKUP_FILE"] = str(backup)
     return subprocess.run(
         ["bash", "-c", textwrap.dedent(harness), "atlas-update-test", scope],
         env=environment,

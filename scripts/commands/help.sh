@@ -85,7 +85,10 @@ Maintenance
 -----------
   atlas verify
   atlas doctor
-  atlas update [core|ingress|all]
+  atlas update <core|ingress|all> --migration none
+  atlas deployment status
+  atlas deployment baseline
+  atlas deployment rollback <deployment-id>
   atlas maintenance status
   atlas maintenance enable
   atlas maintenance disable
