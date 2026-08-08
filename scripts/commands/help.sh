@@ -93,6 +93,8 @@ Maintenance
   atlas maintenance enable
   atlas maintenance disable
   atlas backup
+  atlas restore inspect <archive>
+  atlas restore verify <archive>
   atlas restart
   atlas logs <container>
 
