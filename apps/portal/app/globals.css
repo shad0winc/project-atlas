@@ -1964,3 +1964,215 @@ a {
     text-align: left;
   }
 }
+
+/* M-023.27.3B2 — Personal Requests Portal */
+
+.requests-refresh-button,
+.request-cancel-button,
+.request-secondary-button {
+  min-height: 2.5rem;
+  border: 1px solid var(--border-strong, rgba(148, 163, 184, 0.35));
+  border-radius: 0.75rem;
+  padding: 0.65rem 1rem;
+  background: var(--surface-raised, rgba(15, 23, 42, 0.72));
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.requests-refresh-button:hover:not(:disabled),
+.request-cancel-button:hover:not(:disabled),
+.request-secondary-button:hover:not(:disabled) {
+  border-color: currentColor;
+}
+
+.requests-refresh-button:focus-visible,
+.request-cancel-button:focus-visible,
+.request-secondary-button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+
+.requests-refresh-button:disabled,
+.request-cancel-button:disabled,
+.request-secondary-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.requests-view {
+  display: grid;
+  gap: 1rem;
+}
+
+.requests-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.request-card,
+.requests-message-panel,
+.requests-mutation-error,
+.request-recovery-warning {
+  border: 1px solid var(--border-subtle, rgba(148, 163, 184, 0.22));
+  border-radius: 1rem;
+  background: var(--surface-panel, rgba(15, 23, 42, 0.45));
+}
+
+.request-card {
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+  min-height: 16rem;
+  padding: 1.1rem;
+}
+
+.request-card-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.request-card-kind {
+  margin: 0 0 0.35rem;
+  color: var(--text-muted, #94a3b8);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.request-card-title,
+.requests-message-panel h2,
+.requests-mutation-error h2 {
+  margin: 0;
+}
+
+.request-status-badge {
+  flex: 0 0 auto;
+  border: 1px solid var(--border-subtle, rgba(148, 163, 184, 0.25));
+  border-radius: 999px;
+  padding: 0.25rem 0.55rem;
+  color: var(--text-muted, #94a3b8);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.request-card-meta {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+}
+
+.request-card-meta div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.request-card-meta dt {
+  color: var(--text-muted, #94a3b8);
+}
+
+.request-card-meta dd {
+  margin: 0;
+  text-align: right;
+}
+
+.request-id-value {
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+}
+
+.request-read-only,
+.request-cancel-confirmation p,
+.requests-message-panel p,
+.requests-mutation-error p,
+.request-recovery-warning p {
+  margin: 0;
+  color: var(--text-muted, #94a3b8);
+  line-height: 1.6;
+}
+
+.request-read-only {
+  align-self: end;
+  font-size: 0.875rem;
+}
+
+.request-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.request-cancel-button {
+  border-style: dashed;
+}
+
+.request-cancel-confirmation {
+  display: grid;
+  gap: 0.8rem;
+  align-self: end;
+}
+
+.requests-message-panel,
+.requests-mutation-error,
+.request-recovery-warning {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1.25rem;
+}
+
+.request-recovery-warning {
+  border-style: dashed;
+}
+
+.requests-message-panel .requests-refresh-button {
+  justify-self: start;
+}
+
+.request-card-loading {
+  overflow: hidden;
+}
+
+.request-loading-line {
+  display: block;
+  width: 100%;
+  height: 0.8rem;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.18);
+}
+
+.request-loading-line-short {
+  width: 40%;
+}
+
+.request-loading-line-title {
+  width: 75%;
+  height: 1.6rem;
+}
+
+@media (max-width: 960px) {
+  .requests-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .requests-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .request-card-header,
+  .request-card-meta div {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .request-card-meta dd {
+    text-align: left;
+  }
+}
