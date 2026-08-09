@@ -14,6 +14,12 @@ MAINTAINERR_IMAGE = (
     "811a580fdf479e8582d3c97047b1aa8930fc5523f63143498020864ad6a7cd80"
 )
 
+SEERR_IMAGE = (
+    "ghcr.io/seerr-team/seerr:v3.4.1"
+    "@sha256:"
+    "f4768de5f616248d723e05891f3345a1402123775d03bf0890dbfedc0831bda1"
+)
+
 
 def _service_block(
     content: str,
@@ -63,3 +69,40 @@ def test_maintainerr_preserves_existing_storage_contract() -> None:
     assert "      - ${CONFIG}/maintainerr:/opt/data\n" in maintainerr
     assert "      - ${MEDIA}:/media\n" in maintainerr
     assert '"${MAINTAINERR_PORT:-6246}:6246"' in maintainerr
+
+
+def test_jellyseerr_compatibility_service_uses_official_seerr_image() -> None:
+    content = CORE_COMPOSE.read_text(encoding="utf-8")
+    jellyseerr = _service_block(
+        content,
+        "jellyseerr",
+        "bazarr",
+    )
+
+    assert f"    image: {SEERR_IMAGE}\n" in jellyseerr
+    assert "fallenbagel/jellyseerr" not in content
+    assert "    init: true\n" in jellyseerr
+
+
+def test_seerr_preserves_atlas_jellyseerr_compatibility_identity() -> None:
+    content = CORE_COMPOSE.read_text(encoding="utf-8")
+    jellyseerr = _service_block(
+        content,
+        "jellyseerr",
+        "bazarr",
+    )
+
+    assert "  jellyseerr:\n" in content
+    assert "    container_name: jellyseerr\n" in jellyseerr
+    assert '"${JELLYSEERR_PORT:-5055}:5055"' in jellyseerr
+
+
+def test_seerr_preserves_existing_configuration_path() -> None:
+    content = CORE_COMPOSE.read_text(encoding="utf-8")
+    jellyseerr = _service_block(
+        content,
+        "jellyseerr",
+        "bazarr",
+    )
+
+    assert "      - ${CONFIG}/jellyseerr:/app/config\n" in jellyseerr
