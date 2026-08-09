@@ -356,6 +356,14 @@ The complete request lifecycle must be validated:
 The workflow must avoid duplicate submissions, ambiguous status, and silent
 failure.
 
+For television and anime series, the supported Portal must make season scope
+explicit. A generic TV action must not silently interpret an unspecified season
+as an all-seasons request. When a user requests a supported ongoing series, the
+v1.0 workflow must preserve downstream monitoring through Seerr and the
+appropriate Sonarr instance so future episodes can be acquired automatically
+under the configured monitoring, quality, and release rules without requiring a
+new Atlas request per episode.
+
 ## 8.5 Favorites and Protection
 
 The favorites workflow must be complete from the user's perspective.
@@ -670,7 +678,11 @@ Certification requires:
 - duplicate or ineligible requests are handled clearly;
 - successful submission produces confirmation;
 - status is visible afterward;
-- failures provide actionable feedback.
+- failures provide actionable feedback;
+- outcome-ambiguous mutations are not automatically replayed;
+- television/anime season scope is explicit before series mutation; and
+- ongoing requested series can remain monitored so future episodes are acquired
+  automatically without requiring per-episode Atlas requests.
 
 ### Favorites and Protection
 

@@ -4,6 +4,23 @@ All notable changes to Project Atlas are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added Seerr-backed Media discovery/search through the Atlas API and the
+  authenticated `/portal/media` experience without exposing browser-to-provider
+  access or rendering raw provider media identifiers.
+- Added self-scoped Personal Request creation to the Portal and an eligible
+  movie Request action guarded by `requests.create`, with per-card mutation
+  feedback, zero automatic POST retries, and safe stale-conflict handling.
+- Added global active-target uniqueness for Media Requests using the persistent
+  `requests.lock` sidecar and `fcntl.flock()` so the duplicate check and initial
+  `PENDING` persistence are serialized across concurrent writers before any
+  provider submission can occur.
+- Preserved TV and anime-TV provider request capability while intentionally
+  deferring Portal series mutation until explicit season-selection UX is
+  available; v1.0 acceptance retains ongoing-series monitoring and automatic
+  future-episode acquisition as a required user workflow.
+
 ### Fixed
 
 - Completed the M-023.26 Security engineering review across authentication,

@@ -443,7 +443,31 @@ Manual + Runtime
 ### Expected Result
 
 The request is submitted once, confirmation is clear, and the resulting request
-status is visible to the user.
+status is visible to the user. Duplicate or stale eligibility must not produce a
+second provider submission, and an outcome-ambiguous mutation must not be
+silently retried.
+
+### Series and Anime Acceptance Requirement
+
+Atlas v1.0 must also validate the supported television and anime-series request
+journey once explicit season-selection UX is implemented.
+
+Certification requires:
+
+- the user explicitly chooses the intended season scope rather than a generic
+  TV action silently implying all seasons;
+- television and anime-series requests reach the appropriate supported
+  downstream automation path;
+- an ongoing requested series can remain monitored through Seerr and Sonarr or
+  Sonarr Anime so newly released episodes can be acquired automatically under
+  the configured monitoring, quality, and release rules; and
+- the user is not required to create a new Atlas request for every future
+  episode of an already monitored ongoing series.
+
+At source checkpoint `b1c2ebcb`, the Portal movie Request action is implemented,
+while Portal TV/anime season-selection mutation remains intentionally deferred.
+This acceptance requirement records the v1.0 target; it does not mark that
+remaining Portal workflow complete.
 
 ### Observed Result
 
@@ -1227,6 +1251,9 @@ Validate:
 - [ ] Dashboard loading provides visible progress.
 - [ ] Search provides visible progress.
 - [ ] Request submission prevents accidental duplicate action.
+- [ ] Outcome-ambiguous Request submission is not automatically retried.
+- [ ] Ongoing TV/anime monitoring acquires future episodes without per-episode
+      Atlas requests once the supported series-request workflow is enabled.
 - [ ] Favorites update without misleading delay.
 - [ ] Administrator lists and details remain responsive.
 - [ ] Health data loads within an acceptable operational window.

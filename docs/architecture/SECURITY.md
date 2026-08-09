@@ -227,6 +227,44 @@ release checklist and requires current vulnerability evidence, controlled
 runtime validation, accepted residual limitations, and explicit security
 approval.
 
+## Media Discovery and Request Mutation Boundary
+
+M-023.27.3B3 preserves the security boundary between the public Portal, Atlas,
+and the external Media request/discovery provider.
+
+- Browser clients call only the Atlas API; they do not connect directly to
+  Seerr or receive provider credentials.
+- Discovery requires `media.read`. Request mutation additionally requires
+  `requests.create`; hiding or showing a Portal control never replaces API-side
+  authorization.
+- Personal Request creation is self-scoped. Callers cannot choose request owner,
+  provider request ID, lifecycle status, or server timestamps.
+- Raw provider request IDs remain server-private. Provider media identity is
+  used internally as target identity and request transport but is not rendered
+  by the Media discovery cards.
+- Portal Request POSTs disable automatic transport retries. A 409 active-target
+  conflict is safe to present as already requested, while reconciliation or an
+  otherwise outcome-unconfirmed mutation remains blocked from automatic replay.
+- Active-target uniqueness is global across Atlas users because the current
+  Media provider mutation boundary uses shared server-side provider identity.
+  The authoritative target key is provider + provider media identity +
+  normalized media family/season overlap, not user, title, or year.
+- The Request repository serializes registry mutations with a persistent
+  `requests.lock` sidecar and Linux `fcntl.flock()`. This lock is not a secret;
+  it is coordination state and must live on the same shared Request-state
+  filesystem as `requests.json` for every writer.
+- Provider mutation begins only after the initial local `PENDING` request is
+  durably persisted. A losing concurrent creator therefore cannot reach a
+  second provider submission.
+
+TV/anime request provider capability remains server-side, but the Portal does
+not yet expose generic TV mutation. `season_number=None` means all seasons at
+the current provider boundary, so explicit season-selection UX is required
+before the Portal enables series requests.
+
+See [Media Discovery and Request Safety](MEDIA_DISCOVERY_REQUESTS.md) and
+[Interrupted-Request Recovery](INTERRUPTED_REQUEST_RECOVERY.md).
+
 ## Related Decisions
 
 - [ADR-0024: Security Trust Boundaries](../ADR/0024-security-trust-boundaries.md)

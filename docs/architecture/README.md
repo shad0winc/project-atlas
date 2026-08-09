@@ -33,6 +33,7 @@ Project Atlas
 │   ├── Scheduler and events
 │   │   └── Scheduler Recovery
 │   ├── Media Requests
+│   │   ├── Media Discovery and Request Safety
 │   │   └── Interrupted-Request Recovery
 │   └── Module platform
 ├── Providers and adapters
@@ -58,6 +59,7 @@ logic.
 - [Service Dependency Verification](SERVICE_DEPENDENCY_VERIFICATION.md)
 - [Stale-State Recovery](STALE_STATE_RECOVERY.md)
 - [Scheduler Recovery](SCHEDULER_RECOVERY.md)
+- [Media Discovery and Request Safety](MEDIA_DISCOVERY_REQUESTS.md)
 - [Interrupted-Request Recovery](INTERRUPTED_REQUEST_RECOVERY.md)
 - [Sports Recovery](SPORTS_RECOVERY.md)
 - [Automatic Cleanup Safety](AUTOMATIC_CLEANUP_SAFETY.md)
@@ -149,6 +151,17 @@ runtime-lock behavior without introducing a second scheduling engine.
 
 - [Architecture](SCHEDULER_RECOVERY.md)
 - [ADR 0015 — Scheduler Recovery Boundaries](../ADR/0015-scheduler-recovery-boundaries.md)
+
+## Media Discovery and Request Safety
+
+Media Discovery and Request Safety defines the Seerr-to-Atlas-to-Portal read
+boundary, the authoritative Request mutation path, global active-target
+uniqueness, inter-process registry locking, Portal non-retry behavior, and the
+current movie-only Portal mutation boundary.
+
+- [Architecture](MEDIA_DISCOVERY_REQUESTS.md)
+- [Interrupted-Request Recovery](INTERRUPTED_REQUEST_RECOVERY.md)
+- [Security](SECURITY.md)
 
 ## Interrupted-Request Recovery
 

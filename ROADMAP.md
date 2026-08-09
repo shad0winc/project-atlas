@@ -399,7 +399,7 @@ applications, and modules.
 
 ## M-021 — Media and Sports Experience
 
-**Status:** Planned for v1.0
+**Status:** In Progress for v1.0
 
 **Goal:** Allow friends and family to use Media and Sports without interacting
 with backend services.
@@ -417,16 +417,24 @@ with backend services.
 
 ### Media Experience
 
-- [ ] Browse available media
-- [ ] Search available media
+- [x] Browse available media
+- [x] Search available media
 - [ ] Open media in Jellyfin
-- [ ] Request movies
+- [x] Request movies
 - [ ] Request television series
+  - [x] Preserve server-side TV request/provider capability
+  - [ ] Add explicit Portal season-selection/request UX
+  - [ ] Validate ongoing-series monitoring so future episodes can be acquired
+        automatically through Seerr and Sonarr without a new Atlas request per episode
 - [ ] Request anime movies
 - [ ] Request anime series
-- [ ] View request history
-- [ ] View request status
-- [ ] Cancel eligible requests
+  - [x] Preserve server-side anime-TV request/provider capability
+  - [ ] Add explicit Portal season-selection/request UX
+  - [ ] Validate ongoing-series monitoring so future episodes can be acquired
+        automatically through Seerr and Sonarr Anime without a new Atlas request per episode
+- [x] View request history
+- [x] View request status
+- [x] Cancel eligible requests
 - [ ] Add favorites
 - [ ] Remove favorites
 - [ ] View personal favorites
@@ -774,7 +782,8 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 
 ### Documentation
 
-- [ ] Update architecture documentation
+- [x] Reconcile Media discovery and Request architecture through M-023.27.3B3
+- [ ] Update architecture documentation for remaining v1.0 surfaces
 - [ ] Complete administrator guide
 - [ ] Complete user guide
 - [ ] Complete installation guide

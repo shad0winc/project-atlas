@@ -5745,3 +5745,106 @@ certification must still include:
 
 M-023.26 therefore closes the Security engineering implementation without
 prematurely certifying the v1.0 release.
+
+---
+
+## M-023.27.3B3 — Media Discovery and Safe Request Action
+
+M-023.27.3B3 established the end-user Media discovery-to-request path while
+preserving Atlas as the authoritative security and mutation boundary. The work
+was completed as four atomic source commits on `feature/security-review`.
+
+### B3.1 — Seerr Media Discovery Foundation
+
+Commit `755409de9fdefb756f81248ff1f4016c2b100edb`
+(`feat(media): add seerr-backed media discovery`) added read-only Media discovery
+and search through Atlas.
+
+The API exposes normalized movie/TV discovery state and keeps Seerr server-side.
+`request_eligible` is advisory presentation state: only `not_tracked` is exposed
+as eligible, while tracked, known, or unsupported provider states fail closed.
+Provider media identity is carried only as the internal request target identity.
+
+The final B3.1 regression passed 3,044 Core tests plus 104 subtests and 333 API
+tests plus 15 subtests, including the dedicated discovery and Request provider
+contracts.
+
+### B3.2 — Personal Media Browse and Search
+
+Commit `7bd4a14a1f2532e4cc69a8f02dadf07c601b2105`
+(`feat(portal): add personal media discovery`) added `/portal/media` with
+movie/TV browse, search, pagination, manual refresh, and stale-response
+suppression.
+
+The Portal consumes Atlas only; it does not connect directly to Seerr. Raw
+provider media identifiers are retained internally for stable identity and
+future request transport but are not rendered to the user. B3.2 remained
+read-only.
+
+### B3.3.1 — Active Request Duplicate and Race Protection
+
+Commit `28cbb7902fd518734a907e02e011b67b484cb345`
+(`feat(requests): enforce active request uniqueness`) hardened the durable Media
+Request repository before Portal request mutation was exposed.
+
+The Request registry now owns a persistent `requests.lock` sidecar. Every
+read-modify-write mutation uses Linux `fcntl.flock()` exclusion, and the active
+target conflict check plus the initial `PENDING` write occur in the same locked
+transaction. Provider submission remains outside the lock and occurs only after
+local persistence succeeds.
+
+Active-target identity is global across Atlas users because all users share the
+server-side provider identity. It consists of provider, provider media identity,
+and normalized media family; user ID, title, and year do not define uniqueness.
+Jellyseerr/Seerr movie and anime-movie requests share one movie family, while TV
+and anime-TV share one TV family. An all-seasons TV request overlaps every
+explicit season, the same explicit season conflicts, and different explicit
+seasons may coexist. Terminal history does not permanently block a later
+request.
+
+A losing concurrent creator receives the existing HTTP 409 conflict path before
+a second provider submission. Outcome-ambiguous provider mutations continue to
+use the existing reconciliation-required/do-not-retry behavior from
+Interrupted-Request Recovery. The schema remains version 1.
+
+The final gate passed 3,055 Core tests plus 104 subtests and 336 API tests plus
+15 subtests.
+
+### B3.3.2 — Portal Media to Movie Request Action
+
+Commit `b1c2ebcbfaa63775c8230cc17728911dab0b98c2`
+(`feat(portal): add movie request action`) extended the existing Personal
+Requests feature with caller-controlled POST `/requests` transport and added the
+first Media-card Request action.
+
+The Portal requires `requests.create` before rendering the movie mutation
+control, while API authorization remains independently authoritative. The POST
+contains only caller-controlled media fields, automatic mutation retries are
+disabled, and each card owns its own submitting/result state. A target remains
+locally blocked from repeated POST for the lifetime of the page after any
+mutation attempt. Stale active-target HTTP 409 becomes `Already requested`;
+reconciliation-required or otherwise unconfirmed outcomes become `Check
+requests` and are not automatically replayed.
+
+TV mutation is deliberately not exposed in this slice. A generic TV-card click
+would otherwise map `season_number=None` to all seasons, so the Portal explicitly
+requires future season-selection UX instead of making that choice silently.
+Server-side TV and anime-TV provider capability remains intact.
+
+For v1.0, ongoing TV and anime series remain a required end-user workflow:
+a supported series request must be able to remain monitored downstream through
+Seerr and the appropriate Sonarr instance so future episodes can be acquired
+automatically without requiring a new Atlas request for each episode. This is a
+release acceptance requirement; B3.3.2 does not claim that the Portal
+season-selection workflow is complete yet.
+
+The final B3.3.2 gate passed 67 focused Portal tests, the full 194-test Portal
+suite, TypeScript typecheck, ESLint, and the Next.js production build.
+
+### Result
+
+M-023.27.3B3 completes the safe movie discovery-to-request source path and the
+server-side concurrency prerequisite for future series request UX. No production
+deployment was performed by these four source commits. TV/anime season selection,
+downstream ongoing-series acceptance validation, and the remaining v1.0
+end-to-end/user-acceptance gates remain open.
