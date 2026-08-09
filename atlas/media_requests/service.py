@@ -27,6 +27,7 @@ from .provider import (
 )
 from .repository import (
     JsonMediaRequestRepository,
+    MediaRequestRepositoryConflictError,
     MediaRequestRepositoryError,
 )
 
@@ -158,6 +159,12 @@ class MediaRequestServiceError(RuntimeError):
     """Raised when media-request orchestration cannot complete safely."""
 
 
+class MediaRequestServiceConflictError(
+    MediaRequestServiceError
+):
+    """Raised when an active request already owns the provider target."""
+
+
 class MediaRequestService:
     """Coordinate media-request models, persistence, and providers."""
 
@@ -269,7 +276,15 @@ class MediaRequestService:
             )
 
         try:
-            persisted = self.repository.save(request)
+            persisted = (
+                self.repository.save_if_no_active_conflict(
+                    request
+                )
+            )
+        except MediaRequestRepositoryConflictError as exc:
+            raise MediaRequestServiceConflictError(
+                "active media request conflicts with provider target"
+            ) from exc
         except MediaRequestRepositoryError as exc:
             raise MediaRequestServiceError(
                 f"unable to persist media request: {request.request_id}",

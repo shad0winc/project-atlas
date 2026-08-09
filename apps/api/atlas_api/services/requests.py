@@ -15,6 +15,7 @@ from atlas.media_requests import (
     MediaRequestProviderError,
     MediaRequestRepositoryError,
     MediaRequestService,
+    MediaRequestServiceConflictError,
     MediaRequestServiceError,
     MediaRequestStatus,
     default_jellyseerr_media_request_provider,
@@ -142,6 +143,10 @@ class MediaRequestsAPIService:
             self.requests.create_request(
                 request
             )
+        except MediaRequestServiceConflictError as error:
+            raise MediaRequestConflictError(
+                "Media request conflicts with existing state."
+            ) from error
         except MediaRequestServiceError as error:
             message = str(error)
 

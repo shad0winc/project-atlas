@@ -14,6 +14,7 @@ from atlas.media_requests import (
     MediaRequestProviderOperationError,
     MediaRequestRepositoryError,
     MediaRequestService,
+    MediaRequestServiceConflictError,
     MediaRequestServiceError,
     MediaRequestStatus,
     MediaRequestType,
@@ -209,6 +210,26 @@ def test_create_request_persists_pending_request(
     assert service.get_request(request.request_id) == request
 
 
+def test_create_request_rejects_active_target_conflict(
+    service: MediaRequestService,
+) -> None:
+    first = make_request()
+    second = make_request(
+        request_id="request-002",
+        user_id="user-002",
+    )
+
+    service.create_request(first)
+
+    with pytest.raises(
+        MediaRequestServiceConflictError,
+        match="active media request conflicts",
+    ):
+        service.create_request(second)
+
+    assert service.list_requests() == (first,)
+
+
 def test_create_request_requires_media_request(
     service: MediaRequestService,
 ) -> None:
@@ -292,7 +313,7 @@ def test_create_request_wraps_repository_failure(
 ) -> None:
     monkeypatch.setattr(
         service.repository,
-        "save",
+        "save_if_no_active_conflict",
         lambda request: (_ for _ in ()).throw(
             MediaRequestRepositoryError("failure")
         ),

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Barrier
 import tempfile
 import unittest
 
@@ -34,6 +36,7 @@ from atlas_api.routes.v1.requests import (
     require_requests_read,
 )
 from atlas_api.services.requests import (
+    MediaRequestConflictError,
     MediaRequestNotFoundError,
     MediaRequestReconciliationRequiredError,
     MediaRequestValidationError,
@@ -101,6 +104,7 @@ class StubMediaRequestsAPIService:
                 int | None,
             ]
         ] = []
+        self.create_error: Exception | None = None
         self.cancel_calls: list[
             tuple[str, str]
         ] = []
@@ -134,6 +138,9 @@ class StubMediaRequestsAPIService:
                 season_number,
             )
         )
+
+        if self.create_error is not None:
+            raise self.create_error
 
         return request_record()
 
@@ -272,6 +279,38 @@ class MediaRequestsEndpointTests(unittest.TestCase):
                 )
             ],
             self.service.create_calls,
+        )
+
+    def test_create_maps_active_target_conflict_to_409(
+        self,
+    ) -> None:
+        self.service.create_error = (
+            MediaRequestConflictError(
+                "active duplicate"
+            )
+        )
+
+        response = self.client.post(
+            "/api/v1/requests",
+            json={
+                "media_type": "movie",
+                "provider_media_id": "157336",
+                "title": "Interstellar",
+            },
+        )
+
+        self.assertEqual(
+            409,
+            response.status_code,
+        )
+
+        self.assertEqual(
+            {
+                "detail": (
+                    "Media request conflicts with existing state."
+                )
+            },
+            response.json(),
         )
 
     def test_create_rejects_caller_owned_fields(
@@ -579,6 +618,121 @@ def test_application_create_binds_authenticated_owner_and_id() -> None:
     assert submitted.request_id == REQUEST_ID
     assert submitted.user_id == USER_ID
     assert submitted.status is MediaRequestStatus.SUBMITTING
+
+
+def test_application_rejects_cross_user_active_duplicate_before_provider(
+) -> None:
+    fixture = make_service_fixture()
+
+    fixture.api.create_for_user(
+        USER_ID,
+        media_type="movie",
+        provider_media_id="157336",
+        title="Interstellar",
+    )
+
+    second_api = MediaRequestsAPIService(
+        repository=fixture.repository,
+        requests=fixture.api.requests,
+        request_id_factory=lambda: OTHER_REQUEST_ID,
+    )
+
+    with pytest.raises(
+        MediaRequestConflictError,
+        match="conflicts",
+    ):
+        second_api.create_for_user(
+            OTHER_USER_ID,
+            media_type="movie",
+            provider_media_id="157336",
+            title="Interstellar",
+        )
+
+    assert len(fixture.provider.submissions) == 1
+    assert len(fixture.repository.list()) == 1
+
+
+def test_concurrent_cross_user_duplicate_allows_one_provider_submission(
+) -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory) / "requests"
+        provider = FakeProvider()
+
+        first_repository = JsonMediaRequestRepository(
+            root
+        )
+        second_repository = JsonMediaRequestRepository(
+            root
+        )
+
+        first_api = MediaRequestsAPIService(
+            repository=first_repository,
+            requests=MediaRequestService(
+                first_repository,
+                (provider,),
+            ),
+            request_id_factory=lambda: REQUEST_ID,
+        )
+        second_api = MediaRequestsAPIService(
+            repository=second_repository,
+            requests=MediaRequestService(
+                second_repository,
+                (provider,),
+            ),
+            request_id_factory=lambda: OTHER_REQUEST_ID,
+        )
+
+        start = Barrier(3)
+
+        def create(
+            api: MediaRequestsAPIService,
+            user_id: str,
+        ) -> str:
+            start.wait()
+
+            try:
+                api.create_for_user(
+                    user_id,
+                    media_type="movie",
+                    provider_media_id="157336",
+                    title="Interstellar",
+                )
+            except MediaRequestConflictError:
+                return "conflict"
+
+            return "created"
+
+        with ThreadPoolExecutor(
+            max_workers=2
+        ) as executor:
+            first = executor.submit(
+                create,
+                first_api,
+                USER_ID,
+            )
+            second = executor.submit(
+                create,
+                second_api,
+                OTHER_USER_ID,
+            )
+
+            start.wait()
+
+            outcomes = sorted(
+                (
+                    first.result(),
+                    second.result(),
+                )
+            )
+
+        assert outcomes == [
+            "conflict",
+            "created",
+        ]
+        assert len(provider.submissions) == 1
+        assert len(
+            first_repository.list()
+        ) == 1
 
 
 def test_application_rejects_non_numeric_jellyseerr_id_before_persistence(

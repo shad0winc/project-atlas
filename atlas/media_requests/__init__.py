@@ -37,11 +37,13 @@ from .providers import (
 )
 from .repository import (
     JsonMediaRequestRepository,
+    MediaRequestRepositoryConflictError,
     MediaRequestRepositoryError,
     SCHEMA_VERSION,
 )
 from .service import (
     MediaRequestService,
+    MediaRequestServiceConflictError,
     MediaRequestServiceError,
 )
 
@@ -62,8 +64,10 @@ __all__ = [
     "MediaRequestProvider",
     "MediaRequestProviderError",
     "MediaRequestProviderOperationError",
+    "MediaRequestRepositoryConflictError",
     "MediaRequestRepositoryError",
     "MediaRequestService",
+    "MediaRequestServiceConflictError",
     "MediaRequestServiceError",
     "MediaRequestStatus",
     "MediaRequestType",

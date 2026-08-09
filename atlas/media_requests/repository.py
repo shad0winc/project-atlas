@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
+import fcntl
 import json
 from pathlib import Path
 import re
@@ -13,6 +15,7 @@ from atlas.atomic import write_json_atomic
 from .models import (
     MediaRequest,
     MediaRequestError,
+    MediaRequestType,
 )
 
 
@@ -29,55 +32,102 @@ class MediaRequestRepositoryError(ValueError):
     """Raised when media-request persistence cannot be completed safely."""
 
 
+class MediaRequestRepositoryConflictError(
+    MediaRequestRepositoryError
+):
+    """Raised when an active request already owns the provider target."""
+
+
 class JsonMediaRequestRepository:
     """Persist normalized media requests in one atomic JSON registry."""
 
     def __init__(self, root: str | Path) -> None:
         self.root = Path(root)
         self.registry_file = self.root / "requests.json"
+        self.lock_file = self.root / "requests.lock"
 
     def initialize(self) -> None:
         """Create the repository layout when it does not already exist."""
 
         self.root.mkdir(parents=True, exist_ok=True)
 
-        if not self.registry_file.exists():
-            self._write_document(
-                self._empty_document(),
-            )
+        if self.registry_file.exists():
+            return
+
+        with self._exclusive_lock():
+            if not self.registry_file.exists():
+                self._write_document(
+                    self._empty_document(),
+                )
 
     def save(self, request: MediaRequest) -> MediaRequest:
         """Persist one new request and reject duplicate identities."""
 
+        return self._save(
+            request,
+            reject_active_target_conflict=False,
+        )
+
+    def save_if_no_active_conflict(
+        self,
+        request: MediaRequest,
+    ) -> MediaRequest:
+        """Persist a request only when no active provider target overlaps."""
+
+        return self._save(
+            request,
+            reject_active_target_conflict=True,
+        )
+
+    def _save(
+        self,
+        request: MediaRequest,
+        *,
+        reject_active_target_conflict: bool,
+    ) -> MediaRequest:
         if not isinstance(request, MediaRequest):
             raise MediaRequestRepositoryError(
                 "request must be a MediaRequest",
             )
 
-        document = self._load_document()
-        requests = dict(document["requests"])
+        self.initialize()
 
-        if request.request_id in requests:
-            raise MediaRequestRepositoryError(
-                f"media request already exists: {request.request_id}",
-            )
+        with self._exclusive_lock():
+            document = self._load_document_initialized()
+            requests = dict(document["requests"])
 
-        if request.provider_request_id is not None:
-            duplicate = self._find_provider_request_in_records(
-                requests,
-                request.provider,
-                request.provider_request_id,
-            )
-            if duplicate is not None:
+            if request.request_id in requests:
                 raise MediaRequestRepositoryError(
-                    "provider request already exists: "
-                    f"{request.provider}:{request.provider_request_id}",
+                    f"media request already exists: {request.request_id}",
                 )
 
-        requests[request.request_id] = request.to_dict()
-        self._write_document(
-            self._document(requests),
-        )
+            if request.provider_request_id is not None:
+                duplicate = self._find_provider_request_in_records(
+                    requests,
+                    request.provider,
+                    request.provider_request_id,
+                )
+                if duplicate is not None:
+                    raise MediaRequestRepositoryError(
+                        "provider request already exists: "
+                        f"{request.provider}:{request.provider_request_id}",
+                    )
+
+            if reject_active_target_conflict:
+                conflict = self._find_active_target_conflict_in_records(
+                    requests,
+                    request,
+                )
+                if conflict is not None:
+                    raise MediaRequestRepositoryConflictError(
+                        "active media request conflicts with provider target: "
+                        f"{conflict.request_id}",
+                    )
+
+            requests[request.request_id] = request.to_dict()
+            self._write_document(
+                self._document(requests),
+            )
 
         return request
 
@@ -89,32 +139,35 @@ class JsonMediaRequestRepository:
                 "request must be a MediaRequest",
             )
 
-        document = self._load_document()
-        requests = dict(document["requests"])
+        self.initialize()
 
-        if request.request_id not in requests:
-            raise MediaRequestRepositoryError(
-                f"media request not found: {request.request_id}",
-            )
+        with self._exclusive_lock():
+            document = self._load_document_initialized()
+            requests = dict(document["requests"])
 
-        if request.provider_request_id is not None:
-            duplicate = self._find_provider_request_in_records(
-                requests,
-                request.provider,
-                request.provider_request_id,
-                exclude_request_id=request.request_id,
-            )
-            if duplicate is not None:
+            if request.request_id not in requests:
                 raise MediaRequestRepositoryError(
-                    "provider request already exists: "
-                    f"{request.provider}:{request.provider_request_id}",
+                    f"media request not found: {request.request_id}",
                 )
 
-        requests[request.request_id] = request.to_dict()
+            if request.provider_request_id is not None:
+                duplicate = self._find_provider_request_in_records(
+                    requests,
+                    request.provider,
+                    request.provider_request_id,
+                    exclude_request_id=request.request_id,
+                )
+                if duplicate is not None:
+                    raise MediaRequestRepositoryError(
+                        "provider request already exists: "
+                        f"{request.provider}:{request.provider_request_id}",
+                    )
 
-        self._write_document(
-            self._document(requests),
-        )
+            requests[request.request_id] = request.to_dict()
+
+            self._write_document(
+                self._document(requests),
+            )
 
         return request
 
@@ -210,24 +263,27 @@ class JsonMediaRequestRepository:
             request_id,
             "request_id",
         )
-        document = self._load_document()
-        requests = dict(document["requests"])
-        payload = requests.get(normalized_id)
+        self.initialize()
 
-        if payload is None:
-            raise MediaRequestRepositoryError(
-                f"media request not found: {normalized_id}",
+        with self._exclusive_lock():
+            document = self._load_document_initialized()
+            requests = dict(document["requests"])
+            payload = requests.get(normalized_id)
+
+            if payload is None:
+                raise MediaRequestRepositoryError(
+                    f"media request not found: {normalized_id}",
+                )
+
+            request = self._request_from_payload(
+                payload,
+                expected_request_id=normalized_id,
             )
+            del requests[normalized_id]
 
-        request = self._request_from_payload(
-            payload,
-            expected_request_id=normalized_id,
-        )
-        del requests[normalized_id]
-
-        self._write_document(
-            self._document(requests),
-        )
+            self._write_document(
+                self._document(requests),
+            )
 
         return request
 
@@ -248,7 +304,9 @@ class JsonMediaRequestRepository:
 
     def _load_document(self) -> dict[str, Any]:
         self.initialize()
+        return self._load_document_initialized()
 
+    def _load_document_initialized(self) -> dict[str, Any]:
         try:
             raw = self.registry_file.read_text(encoding="utf-8")
         except OSError as exc:
@@ -377,6 +435,74 @@ class JsonMediaRequestRepository:
 
         return None
 
+    def _find_active_target_conflict_in_records(
+        self,
+        records: Mapping[str, Mapping[str, Any]],
+        candidate: MediaRequest,
+    ) -> MediaRequest | None:
+        for request_id, payload in records.items():
+            request = self._request_from_payload(
+                payload,
+                expected_request_id=request_id,
+            )
+
+            if (
+                request.active
+                and _request_targets_overlap(
+                    request,
+                    candidate,
+                )
+            ):
+                return request
+
+        return None
+
+    @contextmanager
+    def _exclusive_lock(self) -> Iterator[None]:
+        self.root.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        try:
+            handle = self.lock_file.open(
+                "a+",
+                encoding="utf-8",
+            )
+        except OSError as exc:
+            raise MediaRequestRepositoryError(
+                "unable to open media-request lock file: "
+                f"{self.lock_file}",
+            ) from exc
+
+        try:
+            try:
+                fcntl.flock(
+                    handle.fileno(),
+                    fcntl.LOCK_EX,
+                )
+            except OSError as exc:
+                raise MediaRequestRepositoryError(
+                    "unable to acquire media-request lock: "
+                    f"{self.lock_file}",
+                ) from exc
+
+            try:
+                yield
+            finally:
+                try:
+                    fcntl.flock(
+                        handle.fileno(),
+                        fcntl.LOCK_UN,
+                    )
+                except OSError as exc:
+                    raise MediaRequestRepositoryError(
+                        "unable to release media-request lock: "
+                        f"{self.lock_file}",
+                    ) from exc
+        finally:
+            handle.close()
+
     @staticmethod
     def _empty_document() -> dict[str, Any]:
         return {
@@ -395,6 +521,60 @@ class JsonMediaRequestRepository:
                 for request_id in sorted(requests)
             },
         }
+
+
+def _request_targets_overlap(
+    existing: MediaRequest,
+    candidate: MediaRequest,
+) -> bool:
+    if existing.provider != candidate.provider:
+        return False
+
+    if existing.provider_media_id != candidate.provider_media_id:
+        return False
+
+    existing_family = _provider_media_family(existing)
+    candidate_family = _provider_media_family(candidate)
+
+    if existing_family != candidate_family:
+        return False
+
+    if (
+        existing.media_type in {
+            MediaRequestType.TV,
+            MediaRequestType.ANIME_TV,
+        }
+        and candidate.media_type in {
+            MediaRequestType.TV,
+            MediaRequestType.ANIME_TV,
+        }
+    ):
+        return (
+            existing.season_number is None
+            or candidate.season_number is None
+            or existing.season_number == candidate.season_number
+        )
+
+    return True
+
+
+def _provider_media_family(
+    request: MediaRequest,
+) -> str:
+    if request.provider == "jellyseerr":
+        if request.media_type in {
+            MediaRequestType.MOVIE,
+            MediaRequestType.ANIME_MOVIE,
+        }:
+            return "movie"
+
+        if request.media_type in {
+            MediaRequestType.TV,
+            MediaRequestType.ANIME_TV,
+        }:
+            return "tv"
+
+    return request.media_type.value
 
 
 def _required_identity(
