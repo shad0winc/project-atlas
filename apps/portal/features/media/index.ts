@@ -1,6 +1,10 @@
+export { loadMediaDiscovery, loadMediaSearch } from "./api/discovery";
+export type { ReadMediaDiscoveryOptions, SearchMediaDiscoveryOptions } from "./api/discovery";
+
 export { loadMedia } from "./api/media";
 export type { LoadMediaOptions } from "./api/media";
 
+export { MediaDiscoveryContent, MediaDiscoveryView } from "./components/MediaDiscoveryView";
 export { MediaError } from "./components/MediaError";
 export { MediaLibraryCard } from "./components/MediaLibraryCard";
 export { MediaLibraryGrid } from "./components/MediaLibraryGrid";
@@ -10,9 +14,20 @@ export { MediaSkeleton } from "./components/MediaSkeleton";
 export { MediaSummary } from "./components/MediaSummary";
 export { MediaView } from "./components/MediaView";
 
+export { useMediaDiscovery } from "./hooks/use-media-discovery";
+export type {
+  MediaDiscoveryErrorState,
+  MediaDiscoveryLoadingState,
+  MediaDiscoveryMode,
+  MediaDiscoveryReadyState,
+  MediaDiscoveryState,
+  UseMediaDiscoveryResult
+} from "./hooks/use-media-discovery";
+
 export { useMedia } from "./hooks/use-media";
 export type { UseMediaResult } from "./hooks/use-media";
 
+export { readMediaDiscovery, searchMediaDiscovery } from "./services/discovery";
 export { readMediaSnapshot } from "./services/media";
 export type { ReadMediaSnapshotOptions } from "./services/media";
 
@@ -32,3 +47,24 @@ export type {
   MediaReadyState,
   MediaState
 } from "./types/media-state";
+
+export {
+  MEDIA_DISCOVERY_AVAILABILITIES,
+  MEDIA_DISCOVERY_MEDIA_TYPES,
+  createMediaDiscoveryItem,
+  createMediaDiscoveryPage,
+  mediaDiscoveryAvailabilityLabel,
+  normalizeMediaDiscoveryAvailability,
+  normalizeMediaDiscoveryPageNumber,
+  normalizeMediaDiscoveryProviderId,
+  normalizeMediaDiscoveryQuery,
+  normalizeMediaDiscoveryType
+} from "./types/discovery";
+
+export type {
+  CreateMediaDiscoveryPageInput,
+  MediaDiscoveryAvailability,
+  MediaDiscoveryItem,
+  MediaDiscoveryMediaType,
+  MediaDiscoveryPage
+} from "./types/discovery";

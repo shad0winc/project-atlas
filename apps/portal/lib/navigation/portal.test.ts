@@ -51,6 +51,10 @@ describe("Portal route model", () => {
   it("provides stable named route access", () => {
     expect(PORTAL_ROUTES.dashboard.path).toBe("/portal");
     expect(PORTAL_ROUTES.media.path).toBe("/portal/media");
+    expect(PORTAL_ROUTES.media.navigationDescription).toBe("Browse and search movies and TV shows");
+    expect(PORTAL_ROUTES.media.pageDescription).toBe(
+      "Browse and search movies and TV shows available through Atlas."
+    );
     expect(PORTAL_ROUTES.favorites.path).toBe("/portal/favorites");
     expect(PORTAL_ROUTES.favorites.permission).toBe("favorites.read");
     expect(PORTAL_ROUTES.users.permission).toBe("users.read");

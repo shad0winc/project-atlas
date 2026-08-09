@@ -60,11 +60,11 @@ export const portalRoutes: readonly PortalRoute[] = [
     id: "media",
     path: "/portal/media",
     label: "Media",
-    navigationDescription: "Libraries and media statistics",
+    navigationDescription: "Browse and search movies and TV shows",
     abbreviation: "ME",
     permission: ATLAS_PERMISSIONS.mediaRead,
     section: PORTAL_ROUTE_SECTIONS.workspace,
-    pageDescription: "Review Atlas media libraries and collection statistics."
+    pageDescription: "Browse and search movies and TV shows available through Atlas."
   },
   {
     id: "favorites",
