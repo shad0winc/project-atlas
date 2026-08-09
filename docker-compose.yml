@@ -8,6 +8,10 @@ networks:
     name: atlas-identity
     driver: bridge
 
+  atlas-indexer-proxy:
+    name: atlas-indexer-proxy
+    driver: bridge
+
 services:
   jellyfin:
     image: jellyfin/jellyfin:latest
@@ -39,7 +43,9 @@ services:
   prowlarr:
     image: lscr.io/linuxserver/prowlarr:latest
     container_name: prowlarr
-    networks: [atlas]
+    networks:
+      - atlas
+      - atlas-indexer-proxy
     ports:
       - "${PROWLARR_PORT:-9696}:9696"
     environment:
@@ -54,7 +60,8 @@ services:
   flaresolverr:
     image: ghcr.io/flaresolverr/flaresolverr:v3.5.0
     container_name: flaresolverr
-    networks: [atlas]
+    networks:
+      - atlas-indexer-proxy
     environment:
       - LOG_LEVEL=info
       - LOG_HTML=false
