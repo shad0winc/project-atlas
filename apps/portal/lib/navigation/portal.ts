@@ -13,7 +13,14 @@ export const PORTAL_ROUTE_SECTIONS = {
 export type PortalRouteSection = (typeof PORTAL_ROUTE_SECTIONS)[keyof typeof PORTAL_ROUTE_SECTIONS];
 
 export type PortalRouteId =
-  "dashboard" | "media" | "requests" | "downloads" | "users" | "administration" | "settings";
+  | "dashboard"
+  | "media"
+  | "favorites"
+  | "requests"
+  | "downloads"
+  | "users"
+  | "administration"
+  | "settings";
 
 /**
  * Stable route metadata shared by Portal navigation and page presentation.
@@ -58,6 +65,16 @@ export const portalRoutes: readonly PortalRoute[] = [
     permission: ATLAS_PERMISSIONS.mediaRead,
     section: PORTAL_ROUTE_SECTIONS.workspace,
     pageDescription: "Review Atlas media libraries and collection statistics."
+  },
+  {
+    id: "favorites",
+    path: "/portal/favorites",
+    label: "Favorites",
+    navigationDescription: "Your saved media",
+    abbreviation: "FV",
+    permission: ATLAS_PERMISSIONS.favoritesRead,
+    section: PORTAL_ROUTE_SECTIONS.workspace,
+    pageDescription: "Review and manage media saved to your personal Favorites list."
   },
   {
     id: "requests",
@@ -119,6 +136,7 @@ function routeById(routeId: PortalRouteId): PortalRoute {
 export const PORTAL_ROUTES = {
   dashboard: routeById("dashboard"),
   media: routeById("media"),
+  favorites: routeById("favorites"),
   requests: routeById("requests"),
   downloads: routeById("downloads"),
   users: routeById("users"),
