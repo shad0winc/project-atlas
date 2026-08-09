@@ -5646,3 +5646,102 @@ production proof, recovery-time expectation, and documented scope limitation.
 Atlas can create, validate, stage, plan, transactionally apply, verify, resume,
 or abort state recovery without bypassing protected source promotion or the
 shared production mutation boundary.
+
+---
+
+## M-023.26 — Security Review and Runtime Hardening
+
+M-023.26 completed the v1.0 Security engineering-review work packages covering
+authentication, authorization, invitation security, session behavior,
+reverse-proxy and API exposure, secret storage, audit events, dependency/image
+risk, network trust boundaries, and least privilege.
+
+### First-Party Module Runtime Hardening
+
+The final implementation slice hardened the Notifications and Sports
+first-party module runtimes.
+
+Both images now:
+
+- require explicit operator `PUID` and `PGID` build inputs;
+- create and run as the non-root `atlas` identity;
+- use `no-new-privileges`;
+- preserve source-only hardening separately from production ownership changes.
+
+Notifications no longer receives the complete Atlas Runtime Bus. Its Compose
+contract exposes only the read-only event journal, its writable subscriber
+cursor, its read-only filter, and Notifications-owned state.
+
+Sports no longer receives the Atlas Runtime Bus and no longer exposes the
+obsolete private scheduler-state environment contract. Host TaskScheduler state
+remains the authoritative scheduling boundary.
+
+Both module update paths fail closed before container recreation when required
+filesystem ownership or access does not satisfy the future runtime identity.
+The update paths do not automatically `chown` production state.
+
+### Validation
+
+The source change was applied from synchronized
+`feature/security-review` checkpoint
+`75cfdc65d43ec8f3faa74cd1002670ed92ebe4da`.
+
+Immediate validation passed:
+
+- exact changed-file guard;
+- shell syntax validation;
+- 54 focused tests;
+- Notifications and Sports Compose validation;
+- Git diff whitespace validation.
+
+Both hardened images then built successfully. Image inspection and isolated
+runtime probes proved:
+
+- Notifications configured user: `atlas`;
+- Sports configured user: `atlas`;
+- Notifications effective UID:GID: `1000:1000`;
+- Sports effective UID:GID: `1000:1000`.
+
+The existing production Notifications and Sports containers remained running
+with their prior root-default runtime identity, proving that source/image
+hardening did not silently perform the deferred production ownership migration
+or recreate live containers.
+
+The commit-readiness regression gate passed:
+
+- 71 focused security/module tests;
+- 26 module, restore, and notification regressions;
+- all five Sports integration suites;
+- 2,996 Core tests plus 104 subtests;
+- 280 API tests plus 5 subtests;
+- Compose validation;
+- Git diff and repository-state guards.
+
+The resulting atomic commit was
+`4f30fb10de3a321b8d4cfdc6d818ca7725aa687e`
+(`security: harden first-party module runtimes`) and was pushed to
+`origin/feature/security-review` with local/remote equality and a clean working
+tree.
+
+### Security Closure
+
+The M-023.26 closure review found no additional general source-hardening sprint
+justified by the reviewed evidence. The ten Security roadmap items now represent
+completed engineering reviews.
+
+Final v1.0 Security Acceptance remains intentionally open. Release
+certification must still include:
+
+- current dependency/container vulnerability evidence with no unreviewed
+  release-blocking finding;
+- explicit acceptance or remediation of retained privileged capabilities,
+  including Homepage/Dozzle Docker-socket access if retained;
+- controlled production ownership migration and recreation of the hardened
+  Notifications and Sports workers;
+- runtime verification of secret, audit, ingress, network, and least-privilege
+  boundaries;
+- documented accepted security limitations; and
+- explicit security approval through the release checklist.
+
+M-023.26 therefore closes the Security engineering implementation without
+prematurely certifying the v1.0 release.

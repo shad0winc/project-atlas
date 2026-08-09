@@ -6,6 +6,22 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Fixed
 
+- Completed the M-023.26 Security engineering review across authentication,
+  authorization, invitations, sessions, reverse proxy and API exposure,
+  secret storage, audit events, dependency/image risk, network trust
+  boundaries, and least privilege.
+- Hardened first-party Notifications and Sports module images to run as the
+  operator-mapped non-root `atlas` identity, require explicit PUID/PGID build
+  inputs, prevent privilege escalation, and fail closed before recreation when
+  writable-state ownership or Runtime Bus access is incompatible.
+- Narrowed Notifications Runtime Bus mounts to its event journal, cursor, and
+  filter; removed the obsolete Sports private scheduler/runtime mount
+  capability; and preserved deployment-time ownership migration as an explicit
+  maintenance-controlled operation.
+- Preserved final v1.0 Security Acceptance as a separate release gate requiring
+  current vulnerability evidence, controlled runtime validation, documented
+  residual limitations, and explicit approval.
+
 - Completed M-023.25 Backup and Recovery with a versioned state-complete
   recovery format, explicit authoritative-state ownership, protected archive
   publication, isolated restore staging, consumer validation, transactional

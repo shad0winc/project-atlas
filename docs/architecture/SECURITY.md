@@ -2,13 +2,16 @@
 
 ## Purpose
 
-This document defines the Project Atlas v1.0 security boundaries being
-validated by M-023.26. It records the observed production shape, the controls
-Atlas already owns, the gaps discovered during review, and the evidence
-required before the Security roadmap can be closed.
+This document defines the Project Atlas v1.0 security boundaries reviewed
+and hardened through M-023.26. It records the observed production baseline,
+the resulting source security contracts, intentionally retained capabilities,
+deployment-only transitions, and the evidence still required for final v1.0
+security certification.
 
-This is a release-hardening contract. It does not claim that M-023.26 is
-complete.
+M-023.26 engineering review is complete. Final release security acceptance
+remains separate and requires controlled deployment, current vulnerability
+evidence, runtime validation, documented residual-risk acceptance where
+applicable, and release approval.
 
 ## Trust Model
 
@@ -47,7 +50,8 @@ Observed controls:
 - invitation durable state stores token hashes rather than plaintext tokens;
 - Portal access and refresh credentials remain in browser process memory.
 
-Observed gaps requiring M-023.26 resolution:
+The initial discovery identified the following gaps for M-023.26
+resolution:
 
 - `ATLAS_JWT_SECRET` was absent from the running `atlas-api` environment;
 - `/api/docs` and `/api/openapi.json` returned HTTP 200 publicly;
@@ -84,8 +88,9 @@ Authentication and authorization remain separate. Route-level permission
 dependencies are the authoritative HTTP boundary. Subject inactivity, missing
 identity, invalid roles, missing grants, and explicit denials fail closed.
 
-M-023.26 will inventory the public route table so accidental unguarded routes
-become a regression-test failure.
+M-023.26 established deterministic authorization and route-boundary
+regression coverage so accidental unguarded application routes fail review
+rather than silently expanding the public API surface.
 
 ## Session and Browser Boundary
 
@@ -101,10 +106,10 @@ inspection.
 ## Invitation Boundary
 
 Invitation tokens authorize creation of a user identity and are therefore
-credentials. Atlas already hashes them at rest and uses constant-time digest
-comparison. M-023.26 must additionally verify delivery, registration routing,
-proxy logging, event payloads, and failure handling so plaintext tokens do not
-become durable operational data.
+credentials. Atlas hashes them at rest, uses constant-time digest comparison,
+and treats delivery, registration routing, proxy logging, event payloads, and
+failure handling as credential-sensitive boundaries. Plaintext invitation
+tokens must not become durable operational data.
 
 ## Reverse Proxy and API Exposure
 
@@ -159,13 +164,16 @@ state during an online guessing attempt.
 
 ## Dependency Vulnerability Review
 
-M-023.26 dependency certification covers current Python and Node dependency
-manifests plus relevant deployed container images. Advisory information is
-time-sensitive, so the certification records scan date/tool evidence and does
-not treat a historical clean scan as permanently authoritative.
+M-023.26 reviewed the Python and Node dependency surfaces together with
+relevant deployed container-image selections. Atlas now protects reviewed
+third-party image choices with immutable source contracts where required,
+including the maintained Seerr and Maintainerr selections.
 
-Findings are either remediated or explicitly accepted with scope and rationale
-before v1.0 release certification.
+Advisory information remains time-sensitive. Final v1.0 security certification
+therefore requires current scan evidence and does not treat historical review
+or an immutable image selection as proof that future vulnerability findings do
+not exist. Any release-blocking finding must be remediated or explicitly
+accepted with bounded scope and rationale before publication.
 
 ## Validation Strategy
 
@@ -183,23 +191,41 @@ Security changes use the normal Atlas guarded workflow:
 
 No secret values are printed during validation.
 
-## M-023.26 Work Packages
+## M-023.26 Result
 
-The implementation is expected to proceed in bounded increments:
+M-023.26 completed the ten Security engineering-review work packages through
+bounded source changes, deterministic inspection, focused security contracts,
+full regression testing, and controlled runtime evidence where appropriate.
 
-- authentication configuration/readiness and abuse controls;
-- authorization and public route inventory;
-- refresh/session security;
-- invitation and proxy-log handling;
-- browser/reverse-proxy/API exposure hardening;
-- secret permissions and injection review;
-- security audit-event coverage;
-- dependency vulnerability certification;
-- container exposure and least-privilege reconciliation;
-- controlled production validation and final documentation reconciliation.
+The resulting v1.0 source boundary includes:
 
-The exact commit boundaries may combine closely related items, but all ten
-Security roadmap checks remain unchecked until validated evidence exists.
+- fail-closed authentication configuration and bounded abuse controls;
+- explicit deny-by-default authorization and route-boundary coverage;
+- reviewed ephemeral browser-session and refresh-token behavior;
+- invitation-secret handling and proxy/logging protections;
+- hardened browser, reverse-proxy, and API exposure contracts;
+- restrictive secret-file and secret-consumer boundaries;
+- credential-safe security audit-event contracts;
+- reviewed dependency and immutable third-party image selections;
+- first-party non-root runtime identities and reduced module mount capability;
+- explicit network trust boundaries for identity and indexer-proxy access.
+
+Some capabilities intentionally remain outside source-only closure. Homepage
+and Dozzle retain read-only Docker-socket access for operational functionality;
+the Docker API is still a privileged host-control boundary and this capability
+must remain explicitly documented and accepted for v1.0 if retained.
+
+The hardened Notifications and Sports images are source-validated as non-root,
+but production ownership migration and container recreation are deployment
+operations. They must occur only through the backed-up, maintenance-controlled
+deployment path after filesystem ownership and Runtime Bus access preconditions
+are satisfied.
+
+Accordingly, completion of the Security roadmap engineering review does not
+certify the v1.0 release. Final Security Acceptance remains governed by the
+release checklist and requires current vulnerability evidence, controlled
+runtime validation, accepted residual limitations, and explicit security
+approval.
 
 ## Related Decisions
 

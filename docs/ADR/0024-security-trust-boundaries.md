@@ -1,6 +1,6 @@
 # ADR-0024: Security Trust Boundaries
 
-Status: Accepted for M-023.26 implementation
+Status: Accepted — M-023.26 engineering implementation complete
 
 ## Context
 
@@ -25,16 +25,19 @@ M-023.26 discovery confirmed several strong existing contracts:
 - Caddy is the intended public Atlas ingress and publishes ports 80 and 443;
 - the root project `.env` is operator-only mode `0600` in production.
 
-Discovery also identified boundaries that must be hardened or explicitly
-accepted before M-023.26 can be completed. The running API did not receive the
-required `ATLAS_JWT_SECRET`; production OpenAPI and Swagger documentation were
-public; access logging did not redact sensitive URI material; a Content
-Security Policy was absent; multiple backend services published host ports;
-and Homepage and Dozzle consumed the Docker socket.
+Discovery also identified boundaries requiring hardening or explicit
+acceptance. The running API did not receive the required `ATLAS_JWT_SECRET`;
+production OpenAPI and Swagger documentation were public; access logging did
+not redact sensitive URI material; a Content Security Policy was absent;
+multiple backend services published host ports; and Homepage and Dozzle
+consumed the Docker socket.
 
-The security milestone therefore cannot be satisfied by code inspection alone.
-Release acceptance requires source contracts, runtime proof, and explicit
-documentation of intentionally retained exposure.
+M-023.26 subsequently hardened the source-owned authentication, authorization,
+session, invitation, ingress, API exposure, secret, audit, dependency-image,
+network, and first-party runtime boundaries. Release acceptance remains a
+separate gate because source correctness does not replace current vulnerability
+evidence, controlled deployment proof, or explicit documentation of retained
+privileged capabilities.
 
 ## Decision
 
@@ -73,10 +76,9 @@ Security Policy, are part of the release boundary.
 ### 4. Refresh credentials are replay-sensitive
 
 Issuing a new refresh token is not sufficient rotation if the prior credential
-can be replayed until expiration. M-023.26 must define and verify a bounded
-refresh-session/revocation contract or otherwise reduce the capability so a
-stolen refresh token cannot silently retain its full original lifetime after
-rotation.
+can be replayed until expiration. Atlas therefore uses a bounded
+refresh-session/revocation contract so rotation does not silently leave the
+prior credential with its full original capability.
 
 ### 5. Authentication endpoints resist online guessing
 
@@ -137,11 +139,12 @@ explicit, bounded acceptance.
 
 ## Release Acceptance
 
-M-023.26 may be declared complete only when all ten Security roadmap items are
-supported by both automated tests or deterministic inspection and controlled
-runtime evidence where applicable.
+M-023.26 engineering implementation is complete and all ten Security roadmap
+reviews are supported by automated tests, deterministic inspection, or
+controlled runtime evidence appropriate to the reviewed boundary.
 
-At minimum, release evidence must prove:
+This does not constitute v1.0 Security Acceptance. Before release, current
+certification evidence must still prove:
 
 - authentication configuration is present and fail-closed;
 - unauthenticated protected API access is rejected;
@@ -152,7 +155,10 @@ At minimum, release evidence must prove:
 - secret files and secret injection obey least-readable/least-consumer rules;
 - security audit records contain no credential material;
 - dependency scans have no unreviewed release-blocking findings;
-- retained container privileges have explicit justification;
+- retained container privileges have explicit justification, including any
+  retained Docker-socket capability;
+- the non-root module ownership transition has been completed and validated
+  through the controlled deployment path;
 - the repository, verified deployment baseline, recovery boundary, and normal
   maintenance state remain intact through validation.
 

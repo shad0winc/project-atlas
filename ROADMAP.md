@@ -746,16 +746,16 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 
 ### Security
 
-- [ ] Complete authentication review
-- [ ] Complete authorization review
-- [ ] Complete invitation security review
-- [ ] Complete session-cookie review
-- [ ] Complete reverse-proxy security review
-- [ ] Complete secret-storage review
-- [ ] Complete API exposure review
-- [ ] Complete audit-event review
-- [ ] Complete dependency vulnerability review
-- [ ] Complete least-privilege review
+- [x] Complete authentication review
+- [x] Complete authorization review
+- [x] Complete invitation security review
+- [x] Complete session-cookie review
+- [x] Complete reverse-proxy security review
+- [x] Complete secret-storage review
+- [x] Complete API exposure review
+- [x] Complete audit-event review
+- [x] Complete dependency vulnerability review
+- [x] Complete least-privilege review
 
 ### Quality
 
