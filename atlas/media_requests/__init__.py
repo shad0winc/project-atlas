@@ -1,5 +1,11 @@
 """Atlas media-request domain."""
 
+from .discovery import (
+    MediaDiscoveryAvailability,
+    MediaDiscoveryError,
+    MediaDiscoveryItem,
+    MediaDiscoveryPage,
+)
 from .events import (
     MediaRequestEvent,
     MediaRequestEventError,
@@ -41,6 +47,10 @@ from .service import (
 
 __all__ = [
     "BaseMediaRequestHTTPProvider",
+    "MediaDiscoveryAvailability",
+    "MediaDiscoveryError",
+    "MediaDiscoveryItem",
+    "MediaDiscoveryPage",
     "JellyseerrMediaRequestProvider",
     "JsonMediaRequestRepository",
     "MediaRequest",

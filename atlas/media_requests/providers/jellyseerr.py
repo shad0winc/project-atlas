@@ -7,8 +7,14 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import os
 from typing import Any, Callable
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
+from ..discovery import (
+    MediaDiscoveryAvailability,
+    MediaDiscoveryError,
+    MediaDiscoveryItem,
+    MediaDiscoveryPage,
+)
 from ..models import (
     MediaRequest,
     MediaRequestStatus,
@@ -191,6 +197,85 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
             updated_at=self._timestamp(),
         )
 
+    def search_media(
+        self,
+        query: str,
+        *,
+        page: int = 1,
+    ) -> MediaDiscoveryPage:
+        """Search Jellyseerr for normalized movie/TV discovery items."""
+
+        normalized_query = _search_query(
+            query
+        )
+        normalized_page = _discovery_page_number(
+            page
+        )
+
+        query_string = urlencode(
+            {
+                "query":
+                    normalized_query,
+                "page":
+                    normalized_page,
+            }
+        )
+
+        response = self._get_json(
+            f"/api/v1/search?{query_string}"
+        )
+
+        return _normalize_discovery_page(
+            response,
+            expected_media_type=None,
+        )
+
+    def discover_media(
+        self,
+        media_type: MediaRequestType | str,
+        *,
+        page: int = 1,
+    ) -> MediaDiscoveryPage:
+        """Return one Jellyseerr movie or TV discovery page."""
+
+        normalized_type = (
+            _discovery_media_type(
+                media_type
+            )
+        )
+        normalized_page = (
+            _discovery_page_number(
+                page
+            )
+        )
+
+        path_segment = (
+            "movies"
+            if normalized_type
+            is MediaRequestType.MOVIE
+            else "tv"
+        )
+
+        query_string = urlencode(
+            {
+                "page":
+                    normalized_page,
+            }
+        )
+
+        response = self._get_json(
+            "/api/v1/discover/"
+            f"{path_segment}?"
+            f"{query_string}"
+        )
+
+        return _normalize_discovery_page(
+            response,
+            expected_media_type=(
+                normalized_type
+            ),
+        )
+
     def health(self) -> ProviderHealth:
         try:
             response = self._get_json("/api/v1/status")
@@ -280,6 +365,449 @@ def default_jellyseerr_media_request_provider(
     return JellyseerrMediaRequestProvider(
         base_url=base_url,
         api_key=os.getenv("ATLAS_JELLYSEERR_API_KEY", ""),
+    )
+
+
+# Keep aligned with the pinned Seerr runtime MediaStatus enum.
+# The upstream OpenAPI description omits the blocklisted state.
+_DISCOVERY_MEDIA_STATUS = {
+    1:
+        MediaDiscoveryAvailability.UNKNOWN,
+    2:
+        MediaDiscoveryAvailability.PENDING,
+    3:
+        MediaDiscoveryAvailability.PROCESSING,
+    4:
+        MediaDiscoveryAvailability.PARTIALLY_AVAILABLE,
+    5:
+        MediaDiscoveryAvailability.AVAILABLE,
+    6:
+        MediaDiscoveryAvailability.BLOCKLISTED,
+    7:
+        MediaDiscoveryAvailability.DELETED,
+}
+
+
+def _normalize_discovery_page(
+    value: object,
+    *,
+    expected_media_type: MediaRequestType | None,
+) -> MediaDiscoveryPage:
+    resource = _required_mapping(
+        value,
+        "Jellyseerr discovery response",
+    )
+
+    page = _positive_integer(
+        resource.get("page"),
+        "Jellyseerr discovery page",
+    )
+
+    total_pages = _non_negative_integer(
+        resource.get("totalPages"),
+        "Jellyseerr discovery totalPages",
+    )
+
+    results = resource.get(
+        "results"
+    )
+
+    if not isinstance(
+        results,
+        list,
+    ):
+        raise MediaRequestProviderError(
+            "Jellyseerr discovery results "
+            "must be an array"
+        )
+
+    items: list[
+        MediaDiscoveryItem
+    ] = []
+
+    for index, result in enumerate(
+        results
+    ):
+        raw_item = _required_mapping(
+            result,
+            "Jellyseerr discovery "
+            f"results[{index}]",
+        )
+
+        media_type = (
+            expected_media_type
+            if expected_media_type
+            is not None
+            else _search_result_media_type(
+                raw_item.get(
+                    "mediaType"
+                )
+            )
+        )
+
+        # General Jellyseerr search also returns people.
+        # They are not an Atlas Request target.
+        if media_type is None:
+            continue
+
+        try:
+            item = _discovery_item(
+                raw_item,
+                media_type=media_type,
+            )
+        except MediaDiscoveryError as exc:
+            raise MediaRequestProviderError(
+                "Jellyseerr returned invalid "
+                "media discovery metadata"
+            ) from exc
+
+        items.append(
+            item
+        )
+
+    try:
+        return MediaDiscoveryPage(
+            items=tuple(
+                items
+            ),
+            page=page,
+            total_pages=total_pages,
+        )
+    except MediaDiscoveryError as exc:
+        raise MediaRequestProviderError(
+            "Jellyseerr returned an invalid "
+            "media discovery page"
+        ) from exc
+
+
+def _discovery_item(
+    resource: Mapping[str, Any],
+    *,
+    media_type: MediaRequestType,
+) -> MediaDiscoveryItem:
+    provider_media_id = str(
+        _numeric_identifier(
+            resource.get("id"),
+            "Jellyseerr discovery id",
+        )
+    )
+
+    if media_type is MediaRequestType.MOVIE:
+        title = _required_discovery_text(
+            resource.get("title"),
+            "Jellyseerr movie title",
+        )
+        year = _year_from_date(
+            resource.get(
+                "releaseDate"
+            ),
+            "Jellyseerr movie releaseDate",
+        )
+    else:
+        title = _required_discovery_text(
+            resource.get("name"),
+            "Jellyseerr TV name",
+        )
+        year = _year_from_date(
+            resource.get(
+                "firstAirDate"
+            ),
+            "Jellyseerr TV firstAirDate",
+        )
+
+    availability = (
+        _discovery_availability(
+            resource.get(
+                "mediaInfo"
+            )
+        )
+    )
+
+    return MediaDiscoveryItem(
+        provider_media_id=(
+            provider_media_id
+        ),
+        media_type=media_type,
+        title=title,
+        year=year,
+        overview=_optional_discovery_text(
+            resource.get(
+                "overview"
+            ),
+            "Jellyseerr discovery overview",
+        ),
+        poster_path=_optional_discovery_text(
+            resource.get(
+                "posterPath"
+            ),
+            "Jellyseerr discovery posterPath",
+        ),
+        availability=availability,
+    )
+
+
+def _discovery_availability(
+    media_info: object,
+) -> MediaDiscoveryAvailability:
+    # Jellyseerr does not attach MediaInfo to an untracked result.
+    # That is the one state B3.1 treats as immediately requestable.
+    if media_info is None:
+        return (
+            MediaDiscoveryAvailability
+            .NOT_TRACKED
+        )
+
+    resource = _required_mapping(
+        media_info,
+        "Jellyseerr discovery mediaInfo",
+    )
+
+    status = _required_integer(
+        resource.get("status"),
+        "Jellyseerr discovery mediaInfo status",
+    )
+
+    availability = (
+        _DISCOVERY_MEDIA_STATUS
+        .get(status)
+    )
+
+    if availability is None:
+        raise MediaRequestProviderError(
+            "Jellyseerr returned an unsupported "
+            "media availability status"
+        )
+
+    return availability
+
+
+def _search_result_media_type(
+    value: object,
+) -> MediaRequestType | None:
+    if not isinstance(
+        value,
+        str,
+    ):
+        raise MediaRequestProviderError(
+            "Jellyseerr search mediaType "
+            "must be text"
+        )
+
+    normalized = (
+        value
+        .strip()
+        .lower()
+    )
+
+    if normalized == "person":
+        return None
+
+    if normalized == "movie":
+        return MediaRequestType.MOVIE
+
+    if normalized == "tv":
+        return MediaRequestType.TV
+
+    raise MediaRequestProviderError(
+        "Jellyseerr returned an unsupported "
+        "search mediaType"
+    )
+
+
+def _discovery_media_type(
+    value: MediaRequestType | str,
+) -> MediaRequestType:
+    if isinstance(
+        value,
+        MediaRequestType,
+    ):
+        normalized = value
+    elif isinstance(
+        value,
+        str,
+    ):
+        candidate = (
+            value
+            .strip()
+            .lower()
+            .replace("-", "_")
+            .replace(" ", "_")
+        )
+
+        try:
+            normalized = (
+                MediaRequestType(
+                    candidate
+                )
+            )
+        except ValueError as exc:
+            raise MediaRequestProviderError(
+                "media_type must be movie or tv"
+            ) from exc
+    else:
+        raise MediaRequestProviderError(
+            "media_type must be a "
+            "MediaRequestType or text"
+        )
+
+    if normalized not in {
+        MediaRequestType.MOVIE,
+        MediaRequestType.TV,
+    }:
+        raise MediaRequestProviderError(
+            "media_type must be movie or tv"
+        )
+
+    return normalized
+
+
+def _search_query(
+    value: object,
+) -> str:
+    if not isinstance(
+        value,
+        str,
+    ):
+        raise MediaRequestProviderError(
+            "query must be text"
+        )
+
+    normalized = value.strip()
+
+    if not normalized:
+        raise MediaRequestProviderError(
+            "query is required"
+        )
+
+    if len(normalized) > 200:
+        raise MediaRequestProviderError(
+            "query must contain at most "
+            "200 characters"
+        )
+
+    return normalized
+
+
+def _discovery_page_number(
+    value: object,
+) -> int:
+    return _positive_integer(
+        value,
+        "page",
+    )
+
+
+def _positive_integer(
+    value: object,
+    field_name: str,
+) -> int:
+    if (
+        isinstance(value, bool)
+        or not isinstance(
+            value,
+            int,
+        )
+        or value <= 0
+    ):
+        raise MediaRequestProviderError(
+            f"{field_name} must be a positive integer"
+        )
+
+    return value
+
+
+def _non_negative_integer(
+    value: object,
+    field_name: str,
+) -> int:
+    if (
+        isinstance(value, bool)
+        or not isinstance(
+            value,
+            int,
+        )
+        or value < 0
+    ):
+        raise MediaRequestProviderError(
+            f"{field_name} must be a "
+            "non-negative integer"
+        )
+
+    return value
+
+
+def _required_discovery_text(
+    value: object,
+    field_name: str,
+) -> str:
+    if (
+        not isinstance(
+            value,
+            str,
+        )
+        or not value.strip()
+    ):
+        raise MediaRequestProviderError(
+            f"{field_name} is required"
+        )
+
+    return value.strip()
+
+
+def _optional_discovery_text(
+    value: object,
+    field_name: str,
+) -> str | None:
+    if value is None:
+        return None
+
+    if not isinstance(
+        value,
+        str,
+    ):
+        raise MediaRequestProviderError(
+            f"{field_name} must be text or null"
+        )
+
+    normalized = value.strip()
+
+    return (
+        normalized
+        if normalized
+        else None
+    )
+
+
+def _year_from_date(
+    value: object,
+    field_name: str,
+) -> int | None:
+    if value is None:
+        return None
+
+    if not isinstance(
+        value,
+        str,
+    ):
+        raise MediaRequestProviderError(
+            f"{field_name} must be text or null"
+        )
+
+    normalized = value.strip()
+
+    if not normalized:
+        return None
+
+    if (
+        len(normalized) < 4
+        or not normalized[:4].isdigit()
+    ):
+        raise MediaRequestProviderError(
+            f"{field_name} must begin with a year"
+        )
+
+    return int(
+        normalized[:4]
     )
 
 
