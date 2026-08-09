@@ -4,6 +4,10 @@ networks:
   atlas:
     name: atlas
     driver: bridge
+
+  atlas-backend:
+    name: atlas-backend
+    external: true
   atlas-identity:
     name: atlas-identity
     driver: bridge
@@ -192,7 +196,9 @@ services:
     image: ghcr.io/seerr-team/seerr:v3.4.1@sha256:f4768de5f616248d723e05891f3345a1402123775d03bf0890dbfedc0831bda1
     init: true
     container_name: jellyseerr
-    networks: [atlas]
+    networks:
+      - atlas
+      - atlas-backend
     ports:
       - "${JELLYSEERR_PORT:-5055}:5055"
     environment:

@@ -42,6 +42,7 @@ services:
 
     networks:
       - atlas-ingress
+      - atlas-backend
       - atlas-identity
 
     group_add:
@@ -51,6 +52,7 @@ services:
     volumes:
       - /mnt/storage/configs/atlas/users:/mnt/storage/configs/atlas/users:ro
       - /mnt/storage/configs/atlas/identity/favorites:/mnt/storage/configs/atlas/identity/favorites:rw
+      - /mnt/storage/configs/atlas/runtime/requests:/mnt/storage/configs/atlas/runtime/requests:rw
       - /mnt/storage/configs/atlas/runtime/events.jsonl:/mnt/storage/configs/atlas/runtime/events.jsonl:rw
 
     expose:
@@ -59,6 +61,9 @@ services:
     environment:
       ATLAS_JELLYFIN_URL: "http://jellyfin:8096"
       ATLAS_JELLYFIN_API_KEY: "${ATLAS_JELLYFIN_API_KEY:?ATLAS_JELLYFIN_API_KEY is required}"
+      ATLAS_JELLYSEERR_URL: "http://jellyseerr:5055"
+      ATLAS_JELLYSEERR_API_KEY: "${ATLAS_JELLYSEERR_API_KEY:?ATLAS_JELLYSEERR_API_KEY is required}"
+      ATLAS_REQUESTS_DIR: "/mnt/storage/configs/atlas/runtime/requests"
       ATLAS_USERS_DIR: "/mnt/storage/configs/atlas/users"
       ATLAS_SECURITY_AUDIT_PATH: "/mnt/storage/configs/atlas/runtime/events.jsonl"
       ATLAS_JWT_SECRET: "${ATLAS_JWT_SECRET:?ATLAS_JWT_SECRET is required}"
@@ -138,6 +143,9 @@ networks:
   atlas-ingress:
     external: true
     name: atlas-ingress
+  atlas-backend:
+    external: true
+    name: atlas-backend
   atlas-identity:
     external: true
     name: atlas-identity
