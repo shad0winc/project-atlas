@@ -14,7 +14,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "next": "16.2.11",
+    "next": "16.3.0",
     "react": "19.2.0",
     "react-dom": "19.2.0"
   },
@@ -23,7 +23,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "eslint": "^9.39.5",
-    "eslint-config-next": "16.2.11",
+    "eslint-config-next": "16.3.0",
     "prettier": "3.9.6",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
