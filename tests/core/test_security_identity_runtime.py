@@ -70,8 +70,39 @@ def test_ingress_api_has_read_only_identity_access() -> None:
     ) in api
     assert '      ATLAS_JELLYFIN_URL: "http://jellyfin:8096"\n' in api
     assert (
+        '      ATLAS_JELLYFIN_API_KEY: '
+        '"${ATLAS_JELLYFIN_API_KEY:'
+        '?ATLAS_JELLYFIN_API_KEY is required}"\n'
+    ) in api
+    assert "${ATLAS_JELLYFIN_API_KEY:-" not in api
+    assert (
         '      ATLAS_USERS_DIR: "/mnt/storage/configs/atlas/users"\n'
     ) in api
+
+
+def test_ingress_api_limits_writable_identity_state_to_favorites() -> None:
+    content = INGRESS_COMPOSE.read_text(encoding="utf-8")
+    api = _service_block(content, "api", "caddy")
+
+    assert (
+        "      - /mnt/storage/configs/atlas/users:"
+        "/mnt/storage/configs/atlas/users:ro\n"
+    ) in api
+
+    assert (
+        "      - /mnt/storage/configs/atlas/identity/favorites:"
+        "/mnt/storage/configs/atlas/identity/favorites:rw\n"
+    ) in api
+
+    assert (
+        "/mnt/storage/configs/atlas/users:"
+        "/mnt/storage/configs/atlas/users:rw"
+    ) not in api
+
+    assert (
+        "      - /mnt/storage/configs/atlas/identity:"
+        "/mnt/storage/configs/atlas/identity:rw\n"
+    ) not in api
 
 
 def test_identity_network_is_not_shared_with_public_ingress_services() -> None:

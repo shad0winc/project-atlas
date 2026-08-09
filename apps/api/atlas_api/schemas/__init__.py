@@ -6,6 +6,11 @@ from .api_envelope import (
     ApiSuccessEnvelopeSchema,
 )
 from .health import HealthResponse
+from .favorites import (
+    FavoriteCreateRequest,
+    FavoriteListResponse,
+    FavoriteResponse,
+)
 from .portal_dashboard import (
     PortalDashboardResponse,
     PortalOperationsAttentionResponse,
@@ -32,4 +37,7 @@ __all__ = [
     "PortalSchedulerFailureResponse",
     "PortalSchedulerSummaryResponse",
     "PortalSectionStatus",
+    "FavoriteCreateRequest",
+    "FavoriteListResponse",
+    "FavoriteResponse",
 ]
