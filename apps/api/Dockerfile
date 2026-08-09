@@ -19,7 +19,8 @@ COPY apps/api/atlas_api /srv/apps/api/atlas_api
 COPY atlas /srv/atlas
 
 RUN python -m pip install --no-cache-dir --upgrade pip \
-    && python -m pip install --no-cache-dir .
+    && python -m pip install --no-cache-dir . \
+    && python -m pip uninstall --yes pip
 
 USER atlas
 
