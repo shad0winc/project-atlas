@@ -37,6 +37,14 @@ export type MediaRequest = Readonly<{
   availableAt?: string;
 }>;
 
+export type MediaRequestCreateInput = Readonly<{
+  mediaType: MediaRequestType;
+  providerMediaId: string;
+  title: string;
+  year?: number;
+  seasonNumber?: number;
+}>;
+
 export type RequestsLoadingState = Readonly<{
   status: "loading";
 }>;
@@ -156,6 +164,30 @@ export function normalizeRequestId(value: string): string {
 
 export function normalizeRequestUserId(value: string): string {
   return normalizeIdentity(value, "request.userId", USER_ID_PATTERN);
+}
+
+export function createMediaRequestInput(input: MediaRequestCreateInput): MediaRequestCreateInput {
+  const mediaType = normalizeMediaType(input.mediaType);
+
+  const providerMediaId = normalizeRequiredText(input.providerMediaId, "request.providerMediaId");
+
+  const title = normalizeRequiredText(input.title, "request.title");
+
+  const year = normalizeOptionalInteger(input.year, "request.year", 1888);
+
+  const seasonNumber = normalizeOptionalInteger(input.seasonNumber, "request.seasonNumber", 0);
+
+  if (seasonNumber !== undefined && mediaType !== "tv" && mediaType !== "anime_tv") {
+    throw new Error("request.seasonNumber is valid only for TV requests.");
+  }
+
+  return Object.freeze({
+    mediaType,
+    providerMediaId,
+    title,
+    ...(year === undefined ? {} : { year }),
+    ...(seasonNumber === undefined ? {} : { seasonNumber })
+  });
 }
 
 export function createMediaRequest(request: MediaRequest): MediaRequest {

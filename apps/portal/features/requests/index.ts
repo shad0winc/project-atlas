@@ -1,6 +1,10 @@
-export { cancelMediaRequest, loadRequests } from "./api/requests";
+export { cancelMediaRequest, createPersonalMediaRequest, loadRequests } from "./api/requests";
 
-export type { CancelMediaRequestOptions, LoadRequestsOptions } from "./api/requests";
+export type {
+  CancelMediaRequestOptions,
+  CreatePersonalMediaRequestOptions,
+  LoadRequestsOptions
+} from "./api/requests";
 
 export { RequestsRefreshButton } from "./components/RequestsRefreshButton";
 
@@ -16,15 +20,27 @@ export { useRequests } from "./hooks/use-requests";
 
 export type { RequestMutationFailure, UseRequestsResult } from "./hooks/use-requests";
 
-export { RequestCancellationError, cancelRequestRecord, readRequests } from "./services/requests";
+export {
+  RequestCancellationError,
+  RequestCreationError,
+  cancelRequestRecord,
+  createRequestRecord,
+  readRequests
+} from "./services/requests";
 
-export type { CancelRequestOptions, ReadRequestsOptions } from "./services/requests";
+export type {
+  CancelRequestOptions,
+  CreateRequestOptions,
+  ReadRequestsOptions,
+  RequestCreationFailureKind
+} from "./services/requests";
 
 export {
   MEDIA_REQUEST_STATUSES,
   MEDIA_REQUEST_TYPES,
   createMediaRequest,
   createMediaRequestCollection,
+  createMediaRequestInput,
   createRequestsState,
   normalizeRequestId,
   normalizeRequestUserId,
@@ -33,6 +49,7 @@ export {
 
 export type {
   MediaRequest,
+  MediaRequestCreateInput,
   MediaRequestStatus,
   MediaRequestType,
   RequestsErrorState,

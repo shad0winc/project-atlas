@@ -1,13 +1,31 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
+
+import { useAuth } from "../../../lib/auth/use-auth";
+import { ATLAS_PERMISSIONS } from "../../../lib/authorization/permissions";
+import { usePermission } from "../../../lib/authorization/use-permission";
+import { RequestCreationError, createPersonalMediaRequest } from "../../requests";
 
 import {
   useMediaDiscovery,
   type MediaDiscoveryMode,
   type MediaDiscoveryState
 } from "../hooks/use-media-discovery";
-import { mediaDiscoveryAvailabilityLabel, type MediaDiscoveryMediaType } from "../types/discovery";
+import {
+  mediaDiscoveryAvailabilityLabel,
+  type MediaDiscoveryItem,
+  type MediaDiscoveryMediaType
+} from "../types/discovery";
+
+export type MediaDiscoveryRequestAction = Readonly<{
+  status: "submitting" | "submitted" | "conflict" | "unconfirmed";
+  message: string;
+}>;
+
+export type MediaDiscoveryRequestActions = Readonly<
+  Record<string, MediaDiscoveryRequestAction | undefined>
+>;
 
 type MediaDiscoveryContentProps = Readonly<{
   state: MediaDiscoveryState;
@@ -18,10 +36,17 @@ type MediaDiscoveryContentProps = Readonly<{
   onSearch: (query: string) => void;
   onPage: (page: number) => void;
   onRefresh: () => void;
+  canCreateRequests: boolean;
+  requestActions: MediaDiscoveryRequestActions;
+  onRequestMovie: (item: MediaDiscoveryItem) => void;
 }>;
 
 function mediaTypeLabel(mediaType: MediaDiscoveryMediaType): string {
   return mediaType === "movie" ? "Movie" : "TV";
+}
+
+function mediaRequestKey(item: MediaDiscoveryItem): string {
+  return `${item.mediaType}:${item.providerMediaId}`;
 }
 
 function DiscoveryLoading(): React.ReactElement {
@@ -51,7 +76,10 @@ export function MediaDiscoveryContent({
   onBrowse,
   onSearch,
   onPage,
-  onRefresh
+  onRefresh,
+  canCreateRequests,
+  requestActions,
+  onRequestMovie
 }: MediaDiscoveryContentProps): React.ReactElement {
   const [searchText, setSearchText] = useState(activeQuery);
 
@@ -179,7 +207,7 @@ export function MediaDiscoveryContent({
                 <article
                   className="media-discovery-card"
                   data-request-eligible={item.requestEligible ? "true" : "false"}
-                  key={`${item.mediaType}:${item.providerMediaId}`}
+                  key={mediaRequestKey(item)}
                 >
                   <header className="media-discovery-card-header">
                     <div>
@@ -199,11 +227,62 @@ export function MediaDiscoveryContent({
                     {item.overview ?? "No overview is available for this title."}
                   </p>
 
-                  <p className="media-discovery-read-only">
-                    {item.requestEligible
-                      ? "Not currently tracked by the media provider."
-                      : "This title is already tracked by the media provider."}
-                  </p>
+                  <div className="media-discovery-request-area">
+                    <p className="media-discovery-read-only">
+                      {item.requestEligible
+                        ? "Not currently tracked by the media provider."
+                        : "This title is already tracked by the media provider."}
+                    </p>
+
+                    {(() => {
+                      const requestAction = requestActions[mediaRequestKey(item)];
+
+                      if (!item.requestEligible) {
+                        return null;
+                      }
+
+                      if (item.mediaType === "tv") {
+                        return canCreateRequests ? (
+                          <p className="media-discovery-request-message">
+                            Choose a season before requesting TV. TV request actions are not enabled
+                            yet.
+                          </p>
+                        ) : null;
+                      }
+
+                      if (!canCreateRequests) {
+                        return null;
+                      }
+
+                      return (
+                        <>
+                          <button
+                            aria-busy={requestAction?.status === "submitting"}
+                            className="media-discovery-primary-button media-discovery-request-button"
+                            disabled={requestAction !== undefined}
+                            onClick={() => onRequestMovie(item)}
+                            type="button"
+                          >
+                            {requestAction?.status === "submitting"
+                              ? "Requesting…"
+                              : requestAction?.status === "submitted"
+                                ? "Requested"
+                                : requestAction?.status === "conflict"
+                                  ? "Already requested"
+                                  : requestAction?.status === "unconfirmed"
+                                    ? "Check requests"
+                                    : "Request movie"}
+                          </button>
+
+                          {requestAction ? (
+                            <p aria-live="polite" className="media-discovery-request-message">
+                              {requestAction.message}
+                            </p>
+                          ) : null}
+                        </>
+                      );
+                    })()}
+                  </div>
                 </article>
               ))}
             </div>
@@ -240,16 +319,106 @@ export function MediaDiscoveryContent({
 
 export function MediaDiscoveryView(): React.ReactElement {
   const discovery = useMediaDiscovery();
+  const { user } = useAuth();
+  const { can } = usePermission();
+
+  const canCreateRequests = user !== null && can(ATLAS_PERMISSIONS.requestsCreate);
+
+  // A target enters this set before the POST begins and
+  // remains blocked until the page is remounted. This is
+  // presentation-level repeat-submit protection only;
+  // B3.3.1 remains the authoritative server invariant.
+  const blockedRequestKeys = useRef(new Set<string>());
+
+  const [requestActions, setRequestActions] = useState<MediaDiscoveryRequestActions>({});
+
+  const handleRequestMovie = async (item: MediaDiscoveryItem): Promise<void> => {
+    if (item.mediaType !== "movie" || !item.requestEligible || !canCreateRequests || !user) {
+      return;
+    }
+
+    const key = mediaRequestKey(item);
+
+    if (blockedRequestKeys.current.has(key) || requestActions[key] !== undefined) {
+      return;
+    }
+
+    blockedRequestKeys.current.add(key);
+
+    setRequestActions((current) => ({
+      ...current,
+      [key]: {
+        status: "submitting",
+        message: `Submitting ${item.title} to Atlas…`
+      }
+    }));
+
+    try {
+      await createPersonalMediaRequest(
+        {
+          mediaType: "movie",
+          providerMediaId: item.providerMediaId,
+          title: item.title,
+          ...(item.year === undefined
+            ? {}
+            : {
+                year: item.year
+              })
+        },
+        {
+          expectedUserId: user.user_id
+        }
+      );
+
+      setRequestActions((current) => ({
+        ...current,
+        [key]: {
+          status: "submitted",
+          message: `${item.title} was submitted to Atlas.`
+        }
+      }));
+    } catch (error: unknown) {
+      if (error instanceof RequestCreationError && error.kind === "conflict") {
+        setRequestActions((current) => ({
+          ...current,
+          [key]: {
+            status: "conflict",
+            message: error.message
+          }
+        }));
+
+        return;
+      }
+
+      const message =
+        error instanceof RequestCreationError
+          ? error.message
+          : "Atlas did not confirm this request. Review Your requests before trying again.";
+
+      setRequestActions((current) => ({
+        ...current,
+        [key]: {
+          status: "unconfirmed",
+          message
+        }
+      }));
+    }
+  };
 
   return (
     <MediaDiscoveryContent
       activeQuery={discovery.activeQuery}
+      canCreateRequests={canCreateRequests}
       mediaType={discovery.mediaType}
       mode={discovery.mode}
       onBrowse={discovery.browse}
       onPage={discovery.goToPage}
       onRefresh={discovery.refresh}
+      onRequestMovie={(item) => {
+        void handleRequestMovie(item);
+      }}
       onSearch={discovery.search}
+      requestActions={requestActions}
       state={discovery.state}
     />
   );

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createMediaRequest,
   createMediaRequestCollection,
+  createMediaRequestInput,
   createRequestsState,
   replaceMediaRequest,
   type MediaRequest
@@ -32,6 +33,33 @@ function request(overrides: Partial<MediaRequest> = {}): MediaRequest {
 }
 
 describe("Personal Requests domain contract", () => {
+  it("normalizes caller-controlled create input", () => {
+    expect(
+      createMediaRequestInput({
+        mediaType: "movie",
+        providerMediaId: " 157336 ",
+        title: " Interstellar ",
+        year: 2014
+      })
+    ).toEqual({
+      mediaType: "movie",
+      providerMediaId: "157336",
+      title: "Interstellar",
+      year: 2014
+    });
+  });
+
+  it("rejects season selection for non-TV create input", () => {
+    expect(() =>
+      createMediaRequestInput({
+        mediaType: "movie",
+        providerMediaId: "157336",
+        title: "Interstellar",
+        seasonNumber: 1
+      })
+    ).toThrow("request.seasonNumber is valid only for TV requests.");
+  });
+
   it("normalizes Request identity, provider, title, and timestamps", () => {
     expect(createMediaRequest(request())).toEqual({
       requestId: REQUEST_ID,

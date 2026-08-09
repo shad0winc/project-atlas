@@ -3,9 +3,11 @@ import { authenticatedAtlasApiRequest } from "../../../lib/services/authenticate
 import {
   createMediaRequest,
   createMediaRequestCollection,
+  createMediaRequestInput,
   normalizeRequestId,
   normalizeRequestUserId,
-  type MediaRequest
+  type MediaRequest,
+  type MediaRequestCreateInput
 } from "../types/requests";
 
 export type ReadRequestsOptions = Readonly<{
@@ -16,6 +18,12 @@ export type ReadRequestsOptions = Readonly<{
 export type CancelRequestOptions = Readonly<{
   expectedUserId: string;
 }>;
+
+export type CreateRequestOptions = Readonly<{
+  expectedUserId: string;
+}>;
+
+export type RequestCreationFailureKind = "conflict" | "reconciliation" | "unconfirmed";
 
 type MediaRequestTransportResponse = Readonly<{
   request_id: string;
@@ -45,6 +53,17 @@ type HttpFailureShape = Readonly<{
   detail?: unknown;
   message?: unknown;
 }>;
+
+export class RequestCreationError extends Error {
+  readonly kind: RequestCreationFailureKind;
+
+  constructor(message: string, kind: RequestCreationFailureKind, options: ErrorOptions = {}) {
+    super(message, options);
+
+    this.name = "RequestCreationError";
+    this.kind = kind;
+  }
+}
 
 export class RequestCancellationError extends Error {
   readonly reconciliationRequired: boolean;
@@ -94,6 +113,42 @@ function failureDetail(error: unknown): string {
   return "Atlas did not confirm the cancellation.";
 }
 
+function requestCreationFailure(error: unknown): RequestCreationError {
+  if (error !== null && typeof error === "object") {
+    const candidate = error as HttpFailureShape;
+
+    if (candidate.status === 409) {
+      const detail = typeof candidate.detail === "string" ? candidate.detail.toLowerCase() : "";
+
+      if (detail.includes("requires reconciliation") && detail.includes("do not retry")) {
+        return new RequestCreationError(
+          "Atlas could not confirm the final request state. Review Your requests before trying again.",
+          "reconciliation",
+          {
+            cause: error
+          }
+        );
+      }
+
+      return new RequestCreationError(
+        "This title already has an active Atlas request.",
+        "conflict",
+        {
+          cause: error
+        }
+      );
+    }
+  }
+
+  return new RequestCreationError(
+    "Atlas did not confirm this request. Review Your requests before trying again.",
+    "unconfirmed",
+    {
+      cause: error
+    }
+  );
+}
+
 function cancellationRequiresReconciliation(error: unknown): boolean {
   if (error === null || typeof error !== "object") {
     return false;
@@ -131,6 +186,73 @@ function cancellationFailure(error: unknown): RequestCancellationError {
       cause: error
     }
   );
+}
+
+export async function createRequestRecord(
+  input: MediaRequestCreateInput,
+  { expectedUserId }: CreateRequestOptions
+): Promise<MediaRequest> {
+  const normalizedInput = createMediaRequestInput(input);
+
+  const normalizedUserId = normalizeRequestUserId(expectedUserId);
+
+  let response: MediaRequestTransportResponse;
+
+  try {
+    response = await authenticatedAtlasApiRequest<MediaRequestTransportResponse>("/requests", {
+      method: "POST",
+      cache: "no-store",
+      body: {
+        media_type: normalizedInput.mediaType,
+        provider_media_id: normalizedInput.providerMediaId,
+        title: normalizedInput.title,
+        ...(normalizedInput.year === undefined
+          ? {}
+          : {
+              year: normalizedInput.year
+            }),
+        ...(normalizedInput.seasonNumber === undefined
+          ? {}
+          : {
+              season_number: normalizedInput.seasonNumber
+            })
+      },
+
+      // Request creation is a mutation. Never allow the
+      // generic transport retry loop to repeat the POST.
+      retryPolicy: {
+        maxRetries: 0,
+        baseDelayMs: 250,
+        maxDelayMs: 5_000
+      }
+    });
+  } catch (error: unknown) {
+    throw requestCreationFailure(error);
+  }
+
+  const created = mapMediaRequest(response);
+
+  if (created.userId !== normalizedUserId) {
+    throw new RequestCreationError(
+      "Request creation response crossed the authenticated-user boundary.",
+      "unconfirmed"
+    );
+  }
+
+  if (
+    created.mediaType !== normalizedInput.mediaType ||
+    created.providerMediaId !== normalizedInput.providerMediaId ||
+    created.title !== normalizedInput.title ||
+    created.year !== normalizedInput.year ||
+    created.seasonNumber !== normalizedInput.seasonNumber
+  ) {
+    throw new RequestCreationError(
+      "Request creation response did not match the requested media target.",
+      "unconfirmed"
+    );
+  }
+
+  return created;
 }
 
 export async function readRequests({

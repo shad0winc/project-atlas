@@ -5,6 +5,11 @@ export { loadMedia } from "./api/media";
 export type { LoadMediaOptions } from "./api/media";
 
 export { MediaDiscoveryContent, MediaDiscoveryView } from "./components/MediaDiscoveryView";
+
+export type {
+  MediaDiscoveryRequestAction,
+  MediaDiscoveryRequestActions
+} from "./components/MediaDiscoveryView";
 export { MediaError } from "./components/MediaError";
 export { MediaLibraryCard } from "./components/MediaLibraryCard";
 export { MediaLibraryGrid } from "./components/MediaLibraryGrid";

@@ -14,12 +14,15 @@ function render(
   return renderToStaticMarkup(
     <MediaDiscoveryContent
       activeQuery=""
+      canCreateRequests={false}
       mediaType="movie"
       mode="discover"
       onBrowse={noop}
       onPage={noop}
       onRefresh={noop}
+      onRequestMovie={noop}
       onSearch={noop}
+      requestActions={{}}
       state={state}
       {...overrides}
     />
@@ -140,9 +143,9 @@ describe("Media discovery presentation", () => {
     expect(markup).toContain("Page 2 of 3");
   });
 
-  it("keeps Request mutation controls out of B3.2", () => {
-    const markup = render({
-      status: "ready",
+  it("offers eligible movie requests only with requests.create presentation permission", () => {
+    const state = {
+      status: "ready" as const,
       data: createMediaDiscoveryPage({
         items: [
           {
@@ -156,10 +159,97 @@ describe("Media discovery presentation", () => {
         page: 1,
         totalPages: 1
       })
+    };
+
+    expect(render(state)).not.toContain("Request movie");
+
+    const permitted = render(state, {
+      canCreateRequests: true
     });
 
-    expect(markup).not.toContain("Request media");
-    expect(markup).not.toContain("Submit request");
-    expect(markup).not.toContain("providerMediaId");
+    expect(permitted).toContain("Request movie");
+
+    expect(permitted).not.toContain("157336");
+  });
+
+  it("defers TV mutation until season selection is explicit", () => {
+    const markup = render(
+      {
+        status: "ready",
+        data: createMediaDiscoveryPage({
+          items: [
+            {
+              providerMediaId: "1396",
+              mediaType: "tv",
+              title: "Breaking Bad",
+              availability: "not_tracked",
+              requestEligible: true
+            }
+          ],
+          page: 1,
+          totalPages: 1
+        })
+      },
+      {
+        canCreateRequests: true
+      }
+    );
+
+    expect(markup).toContain("Choose a season before requesting TV");
+
+    expect(markup).not.toContain("Request movie");
+
+    expect(markup).not.toContain("1396");
+  });
+
+  it("renders per-card submitting and stale-conflict states without raw provider identity", () => {
+    const state = {
+      status: "ready" as const,
+      data: createMediaDiscoveryPage({
+        items: [
+          {
+            providerMediaId: "157336",
+            mediaType: "movie",
+            title: "Interstellar",
+            availability: "not_tracked",
+            requestEligible: true
+          }
+        ],
+        page: 1,
+        totalPages: 1
+      })
+    };
+
+    const submitting = render(state, {
+      canCreateRequests: true,
+      requestActions: {
+        "movie:157336": {
+          status: "submitting",
+          message: "Submitting Interstellar to Atlas…"
+        }
+      }
+    });
+
+    expect(submitting).toContain("Requesting…");
+
+    expect(submitting).toContain('aria-busy="true"');
+
+    expect(submitting).not.toContain("157336");
+
+    const conflict = render(state, {
+      canCreateRequests: true,
+      requestActions: {
+        "movie:157336": {
+          status: "conflict",
+          message: "This title already has an active Atlas request."
+        }
+      }
+    });
+
+    expect(conflict).toContain("Already requested");
+
+    expect(conflict).toContain("This title already has an active Atlas request.");
+
+    expect(conflict).not.toContain("157336");
   });
 });

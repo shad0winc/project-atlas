@@ -8,7 +8,13 @@ vi.mock("../../../lib/services/authenticated", () => ({
   authenticatedAtlasApiRequest: authenticatedAtlasApiRequestMock
 }));
 
-import { RequestCancellationError, cancelRequestRecord, readRequests } from "./requests";
+import {
+  RequestCancellationError,
+  RequestCreationError,
+  cancelRequestRecord,
+  createRequestRecord,
+  readRequests
+} from "./requests";
 
 const REQUEST_ID = "req_0123456789abcdef0123456789abcdef";
 const USER_ID = "usr_0123456789abcdef0123456789abcdef";
@@ -40,6 +46,145 @@ beforeEach(() => {
 });
 
 describe("Personal Requests authenticated service boundary", () => {
+  it("creates through the self-scoped endpoint with caller-controlled fields only", async () => {
+    authenticatedAtlasApiRequestMock.mockResolvedValue(
+      transportRequest({
+        status: "approved",
+        can_cancel: true
+      })
+    );
+
+    await expect(
+      createRequestRecord(
+        {
+          mediaType: "movie",
+          providerMediaId: "157336",
+          title: "Interstellar",
+          year: 2014
+        },
+        {
+          expectedUserId: USER_ID
+        }
+      )
+    ).resolves.toMatchObject({
+      userId: USER_ID,
+      mediaType: "movie",
+      providerMediaId: "157336",
+      title: "Interstellar",
+      year: 2014
+    });
+
+    const [path, options] = authenticatedAtlasApiRequestMock.mock.calls[0] ?? [];
+
+    expect(path).toBe("/requests");
+
+    expect(options).toMatchObject({
+      method: "POST",
+      cache: "no-store",
+      retryPolicy: {
+        maxRetries: 0
+      }
+    });
+
+    expect(options?.body).toEqual({
+      media_type: "movie",
+      provider_media_id: "157336",
+      title: "Interstellar",
+      year: 2014
+    });
+
+    expect(JSON.stringify(options)).not.toContain("user_id");
+
+    expect(JSON.stringify(options)).not.toContain(USER_ID);
+  });
+
+  it("classifies stale discovery conflict without exposing raw API detail", async () => {
+    authenticatedAtlasApiRequestMock.mockRejectedValue({
+      status: 409,
+      detail: "Media request conflicts with existing state."
+    });
+
+    let caught: unknown;
+
+    try {
+      await createRequestRecord(
+        {
+          mediaType: "movie",
+          providerMediaId: "157336",
+          title: "Interstellar"
+        },
+        {
+          expectedUserId: USER_ID
+        }
+      );
+    } catch (error: unknown) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(RequestCreationError);
+
+    expect((caught as RequestCreationError).kind).toBe("conflict");
+
+    expect((caught as Error).message).toBe("This title already has an active Atlas request.");
+  });
+
+  it("preserves create reconciliation as a blocked do-not-retry state", async () => {
+    authenticatedAtlasApiRequestMock.mockRejectedValue({
+      status: 409,
+      detail: "Media request submission requires reconciliation. Do not retry this request."
+    });
+
+    let caught: unknown;
+
+    try {
+      await createRequestRecord(
+        {
+          mediaType: "movie",
+          providerMediaId: "157336",
+          title: "Interstellar"
+        },
+        {
+          expectedUserId: USER_ID
+        }
+      );
+    } catch (error: unknown) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(RequestCreationError);
+
+    expect((caught as RequestCreationError).kind).toBe("reconciliation");
+
+    expect((caught as Error).message).toContain("Review Your requests");
+  });
+
+  it("treats network create failure as outcome-unconfirmed and never retries automatically", async () => {
+    authenticatedAtlasApiRequestMock.mockRejectedValue(new Error("Network unavailable."));
+
+    let caught: unknown;
+
+    try {
+      await createRequestRecord(
+        {
+          mediaType: "movie",
+          providerMediaId: "157336",
+          title: "Interstellar"
+        },
+        {
+          expectedUserId: USER_ID
+        }
+      );
+    } catch (error: unknown) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(RequestCreationError);
+
+    expect((caught as RequestCreationError).kind).toBe("unconfirmed");
+
+    expect(authenticatedAtlasApiRequestMock).toHaveBeenCalledTimes(1);
+  });
+
   it("lists through the self-scoped endpoint without transmitting a user ID", async () => {
     authenticatedAtlasApiRequestMock.mockResolvedValue({
       requests: [transportRequest()]
