@@ -259,10 +259,16 @@ def get_current_user(
     ),
     jwt_service: JWTService = Depends(get_jwt_service),
     profiles: UserProfileStore = Depends(get_user_profile_store),
+    audit_writer=Depends(get_security_audit_writer),
 ) -> AuthenticatedUser:
     """Validate an access token and resolve its active Atlas profile."""
 
     if credentials is None or credentials.scheme.lower() != "bearer":
+        _publish_credential_rejection(
+            audit_writer,
+            "security.authentication.access_rejected",
+            reason="missing_bearer",
+        )
         raise _unauthorized("Bearer authentication is required.")
 
     return _resolve_token_user(
@@ -271,6 +277,8 @@ def get_current_user(
         jwt_service=jwt_service,
         profiles=profiles,
         invalid_token_message=None,
+        audit_writer=audit_writer,
+        rejection_event="security.authentication.access_rejected",
     )
 
 
@@ -279,11 +287,17 @@ def resolve_refresh_user(
     *,
     jwt_service: JWTService,
     profiles: UserProfileStore,
+    audit_writer=None,
 ) -> AuthenticatedUser:
     """Validate a refresh token and resolve its active Atlas profile."""
 
     normalized_token = refresh_token.strip()
     if not normalized_token:
+        _publish_credential_rejection(
+            audit_writer,
+            "security.session.credential_rejected",
+            reason="missing_value",
+        )
         raise _unauthorized("Refresh token is invalid or expired.")
 
     return _resolve_token_user(
@@ -292,6 +306,8 @@ def resolve_refresh_user(
         jwt_service=jwt_service,
         profiles=profiles,
         invalid_token_message="Refresh token is invalid or expired.",
+        audit_writer=audit_writer,
+        rejection_event="security.session.credential_rejected",
     )
 
 
@@ -302,6 +318,8 @@ def _resolve_token_user(
     jwt_service: JWTService,
     profiles: UserProfileStore,
     invalid_token_message: str | None,
+    audit_writer,
+    rejection_event: str,
 ) -> AuthenticatedUser:
     try:
         claims = jwt_service.decode_token(
@@ -309,12 +327,23 @@ def _resolve_token_user(
             expected_type=expected_type,
         )
     except TokenError as error:
+        _publish_credential_rejection(
+            audit_writer,
+            rejection_event,
+            reason="invalid_or_expired",
+        )
         message = invalid_token_message or str(error)
         raise _unauthorized(message) from error
 
     try:
         profile = profiles.get_user(claims.subject)
     except UserProfileError as error:
+        _publish_credential_rejection(
+            audit_writer,
+            rejection_event,
+            reason="profile_unavailable",
+            user_id=claims.subject,
+        )
         message = (
             invalid_token_message
             or "Authenticated Atlas user was not found."
@@ -322,6 +351,12 @@ def _resolve_token_user(
         raise _unauthorized(message) from error
 
     if profile["status"] != "active":
+        _publish_credential_rejection(
+            audit_writer,
+            rejection_event,
+            reason="profile_inactive",
+            user_id=claims.subject,
+        )
         message = (
             invalid_token_message
             or "Authenticated Atlas user is disabled."
@@ -344,6 +379,9 @@ def clear_dependency_caches() -> None:
     """Clear cached dependencies for tests and controlled reconfiguration."""
 
     get_authentication_service.cache_clear()
+    get_refresh_session_registry.cache_clear()
+    get_login_attempt_limiter.cache_clear()
+    get_security_audit_writer.cache_clear()
     get_dashboard_media_summary_service.cache_clear()
     get_dashboard_summary_service.cache_clear()
     get_jellyfin_authentication_client.cache_clear()
@@ -356,6 +394,25 @@ def clear_dependency_caches() -> None:
     get_user_profile_store.cache_clear()
     get_jwt_service.cache_clear()
     get_settings.cache_clear()
+
+
+def _publish_credential_rejection(
+    audit_writer,
+    event_name: str,
+    *,
+    reason: str,
+    user_id: str | None = None,
+) -> None:
+    # Direct unit calls may leave FastAPI's Depends marker unresolved. Runtime
+    # requests always receive the composed SecurityAuditWriter instance.
+    if not hasattr(audit_writer, "publish"):
+        return
+
+    payload = {"reason": reason}
+    if user_id is not None:
+        payload["user_id"] = user_id
+
+    audit_writer.publish(event_name, payload)
 
 
 def _positive_float_environment(

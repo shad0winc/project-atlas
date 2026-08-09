@@ -22,6 +22,7 @@ from atlas_api.auth.service import AuthenticationService
 from atlas_api.dependencies import (
     get_authentication_service,
     get_jwt_service,
+    get_security_audit_writer,
     get_user_profile_store,
     resolve_refresh_user,
 )
@@ -97,6 +98,7 @@ def refresh_tokens(
     ),
     jwt_service: JWTService = Depends(get_jwt_service),
     profiles=Depends(get_user_profile_store),
+    audit_writer=Depends(get_security_audit_writer),
 ) -> TokenResponse:
     """Validate a refresh token and issue a replacement token pair."""
 
@@ -105,6 +107,7 @@ def refresh_tokens(
             request.refresh_token,
             jwt_service=jwt_service,
             profiles=profiles,
+            audit_writer=audit_writer,
         )
         tokens = authentication.refresh(
             request.refresh_token,
@@ -136,6 +139,7 @@ def logout(
     ),
     jwt_service: JWTService = Depends(get_jwt_service),
     profiles=Depends(get_user_profile_store),
+    audit_writer=Depends(get_security_audit_writer),
 ) -> Response:
     """Revoke the supplied refresh session without exposing its state."""
 
@@ -144,6 +148,7 @@ def logout(
             request.refresh_token,
             jwt_service=jwt_service,
             profiles=profiles,
+            audit_writer=audit_writer,
         )
         authentication.logout(
             request.refresh_token,

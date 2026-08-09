@@ -60,3 +60,20 @@ def test_authorization_dependencies_receive_security_audit_writer() -> None:
     assert "get_security_audit_writer" in content
     assert "audit_writer=Depends(get_security_audit_writer)" in content
     assert '"security.authorization.denied"' in content
+
+
+def test_authentication_dependency_audits_pre_service_rejections() -> None:
+    content = DEPENDENCIES.read_text(encoding="utf-8")
+
+    assert '"security.authentication.access_rejected"' in content
+    assert '"security.session.credential_rejected"' in content
+    assert "reason=\"invalid_or_expired\"" in content
+    assert "audit_writer=Depends(get_security_audit_writer)" in content
+
+
+def test_security_state_caches_are_cleared_together() -> None:
+    content = DEPENDENCIES.read_text(encoding="utf-8")
+
+    assert "get_refresh_session_registry.cache_clear()" in content
+    assert "get_login_attempt_limiter.cache_clear()" in content
+    assert "get_security_audit_writer.cache_clear()" in content

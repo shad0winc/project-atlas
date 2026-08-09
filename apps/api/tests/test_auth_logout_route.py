@@ -12,6 +12,7 @@ from atlas_api.auth.models import AuthenticatedUser
 from atlas_api.dependencies import (
     get_authentication_service,
     get_jwt_service,
+    get_security_audit_writer,
     get_user_profile_store,
 )
 from atlas_api.main import create_app
@@ -33,6 +34,7 @@ class AuthenticationLogoutRouteTests(unittest.TestCase):
         self.client = TestClient(self.application)
         self.jwt_service = object()
         self.profiles = object()
+        self.audit_writer = object()
         self.service = LogoutAuthenticationServiceDouble()
 
         self.application.dependency_overrides[
@@ -44,6 +46,9 @@ class AuthenticationLogoutRouteTests(unittest.TestCase):
         self.application.dependency_overrides[
             get_user_profile_store
         ] = lambda: self.profiles
+        self.application.dependency_overrides[
+            get_security_audit_writer
+        ] = lambda: self.audit_writer
 
         self.user = AuthenticatedUser(
             user_id="user-123",
@@ -76,6 +81,7 @@ class AuthenticationLogoutRouteTests(unittest.TestCase):
             "current-refresh-token",
             jwt_service=self.jwt_service,
             profiles=self.profiles,
+            audit_writer=self.audit_writer,
         )
 
     def test_logout_rejects_invalid_refresh_identity(self) -> None:
