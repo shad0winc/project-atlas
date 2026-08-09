@@ -11,6 +11,11 @@ from .favorites import (
     FavoriteListResponse,
     FavoriteResponse,
 )
+from .requests import (
+    MediaRequestCreateRequest,
+    MediaRequestListResponse,
+    MediaRequestResponse,
+)
 from .portal_dashboard import (
     PortalDashboardResponse,
     PortalOperationsAttentionResponse,
@@ -40,4 +45,7 @@ __all__ = [
     "FavoriteCreateRequest",
     "FavoriteListResponse",
     "FavoriteResponse",
+    "MediaRequestCreateRequest",
+    "MediaRequestListResponse",
+    "MediaRequestResponse",
 ]

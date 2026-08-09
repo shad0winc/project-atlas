@@ -6,7 +6,6 @@ from dataclasses import dataclass
 import json
 from typing import Mapping, Any
 
-from atlas.events import publish_core_event
 from atlas.favorite_service import (
     FavoriteMutationResult,
     FavoriteService,
@@ -17,6 +16,8 @@ from atlas.favorites import (
     default_favorite_store,
 )
 from atlas.media.jellyfin import default_jellyfin_provider
+
+from atlas_api.events import RuntimeEventJournalPublisher
 
 
 class FavoritesAPIError(RuntimeError):
@@ -179,7 +180,11 @@ def build_default_favorites_api_service(
         providers={
             "jellyfin": default_jellyfin_provider(),
         },
-        event_publisher=publish_core_event,
+        event_publisher=(
+            RuntimeEventJournalPublisher
+            .from_environment()
+            .publish
+        ),
     )
 
     return FavoritesAPIService(

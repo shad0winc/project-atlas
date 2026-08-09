@@ -11,6 +11,16 @@ from .favorites import (
     FavoritesUnavailableError,
     build_default_favorites_api_service,
 )
+from .requests import (
+    MediaRequestConflictError,
+    MediaRequestNotFoundError,
+    MediaRequestReconciliationRequiredError,
+    MediaRequestValidationError,
+    MediaRequestsAPIError,
+    MediaRequestsAPIService,
+    MediaRequestsUnavailableError,
+    build_default_media_requests_api_service,
+)
 from .portal_dashboard import PortalDashboardService
 from .scheduler_dashboard import (
     PORTAL_RECENT_FAILURE_LIMIT,
@@ -30,4 +40,12 @@ __all__ = [
     "FavoritesAPIService",
     "FavoritesUnavailableError",
     "build_default_favorites_api_service",
+    "MediaRequestConflictError",
+    "MediaRequestNotFoundError",
+    "MediaRequestReconciliationRequiredError",
+    "MediaRequestValidationError",
+    "MediaRequestsAPIError",
+    "MediaRequestsAPIService",
+    "MediaRequestsUnavailableError",
+    "build_default_media_requests_api_service",
 ]

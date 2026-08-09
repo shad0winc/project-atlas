@@ -9,6 +9,7 @@ from .favorites import router as favorites_router
 from .media_libraries import router as media_libraries_router
 from .operations import router as operations_router
 from .portal import router as portal_router
+from .requests import router as requests_router
 from .health import router as health_router
 
 
@@ -24,6 +25,7 @@ router.include_router(favorites_router)
 router.include_router(media_libraries_router)
 router.include_router(operations_router)
 router.include_router(portal_router)
+router.include_router(requests_router)
 
 __all__ = [
     "router",
