@@ -43,6 +43,8 @@ def make_provider() -> JellyseerrMediaRequestProvider:
     return JellyseerrMediaRequestProvider(
         base_url="http://127.0.0.1:5055",
         api_key="secret",
+        tv_server_id=0,
+        anime_tv_server_id=1,
         clock=lambda: datetime(
             2026,
             8,
@@ -160,6 +162,12 @@ def test_submit_maps_media_types(
     payload = post.call_args.args[1]
     assert payload["mediaType"] == expected_type
 
+    if media_type in {
+        "movie",
+        "anime_movie",
+    }:
+        assert "serverId" not in payload
+
 
 def test_submit_tv_specific_season() -> None:
     provider = make_provider()
@@ -176,7 +184,29 @@ def test_submit_tv_specific_season() -> None:
             )
         )
 
+    assert post.call_args.args[1]["serverId"] == 0
     assert post.call_args.args[1]["seasons"] == [3]
+
+
+def test_submit_anime_tv_uses_explicit_anime_server() -> None:
+    provider = make_provider()
+
+    with patch.object(
+        JellyseerrMediaRequestProvider,
+        "_post_json",
+        return_value=response(
+            media_type="tv"
+        ),
+    ) as post:
+        provider.submit(
+            make_request(
+                media_type="anime_tv",
+                season_number=2,
+            )
+        )
+
+    assert post.call_args.args[1]["serverId"] == 1
+    assert post.call_args.args[1]["seasons"] == [2]
 
 
 def test_submit_tv_all_seasons() -> None:
@@ -189,7 +219,78 @@ def test_submit_tv_all_seasons() -> None:
     ) as post:
         provider.submit(make_request(media_type="tv"))
 
+    assert post.call_args.args[1]["serverId"] == 0
     assert post.call_args.args[1]["seasons"] == "all"
+
+
+@pytest.mark.parametrize(
+    ("media_type", "server_field"),
+    [
+        ("tv", "tv_server_id"),
+        ("anime_tv", "anime_tv_server_id"),
+    ],
+)
+def test_submit_tv_requires_explicit_server_route_before_http(
+    media_type: str,
+    server_field: str,
+) -> None:
+    values = {
+        "base_url": "http://127.0.0.1:5055",
+        "api_key": "secret",
+        "tv_server_id": 0,
+        "anime_tv_server_id": 1,
+    }
+    values[server_field] = None
+
+    provider = JellyseerrMediaRequestProvider(
+        **values
+    )
+
+    with patch.object(
+        JellyseerrMediaRequestProvider,
+        "_post_json",
+    ) as post:
+        with pytest.raises(
+            MediaRequestProviderError,
+            match="routing is not configured",
+        ):
+            provider.submit(
+                make_request(
+                    media_type=media_type,
+                    season_number=1,
+                )
+            )
+
+    post.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "provider_media_id",
+    [
+        "0",
+        0,
+    ],
+)
+def test_submit_rejects_nonpositive_tmdb_id_before_http(
+    provider_media_id: object,
+) -> None:
+    provider = make_provider()
+
+    with patch.object(
+        JellyseerrMediaRequestProvider,
+        "_post_json",
+    ) as post:
+        with pytest.raises(
+            MediaRequestProviderError,
+            match="positive",
+        ):
+            provider.submit(
+                make_request(
+                    provider_media_id=provider_media_id
+                )
+            )
+
+    post.assert_not_called()
 
 
 def test_submit_requires_media_request() -> None:
@@ -464,6 +565,64 @@ def test_clock_must_be_timezone_aware() -> None:
             provider.cancel("42")
 
 
+@pytest.mark.parametrize(
+    ("field_name", "value"),
+    [
+        ("tv_server_id", -1),
+        ("tv_server_id", True),
+        ("tv_server_id", "abc"),
+        ("anime_tv_server_id", -1),
+        ("anime_tv_server_id", True),
+        ("anime_tv_server_id", "abc"),
+    ],
+)
+def test_provider_rejects_invalid_server_id(
+    field_name: str,
+    value: object,
+) -> None:
+    values: dict[str, object] = {
+        "base_url": "http://127.0.0.1:5055",
+        "api_key": "secret",
+    }
+    values[field_name] = value
+
+    with pytest.raises(
+        MediaRequestProviderError,
+        match="non-negative",
+    ):
+        JellyseerrMediaRequestProvider(
+            **values  # type: ignore[arg-type]
+        )
+
+
+def test_default_provider_uses_explicit_routing_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "ATLAS_JELLYSEERR_URL",
+        "https://requests.example.test",
+    )
+    monkeypatch.setenv(
+        "ATLAS_JELLYSEERR_API_KEY",
+        "secret",
+    )
+    monkeypatch.setenv(
+        "ATLAS_JELLYSEERR_TV_SERVER_ID",
+        "0",
+    )
+    monkeypatch.setenv(
+        "ATLAS_JELLYSEERR_ANIME_TV_SERVER_ID",
+        "1",
+    )
+
+    provider = (
+        default_jellyseerr_media_request_provider()
+    )
+
+    assert provider.tv_server_id == 0
+    assert provider.anime_tv_server_id == 1
+
+
 def test_default_provider_uses_explicit_url(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -501,4 +660,46 @@ def test_default_provider_requires_api_key(
     monkeypatch.delenv("JELLYSEERR_PORT", raising=False)
 
     with pytest.raises(MediaRequestHTTPError, match="api_key"):
+        default_jellyseerr_media_request_provider()
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        (
+            "ATLAS_JELLYSEERR_TV_SERVER_ID",
+            "-1",
+        ),
+        (
+            "ATLAS_JELLYSEERR_TV_SERVER_ID",
+            "abc",
+        ),
+        (
+            "ATLAS_JELLYSEERR_ANIME_TV_SERVER_ID",
+            "-1",
+        ),
+        (
+            "ATLAS_JELLYSEERR_ANIME_TV_SERVER_ID",
+            "abc",
+        ),
+    ],
+)
+def test_default_provider_rejects_invalid_routing_environment(
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
+    value: str,
+) -> None:
+    monkeypatch.setenv(
+        "ATLAS_JELLYSEERR_API_KEY",
+        "secret",
+    )
+    monkeypatch.setenv(
+        name,
+        value,
+    )
+
+    with pytest.raises(
+        MediaRequestProviderError,
+        match="non-negative",
+    ):
         default_jellyseerr_media_request_provider()

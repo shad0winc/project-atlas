@@ -133,10 +133,15 @@ class MediaRequestsAPIService:
         # misclassified as an outcome-ambiguous provider mutation.
         if (
             request.provider == REQUEST_PROVIDER
-            and not request.provider_media_id.isdigit()
+            and (
+                not request.provider_media_id.isdigit()
+                or int(
+                    request.provider_media_id
+                ) <= 0
+            )
         ):
             raise MediaRequestValidationError(
-                "Jellyseerr media identifier must be numeric."
+                "Jellyseerr media identifier must be a positive numeric identifier."
             )
 
         try:

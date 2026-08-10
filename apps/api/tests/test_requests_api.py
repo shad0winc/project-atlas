@@ -17,6 +17,7 @@ from atlas.media_requests import (
     JsonMediaRequestRepository,
     MediaRequest,
     MediaRequestProvider,
+    MediaRequestProviderError,
     MediaRequestProviderOperationError,
     MediaRequestRepositoryError,
     MediaRequestService,
@@ -471,8 +472,12 @@ class FakeProvider(MediaRequestProvider):
     """Deterministic provider for application-service tests."""
 
     def __init__(self) -> None:
+        self.preflight_requests: list[
+            MediaRequest
+        ] = []
         self.submissions: list[MediaRequest] = []
         self.cancellations: list[str] = []
+        self.preflight_error: Exception | None = None
         self.submission_error: Exception | None = None
         self.cancel_error: Exception | None = None
 
@@ -492,6 +497,17 @@ class FakeProvider(MediaRequestProvider):
             supports_status=True,
             supports_cancellation=True,
         )
+
+    def validate_submission(
+        self,
+        request: MediaRequest,
+    ) -> None:
+        self.preflight_requests.append(
+            request
+        )
+
+        if self.preflight_error is not None:
+            raise self.preflight_error
 
     def submit(
         self,
@@ -751,6 +767,55 @@ def test_application_rejects_non_numeric_jellyseerr_id_before_persistence(
         )
 
     assert fixture.repository.list() == ()
+    assert fixture.provider.submissions == []
+
+
+def test_application_rejects_zero_jellyseerr_id_before_persistence(
+) -> None:
+    fixture = make_service_fixture()
+
+    with pytest.raises(
+        MediaRequestValidationError,
+        match="positive",
+    ):
+        fixture.api.create_for_user(
+            USER_ID,
+            media_type="movie",
+            provider_media_id="0",
+            title="Invalid",
+        )
+
+    assert fixture.repository.list() == ()
+    assert fixture.provider.preflight_requests == []
+    assert fixture.provider.submissions == []
+
+
+def test_application_provider_preflight_failure_does_not_persist(
+) -> None:
+    fixture = make_service_fixture()
+
+    fixture.provider.preflight_error = (
+        MediaRequestProviderError(
+            "routing is not configured"
+        )
+    )
+
+    with pytest.raises(
+        MediaRequestsUnavailableError,
+        match="could not be created",
+    ):
+        fixture.api.create_for_user(
+            USER_ID,
+            media_type="tv",
+            provider_media_id="1399",
+            title="Example",
+            season_number=1,
+        )
+
+    assert fixture.repository.list() == ()
+    assert len(
+        fixture.provider.preflight_requests
+    ) == 1
     assert fixture.provider.submissions == []
 
 

@@ -99,6 +99,9 @@ def test_complete_provider_satisfies_contract() -> None:
 
     assert provider.name == "example"
     assert provider.capabilities().supports("movie") is True
+    assert provider.validate_submission(
+        make_request()
+    ) is None
     assert provider.submit(make_request()).provider_request_id == "1"
     assert provider.get_status("1").status is MediaRequestStatus.PENDING
     assert provider.cancel("1").status is MediaRequestStatus.CANCELLED

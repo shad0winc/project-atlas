@@ -52,11 +52,35 @@ def _utc_now() -> datetime:
 class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
     """Translate Jellyseerr request resources into Atlas contracts."""
 
+    tv_server_id: int | None = None
+    anime_tv_server_id: int | None = None
     clock: Clock = field(
         default=_utc_now,
         repr=False,
         compare=False,
     )
+
+    def __post_init__(self) -> None:
+        BaseMediaRequestHTTPProvider.__post_init__(
+            self
+        )
+
+        object.__setattr__(
+            self,
+            "tv_server_id",
+            _optional_server_id(
+                self.tv_server_id,
+                "tv_server_id",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "anime_tv_server_id",
+            _optional_server_id(
+                self.anime_tv_server_id,
+                "anime_tv_server_id",
+            ),
+        )
 
     @property
     def name(self) -> str:
@@ -76,10 +100,12 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
             supports_webhooks=True,
         )
 
-    def submit(
+    def validate_submission(
         self,
         request: MediaRequest,
-    ) -> ProviderSubmissionResult:
+    ) -> None:
+        """Validate deterministic Jellyseerr submission prerequisites."""
+
         if not isinstance(request, MediaRequest):
             raise MediaRequestProviderError(
                 "request must be a MediaRequest",
@@ -93,6 +119,33 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
                 f"unsupported Jellyseerr media type: {request.media_type.value}",
             )
 
+        media_id = _numeric_identifier(
+            request.provider_media_id,
+            "provider_media_id",
+        )
+
+        if media_id <= 0:
+            raise MediaRequestProviderError(
+                "provider_media_id must be a positive "
+                "numeric TMDB identifier"
+            )
+
+        if request.media_type in {
+            MediaRequestType.TV,
+            MediaRequestType.ANIME_TV,
+        }:
+            self._server_id_for(
+                request.media_type
+            )
+
+    def submit(
+        self,
+        request: MediaRequest,
+    ) -> ProviderSubmissionResult:
+        self.validate_submission(
+            request
+        )
+
         payload: dict[str, Any] = {
             "mediaType": _jellyseerr_media_type(request.media_type),
             "mediaId": _numeric_identifier(
@@ -105,6 +158,11 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
             MediaRequestType.TV,
             MediaRequestType.ANIME_TV,
         }:
+            payload["serverId"] = (
+                self._server_id_for(
+                    request.media_type
+                )
+            )
             payload["seasons"] = (
                 [request.season_number]
                 if request.season_number is not None
@@ -138,6 +196,28 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
             updated_at=updated_at,
             context=self._context(request, resource),
         )
+
+    def _server_id_for(
+        self,
+        media_type: MediaRequestType,
+    ) -> int:
+        if media_type is MediaRequestType.TV:
+            server_id = self.tv_server_id
+            label = "TV"
+        elif media_type is MediaRequestType.ANIME_TV:
+            server_id = self.anime_tv_server_id
+            label = "anime TV"
+        else:
+            raise MediaRequestProviderError(
+                "server routing is only valid for TV requests"
+            )
+
+        if server_id is None:
+            raise MediaRequestProviderError(
+                f"Jellyseerr {label} server routing is not configured"
+            )
+
+        return server_id
 
     def get_status(
         self,
@@ -514,7 +594,80 @@ def default_jellyseerr_media_request_provider(
     return JellyseerrMediaRequestProvider(
         base_url=base_url,
         api_key=os.getenv("ATLAS_JELLYSEERR_API_KEY", ""),
+        tv_server_id=_environment_server_id(
+            "ATLAS_JELLYSEERR_TV_SERVER_ID"
+        ),
+        anime_tv_server_id=_environment_server_id(
+            "ATLAS_JELLYSEERR_ANIME_TV_SERVER_ID"
+        ),
     )
+
+
+def _environment_server_id(
+    name: str,
+) -> int | None:
+    value = os.getenv(
+        name,
+        "",
+    ).strip()
+
+    if not value:
+        return None
+
+    return _optional_server_id(
+        value,
+        name,
+    )
+
+
+def _optional_server_id(
+    value: object,
+    field_name: str,
+) -> int | None:
+    if value is None:
+        return None
+
+    if isinstance(
+        value,
+        bool,
+    ):
+        raise MediaRequestProviderError(
+            f"{field_name} must be a non-negative integer or null"
+        )
+
+    if isinstance(
+        value,
+        int,
+    ):
+        normalized = value
+    elif isinstance(
+        value,
+        str,
+    ):
+        text = value.strip()
+
+        if not text:
+            return None
+
+        if not text.isdigit():
+            raise MediaRequestProviderError(
+                f"{field_name} must be a non-negative integer or null"
+            )
+
+        normalized = int(
+            text
+        )
+    else:
+        raise MediaRequestProviderError(
+            f"{field_name} must be a non-negative integer or null"
+        )
+
+    if normalized < 0:
+        raise MediaRequestProviderError(
+            f"{field_name} must be a non-negative integer or null"
+        )
+
+    return normalized
 
 
 # Keep aligned with the pinned Seerr runtime MediaStatus enum.

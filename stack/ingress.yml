@@ -63,6 +63,8 @@ services:
       ATLAS_JELLYFIN_API_KEY: "${ATLAS_JELLYFIN_API_KEY:?ATLAS_JELLYFIN_API_KEY is required}"
       ATLAS_JELLYSEERR_URL: "http://jellyseerr:5055"
       ATLAS_JELLYSEERR_API_KEY: "${ATLAS_JELLYSEERR_API_KEY:?ATLAS_JELLYSEERR_API_KEY is required}"
+      ATLAS_JELLYSEERR_TV_SERVER_ID: "${ATLAS_JELLYSEERR_TV_SERVER_ID:-}"
+      ATLAS_JELLYSEERR_ANIME_TV_SERVER_ID: "${ATLAS_JELLYSEERR_ANIME_TV_SERVER_ID:-}"
       ATLAS_REQUESTS_DIR: "/mnt/storage/configs/atlas/runtime/requests"
       ATLAS_USERS_DIR: "/mnt/storage/configs/atlas/users"
       ATLAS_SECURITY_AUDIT_PATH: "/mnt/storage/configs/atlas/runtime/events.jsonl"

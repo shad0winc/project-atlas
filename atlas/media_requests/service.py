@@ -275,6 +275,11 @@ class MediaRequestService:
                 f"{request.provider}:{request.media_type.value}",
             )
 
+        self._validate_submission(
+            provider,
+            request,
+        )
+
         try:
             persisted = (
                 self.repository.save_if_no_active_conflict(
@@ -330,6 +335,11 @@ class MediaRequestService:
                 "provider does not support media type: "
                 f"{request.provider}:{request.media_type.value}",
             )
+
+        self._validate_submission(
+            provider,
+            request,
+        )
 
         self._validate_transition(
             request.status,
@@ -637,6 +647,29 @@ class MediaRequestService:
             ) from exc
 
         return capabilities
+
+    @staticmethod
+    def _validate_submission(
+        provider: MediaRequestProvider,
+        request: MediaRequest,
+    ) -> None:
+        try:
+            result = provider.validate_submission(
+                request
+            )
+        except (
+            MediaRequestProviderError,
+            MediaRequestProviderOperationError,
+        ) as exc:
+            raise MediaRequestServiceError(
+                "provider submission preflight failed: "
+                f"{provider.name}",
+            ) from exc
+
+        if result is not None:
+            raise MediaRequestServiceError(
+                "provider validate_submission() must return null",
+            )
 
     def _apply_status_result(
         self,
