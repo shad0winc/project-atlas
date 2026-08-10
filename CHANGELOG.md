@@ -20,6 +20,16 @@ All notable changes to Project Atlas are documented in this file.
   deferring Portal series mutation until explicit season-selection UX is
   available; v1.0 acceptance retains ongoing-series monitoring and automatic
   future-episode acquisition as a required user workflow.
+- Added normalized TV-series detail, season metadata, ongoing-state derivation,
+  and anime classification through the Atlas read boundary while excluding
+  Specials (`season 0`) from normal request scope.
+- Added deterministic Media Request submission preflight and explicit
+  server-owned Seerr routing for standard TV and anime TV so missing or invalid
+  routing fails before new Request persistence or provider HTTP.
+- Established Seerr ongoing-series monitoring ownership as a service-level
+  runtime concern: the canonical repository image is pinned to Seerr v3.4.1,
+  while production migration, `monitorNewItems=all` verification for both
+  Sonarr routes, and end-to-end future-episode validation remain release gates.
 
 ### Fixed
 

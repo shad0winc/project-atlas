@@ -12,12 +12,14 @@ clients.
 
 ## Current Source Checkpoint
 
-The B3 implementation is represented by four atomic commits:
+The B3 implementation is represented by six atomic commits:
 
 - `755409de` — Seerr-backed Media discovery foundation;
 - `7bd4a14a` — Personal Media browse/search Portal;
-- `28cbb790` — active Request uniqueness and race protection; and
-- `b1c2ebcb` — movie Request action in the Portal.
+- `28cbb790` — active Request uniqueness and race protection;
+- `b1c2ebcb` — movie Request action in the Portal;
+- `b901702d` — TV-series detail and season metadata; and
+- `c1bbe9d5` — explicit TV/anime-TV routing and submission preflight.
 
 These are source/repository changes. They do not, by themselves, certify a
 production deployment or the remaining v1.0 user-acceptance gates.
@@ -52,8 +54,9 @@ authorization, normalization, Request persistence, duplicate protection, error
 translation, and mutation ordering.
 
 The current provider implementation retains some `Jellyseerr` names for
-compatibility with the established Atlas package and environment contracts even
-though the deployed third-party project/image selection has migrated to Seerr.
+compatibility with the established Atlas package and environment contracts.
+Repository source now selects the pinned Seerr runtime, while the deployed
+production container remains a separate migration and release-acceptance gate.
 
 ## Discovery Read Path
 
@@ -105,19 +108,30 @@ The mutation sequence is:
 validate caller input
         |
         v
+resolve provider + deterministic submission preflight
+        |
+        v
 serialize active-target check + PENDING persistence
         |
         v
 release Request registry lock
         |
         v
-submit to provider
+revalidate before SUBMITTING intent
+        |
+        v
+persist SUBMITTING
+        |
+        v
+provider defensive validation + external mutation
         |
         v
 persist provider/result lifecycle state
 ```
 
-Local persistence therefore precedes external mutation.
+Deterministic provider configuration errors therefore fail before a new Request
+is persisted. Local persistence still precedes external mutation, while
+outcome-ambiguous provider operations remain reconciliation-required.
 
 ## Active-Target Identity
 
@@ -219,9 +233,43 @@ quality, and release rules.
 Atlas should not require a new user Request for every future episode of an
 already monitored ongoing series.
 
-This paragraph defines the required end-user/operational acceptance target. It
-does not claim that B3.3.2 already exposes TV/anime season selection in the
-Portal.
+### Monitoring Ownership and Runtime Gate
+
+Ongoing-series monitoring is owned by the configured Seerr Sonarr service, not
+by caller-controlled Atlas Request fields. The target Seerr runtime exposes
+`monitorNewItems` as a Sonarr-service setting and forwards that value when a new
+series is added to Sonarr. Atlas therefore does not add a per-request
+`monitorNewItems` field or allow the browser to control that downstream
+monitoring policy.
+
+The canonical repository runtime is pinned to Seerr v3.4.1. The production
+container observed during B3.3.3C still used the legacy
+`fallenbagel/jellyseerr:latest` lineage and exposed neither a
+`monitorNewItems` setting on its two sanitized Sonarr service records nor
+`monitorNewItems` support in its deployed application code. Source ownership and
+production runtime state are therefore intentionally distinguished.
+
+Before v1.0 series-request acceptance can pass, the controlled production
+deployment must:
+
+1. back up the existing Seerr/Jellyseerr configuration and preserve rollback;
+2. migrate/recreate the service on the repository-pinned Seerr image;
+3. verify the standard-TV route and anime-TV route still resolve to the intended
+   Sonarr service IDs;
+4. set and verify `monitorNewItems=all` for both supported Sonarr services; and
+5. prove through production E2E validation that a newly requested ongoing
+   standard series and anime series remain monitored for future episodes.
+
+Season request scope and future-season monitoring are separate concepts. An
+explicit season request still represents that Atlas Request's user-selected
+season scope, while Seerr's service-level monitoring policy determines whether
+Sonarr automatically monitors later seasons added to upstream metadata. The
+Portal must not present service-level monitoring as a per-request toggle unless
+Atlas later implements a separate authoritative downstream control.
+
+This section defines the required end-user/operational acceptance target. It
+does not claim that Portal TV/anime season selection or the production Seerr
+migration is already complete.
 
 ## Security Properties
 

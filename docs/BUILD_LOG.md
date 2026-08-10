@@ -5848,3 +5848,132 @@ server-side concurrency prerequisite for future series request UX. No production
 deployment was performed by these four source commits. TV/anime season selection,
 downstream ongoing-series acceptance validation, and the remaining v1.0
 end-to-end/user-acceptance gates remain open.
+
+---
+
+# 2026-08-10
+
+## M-023.27.3B3.3.3A — TV Series Detail / Season Metadata Foundation
+
+### Objective
+
+Add the read-only TV-series contract required for explicit season-selection UX
+without enabling TV/anime Request mutation.
+
+### Completed
+
+- Added normalized `MediaSeriesStatus`, `MediaSeriesSeason`, and
+  `MediaSeriesDetail` contracts.
+- Added deterministic serialization and ongoing-series derivation.
+- Added Seerr TV detail retrieval through `GET /api/v1/tv/{id}`.
+- Excluded Specials (`season 0`) from normal season selection.
+- Added provider-status normalization and server-side anime classification.
+- Added `GET /api/v1/media/tv/{provider_media_id}` behind `media.read`.
+- Enforced positive TMDB identity before provider HTTP.
+- Kept Portal TV/anime mutation, server routing, and Request persistence schema
+  unchanged.
+
+### Validation
+
+- Dedicated zero-ID regression passed after correcting the provider guard.
+- Focused Core: 63 passed.
+- Focused API: 26 passed plus 3 subtests.
+- Full Core: 3,076 passed plus 104 subtests.
+- Full API: 346 passed plus 15 subtests.
+- Commit `b901702d`:
+  `feat(media): add tv series detail metadata`.
+
+---
+
+# 2026-08-10
+
+## M-023.27.3B3.3.3B — Explicit TV / Anime Routing and Submission Preflight
+
+### Objective
+
+Make TV/anime downstream routing deterministic and server-owned before the
+Portal exposes series mutation.
+
+### Completed
+
+- Added backward-compatible provider `validate_submission()` preflight.
+- Required Core preflight before active-target persistence.
+- Required revalidation before persisting `SUBMITTING`.
+- Required defensive provider validation before provider HTTP.
+- Added explicit standard-TV and anime-TV Seerr `serverId` ownership through
+  `ATLAS_JELLYSEERR_TV_SERVER_ID` and
+  `ATLAS_JELLYSEERR_ANIME_TV_SERVER_ID`.
+- Preserved valid server ID `0`.
+- Failed missing/invalid TV routing before provider HTTP and before new Request
+  persistence.
+- Preserved movie/anime-movie payload behavior.
+- Added ingress and environment-template configuration without hard-coded
+  production server IDs.
+- Kept Portal mutation, persisted Request schema/repository, production `.env`,
+  and `monitorNewItems` out of the source slice.
+
+### Validation
+
+- Previously failing import-only test defect repaired without weakening tests.
+- Focused Core: 209 passed.
+- Focused Request API: 23 passed plus 7 subtests.
+- Full Core: 3,096 passed plus 104 subtests.
+- Full API: 348 passed plus 15 subtests.
+- Commit `c1bbe9d5`:
+  `feat(requests): add explicit tv routing preflight`.
+
+---
+
+# 2026-08-10
+
+## M-023.27.3B3.3.3C — Seerr Monitoring / Runtime Ownership Review
+
+### Objective
+
+Resolve ownership of ongoing-series monitoring and distinguish repository
+runtime truth from the currently deployed production container before enabling
+Portal TV/anime mutation.
+
+### Read-Only Findings
+
+- Repository source pins
+  `ghcr.io/seerr-team/seerr:v3.4.1` by digest and already includes `init: true`.
+- The deployed container still reports
+  `fallenbagel/jellyseerr:latest`.
+- The deployed runtime has two sanitized Sonarr services:
+  standard TV service ID `0` and Anime TV service ID `1`.
+- Neither deployed Sonarr service record exposes `monitorNewItems`.
+- The deployed application code contains zero `monitorNewItems` references.
+- Explicit Atlas routing IDs `0` and `1` remain structurally compatible with
+  the observed service identities, but production values are still deployment
+  configuration and are not committed.
+- Upstream Seerr owns new-season monitoring as a Sonarr-service setting; Atlas
+  should not add it to caller-controlled Request state.
+
+### Decision
+
+Repository image ownership is already correct; no additional image source
+change is required for this milestone. Production must still migrate from the
+legacy Jellyseerr container to the pinned Seerr runtime under backup,
+maintenance, and rollback control.
+
+After migration, both supported Seerr Sonarr services must be verified with
+`monitorNewItems=all`, Atlas routing IDs must be revalidated, and production E2E
+tests must prove ongoing standard TV and anime TV remain monitored for future
+episodes. Until those runtime acceptance gates pass, Atlas must not claim
+ongoing-series monitoring is production-certified.
+
+Season scope and future-season monitoring remain separate concepts. Portal
+season selection must express the user's Request scope without pretending the
+service-level Seerr monitoring policy is a per-request toggle.
+
+### Safety
+
+The review was read-only:
+
+- no source or documentation mutation;
+- no container restart or image pull;
+- no settings or database write;
+- no production `.env` change;
+- no Request or Portal mutation; and
+- no production deployment.

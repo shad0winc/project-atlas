@@ -423,15 +423,28 @@ with backend services.
 - [x] Request movies
 - [ ] Request television series
   - [x] Preserve server-side TV request/provider capability
+  - [x] Add normalized TV-series detail, season, and ongoing metadata
+  - [x] Add explicit server-owned standard-TV routing and submission preflight
   - [ ] Add explicit Portal season-selection/request UX
   - [ ] Validate ongoing-series monitoring so future episodes can be acquired
         automatically through Seerr and Sonarr without a new Atlas request per episode
+    - [x] Define Seerr service-level `monitorNewItems` ownership
+    - [x] Pin the canonical Seerr runtime image in repository source
+    - [ ] Migrate the deployed Jellyseerr runtime to the canonical Seerr image
+          under backed-up maintenance control
+    - [ ] Verify the standard-TV Sonarr service uses `monitorNewItems=all`
+    - [ ] Complete production E2E future-episode monitoring validation
 - [ ] Request anime movies
 - [ ] Request anime series
   - [x] Preserve server-side anime-TV request/provider capability
+  - [x] Reuse normalized TV-series detail with server-side anime classification
+  - [x] Add explicit server-owned anime-TV routing and submission preflight
   - [ ] Add explicit Portal season-selection/request UX
   - [ ] Validate ongoing-series monitoring so future episodes can be acquired
         automatically through Seerr and Sonarr Anime without a new Atlas request per episode
+    - [x] Define shared Seerr service-level `monitorNewItems` ownership
+    - [ ] Verify the Anime-TV Sonarr service uses `monitorNewItems=all`
+    - [ ] Complete production E2E future-episode monitoring validation
 - [x] View request history
 - [x] View request status
 - [x] Cancel eligible requests

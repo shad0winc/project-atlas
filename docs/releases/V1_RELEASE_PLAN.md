@@ -364,6 +364,32 @@ appropriate Sonarr instance so future episodes can be acquired automatically
 under the configured monitoring, quality, and release rules without requiring a
 new Atlas request per episode.
 
+### 8.4.1 Seerr Monitoring and Migration Gate
+
+Series-request certification requires the canonical Seerr runtime rather than
+the legacy deployed Jellyseerr image. The repository pins Seerr v3.4.1, while
+the B3.3.3C read-only runtime review confirmed that the production container
+still uses the legacy `fallenbagel/jellyseerr:latest` lineage and does not expose
+`monitorNewItems`.
+
+The production deployment gate must therefore:
+
+1. create and verify a pre-change backup of the Seerr/Jellyseerr configuration;
+2. verify the mounted configuration directory is writable by the account used
+   by the pinned Seerr image before recreation;
+3. preserve the current image identity and rollback path;
+4. recreate/migrate the service only inside maintenance control;
+5. verify the migrated standard-TV and anime-TV Sonarr service identities still
+   match Atlas's server-owned routing configuration;
+6. set and verify `monitorNewItems=all` on both supported Sonarr services;
+7. verify Atlas API connectivity and request preflight after migration; and
+8. complete production E2E validation for both ongoing standard TV and ongoing
+   anime TV before the monitoring acceptance item is marked complete.
+
+`monitorNewItems` is a Seerr Sonarr-service policy. Atlas must not represent it
+as caller-controlled Request state or silently imply that a season-scope choice
+changes the downstream service policy.
+
 ## 8.5 Favorites and Protection
 
 The favorites workflow must be complete from the user's perspective.
@@ -680,7 +706,10 @@ Certification requires:
 - status is visible afterward;
 - failures provide actionable feedback;
 - outcome-ambiguous mutations are not automatically replayed;
-- television/anime season scope is explicit before series mutation; and
+- television/anime season scope is explicit before series mutation;
+- the production request path uses the repository-approved Seerr runtime;
+- both supported Sonarr services have `monitorNewItems=all` verified after
+  migration; and
 - ongoing requested series can remain monitored so future episodes are acquired
   automatically without requiring per-episode Atlas requests.
 

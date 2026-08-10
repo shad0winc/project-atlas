@@ -458,16 +458,27 @@ Certification requires:
   TV action silently implying all seasons;
 - television and anime-series requests reach the appropriate supported
   downstream automation path;
+- the production request path runs on the repository-approved Seerr runtime,
+  not the legacy deployed Jellyseerr image;
+- the migrated standard-TV and anime-TV Sonarr service IDs match Atlas's
+  server-owned routing configuration;
+- `monitorNewItems=all` is verified on both supported Seerr Sonarr services;
 - an ongoing requested series can remain monitored through Seerr and Sonarr or
   Sonarr Anime so newly released episodes can be acquired automatically under
   the configured monitoring, quality, and release rules; and
 - the user is not required to create a new Atlas request for every future
   episode of an already monitored ongoing series.
 
-At source checkpoint `b1c2ebcb`, the Portal movie Request action is implemented,
-while Portal TV/anime season-selection mutation remains intentionally deferred.
-This acceptance requirement records the v1.0 target; it does not mark that
-remaining Portal workflow complete.
+The monitoring policy is service-owned. Season scope selected by the user is
+Atlas Request state; `monitorNewItems` is not a caller-controlled Request field
+and must not be presented as a per-request toggle.
+
+At source checkpoint `c1bbe9d5`, Atlas has normalized TV-series/season metadata
+plus explicit server-owned TV/anime-TV routing and deterministic submission
+preflight. Portal TV/anime season-selection mutation and the controlled
+production Seerr migration/monitoring validation remain intentionally deferred.
+This acceptance requirement records the v1.0 target; it does not mark those
+remaining gates complete.
 
 ### Observed Result
 
