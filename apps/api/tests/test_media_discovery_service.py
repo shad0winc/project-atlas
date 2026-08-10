@@ -9,6 +9,8 @@ from atlas.media_requests import (
     MediaDiscoveryItem,
     MediaDiscoveryPage,
     MediaRequestProviderOperationError,
+    MediaSeriesDetail,
+    MediaSeriesSeason,
 )
 
 from atlas_api.services.media_discovery import (
@@ -38,6 +40,27 @@ def _page(
     )
 
 
+def _detail(
+) -> MediaSeriesDetail:
+    return MediaSeriesDetail(
+        provider_media_id="1399",
+        title="Game of Thrones",
+        year=2011,
+        status="returning",
+        in_production=True,
+        is_anime=True,
+        availability="not_tracked",
+        seasons=(
+            MediaSeriesSeason(
+                season_number=1,
+                name="Season 1",
+                episode_count=10,
+                air_date="2011-04-17",
+            ),
+        ),
+    )
+
+
 class DiscoveryProviderStub:
     def __init__(
         self,
@@ -50,6 +73,9 @@ class DiscoveryProviderStub:
         ] = []
         self.discover_calls: list[
             tuple[str, int]
+        ] = []
+        self.detail_calls: list[
+            str
         ] = []
 
     def search_media(
@@ -87,6 +113,19 @@ class DiscoveryProviderStub:
             raise self.error
 
         return _page()
+
+    def get_tv_detail(
+        self,
+        provider_media_id: str | int,
+    ) -> MediaSeriesDetail:
+        self.detail_calls.append(
+            str(provider_media_id)
+        )
+
+        if self.error is not None:
+            raise self.error
+
+        return _detail()
 
 
 def test_search_normalizes_query_and_forwards_page() -> None:
@@ -159,6 +198,45 @@ def test_discover_rejects_unsupported_type() -> None:
         )
 
 
+def test_tv_detail_normalizes_provider_identity() -> None:
+    provider = DiscoveryProviderStub()
+
+    detail = MediaDiscoveryAPIService(
+        provider
+    ).tv_detail(
+        " 1399 "
+    )
+
+    assert detail.provider_media_id == "1399"
+    assert provider.detail_calls == [
+        "1399"
+    ]
+
+
+@pytest.mark.parametrize(
+    "provider_media_id",
+    [
+        "",
+        "abc",
+        "0",
+        -1,
+        True,
+    ],
+)
+def test_tv_detail_rejects_invalid_provider_identity(
+    provider_media_id: object,
+) -> None:
+    with pytest.raises(
+        MediaDiscoveryValidationError,
+        match="provider_media_id",
+    ):
+        MediaDiscoveryAPIService(
+            DiscoveryProviderStub()
+        ).tv_detail(
+            provider_media_id  # type: ignore[arg-type]
+        )
+
+
 def test_provider_failure_becomes_unavailable() -> None:
     service = MediaDiscoveryAPIService(
         DiscoveryProviderStub(
@@ -178,10 +256,36 @@ def test_provider_failure_becomes_unavailable() -> None:
         )
 
 
-def test_provider_requires_both_read_methods() -> None:
+def test_provider_requires_all_read_methods() -> None:
     with pytest.raises(
         TypeError,
     ):
         MediaDiscoveryAPIService(
             object()  # type: ignore[arg-type]
+        )
+
+def test_provider_requires_tv_detail_method() -> None:
+    class IncompleteProvider:
+        def search_media(
+            self,
+            query: str,
+            *,
+            page: int = 1,
+        ) -> MediaDiscoveryPage:
+            return _page()
+
+        def discover_media(
+            self,
+            media_type: str,
+            *,
+            page: int = 1,
+        ) -> MediaDiscoveryPage:
+            return _page()
+
+    with pytest.raises(
+        TypeError,
+        match="get_tv_detail",
+    ):
+        MediaDiscoveryAPIService(
+            IncompleteProvider()  # type: ignore[arg-type]
         )

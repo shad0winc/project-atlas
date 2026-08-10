@@ -29,6 +29,12 @@ from ..provider import (
     ProviderStatusResult,
     ProviderSubmissionResult,
 )
+from ..series import (
+    MediaSeriesDetail,
+    MediaSeriesError,
+    MediaSeriesSeason,
+    MediaSeriesStatus,
+)
 from .base import (
     BaseMediaRequestHTTPProvider,
     MediaRequestHTTPError,
@@ -275,6 +281,149 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
                 normalized_type
             ),
         )
+
+    def get_tv_detail(
+        self,
+        provider_media_id: str | int,
+    ) -> MediaSeriesDetail:
+        """Return normalized TV-series detail for explicit season selection."""
+
+        normalized_id = _numeric_identifier(
+            provider_media_id,
+            "provider_media_id",
+        )
+
+        if normalized_id <= 0:
+            raise MediaRequestProviderError(
+                "provider_media_id must be a positive "
+                "numeric TMDB identifier"
+            )
+
+        response = self._get_json(
+            f"/api/v1/tv/{normalized_id}"
+        )
+
+        resource = _required_mapping(
+            response,
+            "Jellyseerr TV detail response",
+        )
+
+        returned_id = _numeric_identifier(
+            resource.get("id"),
+            "Jellyseerr TV detail id",
+        )
+
+        if returned_id != normalized_id:
+            raise MediaRequestProviderError(
+                "Jellyseerr returned a mismatched TV detail id",
+            )
+
+        seasons = resource.get(
+            "seasons"
+        )
+
+        if not isinstance(
+            seasons,
+            list,
+        ):
+            raise MediaRequestProviderError(
+                "Jellyseerr TV detail seasons must be an array"
+            )
+
+        normalized_seasons: list[
+            MediaSeriesSeason
+        ] = []
+
+        for index, value in enumerate(
+            seasons
+        ):
+            season = _required_mapping(
+                value,
+                "Jellyseerr TV detail "
+                f"seasons[{index}]",
+            )
+
+            season_number = _non_negative_integer(
+                season.get("seasonNumber"),
+                "Jellyseerr TV detail "
+                f"seasons[{index}].seasonNumber",
+            )
+
+            # Atlas does not expose provider specials as a normal
+            # season-selection target in this v1.0 request flow.
+            if season_number == 0:
+                continue
+
+            try:
+                normalized_seasons.append(
+                    MediaSeriesSeason(
+                        season_number=season_number,
+                        name=_required_discovery_text(
+                            season.get("name"),
+                            "Jellyseerr TV detail "
+                            f"seasons[{index}].name",
+                        ),
+                        episode_count=_non_negative_integer(
+                            season.get("episodeCount"),
+                            "Jellyseerr TV detail "
+                            f"seasons[{index}].episodeCount",
+                        ),
+                        air_date=_optional_discovery_text(
+                            season.get("airDate"),
+                            "Jellyseerr TV detail "
+                            f"seasons[{index}].airDate",
+                        ),
+                    )
+                )
+            except MediaSeriesError as exc:
+                raise MediaRequestProviderError(
+                    "Jellyseerr returned invalid "
+                    "TV season metadata"
+                ) from exc
+
+        try:
+            return MediaSeriesDetail(
+                provider_media_id=str(
+                    returned_id
+                ),
+                title=_required_discovery_text(
+                    resource.get("name"),
+                    "Jellyseerr TV detail name",
+                ),
+                year=_year_from_date(
+                    resource.get("firstAirDate"),
+                    "Jellyseerr TV detail firstAirDate",
+                ),
+                overview=_optional_discovery_text(
+                    resource.get("overview"),
+                    "Jellyseerr TV detail overview",
+                ),
+                poster_path=_optional_discovery_text(
+                    resource.get("posterPath"),
+                    "Jellyseerr TV detail posterPath",
+                ),
+                status=_series_status(
+                    resource.get("status")
+                ),
+                in_production=_required_boolean(
+                    resource.get("inProduction"),
+                    "Jellyseerr TV detail inProduction",
+                ),
+                is_anime=_is_anime_tv(
+                    resource.get("keywords")
+                ),
+                availability=_discovery_availability(
+                    resource.get("mediaInfo")
+                ),
+                seasons=tuple(
+                    normalized_seasons
+                ),
+            )
+        except MediaSeriesError as exc:
+            raise MediaRequestProviderError(
+                "Jellyseerr returned invalid "
+                "TV detail metadata"
+            ) from exc
 
     def health(self) -> ProviderHealth:
         try:
@@ -809,6 +958,114 @@ def _year_from_date(
     return int(
         normalized[:4]
     )
+
+
+def _series_status(
+    value: object,
+) -> MediaSeriesStatus:
+    if value is None:
+        return MediaSeriesStatus.UNKNOWN
+
+    if not isinstance(
+        value,
+        str,
+    ):
+        raise MediaRequestProviderError(
+            "Jellyseerr TV detail status "
+            "must be text or null"
+        )
+
+    normalized = (
+        value
+        .strip()
+        .lower()
+    )
+
+    mapping = {
+        "returning series":
+            MediaSeriesStatus.RETURNING,
+        "planned":
+            MediaSeriesStatus.PLANNED,
+        "in production":
+            MediaSeriesStatus.IN_PRODUCTION,
+        "ended":
+            MediaSeriesStatus.ENDED,
+        "canceled":
+            MediaSeriesStatus.CANCELLED,
+        "cancelled":
+            MediaSeriesStatus.CANCELLED,
+        "pilot":
+            MediaSeriesStatus.PILOT,
+    }
+
+    return mapping.get(
+        normalized,
+        MediaSeriesStatus.UNKNOWN,
+    )
+
+
+def _required_boolean(
+    value: object,
+    field_name: str,
+) -> bool:
+    if not isinstance(
+        value,
+        bool,
+    ):
+        raise MediaRequestProviderError(
+            f"{field_name} must be a boolean"
+        )
+
+    return value
+
+
+def _is_anime_tv(
+    value: object,
+) -> bool:
+    if value is None:
+        return False
+
+    if not isinstance(
+        value,
+        list,
+    ):
+        raise MediaRequestProviderError(
+            "Jellyseerr TV detail keywords "
+            "must be an array"
+        )
+
+    for index, item in enumerate(
+        value
+    ):
+        keyword = _required_mapping(
+            item,
+            "Jellyseerr TV detail "
+            f"keywords[{index}]",
+        )
+
+        name = keyword.get(
+            "name"
+        )
+
+        if name is None:
+            continue
+
+        if not isinstance(
+            name,
+            str,
+        ):
+            raise MediaRequestProviderError(
+                "Jellyseerr TV detail keyword "
+                "name must be text"
+            )
+
+        if (
+            name.strip().lower()
+            == "anime"
+        ):
+            return True
+
+    return False
 
 
 def _normalize_status(

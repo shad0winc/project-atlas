@@ -9,6 +9,7 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    Path,
     Query,
     status,
 )
@@ -18,6 +19,7 @@ from atlas_api.auth.models import (
 )
 from atlas_api.schemas.media_discovery import (
     MediaDiscoveryPageResponse,
+    MediaSeriesDetailResponse,
 )
 from atlas_api.security.dependencies import (
     require_permission,
@@ -166,5 +168,49 @@ def discover_media(
 
     return (
         MediaDiscoveryPageResponse
+        .from_domain(result)
+    )
+
+@router.get(
+    "/tv/{provider_media_id}",
+    response_model=MediaSeriesDetailResponse,
+)
+def get_tv_detail(
+    provider_media_id: int = Path(
+        ...,
+        ge=1,
+    ),
+    _user: AuthenticatedUser = Depends(require_media_discovery_read),
+    service: MediaDiscoveryAPIService = Depends(
+        get_media_discovery_api_service
+    ),
+) -> MediaSeriesDetailResponse:
+    """Return normalized TV detail for explicit season selection."""
+
+    try:
+        result = service.tv_detail(
+            provider_media_id
+        )
+    except MediaDiscoveryValidationError as exc:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_400_BAD_REQUEST
+            ),
+            detail=(
+                "Media series identifier is invalid."
+            ),
+        ) from exc
+    except MediaDiscoveryUnavailableError as exc:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_503_SERVICE_UNAVAILABLE
+            ),
+            detail=(
+                "Media discovery is unavailable."
+            ),
+        ) from exc
+
+    return (
+        MediaSeriesDetailResponse
         .from_domain(result)
     )

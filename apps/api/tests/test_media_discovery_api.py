@@ -16,6 +16,8 @@ from atlas.media_requests import (
     MediaDiscoveryAvailability,
     MediaDiscoveryItem,
     MediaDiscoveryPage,
+    MediaSeriesDetail,
+    MediaSeriesSeason,
 )
 
 from atlas_api.auth.models import (
@@ -74,6 +76,35 @@ def result_page(
     )
 
 
+def series_detail(
+) -> MediaSeriesDetail:
+    return MediaSeriesDetail(
+        provider_media_id="1399",
+        title="Game of Thrones",
+        year=2011,
+        overview="Dragons.",
+        poster_path="/got.jpg",
+        status="returning",
+        in_production=True,
+        is_anime=True,
+        availability="not_tracked",
+        seasons=(
+            MediaSeriesSeason(
+                season_number=1,
+                name="Season 1",
+                episode_count=10,
+                air_date="2011-04-17",
+            ),
+            MediaSeriesSeason(
+                season_number=2,
+                name="Season 2",
+                episode_count=10,
+                air_date="2012-04-01",
+            ),
+        ),
+    )
+
+
 class DiscoveryServiceStub:
     def __init__(
         self,
@@ -86,6 +117,9 @@ class DiscoveryServiceStub:
         ] = []
         self.discover_calls: list[
             tuple[str, int]
+        ] = []
+        self.detail_calls: list[
+            str
         ] = []
 
     def search(
@@ -127,6 +161,21 @@ class DiscoveryServiceStub:
             )
 
         return result_page()
+
+    def tv_detail(
+        self,
+        provider_media_id: str | int,
+    ) -> MediaSeriesDetail:
+        self.detail_calls.append(
+            str(provider_media_id)
+        )
+
+        if self.unavailable:
+            raise MediaDiscoveryUnavailableError(
+                "unavailable"
+            )
+
+        return series_detail()
 
 
 class MediaDiscoveryEndpointTests(
@@ -242,6 +291,96 @@ class MediaDiscoveryEndpointTests(
                 )
             ],
             self.service.discover_calls,
+        )
+
+    def test_tv_detail_returns_normalized_series_contract(
+        self,
+    ) -> None:
+        response = self.client.get(
+            "/api/v1/media/tv/1399"
+        )
+
+        self.assertEqual(
+            200,
+            response.status_code,
+        )
+
+        self.assertEqual(
+            [
+                "1399"
+            ],
+            self.service.detail_calls,
+        )
+
+        self.assertEqual(
+            {
+                "provider_media_id": "1399",
+                "title": "Game of Thrones",
+                "year": 2011,
+                "overview": "Dragons.",
+                "poster_path": "/got.jpg",
+                "status": "returning",
+                "in_production": True,
+                "is_ongoing": True,
+                "is_anime": True,
+                "availability": "not_tracked",
+                "request_eligible": True,
+                "seasons": [
+                    {
+                        "season_number": 1,
+                        "name": "Season 1",
+                        "episode_count": 10,
+                        "air_date": "2011-04-17",
+                    },
+                    {
+                        "season_number": 2,
+                        "name": "Season 2",
+                        "episode_count": 10,
+                        "air_date": "2012-04-01",
+                    },
+                ],
+            },
+            response.json(),
+        )
+
+    def test_tv_detail_rejects_nonpositive_identity(
+        self,
+    ) -> None:
+        response = self.client.get(
+            "/api/v1/media/tv/0"
+        )
+
+        self.assertEqual(
+            422,
+            response.status_code,
+        )
+
+    def test_tv_detail_provider_failure_is_generic_503(
+        self,
+    ) -> None:
+        self.app.dependency_overrides[
+            get_media_discovery_api_service
+        ] = lambda: (
+            DiscoveryServiceStub(
+                unavailable=True
+            )
+        )
+
+        response = self.client.get(
+            "/api/v1/media/tv/1399"
+        )
+
+        self.assertEqual(
+            503,
+            response.status_code,
+        )
+
+        self.assertEqual(
+            {
+                "detail":
+                    "Media discovery is unavailable."
+            },
+            response.json(),
         )
 
     def test_discover_rejects_specialized_or_unknown_types(
@@ -386,7 +525,7 @@ class MediaDiscoveryEndpointTests(
             response.json(),
         )
 
-    def test_openapi_registers_both_discovery_routes(
+    def test_openapi_registers_discovery_and_series_routes(
         self,
     ) -> None:
         schema = self.client.app.openapi()
@@ -398,6 +537,11 @@ class MediaDiscoveryEndpointTests(
 
         self.assertIn(
             "/api/v1/media/discover",
+            schema["paths"],
+        )
+
+        self.assertIn(
+            "/api/v1/media/tv/{provider_media_id}",
             schema["paths"],
         )
 

@@ -8,6 +8,7 @@ from atlas.media_requests import (
     MediaDiscoveryPage,
     MediaRequestProviderError,
     MediaRequestProviderOperationError,
+    MediaSeriesDetail,
     default_jellyseerr_media_request_provider,
 )
 
@@ -55,6 +56,14 @@ class MediaDiscoveryProvider(
 
         ...
 
+    def get_tv_detail(
+        self,
+        provider_media_id: str | int,
+    ) -> MediaSeriesDetail:
+        """Read provider TV-series detail."""
+
+        ...
+
 
 class MediaDiscoveryAPIService:
     """Expose normalized read-only provider discovery."""
@@ -83,6 +92,17 @@ class MediaDiscoveryAPIService:
         ):
             raise TypeError(
                 "provider must expose discover_media"
+            )
+
+        if not callable(
+            getattr(
+                provider,
+                "get_tv_detail",
+                None,
+            )
+        ):
+            raise TypeError(
+                "provider must expose get_tv_detail"
             )
 
         self._provider = provider
@@ -144,6 +164,33 @@ class MediaDiscoveryAPIService:
                 .discover_media(
                     normalized_type,
                     page=normalized_page,
+                )
+            )
+        except (
+            MediaRequestProviderError,
+            MediaRequestProviderOperationError,
+        ) as exc:
+            raise MediaDiscoveryUnavailableError(
+                "media discovery provider "
+                "is unavailable"
+            ) from exc
+
+
+    def tv_detail(
+        self,
+        provider_media_id: str | int,
+    ) -> MediaSeriesDetail:
+        normalized_id = (
+            _provider_media_id(
+                provider_media_id
+            )
+        )
+
+        try:
+            return (
+                self._provider
+                .get_tv_detail(
+                    normalized_id
                 )
             )
         except (
@@ -230,6 +277,40 @@ def _media_type(
     }:
         raise MediaDiscoveryValidationError(
             "media_type must be movie or tv"
+        )
+
+    return normalized
+
+
+def _provider_media_id(
+    value: object,
+) -> str:
+    if (
+        isinstance(value, bool)
+        or not isinstance(
+            value,
+            (
+                str,
+                int,
+            ),
+        )
+    ):
+        raise MediaDiscoveryValidationError(
+            "provider_media_id must be text or an integer"
+        )
+
+    normalized = str(
+        value
+    ).strip()
+
+    if (
+        not normalized
+        or not normalized.isdigit()
+        or int(normalized) <= 0
+    ):
+        raise MediaDiscoveryValidationError(
+            "provider_media_id must be a positive "
+            "numeric TMDB identifier"
         )
 
     return normalized

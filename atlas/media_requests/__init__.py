@@ -46,6 +46,12 @@ from .service import (
     MediaRequestServiceConflictError,
     MediaRequestServiceError,
 )
+from .series import (
+    MediaSeriesDetail,
+    MediaSeriesError,
+    MediaSeriesSeason,
+    MediaSeriesStatus,
+)
 
 __all__ = [
     "BaseMediaRequestHTTPProvider",
@@ -71,6 +77,10 @@ __all__ = [
     "MediaRequestServiceError",
     "MediaRequestStatus",
     "MediaRequestType",
+    "MediaSeriesDetail",
+    "MediaSeriesError",
+    "MediaSeriesSeason",
+    "MediaSeriesStatus",
     "ProviderCapabilities",
     "ProviderEventContext",
     "ProviderHealth",
