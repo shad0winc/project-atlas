@@ -6107,3 +6107,54 @@ contracts without overstating production readiness.
   `monitorNewItems=all`, ongoing-series production E2E validation, and final
   release acceptance remain open.
 - No production deployment is performed by this documentation reconciliation.
+
+---
+
+# 2026-08-11
+
+## M-023.27.3B3.3.3E1.3 — Seerr Healthcheck Source Hardening
+
+### Objective
+
+Harden the repository-pinned Seerr runtime with an explicit Docker healthcheck
+before controlled production migration, without changing provider behavior,
+request semantics, deployment state, or production runtime.
+
+### Completed
+
+- Preserved the canonical pinned
+  `ghcr.io/seerr-team/seerr:v3.4.1` image identity.
+- Preserved `init: true`, the existing Jellyseerr-compatible configuration
+  mount, current network membership, ports, restart policy, and dependencies.
+- Added a Docker healthcheck against the local unauthenticated
+  `/api/v1/settings/public` endpoint.
+- Configured a 20-second start period, 3-second timeout, 15-second interval,
+  and three retries.
+- Added a dedicated security regression that fixes the healthcheck endpoint
+  and timing contract in repository source.
+- Kept production unchanged: no container recreation, image pull, ownership
+  mutation, provider setting change, Request mutation, or deployment occurred.
+
+### Validation
+
+- The E1.3 change was bounded to `docker-compose.yml` and
+  `tests/core/test_security_dependency_images.py`.
+- The dedicated security regression passed.
+- Compose rendering passed.
+- Whitespace validation passed after correcting the candidate test file's
+  final EOF blank-line defect.
+- Commit `54baaeed`:
+  `fix(seerr): add production healthcheck`.
+- The committed source hashes were verified as:
+  - `docker-compose.yml`:
+    `d768bd73ae9cf26efcb72288505b25425eef2bb05ce7d876725d77467e757035`;
+  - `tests/core/test_security_dependency_images.py`:
+    `69d01065086766f45156b1f0d67b90c7054920946d3c2944e16782836f4ab296`.
+
+### Remaining Release Boundary
+
+Repository healthcheck hardening does not certify the deployed runtime.
+Production still requires the controlled Jellyseerr-to-Seerr migration,
+post-migration route verification, `monitorNewItems=all` verification for both
+supported Sonarr services, ongoing-series production E2E acceptance, and final
+v1.0 release certification.

@@ -33,6 +33,11 @@ All notable changes to Project Atlas are documented in this file.
   runtime concern: the canonical repository image is pinned to Seerr v3.4.1,
   while production migration, `monitorNewItems=all` verification for both
   Sonarr routes, and end-to-end future-episode validation remain release gates.
+- Added a Docker healthcheck to the repository-pinned Seerr service using the
+  unauthenticated public-settings endpoint, while preserving the pinned image,
+  `init: true`, existing configuration path, and current dependency topology.
+  Production remains on the legacy Jellyseerr runtime until the controlled
+  migration and post-migration acceptance gates are completed.
 
 ### Fixed
 
