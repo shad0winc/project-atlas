@@ -28,11 +28,14 @@ class MediaSeriesStatus(str, Enum):
 
 @dataclass(frozen=True, slots=True)
 class MediaSeriesSeason:
-    """One requestable non-special television season."""
+    """One non-special television season with normalized requestability."""
 
     season_number: int
     name: str
     episode_count: int
+    availability: MediaDiscoveryAvailability
+    requestability_known: bool
+    request_eligible: bool
     air_date: str | None = None
 
     def __post_init__(self) -> None:
@@ -48,10 +51,45 @@ class MediaSeriesSeason:
             self.episode_count,
             "episode_count",
         )
+        availability = _availability(
+            self.availability,
+            "availability",
+        )
+        requestability_known = _boolean(
+            self.requestability_known,
+            "requestability_known",
+        )
+        request_eligible = _boolean(
+            self.request_eligible,
+            "request_eligible",
+        )
         air_date = _optional_date(
             self.air_date,
             "air_date",
         )
+
+        if (
+            not requestability_known
+            and request_eligible
+        ):
+            raise MediaSeriesError(
+                "request_eligible cannot be true when "
+                "requestability is unknown"
+            )
+
+        if (
+            request_eligible
+            and availability
+            not in {
+                MediaDiscoveryAvailability.NOT_TRACKED,
+                MediaDiscoveryAvailability.UNKNOWN,
+                MediaDiscoveryAvailability.DELETED,
+            }
+        ):
+            raise MediaSeriesError(
+                "request_eligible cannot be true for "
+                "tracked unavailable season state"
+            )
 
         object.__setattr__(
             self,
@@ -67,6 +105,21 @@ class MediaSeriesSeason:
             self,
             "episode_count",
             episode_count,
+        )
+        object.__setattr__(
+            self,
+            "availability",
+            availability,
+        )
+        object.__setattr__(
+            self,
+            "requestability_known",
+            requestability_known,
+        )
+        object.__setattr__(
+            self,
+            "request_eligible",
+            request_eligible,
         )
         object.__setattr__(
             self,
@@ -86,6 +139,12 @@ class MediaSeriesSeason:
                 self.name,
             "episode_count":
                 self.episode_count,
+            "availability":
+                self.availability.value,
+            "requestability_known":
+                self.requestability_known,
+            "request_eligible":
+                self.request_eligible,
             "air_date":
                 self.air_date,
         }

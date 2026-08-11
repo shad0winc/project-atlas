@@ -107,6 +107,9 @@ class MediaSeriesSeasonResponse(
     season_number: int
     name: str
     episode_count: int
+    availability: str
+    requestability_known: bool
+    request_eligible: bool
     air_date: str | None
 
     @classmethod
@@ -121,6 +124,15 @@ class MediaSeriesSeasonResponse(
             name=season.name,
             episode_count=(
                 season.episode_count
+            ),
+            availability=(
+                season.availability.value
+            ),
+            requestability_known=(
+                season.requestability_known
+            ),
+            request_eligible=(
+                season.request_eligible
             ),
             air_date=(
                 season.air_date

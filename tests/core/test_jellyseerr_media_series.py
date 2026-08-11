@@ -112,6 +112,17 @@ def test_tv_detail_uses_provider_endpoint_and_normalizes_metadata() -> None:
         2,
     ]
 
+    for season in detail.seasons:
+        assert season.availability is (
+            MediaDiscoveryAvailability
+            .NOT_TRACKED
+        )
+        assert (
+            season.requestability_known
+            is True
+        )
+        assert season.request_eligible is True
+
 
 def test_tv_detail_maps_ended_non_anime_series() -> None:
     provider = _provider()
@@ -136,6 +147,230 @@ def test_tv_detail_maps_ended_non_anime_series() -> None:
     assert detail.is_ongoing is False
     assert detail.is_anime is False
     assert detail.request_eligible is False
+
+    for season in detail.seasons:
+        assert season.availability is (
+            MediaDiscoveryAvailability
+            .UNKNOWN
+        )
+        assert (
+            season.requestability_known
+            is False
+        )
+        assert season.request_eligible is False
+
+
+def test_tv_detail_normalizes_tracked_per_season_requestability() -> None:
+    provider = _provider()
+
+    with patch.object(
+        JellyseerrMediaRequestProvider,
+        "_get_json",
+        return_value=_detail(
+            media_info={
+                "status": 4,
+                "seasons": [
+                    {
+                        "seasonNumber": 1,
+                        "status": 5,
+                    },
+                    {
+                        "seasonNumber": 2,
+                        "status": 1,
+                    },
+                ],
+                "requests": [],
+            },
+        ),
+    ):
+        detail = provider.get_tv_detail(
+            "1399"
+        )
+
+    season_1, season_2 = detail.seasons
+
+    assert season_1.availability is (
+        MediaDiscoveryAvailability
+        .AVAILABLE
+    )
+    assert (
+        season_1.requestability_known
+        is True
+    )
+    assert season_1.request_eligible is False
+
+    assert season_2.availability is (
+        MediaDiscoveryAvailability
+        .UNKNOWN
+    )
+    assert (
+        season_2.requestability_known
+        is True
+    )
+    assert season_2.request_eligible is True
+
+
+@pytest.mark.parametrize(
+    "request_status",
+    [
+        1,
+        2,
+        4,
+    ],
+)
+def test_tv_detail_active_provider_request_blocks_season(
+    request_status: int,
+) -> None:
+    provider = _provider()
+
+    with patch.object(
+        JellyseerrMediaRequestProvider,
+        "_get_json",
+        return_value=_detail(
+            media_info={
+                "status": 2,
+                "seasons": [
+                    {
+                        "seasonNumber": 2,
+                        "status": 1,
+                    },
+                ],
+                "requests": [
+                    {
+                        "status": request_status,
+                        "is4k": False,
+                        "seasons": [
+                            {
+                                "seasonNumber": 2,
+                            },
+                        ],
+                    },
+                ],
+            },
+        ),
+    ):
+        detail = provider.get_tv_detail(
+            "1399"
+        )
+
+    season_1, season_2 = detail.seasons
+
+    assert season_1.availability is (
+        MediaDiscoveryAvailability
+        .UNKNOWN
+    )
+    assert season_1.request_eligible is True
+
+    assert season_2.availability is (
+        MediaDiscoveryAvailability
+        .UNKNOWN
+    )
+    assert (
+        season_2.requestability_known
+        is True
+    )
+    assert season_2.request_eligible is False
+
+
+def test_tv_detail_ignores_terminal_and_4k_provider_requests() -> None:
+    provider = _provider()
+
+    with patch.object(
+        JellyseerrMediaRequestProvider,
+        "_get_json",
+        return_value=_detail(
+            media_info={
+                "status": 4,
+                "seasons": [],
+                "requests": [
+                    {
+                        "status": 3,
+                        "is4k": False,
+                    },
+                    {
+                        "status": 5,
+                        "is4k": False,
+                    },
+                    {
+                        "status": 2,
+                        "is4k": True,
+                    },
+                ],
+            },
+        ),
+    ):
+        detail = provider.get_tv_detail(
+            "1399"
+        )
+
+    assert all(
+        season.request_eligible
+        for season in detail.seasons
+    )
+
+
+def test_tv_detail_incomplete_provider_season_state_fails_closed() -> None:
+    provider = _provider()
+
+    with patch.object(
+        JellyseerrMediaRequestProvider,
+        "_get_json",
+        return_value=_detail(
+            media_info={
+                "status": 4,
+                "seasons": [
+                    {
+                        "seasonNumber": 1,
+                        "status": 5,
+                    },
+                ],
+            },
+        ),
+    ):
+        detail = provider.get_tv_detail(
+            "1399"
+        )
+
+    for season in detail.seasons:
+        assert season.availability is (
+            MediaDiscoveryAvailability
+            .UNKNOWN
+        )
+        assert (
+            season.requestability_known
+            is False
+        )
+        assert season.request_eligible is False
+
+
+def test_tv_detail_malformed_provider_season_state_fails_closed() -> None:
+    provider = _provider()
+
+    with patch.object(
+        JellyseerrMediaRequestProvider,
+        "_get_json",
+        return_value=_detail(
+            media_info={
+                "status": 4,
+                "seasons": [
+                    {
+                        "seasonNumber": 1,
+                        "status": "available",
+                    },
+                ],
+                "requests": [],
+            },
+        ),
+    ):
+        detail = provider.get_tv_detail(
+            "1399"
+        )
+
+    assert all(
+        not season.requestability_known
+        and not season.request_eligible
+        for season in detail.seasons
+    )
 
 
 def test_tv_detail_unknown_provider_status_is_preserved_as_unknown() -> None:

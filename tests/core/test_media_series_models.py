@@ -15,11 +15,20 @@ from atlas.media_requests import (
 
 def _season(
     number: int = 1,
+    *,
+    availability: str = "not_tracked",
+    requestability_known: bool = True,
+    request_eligible: bool = True,
 ) -> MediaSeriesSeason:
     return MediaSeriesSeason(
         season_number=number,
         name=f" Season {number} ",
         episode_count=10,
+        availability=availability,
+        requestability_known=(
+            requestability_known
+        ),
+        request_eligible=request_eligible,
         air_date="2026-01-15",
     )
 
@@ -61,8 +70,46 @@ def test_series_season_normalizes_and_serializes() -> None:
         "season_number": 1,
         "name": "Season 1",
         "episode_count": 10,
+        "availability": "not_tracked",
+        "requestability_known": True,
+        "request_eligible": True,
         "air_date": "2026-01-15",
     }
+
+
+def test_series_season_unknown_requestability_fails_closed() -> None:
+    season = _season(
+        availability="unknown",
+        requestability_known=False,
+        request_eligible=False,
+    )
+
+    assert season.requestability_known is False
+    assert season.request_eligible is False
+
+
+def test_series_season_rejects_eligible_unknown_requestability() -> None:
+    with pytest.raises(
+        MediaSeriesError,
+        match="requestability is unknown",
+    ):
+        _season(
+            availability="unknown",
+            requestability_known=False,
+            request_eligible=True,
+        )
+
+
+def test_series_season_rejects_eligible_tracked_unavailable_state() -> None:
+    with pytest.raises(
+        MediaSeriesError,
+        match="tracked unavailable",
+    ):
+        _season(
+            availability="available",
+            requestability_known=True,
+            request_eligible=True,
+        )
 
 
 def test_series_season_rejects_specials_zero() -> None:
@@ -74,6 +121,9 @@ def test_series_season_rejects_specials_zero() -> None:
             season_number=0,
             name="Specials",
             episode_count=1,
+            availability="not_tracked",
+            requestability_known=True,
+            request_eligible=True,
         )
 
 
@@ -86,6 +136,9 @@ def test_series_season_requires_iso_air_date() -> None:
             season_number=1,
             name="Season 1",
             episode_count=1,
+            availability="not_tracked",
+            requestability_known=True,
+            request_eligible=True,
             air_date="January 1",
         )
 

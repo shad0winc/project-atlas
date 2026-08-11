@@ -398,6 +398,22 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
                 "Jellyseerr returned a mismatched TV detail id",
             )
 
+        media_info = resource.get(
+            "mediaInfo"
+        )
+        series_availability = (
+            _discovery_availability(
+                media_info
+            )
+        )
+        season_provider_state = (
+            None
+            if media_info is None
+            else _series_season_requestability_state(
+                media_info
+            )
+        )
+
         seasons = resource.get(
             "seasons"
         )
@@ -434,6 +450,47 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
             if season_number == 0:
                 continue
 
+            if media_info is None:
+                season_availability = (
+                    MediaDiscoveryAvailability
+                    .NOT_TRACKED
+                )
+                requestability_known = True
+                request_eligible = True
+            elif season_provider_state is None:
+                season_availability = (
+                    MediaDiscoveryAvailability
+                    .UNKNOWN
+                )
+                requestability_known = False
+                request_eligible = False
+            else:
+                (
+                    season_availability_by_number,
+                    blocked_season_numbers,
+                ) = season_provider_state
+
+                season_availability = (
+                    season_availability_by_number
+                    .get(
+                        season_number,
+                        MediaDiscoveryAvailability
+                        .UNKNOWN,
+                    )
+                )
+                requestability_known = True
+                request_eligible = (
+                    season_availability
+                    in {
+                        MediaDiscoveryAvailability
+                        .UNKNOWN,
+                        MediaDiscoveryAvailability
+                        .DELETED,
+                    }
+                    and season_number
+                    not in blocked_season_numbers
+                )
+
             try:
                 normalized_seasons.append(
                     MediaSeriesSeason(
@@ -447,6 +504,13 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
                             season.get("episodeCount"),
                             "Jellyseerr TV detail "
                             f"seasons[{index}].episodeCount",
+                        ),
+                        availability=season_availability,
+                        requestability_known=(
+                            requestability_known
+                        ),
+                        request_eligible=(
+                            request_eligible
                         ),
                         air_date=_optional_discovery_text(
                             season.get("airDate"),
@@ -492,8 +556,8 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
                 is_anime=_is_anime_tv(
                     resource.get("keywords")
                 ),
-                availability=_discovery_availability(
-                    resource.get("mediaInfo")
+                availability=(
+                    series_availability
                 ),
                 seasons=tuple(
                     normalized_seasons
@@ -881,6 +945,182 @@ def _discovery_availability(
         )
 
     return availability
+
+
+def _series_season_requestability_state(
+    media_info: object,
+) -> tuple[
+    dict[
+        int,
+        MediaDiscoveryAvailability,
+    ],
+    set[int],
+] | None:
+    """Return pinned-Seerr season state or fail closed when it is incomplete."""
+
+    resource = _required_mapping(
+        media_info,
+        "Jellyseerr TV detail mediaInfo",
+    )
+
+    # Seerr v3.4.1 eagerly loads Media.seasons and each
+    # MediaRequest.seasons, although those nested fields are not part
+    # of its documented public OpenAPI schemas. Atlas treats them as
+    # optional server-side evidence only. Missing or malformed evidence
+    # makes per-season requestability unknown instead of guessing.
+    provider_seasons = resource.get(
+        "seasons"
+    )
+    provider_requests = resource.get(
+        "requests"
+    )
+
+    if (
+        not isinstance(
+            provider_seasons,
+            list,
+        )
+        or not isinstance(
+            provider_requests,
+            list,
+        )
+    ):
+        return None
+
+    availability_by_number: dict[
+        int,
+        MediaDiscoveryAvailability,
+    ] = {}
+
+    try:
+        for index, value in enumerate(
+            provider_seasons
+        ):
+            season = _required_mapping(
+                value,
+                "Jellyseerr TV detail "
+                f"mediaInfo.seasons[{index}]",
+            )
+            season_number = _non_negative_integer(
+                season.get("seasonNumber"),
+                "Jellyseerr TV detail "
+                f"mediaInfo.seasons[{index}].seasonNumber",
+            )
+
+            if season_number == 0:
+                continue
+
+            status = _required_integer(
+                season.get("status"),
+                "Jellyseerr TV detail "
+                f"mediaInfo.seasons[{index}].status",
+            )
+            availability = (
+                _DISCOVERY_MEDIA_STATUS
+                .get(status)
+            )
+
+            if availability is None:
+                return None
+
+            if (
+                season_number
+                in availability_by_number
+            ):
+                return None
+
+            availability_by_number[
+                season_number
+            ] = availability
+
+        blocked_season_numbers: set[
+            int
+        ] = set()
+
+        for index, value in enumerate(
+            provider_requests
+        ):
+            request = _required_mapping(
+                value,
+                "Jellyseerr TV detail "
+                f"mediaInfo.requests[{index}]",
+            )
+            is_4k = _required_boolean(
+                request.get("is4k"),
+                "Jellyseerr TV detail "
+                f"mediaInfo.requests[{index}].is4k",
+            )
+            status = _required_integer(
+                request.get("status"),
+                "Jellyseerr TV detail "
+                f"mediaInfo.requests[{index}].status",
+            )
+
+            if status not in {
+                1,  # pending
+                2,  # approved
+                3,  # declined
+                4,  # failed
+                5,  # completed
+            }:
+                return None
+
+            # Match Seerr's own duplicate-season filtering:
+            # ignore the other resolution and terminal declined/completed
+            # requests; pending, approved, and failed requests still block.
+            if (
+                is_4k
+                or status in {
+                    3,
+                    5,
+                }
+            ):
+                continue
+
+            request_seasons = request.get(
+                "seasons"
+            )
+
+            if not isinstance(
+                request_seasons,
+                list,
+            ):
+                return None
+
+            for season_index, season_value in enumerate(
+                request_seasons
+            ):
+                request_season = (
+                    _required_mapping(
+                        season_value,
+                        "Jellyseerr TV detail "
+                        f"mediaInfo.requests[{index}]"
+                        f".seasons[{season_index}]",
+                    )
+                )
+                season_number = (
+                    _non_negative_integer(
+                        request_season.get(
+                            "seasonNumber"
+                        ),
+                        "Jellyseerr TV detail "
+                        f"mediaInfo.requests[{index}]"
+                        f".seasons[{season_index}]"
+                        ".seasonNumber",
+                    )
+                )
+
+                if season_number > 0:
+                    blocked_season_numbers.add(
+                        season_number
+                    )
+    except MediaRequestProviderError:
+        return None
+
+    return (
+        availability_by_number,
+        blocked_season_numbers,
+    )
 
 
 def _search_result_media_type(
