@@ -33,6 +33,7 @@ describe("Portal route model", () => {
     expect(portalRoutes.map((route) => route.id)).toEqual([
       "dashboard",
       "media",
+      "favorites",
       "requests",
       "downloads",
       "users",
@@ -50,6 +51,12 @@ describe("Portal route model", () => {
   it("provides stable named route access", () => {
     expect(PORTAL_ROUTES.dashboard.path).toBe("/portal");
     expect(PORTAL_ROUTES.media.path).toBe("/portal/media");
+    expect(PORTAL_ROUTES.media.navigationDescription).toBe("Browse and search movies and TV shows");
+    expect(PORTAL_ROUTES.media.pageDescription).toBe(
+      "Browse and search movies and TV shows available through Atlas."
+    );
+    expect(PORTAL_ROUTES.favorites.path).toBe("/portal/favorites");
+    expect(PORTAL_ROUTES.favorites.permission).toBe("favorites.read");
     expect(PORTAL_ROUTES.users.permission).toBe("users.read");
   });
 
@@ -62,7 +69,7 @@ describe("Portal route model", () => {
     ).toEqual([
       {
         label: PORTAL_ROUTE_SECTIONS.workspace,
-        routes: ["dashboard", "media", "requests", "downloads"]
+        routes: ["dashboard", "media", "favorites", "requests", "downloads"]
       },
       {
         label: PORTAL_ROUTE_SECTIONS.management,
@@ -77,19 +84,23 @@ describe("Portal route model", () => {
   });
 
   it("matches feature roots and nested feature paths", () => {
-    expect(portalRouteMatchesPathname(PORTAL_ROUTES.users, "/portal/users")).toBe(true);
-    expect(portalRouteMatchesPathname(PORTAL_ROUTES.users, "/portal/users/example")).toBe(true);
+    expect(portalRouteMatchesPathname(PORTAL_ROUTES.favorites, "/portal/favorites")).toBe(true);
+    expect(portalRouteMatchesPathname(PORTAL_ROUTES.favorites, "/portal/favorites/example")).toBe(
+      true
+    );
     expect(portalRouteMatchesPathname(PORTAL_ROUTES.users, "/portal/settings")).toBe(false);
   });
 
   it("resolves the most specific matching route", () => {
     expect(portalRouteForPathname("/portal")).toBe(PORTAL_ROUTES.dashboard);
+    expect(portalRouteForPathname("/portal/favorites/example")).toBe(PORTAL_ROUTES.favorites);
     expect(portalRouteForPathname("/portal/users/example")).toBe(PORTAL_ROUTES.users);
     expect(portalRouteForPathname("/not-a-portal-page")).toBeNull();
   });
 
   it("resolves Portal page titles through the route model", () => {
     expect(portalPageTitle("/portal")).toBe("Dashboard");
+    expect(portalPageTitle("/portal/favorites")).toBe("Favorites");
     expect(portalPageTitle("/portal/users/example")).toBe("Users");
     expect(portalPageTitle("/not-a-portal-page")).toBe("Portal");
   });
@@ -99,14 +110,26 @@ describe("Portal navigation authorization", () => {
   it("shows member-facing navigation from effective grants", () => {
     expect(
       visibleLabels(
-        authorization(["atlas.dashboard.read", "media.read", "requests.read", "users.self.read"])
+        authorization([
+          "atlas.dashboard.read",
+          "media.read",
+          "favorites.read",
+          "requests.read",
+          "users.self.read"
+        ])
       )
-    ).toEqual(["Dashboard", "Media", "Requests", "Settings"]);
+    ).toEqual(["Dashboard", "Media", "Favorites", "Requests", "Settings"]);
   });
 
   it("hides management navigation without effective grants", () => {
     const labels = visibleLabels(
-      authorization(["atlas.dashboard.read", "media.read", "requests.read", "users.self.read"])
+      authorization([
+        "atlas.dashboard.read",
+        "media.read",
+        "favorites.read",
+        "requests.read",
+        "users.self.read"
+      ])
     );
 
     expect(labels).not.toContain("Users");
@@ -117,6 +140,7 @@ describe("Portal navigation authorization", () => {
     expect(visibleLabels(authorization(["*"]))).toEqual([
       "Dashboard",
       "Media",
+      "Favorites",
       "Requests",
       "Downloads",
       "Users",
@@ -129,6 +153,7 @@ describe("Portal navigation authorization", () => {
     expect(visibleLabels(authorization(["*.read"]))).toEqual([
       "Dashboard",
       "Media",
+      "Favorites",
       "Requests",
       "Downloads",
       "Users",
@@ -138,12 +163,14 @@ describe("Portal navigation authorization", () => {
   });
 
   it("honors explicit denials before wildcard grants", () => {
-    expect(visibleLabels(authorization(["*"], ["users.read", "system.health.read"]))).toEqual([
-      "Dashboard",
-      "Media",
-      "Requests",
-      "Downloads",
-      "Settings"
+    expect(
+      visibleLabels(authorization(["*"], ["favorites.read", "users.read", "system.health.read"]))
+    ).toEqual(["Dashboard", "Media", "Requests", "Downloads", "Settings"]);
+  });
+
+  it("uses favorites.read rather than favorites.write for navigation", () => {
+    expect(visibleLabels(authorization(["favorites.read"], ["favorites.write"]))).toEqual([
+      "Favorites"
     ]);
   });
 

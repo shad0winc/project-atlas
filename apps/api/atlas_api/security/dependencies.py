@@ -15,6 +15,7 @@ from atlas_api.authorization import (
 )
 from atlas_api.dependencies import (
     get_current_user,
+    get_security_audit_writer,
     get_user_profile_store,
 )
 from atlas_api.security.permissions import (
@@ -46,8 +47,19 @@ def require_permission(permission: str) -> SecurityDependency:
         authorization: AuthorizationService = Depends(
             get_authorization_service
         ),
+        audit_writer=Depends(get_security_audit_writer),
     ) -> AuthenticatedUser:
-        profile = _load_current_profile(user, profiles)
+        try:
+            profile = _load_current_profile(user, profiles)
+        except HTTPException:
+            _publish_authorization_denial(
+                audit_writer,
+                user,
+                reason="profile_unavailable_or_inactive",
+                permission=permission,
+            )
+            raise
+
         decision = evaluate_permission(
             profile,
             permission,
@@ -55,6 +67,17 @@ def require_permission(permission: str) -> SecurityDependency:
         )
 
         if not decision.allowed:
+            reason = (
+                "explicit_denial"
+                if decision.matched_denial is not None
+                else "missing_grant"
+            )
+            _publish_authorization_denial(
+                audit_writer,
+                user,
+                reason=reason,
+                permission=decision.permission,
+            )
             raise _forbidden(decision.reason)
 
         return user
@@ -75,14 +98,30 @@ def require_role(role: str) -> SecurityDependency:
         authorization: AuthorizationService = Depends(
             get_authorization_service
         ),
+        audit_writer=Depends(get_security_audit_writer),
     ) -> AuthenticatedUser:
-        profile = _load_current_profile(user, profiles)
+        try:
+            profile = _load_current_profile(user, profiles)
+        except HTTPException:
+            _publish_authorization_denial(
+                audit_writer,
+                user,
+                reason="profile_unavailable_or_inactive",
+                required_role=normalized_role,
+            )
+            raise
 
         if not subject_has_role(
             profile,
             normalized_role,
             authorization=authorization,
         ):
+            _publish_authorization_denial(
+                audit_writer,
+                user,
+                reason="missing_role",
+                required_role=normalized_role,
+            )
             raise _forbidden(
                 f"The Atlas role '{normalized_role}' is required."
             )
@@ -90,6 +129,36 @@ def require_role(role: str) -> SecurityDependency:
         return user
 
     return dependency
+
+
+def _publish_authorization_denial(
+    audit_writer,
+    user: AuthenticatedUser,
+    *,
+    reason: str,
+    permission: str | None = None,
+    required_role: str | None = None,
+) -> None:
+    # Direct unit calls may leave FastAPI's Depends marker unresolved. Runtime
+    # requests always receive the composed SecurityAuditWriter instance.
+    if not hasattr(audit_writer, "publish"):
+        return
+
+    payload = {
+        "user_id": user.user_id,
+        "username": user.username,
+        "provider": user.provider,
+        "reason": reason,
+    }
+    if permission is not None:
+        payload["permission"] = permission
+    if required_role is not None:
+        payload["required_role"] = required_role
+
+    audit_writer.publish(
+        "security.authorization.denied",
+        payload,
+    )
 
 
 def clear_security_dependency_caches() -> None:

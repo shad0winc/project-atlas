@@ -12,6 +12,7 @@ export const ATLAS_PERMISSIONS = {
   favoritesWrite: "favorites.write",
   mediaRead: "media.read",
   monitoringRead: "monitoring.read",
+  requestsCancel: "requests.cancel",
   requestsCreate: "requests.create",
   requestsRead: "requests.read",
   systemHealthRead: "system.health.read",

@@ -3,7 +3,12 @@
 import { createContext, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import type { AtlasLoginRequest } from "../api/contracts";
-import { loginAtlasUser, readCurrentAtlasUser, refreshAtlasTokens } from "../services/auth";
+import {
+  loginAtlasUser,
+  logoutAtlasSession,
+  readCurrentAtlasUser,
+  refreshAtlasTokens
+} from "../services/auth";
 
 import { registerAtlasAuthLifecycle } from "./session-lifecycle";
 import { clearAtlasAuthSession, readAtlasAuthSession, writeAtlasAuthSession } from "./storage";
@@ -55,11 +60,26 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
     }
   }, []);
 
-  const logout = useCallback((): void => {
+  const expireSession = useCallback((): void => {
     clearAtlasAuthSession();
     setSession(null);
     setStatus("unauthenticated");
   }, []);
+
+  const logout = useCallback(async (): Promise<void> => {
+    const currentSession = readAtlasAuthSession();
+
+    try {
+      if (currentSession !== null) {
+        await logoutAtlasSession(currentSession.tokens.refreshToken);
+      }
+    } catch {
+      // Explicit sign-out must still clear local credentials if revocation
+      // cannot reach the API. The server session will expire independently.
+    } finally {
+      expireSession();
+    }
+  }, [expireSession]);
 
   const refreshAccessToken = useCallback(async (): Promise<string> => {
     const currentSession = readAtlasAuthSession();
@@ -87,9 +107,9 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
   useEffect(() => {
     return registerAtlasAuthLifecycle({
       refreshAccessToken,
-      expireSession: logout
+      expireSession
     });
-  }, [logout, refreshAccessToken]);
+  }, [expireSession, refreshAccessToken]);
 
   const value = useMemo<AtlasAuthContextValue>(
     () => ({

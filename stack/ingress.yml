@@ -42,9 +42,37 @@ services:
 
     networks:
       - atlas-ingress
+      - atlas-backend
+      - atlas-identity
+
+    group_add:
+      - "20000"
+      - "20001"
+
+    volumes:
+      - /mnt/storage/configs/atlas/users:/mnt/storage/configs/atlas/users:ro
+      - /mnt/storage/configs/atlas/identity/favorites:/mnt/storage/configs/atlas/identity/favorites:rw
+      - /mnt/storage/configs/atlas/runtime/requests:/mnt/storage/configs/atlas/runtime/requests:rw
+      - /mnt/storage/configs/atlas/runtime/events.jsonl:/mnt/storage/configs/atlas/runtime/events.jsonl:rw
 
     expose:
       - "8000"
+
+    environment:
+      ATLAS_JELLYFIN_URL: "http://jellyfin:8096"
+      ATLAS_JELLYFIN_API_KEY: "${ATLAS_JELLYFIN_API_KEY:?ATLAS_JELLYFIN_API_KEY is required}"
+      ATLAS_JELLYSEERR_URL: "http://jellyseerr:5055"
+      ATLAS_JELLYSEERR_API_KEY: "${ATLAS_JELLYSEERR_API_KEY:?ATLAS_JELLYSEERR_API_KEY is required}"
+      ATLAS_JELLYSEERR_TV_SERVER_ID: "${ATLAS_JELLYSEERR_TV_SERVER_ID:-}"
+      ATLAS_JELLYSEERR_ANIME_TV_SERVER_ID: "${ATLAS_JELLYSEERR_ANIME_TV_SERVER_ID:-}"
+      ATLAS_REQUESTS_DIR: "/mnt/storage/configs/atlas/runtime/requests"
+      ATLAS_USERS_DIR: "/mnt/storage/configs/atlas/users"
+      ATLAS_SECURITY_AUDIT_PATH: "/mnt/storage/configs/atlas/runtime/events.jsonl"
+      ATLAS_JWT_SECRET: "${ATLAS_JWT_SECRET:?ATLAS_JWT_SECRET is required}"
+      ATLAS_JWT_ISSUER: "${ATLAS_JWT_ISSUER:-project-atlas}"
+      ATLAS_JWT_AUDIENCE: "${ATLAS_JWT_AUDIENCE:-atlas-portal}"
+      ATLAS_ACCESS_TOKEN_MINUTES: "${ATLAS_ACCESS_TOKEN_MINUTES:-15}"
+      ATLAS_REFRESH_TOKEN_DAYS: "${ATLAS_REFRESH_TOKEN_DAYS:-30}"
 
     security_opt:
       - no-new-privileges:true
@@ -117,3 +145,9 @@ networks:
   atlas-ingress:
     external: true
     name: atlas-ingress
+  atlas-backend:
+    external: true
+    name: atlas-backend
+  atlas-identity:
+    external: true
+    name: atlas-identity

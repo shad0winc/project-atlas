@@ -7,6 +7,7 @@ ATLAS_CONFIG_FILE="$PROJECT_DIR/config/atlas.conf"
 module_id="notifications"
 module_name="Atlas Notifications"
 MODULE_DIR="$PROJECT_DIR/modules/$module_id"
+MODULE_ENV_FILE="$MODULE_DIR/.env"
 
 if [[ ! -f "$ATLAS_CONFIG_FILE" ]]; then
   echo "Missing Atlas config: $ATLAS_CONFIG_FILE"
@@ -43,6 +44,10 @@ check "Request routing documentation present" \
   grep -Fq "anime_movie" "$MODULE_DIR/README.md"
 check "Module compose present" test -f "$MODULE_DIR/docker-compose.yml"
 check "Module environment example present" test -f "$MODULE_DIR/.env.example"
+check "Module environment present" test -f "$MODULE_ENV_FILE"
+check "Module environment is not symbolic link" test ! -L "$MODULE_ENV_FILE"
+check "Module environment permissions private" \
+  sh -c '[ "$(stat -c "%a" "$1" 2>/dev/null)" = "600" ]' _ "$MODULE_ENV_FILE"
 check "Module install script present" test -x "$MODULE_DIR/scripts/install.sh"
 check "Module uninstall script present" test -x "$MODULE_DIR/scripts/uninstall.sh"
 check "Module update script present" test -x "$MODULE_DIR/scripts/update.sh"

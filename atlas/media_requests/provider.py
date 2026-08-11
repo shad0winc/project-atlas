@@ -378,6 +378,14 @@ class MediaRequestProvider(ABC):
     def capabilities(self) -> ProviderCapabilities:
         """Return provider capabilities."""
 
+    def validate_submission(
+        self,
+        request: MediaRequest,
+    ) -> None:
+        """Validate deterministic submission prerequisites before persistence."""
+
+        return None
+
     @abstractmethod
     def submit(
         self,

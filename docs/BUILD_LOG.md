@@ -5646,3 +5646,515 @@ production proof, recovery-time expectation, and documented scope limitation.
 Atlas can create, validate, stage, plan, transactionally apply, verify, resume,
 or abort state recovery without bypassing protected source promotion or the
 shared production mutation boundary.
+
+---
+
+## M-023.26 — Security Review and Runtime Hardening
+
+M-023.26 completed the v1.0 Security engineering-review work packages covering
+authentication, authorization, invitation security, session behavior,
+reverse-proxy and API exposure, secret storage, audit events, dependency/image
+risk, network trust boundaries, and least privilege.
+
+### First-Party Module Runtime Hardening
+
+The final implementation slice hardened the Notifications and Sports
+first-party module runtimes.
+
+Both images now:
+
+- require explicit operator `PUID` and `PGID` build inputs;
+- create and run as the non-root `atlas` identity;
+- use `no-new-privileges`;
+- preserve source-only hardening separately from production ownership changes.
+
+Notifications no longer receives the complete Atlas Runtime Bus. Its Compose
+contract exposes only the read-only event journal, its writable subscriber
+cursor, its read-only filter, and Notifications-owned state.
+
+Sports no longer receives the Atlas Runtime Bus and no longer exposes the
+obsolete private scheduler-state environment contract. Host TaskScheduler state
+remains the authoritative scheduling boundary.
+
+Both module update paths fail closed before container recreation when required
+filesystem ownership or access does not satisfy the future runtime identity.
+The update paths do not automatically `chown` production state.
+
+### Validation
+
+The source change was applied from synchronized
+`feature/security-review` checkpoint
+`75cfdc65d43ec8f3faa74cd1002670ed92ebe4da`.
+
+Immediate validation passed:
+
+- exact changed-file guard;
+- shell syntax validation;
+- 54 focused tests;
+- Notifications and Sports Compose validation;
+- Git diff whitespace validation.
+
+Both hardened images then built successfully. Image inspection and isolated
+runtime probes proved:
+
+- Notifications configured user: `atlas`;
+- Sports configured user: `atlas`;
+- Notifications effective UID:GID: `1000:1000`;
+- Sports effective UID:GID: `1000:1000`.
+
+The existing production Notifications and Sports containers remained running
+with their prior root-default runtime identity, proving that source/image
+hardening did not silently perform the deferred production ownership migration
+or recreate live containers.
+
+The commit-readiness regression gate passed:
+
+- 71 focused security/module tests;
+- 26 module, restore, and notification regressions;
+- all five Sports integration suites;
+- 2,996 Core tests plus 104 subtests;
+- 280 API tests plus 5 subtests;
+- Compose validation;
+- Git diff and repository-state guards.
+
+The resulting atomic commit was
+`4f30fb10de3a321b8d4cfdc6d818ca7725aa687e`
+(`security: harden first-party module runtimes`) and was pushed to
+`origin/feature/security-review` with local/remote equality and a clean working
+tree.
+
+### Security Closure
+
+The M-023.26 closure review found no additional general source-hardening sprint
+justified by the reviewed evidence. The ten Security roadmap items now represent
+completed engineering reviews.
+
+Final v1.0 Security Acceptance remains intentionally open. Release
+certification must still include:
+
+- current dependency/container vulnerability evidence with no unreviewed
+  release-blocking finding;
+- explicit acceptance or remediation of retained privileged capabilities,
+  including Homepage/Dozzle Docker-socket access if retained;
+- controlled production ownership migration and recreation of the hardened
+  Notifications and Sports workers;
+- runtime verification of secret, audit, ingress, network, and least-privilege
+  boundaries;
+- documented accepted security limitations; and
+- explicit security approval through the release checklist.
+
+M-023.26 therefore closes the Security engineering implementation without
+prematurely certifying the v1.0 release.
+
+---
+
+## M-023.27.3B3 — Media Discovery and Safe Request Action
+
+M-023.27.3B3 established the end-user Media discovery-to-request path while
+preserving Atlas as the authoritative security and mutation boundary. The work
+was completed as four atomic source commits on `feature/security-review`.
+
+### B3.1 — Seerr Media Discovery Foundation
+
+Commit `755409de9fdefb756f81248ff1f4016c2b100edb`
+(`feat(media): add seerr-backed media discovery`) added read-only Media discovery
+and search through Atlas.
+
+The API exposes normalized movie/TV discovery state and keeps Seerr server-side.
+`request_eligible` is advisory presentation state: only `not_tracked` is exposed
+as eligible, while tracked, known, or unsupported provider states fail closed.
+Provider media identity is carried only as the internal request target identity.
+
+The final B3.1 regression passed 3,044 Core tests plus 104 subtests and 333 API
+tests plus 15 subtests, including the dedicated discovery and Request provider
+contracts.
+
+### B3.2 — Personal Media Browse and Search
+
+Commit `7bd4a14a1f2532e4cc69a8f02dadf07c601b2105`
+(`feat(portal): add personal media discovery`) added `/portal/media` with
+movie/TV browse, search, pagination, manual refresh, and stale-response
+suppression.
+
+The Portal consumes Atlas only; it does not connect directly to Seerr. Raw
+provider media identifiers are retained internally for stable identity and
+future request transport but are not rendered to the user. B3.2 remained
+read-only.
+
+### B3.3.1 — Active Request Duplicate and Race Protection
+
+Commit `28cbb7902fd518734a907e02e011b67b484cb345`
+(`feat(requests): enforce active request uniqueness`) hardened the durable Media
+Request repository before Portal request mutation was exposed.
+
+The Request registry now owns a persistent `requests.lock` sidecar. Every
+read-modify-write mutation uses Linux `fcntl.flock()` exclusion, and the active
+target conflict check plus the initial `PENDING` write occur in the same locked
+transaction. Provider submission remains outside the lock and occurs only after
+local persistence succeeds.
+
+Active-target identity is global across Atlas users because all users share the
+server-side provider identity. It consists of provider, provider media identity,
+and normalized media family; user ID, title, and year do not define uniqueness.
+Jellyseerr/Seerr movie and anime-movie requests share one movie family, while TV
+and anime-TV share one TV family. An all-seasons TV request overlaps every
+explicit season, the same explicit season conflicts, and different explicit
+seasons may coexist. Terminal history does not permanently block a later
+request.
+
+A losing concurrent creator receives the existing HTTP 409 conflict path before
+a second provider submission. Outcome-ambiguous provider mutations continue to
+use the existing reconciliation-required/do-not-retry behavior from
+Interrupted-Request Recovery. The schema remains version 1.
+
+The final gate passed 3,055 Core tests plus 104 subtests and 336 API tests plus
+15 subtests.
+
+### B3.3.2 — Portal Media to Movie Request Action
+
+Commit `b1c2ebcbfaa63775c8230cc17728911dab0b98c2`
+(`feat(portal): add movie request action`) extended the existing Personal
+Requests feature with caller-controlled POST `/requests` transport and added the
+first Media-card Request action.
+
+The Portal requires `requests.create` before rendering the movie mutation
+control, while API authorization remains independently authoritative. The POST
+contains only caller-controlled media fields, automatic mutation retries are
+disabled, and each card owns its own submitting/result state. A target remains
+locally blocked from repeated POST for the lifetime of the page after any
+mutation attempt. Stale active-target HTTP 409 becomes `Already requested`;
+reconciliation-required or otherwise unconfirmed outcomes become `Check
+requests` and are not automatically replayed.
+
+TV mutation is deliberately not exposed in this slice. A generic TV-card click
+would otherwise map `season_number=None` to all seasons, so the Portal explicitly
+requires future season-selection UX instead of making that choice silently.
+Server-side TV and anime-TV provider capability remains intact.
+
+For v1.0, ongoing TV and anime series remain a required end-user workflow:
+a supported series request must be able to remain monitored downstream through
+Seerr and the appropriate Sonarr instance so future episodes can be acquired
+automatically without requiring a new Atlas request for each episode. This is a
+release acceptance requirement; B3.3.2 does not claim that the Portal
+season-selection workflow is complete yet.
+
+The final B3.3.2 gate passed 67 focused Portal tests, the full 194-test Portal
+suite, TypeScript typecheck, ESLint, and the Next.js production build.
+
+### Result
+
+M-023.27.3B3 completes the safe movie discovery-to-request source path and the
+server-side concurrency prerequisite for future series request UX. No production
+deployment was performed by these four source commits. TV/anime season selection,
+downstream ongoing-series acceptance validation, and the remaining v1.0
+end-to-end/user-acceptance gates remain open.
+
+---
+
+# 2026-08-10
+
+## M-023.27.3B3.3.3A — TV Series Detail / Season Metadata Foundation
+
+### Objective
+
+Add the read-only TV-series contract required for explicit season-selection UX
+without enabling TV/anime Request mutation.
+
+### Completed
+
+- Added normalized `MediaSeriesStatus`, `MediaSeriesSeason`, and
+  `MediaSeriesDetail` contracts.
+- Added deterministic serialization and ongoing-series derivation.
+- Added Seerr TV detail retrieval through `GET /api/v1/tv/{id}`.
+- Excluded Specials (`season 0`) from normal season selection.
+- Added provider-status normalization and server-side anime classification.
+- Added `GET /api/v1/media/tv/{provider_media_id}` behind `media.read`.
+- Enforced positive TMDB identity before provider HTTP.
+- Kept Portal TV/anime mutation, server routing, and Request persistence schema
+  unchanged.
+
+### Validation
+
+- Dedicated zero-ID regression passed after correcting the provider guard.
+- Focused Core: 63 passed.
+- Focused API: 26 passed plus 3 subtests.
+- Full Core: 3,076 passed plus 104 subtests.
+- Full API: 346 passed plus 15 subtests.
+- Commit `b901702d`:
+  `feat(media): add tv series detail metadata`.
+
+---
+
+# 2026-08-10
+
+## M-023.27.3B3.3.3B — Explicit TV / Anime Routing and Submission Preflight
+
+### Objective
+
+Make TV/anime downstream routing deterministic and server-owned before the
+Portal exposes series mutation.
+
+### Completed
+
+- Added backward-compatible provider `validate_submission()` preflight.
+- Required Core preflight before active-target persistence.
+- Required revalidation before persisting `SUBMITTING`.
+- Required defensive provider validation before provider HTTP.
+- Added explicit standard-TV and anime-TV Seerr `serverId` ownership through
+  `ATLAS_JELLYSEERR_TV_SERVER_ID` and
+  `ATLAS_JELLYSEERR_ANIME_TV_SERVER_ID`.
+- Preserved valid server ID `0`.
+- Failed missing/invalid TV routing before provider HTTP and before new Request
+  persistence.
+- Preserved movie/anime-movie payload behavior.
+- Added ingress and environment-template configuration without hard-coded
+  production server IDs.
+- Kept Portal mutation, persisted Request schema/repository, production `.env`,
+  and `monitorNewItems` out of the source slice.
+
+### Validation
+
+- Previously failing import-only test defect repaired without weakening tests.
+- Focused Core: 209 passed.
+- Focused Request API: 23 passed plus 7 subtests.
+- Full Core: 3,096 passed plus 104 subtests.
+- Full API: 348 passed plus 15 subtests.
+- Commit `c1bbe9d5`:
+  `feat(requests): add explicit tv routing preflight`.
+
+---
+
+# 2026-08-10
+
+## M-023.27.3B3.3.3C — Seerr Monitoring / Runtime Ownership Review
+
+### Objective
+
+Resolve ownership of ongoing-series monitoring and distinguish repository
+runtime truth from the currently deployed production container before enabling
+Portal TV/anime mutation.
+
+### Read-Only Findings
+
+- Repository source pins
+  `ghcr.io/seerr-team/seerr:v3.4.1` by digest and already includes `init: true`.
+- The deployed container still reports
+  `fallenbagel/jellyseerr:latest`.
+- The deployed runtime has two sanitized Sonarr services:
+  standard TV service ID `0` and Anime TV service ID `1`.
+- Neither deployed Sonarr service record exposes `monitorNewItems`.
+- The deployed application code contains zero `monitorNewItems` references.
+- Explicit Atlas routing IDs `0` and `1` remain structurally compatible with
+  the observed service identities, but production values are still deployment
+  configuration and are not committed.
+- Upstream Seerr owns new-season monitoring as a Sonarr-service setting; Atlas
+  should not add it to caller-controlled Request state.
+
+### Decision
+
+Repository image ownership is already correct; no additional image source
+change is required for this milestone. Production must still migrate from the
+legacy Jellyseerr container to the pinned Seerr runtime under backup,
+maintenance, and rollback control.
+
+After migration, both supported Seerr Sonarr services must be verified with
+`monitorNewItems=all`, Atlas routing IDs must be revalidated, and production E2E
+tests must prove ongoing standard TV and anime TV remain monitored for future
+episodes. Until those runtime acceptance gates pass, Atlas must not claim
+ongoing-series monitoring is production-certified.
+
+Season scope and future-season monitoring remain separate concepts. Portal
+season selection must express the user's Request scope without pretending the
+service-level Seerr monitoring policy is a per-request toggle.
+
+### Safety
+
+The review was read-only:
+
+- no source or documentation mutation;
+- no container restart or image pull;
+- no settings or database write;
+- no production `.env` change;
+- no Request or Portal mutation; and
+- no production deployment.
+
+---
+
+# 2026-08-10
+
+## M-023.27.3B3.3.3D1 — Per-Season Requestability Read Foundation
+
+### Objective
+
+Add a truthful, fail-closed per-season read contract before the Portal enables
+TV/anime mutation.
+
+### Completed
+
+- Extended `MediaSeriesSeason` with normalized `availability`,
+  `requestability_known`, and `request_eligible`.
+- Preserved whole-series `MediaSeriesDetail.request_eligible` semantics while
+  adding season-specific requestability for the TV-detail path.
+- Marked normal seasons on a completely untracked series as known and
+  requestable.
+- Normalized pinned-Seerr nested season/request evidence for tracked series.
+- Treated pending, approved, and failed standard provider requests as blocking
+  their explicit seasons.
+- Treated declined, completed, and 4K provider requests as non-blocking for the
+  standard season-request path.
+- Allowed only `UNKNOWN` or `DELETED` provider season states to remain eligible
+  when no active provider request blocks that season.
+- Failed closed to `requestability_known=false` and
+  `request_eligible=false` when nested provider state is missing, malformed,
+  unsupported, or otherwise not trustworthy.
+- Transported the normalized fields through
+  `GET /api/v1/media/tv/{provider_media_id}` without adding provider HTTP calls,
+  Portal mutation, Request persistence changes, routing changes, or
+  `monitorNewItems` controls.
+
+### Validation
+
+- Focused season regression: 31 passed.
+- Focused Core discovery/series regression: 73 passed.
+- Focused API discovery/series regression: 26 passed plus 3 subtests.
+- Full Core: 3,106 passed plus 104 subtests.
+- Full API: 348 passed plus 15 subtests.
+- Validation-harness assumptions about formatting/comments and function scope
+  were corrected without changing reviewed source bytes or weakening tests.
+- Commit `10c57e67`:
+  `feat(media): add per-season requestability`.
+
+---
+
+# 2026-08-10
+
+## M-023.27.3B3.3.3D2 — Portal TV / Anime Explicit Season Requests
+
+### Objective
+
+Consume the D1 per-season read contract in the Portal and enable safe,
+explicitly scoped TV/anime Request mutation without introducing ambiguous
+all-season behavior.
+
+### Completed
+
+- Added the authenticated Portal TV-detail client for
+  `GET /api/v1/media/tv/{provider_media_id}`.
+- Allowed TV cards, including tracked or partially available series, to inspect
+  Atlas-normalized season state.
+- Exposed a Request action only when the selected season has
+  `requestabilityKnown=true` and `requestEligible=true`.
+- Failed closed to retry-only presentation when series detail or season
+  requestability cannot be trusted.
+- Required every Portal TV/anime mutation to carry an explicit positive
+  `seasonNumber`.
+- Derived `tv` versus `anime_tv` exclusively from server-provided
+  `detail.isAnime`; the browser does not infer anime classification from titles
+  or genres.
+- Preserved the existing authenticated Personal Request client, zero automatic
+  mutation retries, page-lifetime repeat-submit blocking, stale-conflict
+  handling, reconciliation-required handling, and no discovery auto-refresh.
+- Kept raw provider media identity internal and added no browser-controlled
+  `serverId`, `monitorNewItems`, direct provider access, generic TV Request,
+  all-seasons shortcut, or current-season inference.
+- Kept season scope separate from future-season monitoring ownership:
+  Seerr/Sonarr service policy remains responsible for downstream monitoring.
+
+### Validation
+
+- Focused API TV-detail contract: 26 passed plus 3 subtests.
+- Focused Portal media/request regression: 60 passed.
+- Full Portal: 211 passed.
+- TypeScript typecheck: passed.
+- ESLint: passed.
+- Next.js production build: passed.
+- The untracked-file diff-accounting harness was corrected with a temporary
+  alternate Git index; the reviewed source bytes were unchanged and tests were
+  not weakened.
+- Commit `ad84a30d`:
+  `feat(portal): add explicit tv season requests`.
+
+### Result
+
+The source-level TV/anime season-request path is now complete through explicit
+one-season Portal mutation. This does not certify the production runtime.
+Controlled migration from the legacy Jellyseerr container to the pinned Seerr
+runtime, post-migration routing verification, `monitorNewItems=all` verification
+for both supported Sonarr services, and production E2E proof for ongoing
+standard TV and anime TV remain open v1.0 gates.
+
+---
+
+# 2026-08-10
+
+## M-023.27.3B3.3.3D3 — TV / Anime Season Request Documentation Reconciliation
+
+### Objective
+
+Reconcile the authoritative documentation with the completed D1 and D2 source
+contracts without overstating production readiness.
+
+### Reconciled Truth
+
+- Per-season availability and requestability are implemented and fail closed.
+- Portal TV/anime mutation is implemented as one explicit season per Atlas
+  Request.
+- TV versus anime-TV mutation type is based on server-provided classification.
+- Generic TV, all-seasons, and current-season Portal shortcuts are not enabled.
+- The browser does not control downstream `serverId` or `monitorNewItems`.
+- Season Request scope and future-season monitoring remain separate concepts.
+- Production Seerr migration, route verification, service-level
+  `monitorNewItems=all`, ongoing-series production E2E validation, and final
+  release acceptance remain open.
+- No production deployment is performed by this documentation reconciliation.
+
+---
+
+# 2026-08-11
+
+## M-023.27.3B3.3.3E1.3 — Seerr Healthcheck Source Hardening
+
+### Objective
+
+Harden the repository-pinned Seerr runtime with an explicit Docker healthcheck
+before controlled production migration, without changing provider behavior,
+request semantics, deployment state, or production runtime.
+
+### Completed
+
+- Preserved the canonical pinned
+  `ghcr.io/seerr-team/seerr:v3.4.1` image identity.
+- Preserved `init: true`, the existing Jellyseerr-compatible configuration
+  mount, current network membership, ports, restart policy, and dependencies.
+- Added a Docker healthcheck against the local unauthenticated
+  `/api/v1/settings/public` endpoint.
+- Configured a 20-second start period, 3-second timeout, 15-second interval,
+  and three retries.
+- Added a dedicated security regression that fixes the healthcheck endpoint
+  and timing contract in repository source.
+- Kept production unchanged: no container recreation, image pull, ownership
+  mutation, provider setting change, Request mutation, or deployment occurred.
+
+### Validation
+
+- The E1.3 change was bounded to `docker-compose.yml` and
+  `tests/core/test_security_dependency_images.py`.
+- The dedicated security regression passed.
+- Compose rendering passed.
+- Whitespace validation passed after correcting the candidate test file's
+  final EOF blank-line defect.
+- Commit `54baaeed`:
+  `fix(seerr): add production healthcheck`.
+- The committed source hashes were verified as:
+  - `docker-compose.yml`:
+    `d768bd73ae9cf26efcb72288505b25425eef2bb05ce7d876725d77467e757035`;
+  - `tests/core/test_security_dependency_images.py`:
+    `69d01065086766f45156b1f0d67b90c7054920946d3c2944e16782836f4ab296`.
+
+### Remaining Release Boundary
+
+Repository healthcheck hardening does not certify the deployed runtime.
+Production still requires the controlled Jellyseerr-to-Seerr migration,
+post-migration route verification, `monitorNewItems=all` verification for both
+supported Sonarr services, ongoing-series production E2E acceptance, and final
+v1.0 release certification.

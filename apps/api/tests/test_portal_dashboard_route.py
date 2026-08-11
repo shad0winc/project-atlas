@@ -41,12 +41,21 @@ GENERATED_AT = "2026-08-04T04:30:00Z"
 @pytest.fixture(autouse=True)
 def api_environment(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
 ):
     """Provide isolated valid API settings for every route test."""
+
+    audit_path = tmp_path / "events.jsonl"
+    audit_path.write_text("", encoding="utf-8")
+    audit_path.chmod(0o660)
 
     monkeypatch.setenv(
         "ATLAS_JWT_SECRET",
         "m023-11-portal-route-test-secret-0001",
+    )
+    monkeypatch.setenv(
+        "ATLAS_SECURITY_AUDIT_PATH",
+        str(audit_path),
     )
 
     clear_dependency_caches()

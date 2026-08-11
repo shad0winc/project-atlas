@@ -33,6 +33,7 @@ Project Atlas
 │   ├── Scheduler and events
 │   │   └── Scheduler Recovery
 │   ├── Media Requests
+│   │   ├── Media Discovery and Request Safety
 │   │   └── Interrupted-Request Recovery
 │   └── Module platform
 ├── Providers and adapters
@@ -58,12 +59,14 @@ logic.
 - [Service Dependency Verification](SERVICE_DEPENDENCY_VERIFICATION.md)
 - [Stale-State Recovery](STALE_STATE_RECOVERY.md)
 - [Scheduler Recovery](SCHEDULER_RECOVERY.md)
+- [Media Discovery and Request Safety](MEDIA_DISCOVERY_REQUESTS.md)
 - [Interrupted-Request Recovery](INTERRUPTED_REQUEST_RECOVERY.md)
 - [Sports Recovery](SPORTS_RECOVERY.md)
 - [Automatic Cleanup Safety](AUTOMATIC_CLEANUP_SAFETY.md)
 - [Storage Exhaustion Recovery](STORAGE_EXHAUSTION.md)
 - [Portal](PORTAL.md)
 - [Backup and Recovery](BACKUP_RECOVERY.md)
+- [Security](SECURITY.md)
 
 Additional subsystem documents should be added only when their design is mature
 enough to serve as a stable implementation and integration reference.
@@ -149,6 +152,18 @@ runtime-lock behavior without introducing a second scheduling engine.
 - [Architecture](SCHEDULER_RECOVERY.md)
 - [ADR 0015 — Scheduler Recovery Boundaries](../ADR/0015-scheduler-recovery-boundaries.md)
 
+## Media Discovery and Request Safety
+
+Media Discovery and Request Safety defines the Atlas-to-provider read boundary,
+the authoritative Request mutation path, global active-target uniqueness,
+inter-process registry locking, Portal non-retry behavior, fail-closed
+per-season requestability, and the current movie plus explicit one-season
+TV/anime Portal mutation boundary.
+
+- [Architecture](MEDIA_DISCOVERY_REQUESTS.md)
+- [Interrupted-Request Recovery](INTERRUPTED_REQUEST_RECOVERY.md)
+- [Security](SECURITY.md)
+
 ## Interrupted-Request Recovery
 
 Interrupted-Request Recovery extends the existing Media Requests state machine
@@ -220,3 +235,12 @@ recovery.
 
 - [Architecture](BACKUP_RECOVERY.md)
 - [ADR 0023 — Backup and Restore Recovery Boundaries](../ADR/0023-backup-restore-recovery-boundaries.md)
+
+## Security
+
+Security defines the v1.0 authentication, authorization, browser session,
+invitation, reverse-proxy, secret, audit, dependency, network-exposure, and
+least-privilege boundaries validated by M-023.26.
+
+- [Architecture](SECURITY.md)
+- [ADR 0024 — Security Trust Boundaries](../ADR/0024-security-trust-boundaries.md)

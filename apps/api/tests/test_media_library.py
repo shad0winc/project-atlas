@@ -221,18 +221,11 @@ class MediaLibraryEndpointTests(
     def test_openapi_registers_media_library_route(
         self,
     ) -> None:
-        response = self.client.get(
-            "/api/openapi.json"
-        )
-
-        self.assertEqual(
-            200,
-            response.status_code,
-        )
+        schema = self.client.app.openapi()
 
         self.assertIn(
             "/api/v1/media/libraries/{library_id}",
-            response.json()["paths"],
+            schema["paths"],
         )
 
 

@@ -3,6 +3,7 @@ set -euo pipefail
 
 PROJECT_DIR="/opt/project-atlas"
 ATLAS_CONFIG_FILE="$PROJECT_DIR/config/atlas.conf"
+MODULE_ENV_FILE="$PROJECT_DIR/modules/sports/.env"
 
 source "$ATLAS_CONFIG_FILE"
 
@@ -35,6 +36,10 @@ check "Sports media directory present" test -d "$ATLAS_MEDIA_ROOT/Sports"
 check "Module compose valid" docker compose -f "$ATLAS_PROJECT_DIR/modules/sports/docker-compose.yml" config
 check "Module metadata present" test -f "$ATLAS_PROJECT_DIR/modules/sports/module.conf"
 check "Module environment example present" test -f "$ATLAS_PROJECT_DIR/modules/sports/.env.example"
+check "Module environment present" test -f "$MODULE_ENV_FILE"
+check "Module environment is not symbolic link" test ! -L "$MODULE_ENV_FILE"
+check "Module environment permissions private" \
+  sh -c '[ "$(stat -c "%a" "$1" 2>/dev/null)" = "600" ]' _ "$MODULE_ENV_FILE"
 check "Module update script present" test -x "$ATLAS_PROJECT_DIR/modules/sports/scripts/update.sh"
 
 check "Sports feed container running" \

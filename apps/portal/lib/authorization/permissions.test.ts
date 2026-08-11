@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ATLAS_PERMISSIONS,
   atlasPermissionPatternMatches,
   hasAnyAtlasPermission,
   hasAtlasPermission,
@@ -20,6 +21,12 @@ function authorization(
 }
 
 describe("Atlas Portal effective permission evaluation", () => {
+  it("publishes stable Request permission identifiers", () => {
+    expect(ATLAS_PERMISSIONS.requestsRead).toBe("requests.read");
+    expect(ATLAS_PERMISSIONS.requestsCreate).toBe("requests.create");
+    expect(ATLAS_PERMISSIONS.requestsCancel).toBe("requests.cancel");
+  });
+
   it("normalizes permission names", () => {
     expect(normalizeAtlasPermission(" MEDIA.READ ")).toBe("media.read");
   });

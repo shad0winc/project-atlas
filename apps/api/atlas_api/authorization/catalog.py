@@ -176,6 +176,7 @@ _BUILT_IN_ROLES: dict[str, RoleDefinition] = {
                 "favorites.read",
                 "favorites.write",
                 "media.read",
+                "requests.cancel",
                 "requests.create",
                 "requests.read",
                 "users.self.read",

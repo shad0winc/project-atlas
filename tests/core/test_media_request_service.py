@@ -11,9 +11,11 @@ from atlas.media_requests import (
     JsonMediaRequestRepository,
     MediaRequest,
     MediaRequestProvider,
+    MediaRequestProviderError,
     MediaRequestProviderOperationError,
     MediaRequestRepositoryError,
     MediaRequestService,
+    MediaRequestServiceConflictError,
     MediaRequestServiceError,
     MediaRequestStatus,
     MediaRequestType,
@@ -63,6 +65,9 @@ class FakeProvider(MediaRequestProvider):
             supports_status=supports_status,
             supports_cancellation=supports_cancellation,
         )
+        self.preflight_requests: list[
+            MediaRequest
+        ] = []
         self.submissions: list[MediaRequest] = []
         self.status_requests: list[str] = []
         self.cancellations: list[str] = []
@@ -85,6 +90,7 @@ class FakeProvider(MediaRequestProvider):
             status="cancelled",
             updated_at=UPDATED,
         )
+        self.preflight_error: Exception | None = None
         self.submission_error: Exception | None = None
         self.status_error: Exception | None = None
         self.cancel_error: Exception | None = None
@@ -98,6 +104,17 @@ class FakeProvider(MediaRequestProvider):
         if self.capabilities_error is not None:
             raise self.capabilities_error
         return self._capabilities
+
+    def validate_submission(
+        self,
+        request: MediaRequest,
+    ) -> None:
+        self.preflight_requests.append(
+            request
+        )
+
+        if self.preflight_error is not None:
+            raise self.preflight_error
 
     def submit(
         self,
@@ -209,6 +226,26 @@ def test_create_request_persists_pending_request(
     assert service.get_request(request.request_id) == request
 
 
+def test_create_request_rejects_active_target_conflict(
+    service: MediaRequestService,
+) -> None:
+    first = make_request()
+    second = make_request(
+        request_id="request-002",
+        user_id="user-002",
+    )
+
+    service.create_request(first)
+
+    with pytest.raises(
+        MediaRequestServiceConflictError,
+        match="active media request conflicts",
+    ):
+        service.create_request(second)
+
+    assert service.list_requests() == (first,)
+
+
 def test_create_request_requires_media_request(
     service: MediaRequestService,
 ) -> None:
@@ -286,13 +323,38 @@ def test_create_request_rejects_provider_without_submission(
         service.create_request(make_request())
 
 
+def test_create_request_preflight_failure_blocks_persistence(
+    service: MediaRequestService,
+    provider: FakeProvider,
+) -> None:
+    provider.preflight_error = MediaRequestProviderError(
+        "routing is not configured"
+    )
+
+    request = make_request()
+
+    with pytest.raises(
+        MediaRequestServiceError,
+        match="preflight",
+    ):
+        service.create_request(
+            request
+        )
+
+    assert provider.preflight_requests == [
+        request
+    ]
+    assert provider.submissions == []
+    assert service.list_requests() == ()
+
+
 def test_create_request_wraps_repository_failure(
     service: MediaRequestService,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
         service.repository,
-        "save",
+        "save_if_no_active_conflict",
         lambda request: (_ for _ in ()).throw(
             MediaRequestRepositoryError("failure")
         ),
@@ -334,6 +396,42 @@ def test_submit_request_rejects_already_submitted_request(
         match="already submitted",
     ):
         service.submit_request("request-001")
+
+
+def test_submit_request_revalidates_before_submitting_intent(
+    service: MediaRequestService,
+    provider: FakeProvider,
+) -> None:
+    request = service.create_request(
+        make_request()
+    )
+
+    provider.preflight_error = (
+        MediaRequestProviderError(
+            "routing changed"
+        )
+    )
+
+    with pytest.raises(
+        MediaRequestServiceError,
+        match="preflight",
+    ):
+        service.submit_request(
+            request.request_id
+        )
+
+    assert len(
+        provider.preflight_requests
+    ) == 2
+    assert provider.submissions == []
+    assert (
+        service
+        .get_request(
+            request.request_id
+        )
+        .status
+        is MediaRequestStatus.PENDING
+    )
 
 
 def test_submit_request_wraps_provider_failure(

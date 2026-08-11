@@ -399,7 +399,7 @@ applications, and modules.
 
 ## M-021 — Media and Sports Experience
 
-**Status:** Planned for v1.0
+**Status:** In Progress for v1.0
 
 **Goal:** Allow friends and family to use Media and Sports without interacting
 with backend services.
@@ -417,16 +417,41 @@ with backend services.
 
 ### Media Experience
 
-- [ ] Browse available media
-- [ ] Search available media
+- [x] Browse available media
+- [x] Search available media
 - [ ] Open media in Jellyfin
-- [ ] Request movies
+- [x] Request movies
 - [ ] Request television series
+  - [x] Preserve server-side TV request/provider capability
+  - [x] Add normalized TV-series detail, season, and ongoing metadata
+  - [x] Add fail-closed per-season availability and requestability state
+  - [x] Add explicit server-owned standard-TV routing and submission preflight
+  - [x] Add explicit Portal one-season request UX with no generic/all/current shortcut
+  - [x] Derive the Portal TV request type from server-provided series classification
+  - [ ] Validate ongoing-series monitoring so future episodes can be acquired
+        automatically through Seerr and Sonarr without a new Atlas request per episode
+    - [x] Define Seerr service-level `monitorNewItems` ownership
+    - [x] Pin the canonical Seerr runtime image in repository source
+    - [ ] Migrate the deployed Jellyseerr runtime to the canonical Seerr image
+          under backed-up maintenance control
+    - [ ] Verify the standard-TV Sonarr service uses `monitorNewItems=all`
+    - [ ] Complete production E2E future-episode monitoring validation
 - [ ] Request anime movies
 - [ ] Request anime series
-- [ ] View request history
-- [ ] View request status
-- [ ] Cancel eligible requests
+  - [x] Preserve server-side anime-TV request/provider capability
+  - [x] Reuse normalized TV-series detail with server-side anime classification
+  - [x] Reuse fail-closed per-season availability and requestability state
+  - [x] Add explicit server-owned anime-TV routing and submission preflight
+  - [x] Add explicit Portal one-season request UX with no generic/all/current shortcut
+  - [x] Derive `anime_tv` from server-provided series classification
+  - [ ] Validate ongoing-series monitoring so future episodes can be acquired
+        automatically through Seerr and Sonarr Anime without a new Atlas request per episode
+    - [x] Define shared Seerr service-level `monitorNewItems` ownership
+    - [ ] Verify the Anime-TV Sonarr service uses `monitorNewItems=all`
+    - [ ] Complete production E2E future-episode monitoring validation
+- [x] View request history
+- [x] View request status
+- [x] Cancel eligible requests
 - [ ] Add favorites
 - [ ] Remove favorites
 - [ ] View personal favorites
@@ -746,16 +771,16 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 
 ### Security
 
-- [ ] Complete authentication review
-- [ ] Complete authorization review
-- [ ] Complete invitation security review
-- [ ] Complete session-cookie review
-- [ ] Complete reverse-proxy security review
-- [ ] Complete secret-storage review
-- [ ] Complete API exposure review
-- [ ] Complete audit-event review
-- [ ] Complete dependency vulnerability review
-- [ ] Complete least-privilege review
+- [x] Complete authentication review
+- [x] Complete authorization review
+- [x] Complete invitation security review
+- [x] Complete session-cookie review
+- [x] Complete reverse-proxy security review
+- [x] Complete secret-storage review
+- [x] Complete API exposure review
+- [x] Complete audit-event review
+- [x] Complete dependency vulnerability review
+- [x] Complete least-privilege review
 
 ### Quality
 
@@ -774,7 +799,8 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 
 ### Documentation
 
-- [ ] Update architecture documentation
+- [x] Reconcile Media discovery and Request architecture through M-023.27.3B3
+- [ ] Update architecture documentation for remaining v1.0 surfaces
 - [ ] Complete administrator guide
 - [ ] Complete user guide
 - [ ] Complete installation guide

@@ -5,11 +5,24 @@ networks:
     name: atlas
     driver: bridge
 
+  atlas-backend:
+    name: atlas-backend
+    external: true
+  atlas-identity:
+    name: atlas-identity
+    driver: bridge
+
+  atlas-indexer-proxy:
+    name: atlas-indexer-proxy
+    driver: bridge
+
 services:
   jellyfin:
     image: jellyfin/jellyfin:latest
     container_name: jellyfin
-    networks: [atlas]
+    networks:
+      - atlas
+      - atlas-identity
     ports:
       - "${JELLYFIN_PORT:-8096}:8096"
     volumes:
@@ -34,7 +47,9 @@ services:
   prowlarr:
     image: lscr.io/linuxserver/prowlarr:latest
     container_name: prowlarr
-    networks: [atlas]
+    networks:
+      - atlas
+      - atlas-indexer-proxy
     ports:
       - "${PROWLARR_PORT:-9696}:9696"
     environment:
@@ -49,7 +64,8 @@ services:
   flaresolverr:
     image: ghcr.io/flaresolverr/flaresolverr:v3.5.0
     container_name: flaresolverr
-    networks: [atlas]
+    networks:
+      - atlas-indexer-proxy
     environment:
       - LOG_LEVEL=info
       - LOG_HTML=false
@@ -177,9 +193,12 @@ services:
         condition: service_healthy
 
   jellyseerr:
-    image: fallenbagel/jellyseerr:latest
+    image: ghcr.io/seerr-team/seerr:v3.4.1@sha256:f4768de5f616248d723e05891f3345a1402123775d03bf0890dbfedc0831bda1
+    init: true
     container_name: jellyseerr
-    networks: [atlas]
+    networks:
+      - atlas
+      - atlas-backend
     ports:
       - "${JELLYSEERR_PORT:-5055}:5055"
     environment:
@@ -187,6 +206,12 @@ services:
       - TZ=${TZ}
     volumes:
       - ${CONFIG}/jellyseerr:/app/config
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:5055/api/v1/settings/public || exit 1
+      start_period: 20s
+      timeout: 3s
+      interval: 15s
+      retries: 3
     restart: unless-stopped
     depends_on:
       - jellyfin
@@ -209,8 +234,9 @@ services:
     restart: unless-stopped
 
   maintainerr:
-    image: ghcr.io/jorenn92/maintainerr:latest
+    image: ghcr.io/maintainerr/maintainerr:3.21.1@sha256:811a580fdf479e8582d3c97047b1aa8930fc5523f63143498020864ad6a7cd80
     container_name: maintainerr
+    user: "1000:1000"
     networks: [atlas]
     ports:
       - "${MAINTAINERR_PORT:-6246}:6246"

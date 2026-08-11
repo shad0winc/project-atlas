@@ -39,6 +39,9 @@ services:
     build:
       context: /opt/project-atlas
       dockerfile: modules/sports/Dockerfile
+      args:
+        PUID: "${PUID:?PUID is required}"
+        PGID: "${PGID:?PGID is required}"
 
     container_name: atlas-sports-controller
     restart: unless-stopped
@@ -65,7 +68,6 @@ services:
       SPORTS_MAINTENANCE_INTERVAL_SECONDS: "${SPORTS_MAINTENANCE_INTERVAL_SECONDS:-3600}"
       SPORTS_MAINTENANCE_DRY_RUN: "${SPORTS_MAINTENANCE_DRY_RUN:-false}"
       SPORTS_MAINTENANCE_STATE_FILE: "${SPORTS_MAINTENANCE_STATE_FILE:-/mnt/storage/configs/sportyfin/state/maintenance.json}"
-      SPORTS_TASK_SCHEDULER_STATE_FILE: "${SPORTS_TASK_SCHEDULER_STATE_FILE:-/mnt/storage/configs/atlas/runtime/scheduler/sports.json}"
       SPORTS_PARTIAL_RETENTION_HOURS: "${SPORTS_PARTIAL_RETENTION_HOURS:-6}"
       SPORTS_RECORDING_LOG_RETENTION_DAYS: "${SPORTS_RECORDING_LOG_RETENTION_DAYS:-14}"
       SPORTS_RECORDING_EXIT_RETENTION_DAYS: "${SPORTS_RECORDING_EXIT_RETENTION_DAYS:-7}"
@@ -75,7 +77,9 @@ services:
       - /opt/project-atlas:/opt/project-atlas:ro
       - /mnt/storage/configs/sportyfin:/mnt/storage/configs/sportyfin
       - /mnt/storage/media/Sports:/mnt/storage/media/Sports
-      - /mnt/storage/configs/atlas/runtime:/mnt/storage/configs/atlas/runtime
+
+    security_opt:
+      - no-new-privileges:true
 
     mem_limit: 128m
     cpus: 0.50

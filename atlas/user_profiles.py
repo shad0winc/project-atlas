@@ -79,7 +79,16 @@ class UserProfileStore:
         return self.root / "profiles"
 
     def initialize(self) -> None:
-        self.profiles_directory.mkdir(parents=True, exist_ok=True)
+        self.root.mkdir(
+            parents=True,
+            exist_ok=True,
+            mode=0o2750,
+        )
+        self.profiles_directory.mkdir(
+            parents=True,
+            exist_ok=True,
+            mode=0o2750,
+        )
 
         if not self.registry_file.exists():
             _atomic_write_json(
@@ -158,7 +167,11 @@ class UserProfileStore:
         )
 
         profile_file = self._profile_file(user_id)
-        profile_file.parent.mkdir(parents=True, exist_ok=False)
+        profile_file.parent.mkdir(
+            parents=True,
+            exist_ok=False,
+            mode=0o2750,
+        )
 
         try:
             _atomic_write_json(profile_file, profile)
@@ -1099,6 +1112,7 @@ def _atomic_write_json(
     path.parent.mkdir(
         parents=True,
         exist_ok=True,
+        mode=0o2750,
     )
 
     descriptor, temporary_name = tempfile.mkstemp(
@@ -1124,6 +1138,8 @@ def _atomic_write_json(
             handle.write("\n")
             handle.flush()
             os.fsync(handle.fileno())
+
+        os.chmod(temporary_path, 0o640)
 
         os.replace(
             temporary_path,
