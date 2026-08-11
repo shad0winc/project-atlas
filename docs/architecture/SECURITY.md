@@ -257,10 +257,18 @@ and the external Media request/discovery provider.
   durably persisted. A losing concurrent creator therefore cannot reach a
   second provider submission.
 
-TV/anime request provider capability remains server-side, but the Portal does
-not yet expose generic TV mutation. `season_number=None` means all seasons at
-the current provider boundary, so explicit season-selection UX is required
-before the Portal enables series requests.
+TV/anime request provider capability remains server-side, and the Portal now
+exposes only explicit one-season mutation. Before rendering a season Request
+action, the browser consumes Atlas-normalized per-season requestability and fails
+closed when that state is unknown or ineligible. Every Portal TV/anime mutation
+carries a positive `season_number`; the Portal does not expose a generic TV,
+all-seasons, or current-season shortcut even though `season_number=None` still
+means all seasons at the provider boundary.
+
+TV versus anime-TV mutation type comes from server-provided series
+classification. The browser does not infer anime classification and does not
+control downstream `serverId` routing or the Seerr/Sonarr `monitorNewItems`
+service policy.
 
 See [Media Discovery and Request Safety](MEDIA_DISCOVERY_REQUESTS.md) and
 [Interrupted-Request Recovery](INTERRUPTED_REQUEST_RECOVERY.md).

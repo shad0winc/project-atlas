@@ -12,14 +12,16 @@ clients.
 
 ## Current Source Checkpoint
 
-The B3 implementation is represented by six atomic commits:
+The B3 implementation is represented by eight atomic source commits:
 
 - `755409de` — Seerr-backed Media discovery foundation;
 - `7bd4a14a` — Personal Media browse/search Portal;
 - `28cbb790` — active Request uniqueness and race protection;
 - `b1c2ebcb` — movie Request action in the Portal;
-- `b901702d` — TV-series detail and season metadata; and
-- `c1bbe9d5` — explicit TV/anime-TV routing and submission preflight.
+- `b901702d` — TV-series detail and season metadata;
+- `c1bbe9d5` — explicit TV/anime-TV routing and submission preflight;
+- `10c57e67` — fail-closed per-season requestability; and
+- `ad84a30d` — explicit one-season TV/anime Request actions in the Portal.
 
 These are source/repository changes. They do not, by themselves, certify a
 production deployment or the remaining v1.0 user-acceptance gates.
@@ -70,14 +72,32 @@ GET /api/v1/media/discover
 Discovery requires `media.read`. Results normalize provider data into the public
 Media discovery contract used by `/portal/media`.
 
-`request_eligible` is advisory presentation state, not mutation authorization.
-Only provider state `not_tracked` is currently considered request-eligible.
-Tracked/known states and unsupported states fail closed. A stale eligible card
-may therefore still be rejected by the authoritative Request POST.
+Whole-item discovery `request_eligible` is advisory presentation state, not
+mutation authorization. Only provider state `not_tracked` is considered
+whole-item request-eligible. Tracked/known states and unsupported states fail
+closed, and a stale eligible card may still be rejected by the authoritative
+Request POST.
+
+TV-series detail is read through:
+
+```text
+GET /api/v1/media/tv/{provider_media_id}
+```
+
+Each normal non-Specials season carries normalized `availability`,
+`requestability_known`, and `request_eligible`. A completely untracked series
+marks its normal seasons as known and requestable. For tracked series, Atlas
+uses the pinned-Seerr nested season/request evidence when that evidence is
+present and valid. Pending, approved, and failed standard provider requests
+block their explicit seasons; declined, completed, and 4K provider requests do
+not block the standard season path. A season is eligible only when its normalized
+provider state is `unknown` or `deleted` and no blocking request occupies it.
+Missing, malformed, duplicate, or unsupported nested provider evidence fails
+closed to unknown requestability and no Portal mutation action.
 
 Provider media identity is carried internally so Atlas can address the intended
 provider target. The Portal uses it for internal item identity and Request
-transport, but B3.2/B3.3.2 do not render the raw identifier in Media cards.
+transport but does not render the raw identifier in Media cards.
 
 ## Request Mutation Path
 
@@ -98,9 +118,9 @@ The caller may provide only:
 Atlas owns the authenticated user identity, provider selection, Atlas request
 identity, provider request identity, lifecycle status, and timestamps.
 
-Portal presentation additionally checks `requests.create` before showing the
-movie Request control. The API enforces authorization independently; the Portal
-permission check is never the security boundary.
+Portal presentation additionally checks `requests.create` before showing movie
+or explicit-season TV/anime Request controls. The API enforces authorization
+independently; the Portal permission check is never the security boundary.
 
 The mutation sequence is:
 
@@ -199,36 +219,43 @@ persists `SUBMITTING` or `CANCELLING` mutation intent before the corresponding
 provider operation. If the provider outcome is ambiguous, Atlas retains a
 recovery-required active state and instructs the caller not to retry blindly.
 
-The Portal create transport uses zero automatic retries. After any movie Request
-attempt, the target remains locally blocked for the lifetime of that page:
+The Portal create transport uses zero automatic retries. After any Portal
+Request attempt, the logical target remains locally blocked for the lifetime of
+that page:
 
 - success -> `Requested`;
 - stale active-target 409 -> `Already requested`;
 - reconciliation-required or otherwise unconfirmed outcome -> `Check requests`.
 
-This browser-level block improves user experience but does not replace the
-server-side active-target invariant.
+For TV/anime, the page-lifetime target key includes the explicit season scope so
+different requestable seasons can remain independently actionable while the same
+season cannot be blindly replayed. This browser-level block improves user
+experience but does not replace the server-side active-target invariant.
 
 ## Current Portal Mutation Scope
 
-B3.3.2 enables movie Request mutation only. Eligible TV cards do not POST a
-request. The Portal instead explains that explicit season selection is required.
+The Portal supports movie mutation and explicit one-season TV/anime mutation.
+TV cards first load Atlas TV-series detail and display normalized season state,
+including for tracked or partially available series. A season Request action is
+shown only when that season has known, eligible requestability.
 
-This is deliberate. At the current provider boundary, `season_number=None` for
-TV means all seasons. Atlas must not silently convert a generic series-card click
-into that scope.
+Every Portal TV/anime mutation carries a positive explicit `season_number`.
+`season_number=None` continues to mean all seasons at the provider boundary, so
+the Portal does not expose a generic TV Request, an all-seasons shortcut, or a
+current-season inference. Specials (`season 0`) remain outside normal selection.
 
-Server-side TV and anime-TV Request capability remains intact and is the
-foundation for the later Portal season-selection workflow.
+The browser derives `tv` versus `anime_tv` only from the server-provided series
+classification. It does not infer anime from title/genre data and does not
+supply downstream `serverId` routing.
 
 ## Ongoing TV and Anime Series
 
-Ongoing-series automation remains a v1.0 requirement. Once the supported
-TV/anime Portal request workflow is enabled, the user should choose the intended
-series/season scope once. The downstream Seerr/Sonarr or Seerr/Sonarr Anime
-configuration is expected to keep the supported ongoing series monitored so
-future episodes can be acquired automatically under the configured monitoring,
-quality, and release rules.
+Ongoing-series automation remains a v1.0 requirement. The source-level
+TV/anime Portal request workflow now lets the user choose an explicit season
+scope. The downstream Seerr/Sonarr or Seerr/Sonarr Anime configuration is
+expected to keep a supported ongoing series monitored so future episodes can be
+acquired automatically under the configured monitoring, quality, and release
+rules.
 
 Atlas should not require a new user Request for every future episode of an
 already monitored ongoing series.
@@ -267,9 +294,10 @@ Sonarr automatically monitors later seasons added to upstream metadata. The
 Portal must not present service-level monitoring as a per-request toggle unless
 Atlas later implements a separate authoritative downstream control.
 
-This section defines the required end-user/operational acceptance target. It
-does not claim that Portal TV/anime season selection or the production Seerr
-migration is already complete.
+This section defines the required end-user/operational acceptance target. The
+source-level Portal TV/anime explicit-season workflow is complete, but this does
+not claim that the production Seerr migration, service-level monitoring
+configuration, or ongoing-series production acceptance is complete.
 
 ## Security Properties
 
@@ -299,11 +327,13 @@ See [Security](SECURITY.md) for the broader trust-boundary model.
 ## Validation Boundary
 
 The B3 source chain was validated incrementally and then through full regression
-gates. The final server-side race-protection gate passed 3,055 Core tests plus
-104 subtests and 336 API tests plus 15 subtests. The final Portal action gate
-passed the full 194-test Portal suite, typecheck, lint, and production build.
+gates. D1 passed 3,106 Core tests plus 104 subtests and 348 API tests plus 15
+subtests after adding fail-closed per-season requestability. D2 passed 26 focused
+API tests plus 3 subtests, 60 focused Portal tests, the full 211-test Portal
+suite, typecheck, lint, and production build while adding explicit one-season
+TV/anime mutation.
 
-Production deployment, explicit TV/anime season-selection UX, ongoing-series
-runtime acceptance, end-to-end journey certification, accessibility,
-performance, sustained-use, pilot, stabilization, and v1.0 release approval
-remain separate gates.
+Production deployment, Seerr migration, `monitorNewItems=all` verification,
+ongoing-series runtime acceptance, end-to-end journey certification,
+accessibility, performance, sustained-use, pilot, stabilization, and v1.0
+release approval remain separate gates.

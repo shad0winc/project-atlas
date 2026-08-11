@@ -154,10 +154,11 @@ runtime-lock behavior without introducing a second scheduling engine.
 
 ## Media Discovery and Request Safety
 
-Media Discovery and Request Safety defines the Seerr-to-Atlas-to-Portal read
-boundary, the authoritative Request mutation path, global active-target
-uniqueness, inter-process registry locking, Portal non-retry behavior, and the
-current movie-only Portal mutation boundary.
+Media Discovery and Request Safety defines the Atlas-to-provider read boundary,
+the authoritative Request mutation path, global active-target uniqueness,
+inter-process registry locking, Portal non-retry behavior, fail-closed
+per-season requestability, and the current movie plus explicit one-season
+TV/anime Portal mutation boundary.
 
 - [Architecture](MEDIA_DISCOVERY_REQUESTS.md)
 - [Interrupted-Request Recovery](INTERRUPTED_REQUEST_RECOVERY.md)

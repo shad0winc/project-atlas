@@ -449,13 +449,17 @@ silently retried.
 
 ### Series and Anime Acceptance Requirement
 
-Atlas v1.0 must also validate the supported television and anime-series request
-journey once explicit season-selection UX is implemented.
+Atlas v1.0 must also validate the implemented television and anime-series
+explicit-season request journey in the production runtime.
 
 Certification requires:
 
-- the user explicitly chooses the intended season scope rather than a generic
-  TV action silently implying all seasons;
+- the Portal exposes truthful per-season availability/requestability and fails
+  closed when that state is unknown or ineligible;
+- the user explicitly chooses one intended positive season scope rather than a
+  generic, all-seasons, or inferred current-season action;
+- the Portal derives standard TV versus anime TV from server-provided
+  classification rather than browser title/genre inference;
 - television and anime-series requests reach the appropriate supported
   downstream automation path;
 - the production request path runs on the repository-approved Seerr runtime,
@@ -473,12 +477,12 @@ The monitoring policy is service-owned. Season scope selected by the user is
 Atlas Request state; `monitorNewItems` is not a caller-controlled Request field
 and must not be presented as a per-request toggle.
 
-At source checkpoint `c1bbe9d5`, Atlas has normalized TV-series/season metadata
-plus explicit server-owned TV/anime-TV routing and deterministic submission
-preflight. Portal TV/anime season-selection mutation and the controlled
-production Seerr migration/monitoring validation remain intentionally deferred.
-This acceptance requirement records the v1.0 target; it does not mark those
-remaining gates complete.
+At source checkpoint `ad84a30d`, Atlas has normalized TV-series/season metadata,
+fail-closed per-season requestability, explicit server-owned TV/anime-TV routing
+and submission preflight, and Portal explicit one-season mutation. Source
+completion does not certify production. The controlled Seerr migration,
+post-migration route verification, `monitorNewItems=all` validation, and
+ongoing-series production E2E acceptance remain open.
 
 ### Observed Result
 

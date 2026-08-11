@@ -16,13 +16,16 @@ All notable changes to Project Atlas are documented in this file.
   `requests.lock` sidecar and `fcntl.flock()` so the duplicate check and initial
   `PENDING` persistence are serialized across concurrent writers before any
   provider submission can occur.
-- Preserved TV and anime-TV provider request capability while intentionally
-  deferring Portal series mutation until explicit season-selection UX is
-  available; v1.0 acceptance retains ongoing-series monitoring and automatic
-  future-episode acquisition as a required user workflow.
 - Added normalized TV-series detail, season metadata, ongoing-state derivation,
   and anime classification through the Atlas read boundary while excluding
   Specials (`season 0`) from normal request scope.
+- Added fail-closed per-season availability and requestability normalization so
+  the Portal can distinguish known requestable seasons from tracked,
+  provider-requested, unknown, or malformed provider state.
+- Added explicit one-season TV and anime-TV Request actions to the Portal. The
+  browser consumes Atlas-normalized season state, derives `tv` versus `anime_tv`
+  only from server-provided anime classification, and does not expose generic
+  TV, all-seasons, or current-season shortcuts.
 - Added deterministic Media Request submission preflight and explicit
   server-owned Seerr routing for standard TV and anime TV so missing or invalid
   routing fails before new Request persistence or provider HTTP.

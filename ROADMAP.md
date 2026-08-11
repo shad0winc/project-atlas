@@ -424,8 +424,10 @@ with backend services.
 - [ ] Request television series
   - [x] Preserve server-side TV request/provider capability
   - [x] Add normalized TV-series detail, season, and ongoing metadata
+  - [x] Add fail-closed per-season availability and requestability state
   - [x] Add explicit server-owned standard-TV routing and submission preflight
-  - [ ] Add explicit Portal season-selection/request UX
+  - [x] Add explicit Portal one-season request UX with no generic/all/current shortcut
+  - [x] Derive the Portal TV request type from server-provided series classification
   - [ ] Validate ongoing-series monitoring so future episodes can be acquired
         automatically through Seerr and Sonarr without a new Atlas request per episode
     - [x] Define Seerr service-level `monitorNewItems` ownership
@@ -438,8 +440,10 @@ with backend services.
 - [ ] Request anime series
   - [x] Preserve server-side anime-TV request/provider capability
   - [x] Reuse normalized TV-series detail with server-side anime classification
+  - [x] Reuse fail-closed per-season availability and requestability state
   - [x] Add explicit server-owned anime-TV routing and submission preflight
-  - [ ] Add explicit Portal season-selection/request UX
+  - [x] Add explicit Portal one-season request UX with no generic/all/current shortcut
+  - [x] Derive `anime_tv` from server-provided series classification
   - [ ] Validate ongoing-series monitoring so future episodes can be acquired
         automatically through Seerr and Sonarr Anime without a new Atlas request per episode
     - [x] Define shared Seerr service-level `monitorNewItems` ownership

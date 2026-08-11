@@ -357,12 +357,19 @@ The workflow must avoid duplicate submissions, ambiguous status, and silent
 failure.
 
 For television and anime series, the supported Portal must make season scope
-explicit. A generic TV action must not silently interpret an unspecified season
-as an all-seasons request. When a user requests a supported ongoing series, the
-v1.0 workflow must preserve downstream monitoring through Seerr and the
-appropriate Sonarr instance so future episodes can be acquired automatically
-under the configured monitoring, quality, and release rules without requiring a
-new Atlas request per episode.
+explicit. The implemented source path exposes one positive season at a time,
+uses Atlas-normalized fail-closed requestability, and derives standard TV versus
+anime TV from server-provided classification. A generic TV action must not
+silently interpret an unspecified season as an all-seasons request, and the
+Portal does not expose all-seasons or inferred current-season shortcuts.
+
+At source checkpoint `ad84a30d`, this explicit-season Portal workflow is
+implemented. That source milestone does not certify the production request path.
+When a user requests a supported ongoing series, the v1.0 workflow must still
+preserve downstream monitoring through Seerr and the appropriate Sonarr instance
+so future episodes can be acquired automatically under the configured
+monitoring, quality, and release rules without requiring a new Atlas request per
+episode.
 
 ### 8.4.1 Seerr Monitoring and Migration Gate
 
@@ -707,6 +714,10 @@ Certification requires:
 - failures provide actionable feedback;
 - outcome-ambiguous mutations are not automatically replayed;
 - television/anime season scope is explicit before series mutation;
+- unknown or ineligible per-season requestability fails closed to no mutation;
+- the Portal uses server-provided classification for standard TV versus anime TV;
+- no generic, all-seasons, or inferred current-season shortcut bypasses the
+  explicit-season scope;
 - the production request path uses the repository-approved Seerr runtime;
 - both supported Sonarr services have `monitorNewItems=all` verified after
   migration; and

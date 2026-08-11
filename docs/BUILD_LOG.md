@@ -5977,3 +5977,133 @@ The review was read-only:
 - no production `.env` change;
 - no Request or Portal mutation; and
 - no production deployment.
+
+---
+
+# 2026-08-10
+
+## M-023.27.3B3.3.3D1 — Per-Season Requestability Read Foundation
+
+### Objective
+
+Add a truthful, fail-closed per-season read contract before the Portal enables
+TV/anime mutation.
+
+### Completed
+
+- Extended `MediaSeriesSeason` with normalized `availability`,
+  `requestability_known`, and `request_eligible`.
+- Preserved whole-series `MediaSeriesDetail.request_eligible` semantics while
+  adding season-specific requestability for the TV-detail path.
+- Marked normal seasons on a completely untracked series as known and
+  requestable.
+- Normalized pinned-Seerr nested season/request evidence for tracked series.
+- Treated pending, approved, and failed standard provider requests as blocking
+  their explicit seasons.
+- Treated declined, completed, and 4K provider requests as non-blocking for the
+  standard season-request path.
+- Allowed only `UNKNOWN` or `DELETED` provider season states to remain eligible
+  when no active provider request blocks that season.
+- Failed closed to `requestability_known=false` and
+  `request_eligible=false` when nested provider state is missing, malformed,
+  unsupported, or otherwise not trustworthy.
+- Transported the normalized fields through
+  `GET /api/v1/media/tv/{provider_media_id}` without adding provider HTTP calls,
+  Portal mutation, Request persistence changes, routing changes, or
+  `monitorNewItems` controls.
+
+### Validation
+
+- Focused season regression: 31 passed.
+- Focused Core discovery/series regression: 73 passed.
+- Focused API discovery/series regression: 26 passed plus 3 subtests.
+- Full Core: 3,106 passed plus 104 subtests.
+- Full API: 348 passed plus 15 subtests.
+- Validation-harness assumptions about formatting/comments and function scope
+  were corrected without changing reviewed source bytes or weakening tests.
+- Commit `10c57e67`:
+  `feat(media): add per-season requestability`.
+
+---
+
+# 2026-08-10
+
+## M-023.27.3B3.3.3D2 — Portal TV / Anime Explicit Season Requests
+
+### Objective
+
+Consume the D1 per-season read contract in the Portal and enable safe,
+explicitly scoped TV/anime Request mutation without introducing ambiguous
+all-season behavior.
+
+### Completed
+
+- Added the authenticated Portal TV-detail client for
+  `GET /api/v1/media/tv/{provider_media_id}`.
+- Allowed TV cards, including tracked or partially available series, to inspect
+  Atlas-normalized season state.
+- Exposed a Request action only when the selected season has
+  `requestabilityKnown=true` and `requestEligible=true`.
+- Failed closed to retry-only presentation when series detail or season
+  requestability cannot be trusted.
+- Required every Portal TV/anime mutation to carry an explicit positive
+  `seasonNumber`.
+- Derived `tv` versus `anime_tv` exclusively from server-provided
+  `detail.isAnime`; the browser does not infer anime classification from titles
+  or genres.
+- Preserved the existing authenticated Personal Request client, zero automatic
+  mutation retries, page-lifetime repeat-submit blocking, stale-conflict
+  handling, reconciliation-required handling, and no discovery auto-refresh.
+- Kept raw provider media identity internal and added no browser-controlled
+  `serverId`, `monitorNewItems`, direct provider access, generic TV Request,
+  all-seasons shortcut, or current-season inference.
+- Kept season scope separate from future-season monitoring ownership:
+  Seerr/Sonarr service policy remains responsible for downstream monitoring.
+
+### Validation
+
+- Focused API TV-detail contract: 26 passed plus 3 subtests.
+- Focused Portal media/request regression: 60 passed.
+- Full Portal: 211 passed.
+- TypeScript typecheck: passed.
+- ESLint: passed.
+- Next.js production build: passed.
+- The untracked-file diff-accounting harness was corrected with a temporary
+  alternate Git index; the reviewed source bytes were unchanged and tests were
+  not weakened.
+- Commit `ad84a30d`:
+  `feat(portal): add explicit tv season requests`.
+
+### Result
+
+The source-level TV/anime season-request path is now complete through explicit
+one-season Portal mutation. This does not certify the production runtime.
+Controlled migration from the legacy Jellyseerr container to the pinned Seerr
+runtime, post-migration routing verification, `monitorNewItems=all` verification
+for both supported Sonarr services, and production E2E proof for ongoing
+standard TV and anime TV remain open v1.0 gates.
+
+---
+
+# 2026-08-10
+
+## M-023.27.3B3.3.3D3 — TV / Anime Season Request Documentation Reconciliation
+
+### Objective
+
+Reconcile the authoritative documentation with the completed D1 and D2 source
+contracts without overstating production readiness.
+
+### Reconciled Truth
+
+- Per-season availability and requestability are implemented and fail closed.
+- Portal TV/anime mutation is implemented as one explicit season per Atlas
+  Request.
+- TV versus anime-TV mutation type is based on server-provided classification.
+- Generic TV, all-seasons, and current-season Portal shortcuts are not enabled.
+- The browser does not control downstream `serverId` or `monitorNewItems`.
+- Season Request scope and future-season monitoring remain separate concepts.
+- Production Seerr migration, route verification, service-level
+  `monitorNewItems=all`, ongoing-series production E2E validation, and final
+  release acceptance remain open.
+- No production deployment is performed by this documentation reconciliation.
