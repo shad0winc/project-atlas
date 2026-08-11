@@ -106,3 +106,22 @@ def test_seerr_preserves_existing_configuration_path() -> None:
     )
 
     assert "      - ${CONFIG}/jellyseerr:/app/config\n" in jellyseerr
+
+def test_seerr_has_canonical_public_settings_healthcheck() -> None:
+    content = CORE_COMPOSE.read_text(encoding="utf-8")
+    jellyseerr = _service_block(
+        content,
+        "jellyseerr",
+        "bazarr",
+    )
+
+    assert "    healthcheck:\n" in jellyseerr
+    assert (
+        "      test: wget --no-verbose --tries=1 --spider "
+        "http://localhost:5055/api/v1/settings/public || exit 1\n"
+        in jellyseerr
+    )
+    assert "      start_period: 20s\n" in jellyseerr
+    assert "      timeout: 3s\n" in jellyseerr
+    assert "      interval: 15s\n" in jellyseerr
+    assert "      retries: 3\n" in jellyseerr
