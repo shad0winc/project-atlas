@@ -1,0 +1,79 @@
+"""Source contracts for the isolated API security-audit boundary."""
+
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+INGRESS = PROJECT_ROOT / "stack" / "ingress.yml"
+DEPENDENCIES = PROJECT_ROOT / "apps" / "api" / "atlas_api" / "dependencies.py"
+
+
+def test_api_receives_only_exact_runtime_event_journal() -> None:
+    content = INGRESS.read_text(encoding="utf-8")
+
+    assert (
+        "/mnt/storage/configs/atlas/runtime/events.jsonl:"
+        "/mnt/storage/configs/atlas/runtime/events.jsonl:rw"
+    ) in content
+    assert (
+        "/mnt/storage/configs/atlas/runtime:"
+        "/mnt/storage/configs/atlas/runtime"
+    ) not in content
+    assert "/mnt/storage/configs/atlas/runtime/subscribers" not in content
+
+
+def test_api_has_dedicated_event_writer_supplemental_group() -> None:
+    content = INGRESS.read_text(encoding="utf-8")
+
+    assert '      - "20000"' in content
+    assert '      - "20001"' in content
+
+
+def test_api_security_audit_path_is_explicit() -> None:
+    content = INGRESS.read_text(encoding="utf-8")
+
+    assert (
+        'ATLAS_SECURITY_AUDIT_PATH: '
+        '"/mnt/storage/configs/atlas/runtime/events.jsonl"'
+    ) in content
+
+
+def test_security_audit_writer_is_composed_as_process_dependency() -> None:
+    content = DEPENDENCIES.read_text(encoding="utf-8")
+
+    assert "def get_security_audit_writer():" in content
+    assert "SecurityAuditWriter.from_environment()" in content
+    assert "audit_publisher=get_security_audit_writer().publish" in content
+
+
+def test_authorization_dependencies_receive_security_audit_writer() -> None:
+    path = (
+        PROJECT_ROOT
+        / "apps"
+        / "api"
+        / "atlas_api"
+        / "security"
+        / "dependencies.py"
+    )
+    content = path.read_text(encoding="utf-8")
+
+    assert "get_security_audit_writer" in content
+    assert "audit_writer=Depends(get_security_audit_writer)" in content
+    assert '"security.authorization.denied"' in content
+
+
+def test_authentication_dependency_audits_pre_service_rejections() -> None:
+    content = DEPENDENCIES.read_text(encoding="utf-8")
+
+    assert '"security.authentication.access_rejected"' in content
+    assert '"security.session.credential_rejected"' in content
+    assert "reason=\"invalid_or_expired\"" in content
+    assert "audit_writer=Depends(get_security_audit_writer)" in content
+
+
+def test_security_state_caches_are_cleared_together() -> None:
+    content = DEPENDENCIES.read_text(encoding="utf-8")
+
+    assert "get_refresh_session_registry.cache_clear()" in content
+    assert "get_login_attempt_limiter.cache_clear()" in content
+    assert "get_security_audit_writer.cache_clear()" in content

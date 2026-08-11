@@ -27,6 +27,7 @@ from .provider import (
 )
 from .repository import (
     JsonMediaRequestRepository,
+    MediaRequestRepositoryConflictError,
     MediaRequestRepositoryError,
 )
 
@@ -158,6 +159,12 @@ class MediaRequestServiceError(RuntimeError):
     """Raised when media-request orchestration cannot complete safely."""
 
 
+class MediaRequestServiceConflictError(
+    MediaRequestServiceError
+):
+    """Raised when an active request already owns the provider target."""
+
+
 class MediaRequestService:
     """Coordinate media-request models, persistence, and providers."""
 
@@ -268,8 +275,21 @@ class MediaRequestService:
                 f"{request.provider}:{request.media_type.value}",
             )
 
+        self._validate_submission(
+            provider,
+            request,
+        )
+
         try:
-            persisted = self.repository.save(request)
+            persisted = (
+                self.repository.save_if_no_active_conflict(
+                    request
+                )
+            )
+        except MediaRequestRepositoryConflictError as exc:
+            raise MediaRequestServiceConflictError(
+                "active media request conflicts with provider target"
+            ) from exc
         except MediaRequestRepositoryError as exc:
             raise MediaRequestServiceError(
                 f"unable to persist media request: {request.request_id}",
@@ -315,6 +335,11 @@ class MediaRequestService:
                 "provider does not support media type: "
                 f"{request.provider}:{request.media_type.value}",
             )
+
+        self._validate_submission(
+            provider,
+            request,
+        )
 
         self._validate_transition(
             request.status,
@@ -622,6 +647,29 @@ class MediaRequestService:
             ) from exc
 
         return capabilities
+
+    @staticmethod
+    def _validate_submission(
+        provider: MediaRequestProvider,
+        request: MediaRequest,
+    ) -> None:
+        try:
+            result = provider.validate_submission(
+                request
+            )
+        except (
+            MediaRequestProviderError,
+            MediaRequestProviderOperationError,
+        ) as exc:
+            raise MediaRequestServiceError(
+                "provider submission preflight failed: "
+                f"{provider.name}",
+            ) from exc
+
+        if result is not None:
+            raise MediaRequestServiceError(
+                "provider validate_submission() must return null",
+            )
 
     def _apply_status_result(
         self,

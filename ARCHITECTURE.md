@@ -344,7 +344,7 @@ Provider adapters translate Atlas contracts into external-system operations.
 Examples include:
 
 - Jellyfin identity and media operations
-- Jellyseerr request workflows
+- Seerr-compatible media discovery and request workflows
 - Sonarr and Radarr automation
 - Prowlarr indexer integration
 - qBittorrent download operations
@@ -576,10 +576,13 @@ Human or JSON Output
 User
   |
   v
-Atlas Portal / Jellyseerr
+Atlas Portal
   |
   v
-Request Management
+Atlas API / Request Management
+  |
+  v
+Seerr provider boundary
   |
   v
 Sonarr / Radarr

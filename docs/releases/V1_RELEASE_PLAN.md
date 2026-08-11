@@ -356,6 +356,47 @@ The complete request lifecycle must be validated:
 The workflow must avoid duplicate submissions, ambiguous status, and silent
 failure.
 
+For television and anime series, the supported Portal must make season scope
+explicit. The implemented source path exposes one positive season at a time,
+uses Atlas-normalized fail-closed requestability, and derives standard TV versus
+anime TV from server-provided classification. A generic TV action must not
+silently interpret an unspecified season as an all-seasons request, and the
+Portal does not expose all-seasons or inferred current-season shortcuts.
+
+At source checkpoint `ad84a30d`, this explicit-season Portal workflow is
+implemented. That source milestone does not certify the production request path.
+When a user requests a supported ongoing series, the v1.0 workflow must still
+preserve downstream monitoring through Seerr and the appropriate Sonarr instance
+so future episodes can be acquired automatically under the configured
+monitoring, quality, and release rules without requiring a new Atlas request per
+episode.
+
+### 8.4.1 Seerr Monitoring and Migration Gate
+
+Series-request certification requires the canonical Seerr runtime rather than
+the legacy deployed Jellyseerr image. The repository pins Seerr v3.4.1, while
+the B3.3.3C read-only runtime review confirmed that the production container
+still uses the legacy `fallenbagel/jellyseerr:latest` lineage and does not expose
+`monitorNewItems`.
+
+The production deployment gate must therefore:
+
+1. create and verify a pre-change backup of the Seerr/Jellyseerr configuration;
+2. verify the mounted configuration directory is writable by the account used
+   by the pinned Seerr image before recreation;
+3. preserve the current image identity and rollback path;
+4. recreate/migrate the service only inside maintenance control;
+5. verify the migrated standard-TV and anime-TV Sonarr service identities still
+   match Atlas's server-owned routing configuration;
+6. set and verify `monitorNewItems=all` on both supported Sonarr services;
+7. verify Atlas API connectivity and request preflight after migration; and
+8. complete production E2E validation for both ongoing standard TV and ongoing
+   anime TV before the monitoring acceptance item is marked complete.
+
+`monitorNewItems` is a Seerr Sonarr-service policy. Atlas must not represent it
+as caller-controlled Request state or silently imply that a season-scope choice
+changes the downstream service policy.
+
 ## 8.5 Favorites and Protection
 
 The favorites workflow must be complete from the user's perspective.
@@ -670,7 +711,18 @@ Certification requires:
 - duplicate or ineligible requests are handled clearly;
 - successful submission produces confirmation;
 - status is visible afterward;
-- failures provide actionable feedback.
+- failures provide actionable feedback;
+- outcome-ambiguous mutations are not automatically replayed;
+- television/anime season scope is explicit before series mutation;
+- unknown or ineligible per-season requestability fails closed to no mutation;
+- the Portal uses server-provided classification for standard TV versus anime TV;
+- no generic, all-seasons, or inferred current-season shortcut bypasses the
+  explicit-season scope;
+- the production request path uses the repository-approved Seerr runtime;
+- both supported Sonarr services have `monitorNewItems=all` verified after
+  migration; and
+- ongoing requested series can remain monitored so future episodes are acquired
+  automatically without requiring per-episode Atlas requests.
 
 ### Favorites and Protection
 

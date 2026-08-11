@@ -35,7 +35,7 @@ export interface AtlasAuthContextValue {
   readonly user: AtlasCurrentUserResponse | null;
   readonly isAuthenticated: boolean;
   readonly login: (credentials: AtlasLoginRequest) => Promise<void>;
-  readonly logout: () => void;
+  readonly logout: () => Promise<void>;
 }
 
 /**

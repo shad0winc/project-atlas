@@ -1,5 +1,11 @@
 """Atlas media-request domain."""
 
+from .discovery import (
+    MediaDiscoveryAvailability,
+    MediaDiscoveryError,
+    MediaDiscoveryItem,
+    MediaDiscoveryPage,
+)
 from .events import (
     MediaRequestEvent,
     MediaRequestEventError,
@@ -31,16 +37,28 @@ from .providers import (
 )
 from .repository import (
     JsonMediaRequestRepository,
+    MediaRequestRepositoryConflictError,
     MediaRequestRepositoryError,
     SCHEMA_VERSION,
 )
 from .service import (
     MediaRequestService,
+    MediaRequestServiceConflictError,
     MediaRequestServiceError,
+)
+from .series import (
+    MediaSeriesDetail,
+    MediaSeriesError,
+    MediaSeriesSeason,
+    MediaSeriesStatus,
 )
 
 __all__ = [
     "BaseMediaRequestHTTPProvider",
+    "MediaDiscoveryAvailability",
+    "MediaDiscoveryError",
+    "MediaDiscoveryItem",
+    "MediaDiscoveryPage",
     "JellyseerrMediaRequestProvider",
     "JsonMediaRequestRepository",
     "MediaRequest",
@@ -52,11 +70,17 @@ __all__ = [
     "MediaRequestProvider",
     "MediaRequestProviderError",
     "MediaRequestProviderOperationError",
+    "MediaRequestRepositoryConflictError",
     "MediaRequestRepositoryError",
     "MediaRequestService",
+    "MediaRequestServiceConflictError",
     "MediaRequestServiceError",
     "MediaRequestStatus",
     "MediaRequestType",
+    "MediaSeriesDetail",
+    "MediaSeriesError",
+    "MediaSeriesSeason",
+    "MediaSeriesStatus",
     "ProviderCapabilities",
     "ProviderEventContext",
     "ProviderHealth",

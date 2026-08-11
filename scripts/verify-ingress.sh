@@ -76,6 +76,7 @@ fi
 check_command \
   "Ingress Compose configuration valid" \
   docker compose \
+    --env-file "$PROJECT_DIR/.env" \
     -p "$COMPOSE_PROJECT" \
     -f "$COMPOSE_FILE" \
     config --quiet

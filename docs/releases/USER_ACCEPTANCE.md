@@ -443,7 +443,46 @@ Manual + Runtime
 ### Expected Result
 
 The request is submitted once, confirmation is clear, and the resulting request
-status is visible to the user.
+status is visible to the user. Duplicate or stale eligibility must not produce a
+second provider submission, and an outcome-ambiguous mutation must not be
+silently retried.
+
+### Series and Anime Acceptance Requirement
+
+Atlas v1.0 must also validate the implemented television and anime-series
+explicit-season request journey in the production runtime.
+
+Certification requires:
+
+- the Portal exposes truthful per-season availability/requestability and fails
+  closed when that state is unknown or ineligible;
+- the user explicitly chooses one intended positive season scope rather than a
+  generic, all-seasons, or inferred current-season action;
+- the Portal derives standard TV versus anime TV from server-provided
+  classification rather than browser title/genre inference;
+- television and anime-series requests reach the appropriate supported
+  downstream automation path;
+- the production request path runs on the repository-approved Seerr runtime,
+  not the legacy deployed Jellyseerr image;
+- the migrated standard-TV and anime-TV Sonarr service IDs match Atlas's
+  server-owned routing configuration;
+- `monitorNewItems=all` is verified on both supported Seerr Sonarr services;
+- an ongoing requested series can remain monitored through Seerr and Sonarr or
+  Sonarr Anime so newly released episodes can be acquired automatically under
+  the configured monitoring, quality, and release rules; and
+- the user is not required to create a new Atlas request for every future
+  episode of an already monitored ongoing series.
+
+The monitoring policy is service-owned. Season scope selected by the user is
+Atlas Request state; `monitorNewItems` is not a caller-controlled Request field
+and must not be presented as a per-request toggle.
+
+At source checkpoint `ad84a30d`, Atlas has normalized TV-series/season metadata,
+fail-closed per-season requestability, explicit server-owned TV/anime-TV routing
+and submission preflight, and Portal explicit one-season mutation. Source
+completion does not certify production. The controlled Seerr migration,
+post-migration route verification, `monitorNewItems=all` validation, and
+ongoing-series production E2E acceptance remain open.
 
 ### Observed Result
 
@@ -1227,6 +1266,9 @@ Validate:
 - [ ] Dashboard loading provides visible progress.
 - [ ] Search provides visible progress.
 - [ ] Request submission prevents accidental duplicate action.
+- [ ] Outcome-ambiguous Request submission is not automatically retried.
+- [ ] Ongoing TV/anime monitoring acquires future episodes without per-episode
+      Atlas requests once the supported series-request workflow is enabled.
 - [ ] Favorites update without misleading delay.
 - [ ] Administrator lists and details remain responsive.
 - [ ] Health data loads within an acceptable operational window.

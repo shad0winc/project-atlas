@@ -19,15 +19,15 @@ atlas_update_validate_migration() {
 }
 
 atlas_update_core_apply() {
-  docker compose -f "$ATLAS_PROJECT_DIR/docker-compose.yml" pull || return 1
-  docker compose -f "$ATLAS_PROJECT_DIR/docker-compose.yml" up -d || return 1
+  docker compose --env-file "$ATLAS_PROJECT_DIR/.env" -f "$ATLAS_PROJECT_DIR/docker-compose.yml" pull || return 1
+  docker compose --env-file "$ATLAS_PROJECT_DIR/.env" -f "$ATLAS_PROJECT_DIR/docker-compose.yml" up -d || return 1
 }
 
 atlas_update_ingress_apply() {
   local compose_file="$ATLAS_PROJECT_DIR/stack/ingress.yml"
-  docker compose -f "$compose_file" pull caddy || return 1
-  docker compose -f "$compose_file" build portal api || return 1
-  docker compose -f "$compose_file" up -d || return 1
+  docker compose --env-file "$ATLAS_PROJECT_DIR/.env" -f "$compose_file" pull caddy || return 1
+  docker compose --env-file "$ATLAS_PROJECT_DIR/.env" -f "$compose_file" build portal api || return 1
+  docker compose --env-file "$ATLAS_PROJECT_DIR/.env" -f "$compose_file" up -d || return 1
 }
 
 atlas_update_apply_scope() {

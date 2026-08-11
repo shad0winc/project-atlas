@@ -3,6 +3,9 @@ services:
     build:
       context: ../..
       dockerfile: modules/notifications/Dockerfile
+      args:
+        PUID: "${PUID:?PUID is required}"
+        PGID: "${PGID:?PGID is required}"
 
     container_name: atlas-notifications-worker
     restart: unless-stopped
@@ -15,8 +18,13 @@ services:
 
     volumes:
       - /opt/project-atlas:/opt/project-atlas:ro
-      - /mnt/storage/configs/atlas/runtime:/mnt/storage/configs/atlas/runtime
+      - /mnt/storage/configs/atlas/runtime/events.jsonl:/mnt/storage/configs/atlas/runtime/events.jsonl:ro
+      - /mnt/storage/configs/atlas/runtime/subscribers/module-notifications.cursor:/mnt/storage/configs/atlas/runtime/subscribers/module-notifications.cursor
+      - /mnt/storage/configs/atlas/runtime/subscribers/module-notifications.filter:/mnt/storage/configs/atlas/runtime/subscribers/module-notifications.filter:ro
       - /mnt/storage/configs/atlas/notifications:/mnt/storage/configs/atlas/notifications
+
+    security_opt:
+      - no-new-privileges:true
 
     mem_limit: 128m
     cpus: 0.50

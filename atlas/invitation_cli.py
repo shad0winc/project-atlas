@@ -25,7 +25,7 @@ def _days(a):
     except (TypeError,ValueError) as exc: raise InvitationError('ATLAS_INVITE_EXPIRATION_DAYS must be an integer') from exc
     if value<=0: raise InvitationError('invitation expiration days must be greater than zero')
     return value
-def _url(token,base): return f"{(base or os.getenv('ATLAS_BASE_URL','http://atlas.local')).rstrip('/')}/register?token={quote(token,safe='')}"
+def _url(token,base): return f"{(base or os.getenv('ATLAS_BASE_URL','http://atlas.local')).rstrip('/')}/register#token={quote(token,safe='')}"
 def _json(v): print(json.dumps(v,indent=2,sort_keys=True))
 def main(argv:Sequence[str]|None=None)->int:
     a=_parser().parse_args(argv); store=_store(a)

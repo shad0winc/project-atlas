@@ -4,7 +4,7 @@ import { MediaPageClient } from "./MediaPageClient";
 
 export const metadata: Metadata = {
   title: "Media",
-  description: "Review Project Atlas media libraries and collection statistics."
+  description: "Browse and search movies and TV shows through Project Atlas."
 };
 
 export default function MediaPage(): React.ReactElement {

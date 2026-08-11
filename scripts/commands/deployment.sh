@@ -164,7 +164,7 @@ atlas_deployment_capture_images() {
     compose_file="$ATLAS_PROJECT_DIR/$compose_relative"
     [[ -f "$compose_file" ]] || return 1
 
-    identifiers="$(docker compose -f "$compose_file" ps -q)" || return 1
+    identifiers="$(docker compose --env-file "$ATLAS_PROJECT_DIR/.env" -f "$compose_file" ps -q)" || return 1
     [[ -n "${identifiers//[[:space:]]/}" ]] || return 1
 
     while IFS= read -r container; do
@@ -439,6 +439,7 @@ atlas_deployment_restore_surface() {
   (
     cd "$recovery"
     docker compose \
+      --env-file "$recovery/.env" \
       --project-name "$project" \
       -f "$recovery/$compose_relative" \
       up -d --no-build --pull never

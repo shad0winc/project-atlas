@@ -4,7 +4,58 @@ All notable changes to Project Atlas are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added Seerr-backed Media discovery/search through the Atlas API and the
+  authenticated `/portal/media` experience without exposing browser-to-provider
+  access or rendering raw provider media identifiers.
+- Added self-scoped Personal Request creation to the Portal and an eligible
+  movie Request action guarded by `requests.create`, with per-card mutation
+  feedback, zero automatic POST retries, and safe stale-conflict handling.
+- Added global active-target uniqueness for Media Requests using the persistent
+  `requests.lock` sidecar and `fcntl.flock()` so the duplicate check and initial
+  `PENDING` persistence are serialized across concurrent writers before any
+  provider submission can occur.
+- Added normalized TV-series detail, season metadata, ongoing-state derivation,
+  and anime classification through the Atlas read boundary while excluding
+  Specials (`season 0`) from normal request scope.
+- Added fail-closed per-season availability and requestability normalization so
+  the Portal can distinguish known requestable seasons from tracked,
+  provider-requested, unknown, or malformed provider state.
+- Added explicit one-season TV and anime-TV Request actions to the Portal. The
+  browser consumes Atlas-normalized season state, derives `tv` versus `anime_tv`
+  only from server-provided anime classification, and does not expose generic
+  TV, all-seasons, or current-season shortcuts.
+- Added deterministic Media Request submission preflight and explicit
+  server-owned Seerr routing for standard TV and anime TV so missing or invalid
+  routing fails before new Request persistence or provider HTTP.
+- Established Seerr ongoing-series monitoring ownership as a service-level
+  runtime concern: the canonical repository image is pinned to Seerr v3.4.1,
+  while production migration, `monitorNewItems=all` verification for both
+  Sonarr routes, and end-to-end future-episode validation remain release gates.
+- Added a Docker healthcheck to the repository-pinned Seerr service using the
+  unauthenticated public-settings endpoint, while preserving the pinned image,
+  `init: true`, existing configuration path, and current dependency topology.
+  Production remains on the legacy Jellyseerr runtime until the controlled
+  migration and post-migration acceptance gates are completed.
+
 ### Fixed
+
+- Completed the M-023.26 Security engineering review across authentication,
+  authorization, invitations, sessions, reverse proxy and API exposure,
+  secret storage, audit events, dependency/image risk, network trust
+  boundaries, and least privilege.
+- Hardened first-party Notifications and Sports module images to run as the
+  operator-mapped non-root `atlas` identity, require explicit PUID/PGID build
+  inputs, prevent privilege escalation, and fail closed before recreation when
+  writable-state ownership or Runtime Bus access is incompatible.
+- Narrowed Notifications Runtime Bus mounts to its event journal, cursor, and
+  filter; removed the obsolete Sports private scheduler/runtime mount
+  capability; and preserved deployment-time ownership migration as an explicit
+  maintenance-controlled operation.
+- Preserved final v1.0 Security Acceptance as a separate release gate requiring
+  current vulnerability evidence, controlled runtime validation, documented
+  residual limitations, and explicit approval.
 
 - Completed M-023.25 Backup and Recovery with a versioned state-complete
   recovery format, explicit authoritative-state ownership, protected archive

@@ -13,6 +13,7 @@ import pytest
 from atlas.media_requests import (
     JsonMediaRequestRepository,
     MediaRequest,
+    MediaRequestRepositoryConflictError,
     MediaRequestRepositoryError,
     MediaRequestStatus,
     MediaRequestType,
@@ -166,6 +167,192 @@ def test_requests_without_provider_request_id_can_repeat(
     repository.save(second)
 
     assert repository.list() == (first, second)
+
+
+def test_strict_save_rejects_active_duplicate_across_users(
+    repository: JsonMediaRequestRepository,
+) -> None:
+    first = make_request(
+        provider_request_id=None,
+    )
+    second = make_request(
+        request_id="request-002",
+        user_id="user-002",
+        provider_request_id=None,
+        title="Same provider target, different title",
+        year=2015,
+    )
+
+    repository.save_if_no_active_conflict(first)
+
+    with pytest.raises(
+        MediaRequestRepositoryConflictError,
+        match="active media request conflicts",
+    ):
+        repository.save_if_no_active_conflict(second)
+
+    assert repository.list() == (first,)
+
+
+def test_strict_save_treats_jellyseerr_anime_movie_as_movie(
+    repository: JsonMediaRequestRepository,
+) -> None:
+    first = make_request(
+        provider_request_id=None,
+        media_type=MediaRequestType.MOVIE,
+    )
+    second = make_request(
+        request_id="request-002",
+        user_id="user-002",
+        provider_request_id=None,
+        media_type=MediaRequestType.ANIME_MOVIE,
+    )
+
+    repository.save_if_no_active_conflict(first)
+
+    with pytest.raises(
+        MediaRequestRepositoryConflictError,
+        match="active media request conflicts",
+    ):
+        repository.save_if_no_active_conflict(second)
+
+
+@pytest.mark.parametrize(
+    ("existing_season", "candidate_season"),
+    (
+        (None, None),
+        (None, 1),
+        (1, None),
+        (1, 1),
+    ),
+)
+def test_strict_save_rejects_overlapping_tv_seasons(
+    repository: JsonMediaRequestRepository,
+    existing_season: int | None,
+    candidate_season: int | None,
+) -> None:
+    first = make_request(
+        provider_request_id=None,
+        media_type=MediaRequestType.TV,
+        season_number=existing_season,
+    )
+    second = make_request(
+        request_id="request-002",
+        user_id="user-002",
+        provider_request_id=None,
+        media_type=MediaRequestType.ANIME_TV,
+        season_number=candidate_season,
+    )
+
+    repository.save_if_no_active_conflict(first)
+
+    with pytest.raises(
+        MediaRequestRepositoryConflictError,
+        match="active media request conflicts",
+    ):
+        repository.save_if_no_active_conflict(second)
+
+
+def test_strict_save_allows_different_explicit_tv_seasons(
+    repository: JsonMediaRequestRepository,
+) -> None:
+    first = make_request(
+        provider_request_id=None,
+        media_type=MediaRequestType.TV,
+        season_number=1,
+    )
+    second = make_request(
+        request_id="request-002",
+        user_id="user-002",
+        provider_request_id=None,
+        media_type=MediaRequestType.ANIME_TV,
+        season_number=2,
+    )
+
+    repository.save_if_no_active_conflict(first)
+    repository.save_if_no_active_conflict(second)
+
+    assert repository.list() == (first, second)
+
+
+def test_strict_save_allows_target_after_terminal_history(
+    repository: JsonMediaRequestRepository,
+) -> None:
+    first = make_request(
+        provider_request_id=None,
+        status=MediaRequestStatus.CANCELLED,
+    )
+    second = make_request(
+        request_id="request-002",
+        user_id="user-002",
+        provider_request_id=None,
+    )
+
+    repository.save(first)
+    repository.save_if_no_active_conflict(second)
+
+    assert repository.list() == (first, second)
+
+
+def test_strict_save_acquires_process_lock(
+    repository: JsonMediaRequestRepository,
+) -> None:
+    repository.initialize()
+
+    request = make_request(
+        provider_request_id=None,
+    )
+
+    with patch(
+        "atlas.media_requests.repository.fcntl.flock"
+    ) as flock:
+        repository.save_if_no_active_conflict(
+            request
+        )
+
+    assert flock.call_count == 2
+    assert flock.call_args_list[0].args[1] == (
+        __import__("fcntl").LOCK_EX
+    )
+    assert flock.call_args_list[1].args[1] == (
+        __import__("fcntl").LOCK_UN
+    )
+
+
+def test_all_registry_mutations_acquire_process_lock(
+    repository: JsonMediaRequestRepository,
+) -> None:
+    repository.initialize()
+
+    original = make_request(
+        provider_request_id=None,
+    )
+    replacement = make_request(
+        provider_request_id=None,
+        status=MediaRequestStatus.APPROVED,
+        updated_at="2026-08-02T20:30:00Z",
+    )
+
+    with patch(
+        "atlas.media_requests.repository.fcntl.flock"
+    ) as flock:
+        repository.save(original)
+        repository.replace(replacement)
+        repository.delete(original.request_id)
+
+    operations = [
+        call.args[1]
+        for call in flock.call_args_list
+    ]
+
+    assert operations == [
+        __import__("fcntl").LOCK_EX,
+        __import__("fcntl").LOCK_UN,
+        __import__("fcntl").LOCK_EX,
+        __import__("fcntl").LOCK_UN,
+        __import__("fcntl").LOCK_EX,
+        __import__("fcntl").LOCK_UN,
+    ]
 
 
 def test_replace_updates_existing_request(
