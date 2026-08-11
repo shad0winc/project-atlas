@@ -8,7 +8,9 @@ export { MediaDiscoveryContent, MediaDiscoveryView } from "./components/MediaDis
 
 export type {
   MediaDiscoveryRequestAction,
-  MediaDiscoveryRequestActions
+  MediaDiscoveryRequestActions,
+  MediaDiscoverySeriesState,
+  MediaDiscoverySeriesStates
 } from "./components/MediaDiscoveryView";
 export { MediaError } from "./components/MediaError";
 export { MediaLibraryCard } from "./components/MediaLibraryCard";
@@ -33,6 +35,23 @@ export { useMedia } from "./hooks/use-media";
 export type { UseMediaResult } from "./hooks/use-media";
 
 export { readMediaDiscovery, searchMediaDiscovery } from "./services/discovery";
+
+export { readMediaSeriesDetail } from "./services/series";
+export type { ReadMediaSeriesDetailOptions } from "./services/series";
+
+export {
+  MEDIA_SERIES_STATUSES,
+  createMediaSeriesDetail,
+  createMediaSeriesSeason,
+  mediaSeriesRequestType
+} from "./types/series";
+
+export type {
+  MediaSeriesDetail,
+  MediaSeriesRequestType,
+  MediaSeriesSeason,
+  MediaSeriesStatus
+} from "./types/series";
 export { readMediaSnapshot } from "./services/media";
 export type { ReadMediaSnapshotOptions } from "./services/media";
 
