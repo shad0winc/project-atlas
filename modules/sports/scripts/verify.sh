@@ -4,6 +4,7 @@ set -euo pipefail
 PROJECT_DIR="/opt/project-atlas"
 ATLAS_CONFIG_FILE="$PROJECT_DIR/config/atlas.conf"
 MODULE_ENV_FILE="$PROJECT_DIR/modules/sports/.env"
+OPERATOR_ENV_FILE="$PROJECT_DIR/.env"
 
 source "$ATLAS_CONFIG_FILE"
 
@@ -33,7 +34,11 @@ check "Sports output directory present" test -d "$ATLAS_CONFIG_ROOT/sportyfin/ou
 check "Sports logs directory present" test -d "$ATLAS_CONFIG_ROOT/sportyfin/logs"
 check "Sports state directory present" test -d "$ATLAS_CONFIG_ROOT/sportyfin/state"
 check "Sports media directory present" test -d "$ATLAS_MEDIA_ROOT/Sports"
-check "Module compose valid" docker compose -f "$ATLAS_PROJECT_DIR/modules/sports/docker-compose.yml" config
+check "Module compose valid" \
+  docker compose \
+    --env-file "$OPERATOR_ENV_FILE" \
+    -f "$ATLAS_PROJECT_DIR/modules/sports/docker-compose.yml" \
+    config
 check "Module metadata present" test -f "$ATLAS_PROJECT_DIR/modules/sports/module.conf"
 check "Module environment example present" test -f "$ATLAS_PROJECT_DIR/modules/sports/.env.example"
 check "Module environment present" test -f "$MODULE_ENV_FILE"
