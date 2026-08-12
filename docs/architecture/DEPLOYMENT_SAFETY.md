@@ -364,3 +364,50 @@ durable rollback references. Validation then established:
 The historical premature `v1.0.0` tag remains intentionally untouched and is
 still an explicit release-certification blocker. Its reconciliation belongs to
 final v1.0 release work, not Deployment Safety.
+
+## E2.5 Migration Recovery Lessons
+
+The first controlled E2.5 Jellyseerr-to-Seerr migration attempt added production
+evidence to the deployment-safety contract.
+
+The attempt did not complete successfully. Atlas preserved maintenance mode,
+deployment-lock ownership, the previous verified baseline, and the failed
+transaction until explicit recovery established a known-safe runtime. Recovery
+restored the legacy Jellyseerr service and did not rewrite the failed migration
+as a successful deployment.
+
+The recovery also exposed a runtime-ownership dependency outside the primary
+migration target: recreating the Sports controller failed because its configured
+non-root identity could not write required heartbeat and recording state.
+
+The incident establishes the following permanent deployment rules:
+
+1. **Recovery scope must include required dependent runtime contracts.**
+   A service can be correctly defined in source yet still fail recovery when
+   persistent writable paths do not match its effective runtime identity.
+
+2. **Non-root runtime ownership is a deployment prerequisite.**
+   Install, update, migration, and recovery paths that recreate a non-root
+   service must establish and verify ownership of that service's declared
+   writable runtime surfaces before health is expected to pass.
+
+3. **Recovery must remain isolated.**
+   Recovery of a failed target must not unnecessarily recreate unrelated healthy
+   services. Target-artifact selection and Compose operations must remain
+   explicitly bounded.
+
+4. **Recovery success is health-based, not command-based.**
+   A successful container recreation command is not sufficient. Required
+   heartbeat, module verification, Doctor, provider, and affected runtime checks
+   must pass before recovery can be finalized.
+
+5. **Failed transaction history is immutable audit evidence.**
+   Forward recovery or rollback may establish a new safe state, but it must not
+   rewrite the original failed deployment outcome as success.
+
+6. **Maintenance and lock release are terminal actions.**
+   They occur only after the recovered production surface passes the required
+   verification gates and the transaction reaches its defined terminal state.
+
+These rules extend the existing rollback and forward-recovery architecture; they
+do not create a second deployment or lifecycle system.

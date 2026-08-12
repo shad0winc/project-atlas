@@ -542,6 +542,18 @@ All notable changes to Project Atlas are documented in this file.
 
 ## [1.0.0] — Production Foundation
 
+### Release Hardening
+
+- Completed the first controlled E2.5 Jellyseerr-to-Seerr migration attempt under the Atlas deployment transaction.
+- The migration did not complete and is not certified as successful; Atlas failed closed with maintenance enabled and the deployment lock retained for explicit recovery.
+- Recovery restored the legacy Jellyseerr runtime and preserved the failed transaction as audit evidence rather than rewriting the outcome.
+- Recovery exposed a Sports runtime ownership defect on writable state and recording paths for the configured `atlas` runtime identity (`1000:1000`).
+- Corrected the bounded Sports writable-path ownership, recreated the controller, verified a fresh heartbeat, and returned the Sports module to healthy operation.
+- Final recovery verification returned `atlas doctor` to 100%, preserved the verified deployment baseline, disabled maintenance only after successful validation, and released the deployment lock.
+- Hardened deployment/update and Sports lifecycle contracts from the production evidence before a second Seerr migration attempt.
+- The deployed Seerr migration, `monitorNewItems=all` verification, routing validation, ongoing-series production E2E validation, and final v1.0 release certification remain open.
+
+
 ### Added
 
 #### Atlas Retention Intelligence
