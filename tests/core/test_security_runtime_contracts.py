@@ -59,7 +59,7 @@ def test_operational_compose_calls_use_explicit_operator_environment() -> None:
         encoding="utf-8"
     )
 
-    assert update.count('--env-file "$ATLAS_PROJECT_DIR/.env"') == 5
+    assert update.count('--env-file "$ATLAS_PROJECT_DIR/.env"') == 6
     assert '--env-file "$PROJECT_DIR/.env"' in verify
 
 

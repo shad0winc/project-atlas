@@ -65,7 +65,37 @@ def prepare_runtime(tmp_path: Path, *, branch: str = "main") -> dict[str, str]:
         """
         #!/usr/bin/env bash
         set -euo pipefail
+
         echo "docker $*" >> "$ATLAS_TEST_EVENTS"
+
+        args=" $* "
+
+        if [[ "$args" == *" compose "* && "$args" == *" config --images "* ]]; then
+          if [[ "$args" == *" stack/ingress.yml "* ]]; then
+            printf '%s\\n' \
+              'atlas-api:test' \
+              'atlas-portal:test' \
+              'caddy:test'
+          else
+            printf '%s\\n' \
+              'core:test' \
+              'dependency:test'
+          fi
+          exit 0
+        fi
+
+        if [[ "$args" == *" image inspect "* ]]; then
+          image="${@: -1}"
+
+          if [[ -n "${ATLAS_TEST_MISSING_IMAGE:-}" ]] &&
+             [[ "$image" == "$ATLAS_TEST_MISSING_IMAGE" ]]
+          then
+            exit 1
+          fi
+
+          exit 0
+        fi
+
         exit "${ATLAS_TEST_DOCKER_STATUS:-0}"
         """,
     )
@@ -211,21 +241,49 @@ def test_diverged_main_is_rejected_before_runtime_mutation(tmp_path: Path) -> No
     assert not lock_path(environment).exists()
 
 
-def test_core_update_orders_backup_before_apply_and_reopens_on_success(tmp_path: Path) -> None:
+def test_core_update_preflights_artifacts_before_maintenance_and_reopens_on_success(
+    tmp_path: Path,
+) -> None:
     environment = prepare_runtime(tmp_path)
 
     result = run_update(environment, "core")
 
     assert result.returncode == 0, result.stderr
     events = event_lines(environment)
-    assert events[0:4] == [
-        "preserve-rollback-images",
-        "doctor",
-        "maintenance:enable",
-        "backup",
+
+    preserve = events.index("preserve-rollback-images")
+    doctor = events.index("doctor")
+    pull = next(
+        index
+        for index, event in enumerate(events)
+        if "docker compose" in event and event.endswith(" pull")
+    )
+    render = next(
+        index
+        for index, event in enumerate(events)
+        if "docker compose" in event and "config --images" in event
+    )
+    inspections = [
+        index
+        for index, event in enumerate(events)
+        if event.startswith("docker image inspect ")
     ]
-    assert events[4].startswith("docker compose")
-    assert events[5].startswith("docker compose")
+    maintenance = events.index("maintenance:enable")
+    backup = events.index("backup")
+    apply = next(
+        index
+        for index, event in enumerate(events)
+        if "docker compose" in event
+        and "up -d" in event
+        and "--no-build" in event
+        and "--pull never" in event
+    )
+
+    assert inspections
+    assert preserve < doctor < pull < render
+    assert all(render < inspection < maintenance for inspection in inspections)
+    assert maintenance < backup < apply
+
     assert events[-3:] == ["maintenance:disable", "doctor", "verify"]
     assert not lock_path(environment).exists()
     assert not any("image prune" in event for event in events)
@@ -238,12 +296,20 @@ def test_backup_failure_keeps_maintenance_and_lock(tmp_path: Path) -> None:
     result = run_update(environment)
 
     assert result.returncode != 0
-    assert event_lines(environment) == [
-        "preserve-rollback-images",
-        "doctor",
-        "maintenance:enable",
-        "backup",
-    ]
+
+    events = event_lines(environment)
+
+    assert events[0] == "preserve-rollback-images"
+    assert events[1] == "doctor"
+    assert any(event.endswith(" pull") for event in events)
+    assert any("config --images" in event for event in events)
+    assert any(event.startswith("docker image inspect ") for event in events)
+
+    maintenance = events.index("maintenance:enable")
+    backup = events.index("backup")
+
+    assert maintenance < backup
+    assert backup == len(events) - 1
     assert lock_path(environment).is_dir()
     assert "Maintenance mode remains enabled" in result.stderr
 
@@ -261,18 +327,41 @@ def test_post_verify_failure_keeps_maintenance_and_lock(tmp_path: Path) -> None:
     assert lock_path(environment).is_dir()
 
 
-def test_ingress_scope_builds_ingress_and_runs_ingress_verifier(tmp_path: Path) -> None:
+def test_ingress_scope_prepares_builds_and_applies_without_network_in_maintenance(
+    tmp_path: Path,
+) -> None:
     environment = prepare_runtime(tmp_path)
 
     result = run_update(environment, "ingress")
 
     assert result.returncode == 0, result.stderr
+
     events = event_lines(environment)
-    assert any("pull caddy" in event for event in events)
-    assert any("build portal api" in event for event in events)
-    assert any("up -d" in event for event in events)
+
+    pull = next(
+        index for index, event in enumerate(events) if "pull caddy" in event
+    )
+    build = next(
+        index for index, event in enumerate(events) if "build portal api" in event
+    )
+    render = next(
+        index for index, event in enumerate(events) if "config --images" in event
+    )
+    maintenance = events.index("maintenance:enable")
+    apply = next(
+        index
+        for index, event in enumerate(events)
+        if "up -d" in event
+        and "--no-build" in event
+        and "--pull never" in event
+    )
+
+    assert pull < build < render < maintenance < apply
+
     assert events.count("ingress-verify") == 2
+
     disable = events.index("maintenance:disable")
+
     assert events.index("ingress-verify") < disable
     assert events.index("ingress-verify", disable + 1) > disable
 
@@ -338,3 +427,36 @@ def test_standalone_update_delegates_to_canonical_atlas_cli() -> None:
     assert 'exec "$project_dir/scripts/atlas" update "$@"' in content
     assert "docker compose" not in content
     assert "docker image prune" not in content
+
+
+def test_missing_target_image_aborts_before_maintenance_or_apply(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_MISSING_IMAGE"] = "dependency:test"
+
+    result = run_update(environment, "core")
+
+    assert result.returncode != 0
+
+    events = event_lines(environment)
+
+    assert events[0] == "preserve-rollback-images"
+    assert events[1] == "doctor"
+    assert any(event.endswith(" pull") for event in events)
+    assert any("config --images" in event for event in events)
+    assert "docker image inspect dependency:test" in events
+
+    assert "maintenance:enable" not in events
+    assert "backup" not in events
+    assert not any(
+        "up -d" in event
+        for event in events
+        if event.startswith("docker compose")
+    )
+
+    assert not lock_path(environment).exists()
+    assert (
+        "target image completeness verification failed before maintenance"
+        in result.stderr
+    )
