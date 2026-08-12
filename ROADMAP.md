@@ -755,6 +755,10 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
   - [x] Verify healthy backends plus public HTTP 503 isolation during maintenance
   - [x] Reverify public ingress after maintenance before publishing a new baseline
   - [x] Complete controlled production failure, recovery, and repair validation
+  - [x] Validate failed migration ownership through maintenance and deployment-lock retention
+  - [x] Validate explicit recovery without rewriting the failed deployment outcome
+  - [x] Repair and verify Sports writable-runtime ownership discovered during production recovery
+  - [x] Harden target-artifact, isolation, lifecycle-ordering, and recovery contracts from E2.5 attempt #1
 
 ### Backup and Recovery
 

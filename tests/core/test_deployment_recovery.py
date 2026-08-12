@@ -184,3 +184,78 @@ def test_rollback_reopens_traffic_only_after_verification() -> None:
     release = section.rindex("atlas_deployment_release_lock")
     set_current = section.index("atlas_deployment_set_current", disable)
     assert doctor < verify < disable < public_verify < set_current < release
+
+
+def test_update_prepares_and_verifies_target_artifacts_before_maintenance() -> None:
+    content = UPDATE.read_text(encoding="utf-8")
+    section = content.split("atlas_command_update() {", 1)[1]
+
+    doctor = section.index("atlas_command_doctor")
+    prepare = section.index('atlas_update_prepare_scope "$scope"')
+    verify = section.index('atlas_update_verify_target_images "$scope"')
+    maintenance = section.index("atlas_command_maintenance enable")
+    backup = section.index("atlas_command_backup")
+    apply = section.index('atlas_update_apply_scope "$scope"')
+
+    assert doctor < prepare < verify < maintenance < backup < apply
+
+
+def test_update_verifies_every_rendered_target_image_is_local() -> None:
+    content = UPDATE.read_text(encoding="utf-8")
+    section = content.split(
+        "atlas_update_verify_compose_images() {",
+        1,
+    )[1].split(
+        "atlas_update_verify_target_images() {",
+        1,
+    )[0]
+
+    assert "config --images" in section
+    assert "LC_ALL=C sort -u" in section
+    assert 'docker image inspect "$image"' in section
+    assert "target image is not locally available" in section
+    assert "target Compose image set is empty" in section
+
+
+def test_update_apply_is_network_and_build_independent() -> None:
+    content = UPDATE.read_text(encoding="utf-8")
+
+    core = content.split("atlas_update_core_apply() {", 1)[1].split(
+        "atlas_update_ingress_apply() {",
+        1,
+    )[0]
+
+    ingress = content.split("atlas_update_ingress_apply() {", 1)[1].split(
+        "atlas_update_apply_scope() {",
+        1,
+    )[0]
+
+    for section in (core, ingress):
+        assert "--no-build" in section
+        assert "--pull never" in section
+        assert "\n    pull" not in section
+        assert "\n    build" not in section
+
+
+def test_update_acquires_network_artifacts_only_before_maintenance() -> None:
+    content = UPDATE.read_text(encoding="utf-8")
+
+    core_prepare = content.split(
+        "atlas_update_core_prepare() {",
+        1,
+    )[1].split(
+        "atlas_update_ingress_prepare() {",
+        1,
+    )[0]
+
+    ingress_prepare = content.split(
+        "atlas_update_ingress_prepare() {",
+        1,
+    )[1].split(
+        "atlas_update_prepare_scope() {",
+        1,
+    )[0]
+
+    assert "\n    pull" in core_prepare
+    assert "\n    pull caddy" in ingress_prepare
+    assert "\n    build portal api" in ingress_prepare

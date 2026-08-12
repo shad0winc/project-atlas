@@ -233,3 +233,39 @@ This decision does not:
 - declare all persistent state backups certified;
 - automatically rewrite or delete the premature `v1.0.0` tag; or
 - make every production failure automatically reversible.
+
+## E2.5 Production Evidence
+
+The first controlled E2.5 Jellyseerr-to-Seerr migration attempt confirmed the
+ADR's fail-closed transaction model and exposed an additional recovery
+requirement.
+
+The migration failed without reopening user traffic or releasing transaction
+ownership. Atlas retained maintenance mode, the deployment lock, the previous
+verified baseline, and the failed transaction until explicit recovery completed.
+
+Recovery restored the legacy Jellyseerr runtime. During that recovery, the
+Sports controller could not become healthy because its effective non-root
+runtime identity lacked write ownership for required persistent heartbeat and
+recording paths.
+
+The resulting architectural clarification is:
+
+> A deployment or recovery transaction that recreates a non-root service must
+> establish and verify the declared writable-runtime ownership required by that
+> service before the service can satisfy post-change health gates.
+
+This is part of the existing deployment prerequisite and verification boundary,
+not a new lifecycle abstraction.
+
+Recovery operations must also remain bounded to the intended target and its
+declared dependencies. Healthy unrelated services must not be recreated merely
+because they share a broader Compose or operational environment.
+
+Finally, recovery establishes a new safe state without changing the historical
+meaning of the failed transaction. Failed deployment records remain audit
+evidence even when rollback or forward recovery subsequently succeeds.
+
+These clarifications preserve the existing decision that maintenance mode and
+deployment-lock ownership remain in force until deterministic post-recovery
+verification succeeds.

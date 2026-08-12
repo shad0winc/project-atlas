@@ -6158,3 +6158,89 @@ Production still requires the controlled Jellyseerr-to-Seerr migration,
 post-migration route verification, `monitorNewItems=all` verification for both
 supported Sonarr services, ongoing-series production E2E acceptance, and final
 v1.0 release certification.
+
+---
+
+# 2026-08-12
+
+## M-023.27C — E2.5 Attempt #1 Recovery and Release-Hardening Reconciliation
+
+### Objective
+
+Reconcile the first controlled E2.5 Jellyseerr-to-Seerr production migration
+attempt and its recovery lessons into the permanent v1.0 release documentation
+without representing the failed migration as successful or closing the remaining
+production acceptance gates.
+
+### Production Evidence
+
+The controlled migration ran through the Atlas deployment-safety boundary with
+maintenance mode, deployment-lock ownership, recovery evidence, and explicit
+transaction state.
+
+The migration did not complete successfully. Atlas failed closed:
+
+- maintenance remained enabled;
+- the deployment lock remained owned by transaction
+  `seerr-migration-20260812T011023Z-3592826`;
+- the failed transaction remained recorded;
+- the previous verified deployment baseline remained authoritative; and
+- recovery required an explicit operator-controlled continuation.
+
+Recovery restored the legacy Jellyseerr runtime rather than silently accepting
+the incomplete Seerr migration.
+
+During recovery, recreation of the Sports controller exposed a separate runtime
+ownership defect. The configured Sports runtime identity was `1000:1000`, while
+writable Sports state and recording paths were not writable by that identity.
+The controller therefore failed to write its heartbeat and recording metadata.
+
+A bounded ownership repair corrected only the declared Sports writable runtime
+paths, including Sports state, recording metadata, and Sports media storage.
+After recreation:
+
+- the Sports controller became healthy;
+- the controller heartbeat became fresh;
+- Sports provider and feed verification passed;
+- the complete Sports module verification passed;
+- `atlas doctor` returned Overall Status `HEALTHY` with a 100% score;
+- the recovered service surface passed;
+- legacy Jellyseerr rollback state passed;
+- the failed transaction record was finalized;
+- maintenance was disabled only after successful recovery verification; and
+- the deployment lock was released.
+
+### Release-Hardening Result
+
+The production evidence was converted into source-level hardening before any
+second migration attempt.
+
+The hardened candidate covers:
+
+- exact target-artifact and deployment-scope behavior;
+- recovery isolation from unrelated services;
+- Sports install/update writable-runtime ownership;
+- lifecycle ordering;
+- deployment-recovery behavior; and
+- regression coverage for the failure observed during E2.5 attempt #1.
+
+The final seven-file source candidate passed its reviewed hashes, syntax and
+whitespace checks, Sports lifecycle contracts, target-artifact/isolation
+contracts, lifecycle-ordering checks, attempt-1 incident regression, and
+production-invariant checks.
+
+### Release Boundary
+
+E2.5 attempt #1 is recovery and hardening evidence, not successful Seerr
+production certification.
+
+The following remain open before v1.0 release acceptance:
+
+- controlled migration of the deployed legacy Jellyseerr runtime to the pinned
+  Seerr runtime;
+- post-migration Atlas routing verification;
+- `monitorNewItems=all` verification for both supported Sonarr services;
+- ongoing-series production E2E validation for standard TV and anime TV; and
+- final release-candidate and v1.0 certification gates.
+
+No production mutation is performed by M-023.27C documentation reconciliation.
