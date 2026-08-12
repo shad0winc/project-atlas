@@ -103,3 +103,26 @@ def test_notifications_update_protects_runtime_bus_transition() -> None:
     assert "cannot read the Runtime Bus event journal" in content
     assert "cannot read its Runtime Bus filter" in content
     assert "Refusing to recreate the non-root Notifications worker." in content
+
+
+def test_sports_install_establishes_non_root_runtime_ownership() -> None:
+    install = PROJECT_ROOT / "modules" / "sports" / "scripts" / "install.sh"
+    content = install.read_text(encoding="utf-8")
+
+    assert 'OPERATOR_ENV_FILE="$PROJECT_DIR/.env"' in content
+    assert "Numeric PUID and PGID are required" in content
+    assert "required_writable_paths=(" in content
+    assert 'chown "$puid:$pgid" "${required_writable_paths[@]}"' in content
+    assert "Sports runtime ownership installation failed" in content
+
+
+def test_sports_update_has_explicit_compose_project_boundary() -> None:
+    content = SPORTS_UPDATE.read_text(encoding="utf-8")
+
+    assert content.count("--project-name sports") == 3
+
+
+def test_sports_update_does_not_remove_cross_project_orphans() -> None:
+    content = SPORTS_UPDATE.read_text(encoding="utf-8")
+
+    assert "--remove-orphans" not in content
