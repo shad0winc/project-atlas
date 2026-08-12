@@ -63,3 +63,23 @@ def test_module_verification_requires_private_non_symlink_environment() -> None:
         )
         assert 'check "Module environment permissions private"' in content
         assert '= "600"' in content
+
+
+def test_module_verification_uses_operator_environment_for_compose_interpolation() -> None:
+    for relative in (
+        "modules/sports/scripts/verify.sh",
+        "modules/notifications/scripts/verify.sh",
+    ):
+        content = source(relative)
+
+        operator_env = 'OPERATOR_ENV_FILE="$PROJECT_DIR/.env"'
+        env_option = '--env-file "$OPERATOR_ENV_FILE"'
+        module_env_option = '--env-file "$MODULE_ENV_FILE"'
+        compose_validation = 'check "Module compose valid"'
+
+        assert operator_env in content
+        assert env_option in content
+        assert module_env_option not in content
+        assert compose_validation in content
+        assert content.index(operator_env) < content.index(compose_validation)
+        assert content.index(compose_validation) < content.index(env_option)
