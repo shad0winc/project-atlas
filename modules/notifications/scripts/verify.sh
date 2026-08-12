@@ -7,6 +7,7 @@ ATLAS_CONFIG_FILE="$PROJECT_DIR/config/atlas.conf"
 module_id="notifications"
 module_name="Atlas Notifications"
 MODULE_DIR="$PROJECT_DIR/modules/$module_id"
+OPERATOR_ENV_FILE="$PROJECT_DIR/.env"
 MODULE_ENV_FILE="$MODULE_DIR/.env"
 
 if [[ ! -f "$ATLAS_CONFIG_FILE" ]]; then
@@ -51,7 +52,11 @@ check "Module environment permissions private" \
 check "Module install script present" test -x "$MODULE_DIR/scripts/install.sh"
 check "Module uninstall script present" test -x "$MODULE_DIR/scripts/uninstall.sh"
 check "Module update script present" test -x "$MODULE_DIR/scripts/update.sh"
-check "Module compose valid" docker compose -f "$MODULE_DIR/docker-compose.yml" config
+check "Module compose valid" \
+  docker compose \
+    --env-file "$OPERATOR_ENV_FILE" \
+    -f "$MODULE_DIR/docker-compose.yml" \
+    config
 
 check "Sports audience notification formatting valid" \
   sh -c '
