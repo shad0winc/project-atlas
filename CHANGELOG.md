@@ -30,14 +30,18 @@ All notable changes to Project Atlas are documented in this file.
   server-owned Seerr routing for standard TV and anime TV so missing or invalid
   routing fails before new Request persistence or provider HTTP.
 - Established Seerr ongoing-series monitoring ownership as a service-level
-  runtime concern: the canonical repository image is pinned to Seerr v3.4.1,
-  while production migration, `monitorNewItems=all` verification for both
-  Sonarr routes, and end-to-end future-episode validation remain release gates.
+  runtime concern and completed the controlled production migration to the
+  repository-pinned Seerr v3.4.1 runtime under backup, maintenance, deployment
+  lock, rollback, and post-change verification control.
+- Verified `monitorNewItems=all` for both supported Sonarr routes and revalidated
+  Atlas's server-owned routing after migration.
+- Certified production TV/anime routing through E2.5: standard TV remains on
+  server `0`, while `anime_tv` routes to Seerr server `1`, `sonarr-anime`, and
+  `/media/Anime TV`; ongoing-series acceptance proved monitored downstream
+  ownership without exposing `serverId` or monitoring policy to the browser.
 - Added a Docker healthcheck to the repository-pinned Seerr service using the
   unauthenticated public-settings endpoint, while preserving the pinned image,
   `init: true`, existing configuration path, and current dependency topology.
-  Production remains on the legacy Jellyseerr runtime until the controlled
-  migration and post-migration acceptance gates are completed.
 
 ### Fixed
 
@@ -551,7 +555,10 @@ All notable changes to Project Atlas are documented in this file.
 - Corrected the bounded Sports writable-path ownership, recreated the controller, verified a fresh heartbeat, and returned the Sports module to healthy operation.
 - Final recovery verification returned `atlas doctor` to 100%, preserved the verified deployment baseline, disabled maintenance only after successful validation, and released the deployment lock.
 - Hardened deployment/update and Sports lifecycle contracts from the production evidence before a second Seerr migration attempt.
-- The deployed Seerr migration, `monitorNewItems=all` verification, routing validation, ongoing-series production E2E validation, and final v1.0 release certification remain open.
+- Completed the subsequent controlled Jellyseerr-to-Seerr production migration under transaction `seerr-migration-20260813T001057Z-760620`; the migrated runtime reached `runtime_verified` / `migration_runtime_ready` while maintenance and deployment-lock ownership remained fail closed through acceptance.
+- Recovered a first Anime-TV acceptance misroute involving Mushoku Tensei without deleting the seven preserved media files; reconciled the stale Seerr and Atlas request artifacts and restored authoritative Anime Sonarr ownership before continuing.
+- Certified E2.5 Anime-TV production acceptance with Demon Slayer: Kimetsu no Yaiba Season 2: Atlas persisted `media_type=anime_tv`, Seerr request `3` routed to server `1`, Anime Sonarr created the target under `/media/Anime TV`, Season 2 remained monitored, and standard Sonarr remained untouched.
+- E2.5 production migration, routing, monitoring, and TV/anime acceptance are closed; final release-candidate, pilot, stabilization, and v1.0 certification gates remain open.
 
 
 ### Added

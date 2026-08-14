@@ -428,14 +428,14 @@ with backend services.
   - [x] Add explicit server-owned standard-TV routing and submission preflight
   - [x] Add explicit Portal one-season request UX with no generic/all/current shortcut
   - [x] Derive the Portal TV request type from server-provided series classification
-  - [ ] Validate ongoing-series monitoring so future episodes can be acquired
+  - [x] Validate ongoing-series monitoring so future episodes can be acquired
         automatically through Seerr and Sonarr without a new Atlas request per episode
     - [x] Define Seerr service-level `monitorNewItems` ownership
     - [x] Pin the canonical Seerr runtime image in repository source
-    - [ ] Migrate the deployed Jellyseerr runtime to the canonical Seerr image
+    - [x] Migrate the deployed Jellyseerr runtime to the canonical Seerr image
           under backed-up maintenance control
-    - [ ] Verify the standard-TV Sonarr service uses `monitorNewItems=all`
-    - [ ] Complete production E2E future-episode monitoring validation
+    - [x] Verify the standard-TV Sonarr service uses `monitorNewItems=all`
+    - [x] Complete production E2E future-episode monitoring validation
 - [ ] Request anime movies
 - [ ] Request anime series
   - [x] Preserve server-side anime-TV request/provider capability
@@ -444,11 +444,11 @@ with backend services.
   - [x] Add explicit server-owned anime-TV routing and submission preflight
   - [x] Add explicit Portal one-season request UX with no generic/all/current shortcut
   - [x] Derive `anime_tv` from server-provided series classification
-  - [ ] Validate ongoing-series monitoring so future episodes can be acquired
+  - [x] Validate ongoing-series monitoring so future episodes can be acquired
         automatically through Seerr and Sonarr Anime without a new Atlas request per episode
     - [x] Define shared Seerr service-level `monitorNewItems` ownership
-    - [ ] Verify the Anime-TV Sonarr service uses `monitorNewItems=all`
-    - [ ] Complete production E2E future-episode monitoring validation
+    - [x] Verify the Anime-TV Sonarr service uses `monitorNewItems=all`
+    - [x] Complete production E2E future-episode monitoring validation
 - [x] View request history
 - [x] View request status
 - [x] Cancel eligible requests
@@ -758,6 +758,8 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
   - [x] Validate failed migration ownership through maintenance and deployment-lock retention
   - [x] Validate explicit recovery without rewriting the failed deployment outcome
   - [x] Repair and verify Sports writable-runtime ownership discovered during production recovery
+  - [x] Complete the second controlled Jellyseerr-to-Seerr migration with the verified deployment transaction retained through runtime acceptance
+  - [x] Certify standard-TV and Anime-TV server-owned routing, monitoring policy, and production E2E isolation under E2.5
   - [x] Harden target-artifact, isolation, lifecycle-ordering, and recovery contracts from E2.5 attempt #1
 
 ### Backup and Recovery
@@ -803,7 +805,7 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 
 ### Documentation
 
-- [x] Reconcile Media discovery and Request architecture through M-023.27.3B3
+- [x] Reconcile Media discovery and Request architecture through E2.5 production acceptance
 - [ ] Update architecture documentation for remaining v1.0 surfaces
 - [ ] Complete administrator guide
 - [ ] Complete user guide
