@@ -6374,3 +6374,57 @@ reclassified as a successful migration.
 Final release-candidate creation, remaining user-acceptance journeys,
 accessibility/performance/sustained-use validation, controlled pilot,
 stabilization, and final v1.0 approval remain separate release gates.
+
+---
+
+## M-018.29 — Guarded Lifecycle Planning Contracts
+
+**Status:** Complete — domain contracts only
+
+M-018.29 closes the remaining Service Lifecycle foundation-model gap without
+opening a production mutation surface.
+
+Implemented:
+
+- immutable `ServiceUpdatePlan`;
+- immutable `ServiceUpdateResult`;
+- normalized `ServiceUpdateOutcome`;
+- immutable `MaintenanceEvent`;
+- normalized identifiers and UTC timestamps;
+- child-contract validation for image references and structured state;
+- deterministic `to_dict()` serialization;
+- public package exports;
+- dedicated planning/result tests; and
+- dedicated maintenance-event tests.
+
+`ServiceUpdatePlan` is constrained to dry-run planning and rejects an update
+whose target image equals its current image. `ServiceUpdateResult` records
+operation outcome and rollback state while enforcing rollback consistency.
+`MaintenanceEvent` implements the ADR 0010 audit-domain field set while
+preserving the pre-existing maintenance-history contracts byte-for-byte.
+
+Validation established:
+
+- 11 dedicated planning/result model tests;
+- 6 dedicated maintenance-event tests;
+- all 13 authoritative `test_service_lifecycle*.py` test files passed;
+- Docker Compose provider regression passed;
+- `git diff --check` passed;
+- Atlas Doctor passed;
+- existing `maintenance_models.py` content before `MaintenanceEvent` remained
+  byte-for-byte identical to its pre-M-018.29 source; and
+- the implementation introduces no Docker/provider/CLI/API/Portal execution
+  primitive.
+
+Frozen source evidence:
+
+- final source review diff:
+  `c87ef73721b4080ab25ae5816e3d647d70ea43b13de47d84856f5b57cb172ea1`;
+- final source certification:
+  `de733ad88dda053baa00e48f50c33c6f1cca5e256565a058738f9c2d03eb66da`.
+
+This milestone does **not** close lifecycle audit-event publication or guarded
+lifecycle operations. Administrator authorization, allow-listed mutation
+targets, update/restart execution, dependency-aware execution, locking,
+rollback execution, bulk planning, maintenance windows, CLI/API mutation, and
+Portal lifecycle administration remain separate M-018 work.

@@ -401,3 +401,195 @@ def _parse_timestamp(value: str) -> datetime:
 
 def _now_timestamp() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+@dataclass(frozen=True)
+class MaintenanceEvent:
+    """Auditable lifecycle mutation event defined by ADR 0010."""
+
+    event_id: str
+    service_identifier: str
+    operation_type: str
+    requested_by: str
+    started_at: str
+    completed_at: str | None
+    previous_state: Mapping[str, Any]
+    resulting_state: Mapping[str, Any] | None
+    outcome: MaintenanceResult
+    warnings: tuple[str, ...] = ()
+    errors: tuple[str, ...] = ()
+    rollback_information: Mapping[str, Any] = field(
+        default_factory=dict,
+    )
+    correlation_id: str | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "event_id",
+            _required_identifier(self.event_id, "event_id"),
+        )
+        object.__setattr__(
+            self,
+            "service_identifier",
+            _required_identifier(
+                self.service_identifier,
+                "service_identifier",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "operation_type",
+            _required_identifier(
+                self.operation_type,
+                "operation_type",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "requested_by",
+            _required_text(self.requested_by, "requested_by"),
+        )
+        object.__setattr__(
+            self,
+            "started_at",
+            _required_timestamp(self.started_at, "started_at"),
+        )
+        object.__setattr__(
+            self,
+            "completed_at",
+            _optional_timestamp(
+                self.completed_at,
+                "completed_at",
+            ),
+        )
+
+        if (
+            self.completed_at is not None
+            and _parse_timestamp(self.completed_at)
+            < _parse_timestamp(self.started_at)
+        ):
+            raise ServiceLifecycleError(
+                "completed_at must not precede started_at",
+            )
+
+        if not isinstance(self.previous_state, Mapping):
+            raise ServiceLifecycleError(
+                "previous_state must be an object",
+            )
+
+        if (
+            self.resulting_state is not None
+            and not isinstance(self.resulting_state, Mapping)
+        ):
+            raise ServiceLifecycleError(
+                "resulting_state must be an object or null",
+            )
+
+        object.__setattr__(
+            self,
+            "previous_state",
+            dict(self.previous_state),
+        )
+        object.__setattr__(
+            self,
+            "resulting_state",
+            (
+                dict(self.resulting_state)
+                if self.resulting_state is not None
+                else None
+            ),
+        )
+        object.__setattr__(
+            self,
+            "outcome",
+            _normalize_enum(
+                self.outcome,
+                MaintenanceResult,
+                "outcome",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "warnings",
+            _normalize_text_collection(
+                self.warnings,
+                "warnings",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "errors",
+            _normalize_text_collection(
+                self.errors,
+                "errors",
+            ),
+        )
+
+        if not isinstance(self.rollback_information, Mapping):
+            raise ServiceLifecycleError(
+                "rollback_information must be an object",
+            )
+
+        object.__setattr__(
+            self,
+            "rollback_information",
+            dict(self.rollback_information),
+        )
+        object.__setattr__(
+            self,
+            "correlation_id",
+            (
+                None
+                if self.correlation_id is None
+                else _required_identifier(
+                    self.correlation_id,
+                    "correlation_id",
+                )
+            ),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize the normalized maintenance-event contract."""
+
+        return {
+            "event_id": self.event_id,
+            "service_identifier": self.service_identifier,
+            "operation_type": self.operation_type,
+            "requested_by": self.requested_by,
+            "started_at": self.started_at,
+            "completed_at": self.completed_at,
+            "previous_state": dict(self.previous_state),
+            "resulting_state": (
+                dict(self.resulting_state)
+                if self.resulting_state is not None
+                else None
+            ),
+            "outcome": self.outcome.value,
+            "warnings": list(self.warnings),
+            "errors": list(self.errors),
+            "rollback_information": dict(
+                self.rollback_information,
+            ),
+            "correlation_id": self.correlation_id,
+        }
+
+
+def _normalize_text_collection(
+    values: Iterable[str],
+    field_name: str,
+) -> tuple[str, ...]:
+    """Normalize one immutable collection of non-empty text values."""
+
+    if isinstance(values, (str, bytes)) or not isinstance(
+        values,
+        Iterable,
+    ):
+        raise ServiceLifecycleError(
+            f"{field_name} must be a collection",
+        )
+
+    return tuple(
+        _required_text(value, field_name)
+        for value in values
+    )

@@ -4,6 +4,19 @@ All notable changes to Project Atlas are documented in this file.
 
 ## [Unreleased]
 
+- Added M-018.29 guarded lifecycle planning contracts: immutable
+  `ServiceUpdatePlan`, `ServiceUpdateResult`, and `ServiceUpdateOutcome`
+  contracts now normalize managed-service identity, image state, dependency
+  identities, UTC timestamps, rollback metadata, warnings/errors, correlation
+  identity, and deterministic `to_dict()` serialization.
+- Added the `MaintenanceEvent` audit-domain contract required by the Service
+  Lifecycle architecture, including requester identity, operation identity,
+  previous/resulting state, outcome, warnings/errors, rollback information,
+  timestamps, and correlation identity.
+- M-018.29 is intentionally domain-only: Service Lifecycle provider mutation,
+  audit-event publication, guarded update/restart execution, CLI/API mutation,
+  and Portal lifecycle administration remain open.
+
 ### Added
 
 - Added Seerr-backed Media discovery/search through the Atlas API and the

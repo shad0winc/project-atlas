@@ -201,8 +201,8 @@ for Atlas-managed infrastructure.
 - [x] Add normalized managed-service models
 - [x] Add service image and runtime-state models
 - [x] Add service health models
-- [ ] Add update-plan and update-result models
-- [ ] Add maintenance-event models
+- [x] Add update-plan and update-result models
+- [x] Add maintenance-event models
 - [x] Add provider-independent service contracts
 - [x] Add provider-independent orchestration service
 - [x] Add dedicated domain tests
