@@ -263,8 +263,10 @@ for Atlas-managed infrastructure.
 - [x] Add `atlas service updates`
 - [x] Add `atlas service history`
 - [ ] Add `atlas service update <service> --dry-run`
-- [ ] Add guarded lifecycle API endpoints
-- [ ] Add lifecycle API authorization tests
+- [x] Add read-only Service Lifecycle API endpoints
+- [ ] Add guarded lifecycle mutation API endpoints
+- [x] Add read-only lifecycle API authorization tests
+- [ ] Add guarded lifecycle mutation API authorization tests
 - [x] Add lifecycle CLI contract tests
 
 ### Admin Portal Integration

@@ -1522,3 +1522,18 @@ This document is complete only when:
 
 Planned validation, incomplete notes, or assumed success do not satisfy User
 Acceptance Certification.
+
+## M-018.30 — Read-Only Service Lifecycle API Foundation
+
+M-018.30 establishes the backend read-only Service Lifecycle transport required
+for the administrator health/service-visibility journey. Authorized
+administrators can now be served normalized managed-service collection/detail,
+aggregate health, and infrastructure-summary data through
+`GET /api/v1/services`, `GET /api/v1/services/{service_identifier}`,
+`GET /api/v1/services/health`, and `GET /api/v1/services/summary`, guarded by
+`system.health.read`.
+
+This backend certification does **not** certify the Portal experience itself.
+The health/service-visibility journey remains open until the Administration
+Portal consumes these contracts and representative user-acceptance validation
+is completed. M-018.30 introduces no lifecycle mutation.

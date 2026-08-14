@@ -972,3 +972,15 @@ Approval of this plan does not certify Atlas v1.0.
 
 It establishes the contract against which Atlas v1.0 will be implemented,
 validated, and certified.
+
+## M-018.30 — Read-Only Service Lifecycle API Foundation
+
+M-018.30 establishes the read-only Service Lifecycle API foundation for the
+service-visibility portion of the v1.0 administrator requirement. The API
+exposes managed-service collection/detail, aggregate health, and infrastructure
+summary through four GET-only endpoints protected by `system.health.read`.
+
+This closes the backend Service Lifecycle transport prerequisite; it does not
+certify the administrator Portal experience. Portal presentation and final
+health/service-visibility user acceptance remain required for v1.0. Guarded
+lifecycle mutation remains outside the v1.0 read-only boundary.
