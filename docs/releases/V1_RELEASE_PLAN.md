@@ -984,3 +984,22 @@ This closes the backend Service Lifecycle transport prerequisite; it does not
 certify the administrator Portal experience. Portal presentation and final
 health/service-visibility user acceptance remain required for v1.0. Guarded
 lifecycle mutation remains outside the v1.0 read-only boundary.
+
+## M-018.31 — Portal Service Lifecycle Foundation
+
+M-018.31 closes three implementation gates in the v1.0 administrator
+service-visibility path: managed-service overview, service health cards, and
+service detail views.
+
+The protected `/portal/services` experience consumes the four M-018.30 GET-only
+Service Lifecycle endpoints through the authenticated Portal service boundary
+and remains protected by `system.health.read`. Runtime and health presentation
+are aligned with the production aggregate payloads, including unavailable
+health and normalized read-only detail enrichment.
+
+This milestone does not close the complete administrator acceptance gate.
+Update-availability indicators, Maintenance History presentation, responsive
+phone/tablet acceptance, touch-friendly lifecycle interaction, mobile-safe
+service-card/table acceptance, PWA evaluation, representative user acceptance,
+and final v1.0 approval remain required. Guarded lifecycle mutation remains
+outside the v1.0 read-only boundary.

@@ -1537,3 +1537,27 @@ This backend certification does **not** certify the Portal experience itself.
 The health/service-visibility journey remains open until the Administration
 Portal consumes these contracts and representative user-acceptance validation
 is completed. M-018.30 introduces no lifecycle mutation.
+
+## M-018.31 — Portal Service Lifecycle Foundation
+
+M-018.31 implements the first Administration Portal consumer of the read-only
+Service Lifecycle API. Authorized administrators with `system.health.read` can
+open `/portal/services` and receive managed-service overview cards, aggregate
+service-health presentation, and read-only individual service details.
+
+The Portal consumes production-shaped Atlas API responses: managed-service
+identity is joined with aggregate runtime and health entries, the `unavailable`
+health state is preserved, and detail inspection is enriched with normalized
+overview runtime/health state. No lifecycle mutation control is exposed.
+
+Engineering validation for this slice is complete: focused Service
+Lifecycle/navigation tests passed 23 tests, the complete Portal suite passed
+218 tests across 27 files, and typecheck, formatting, lint, whitespace,
+bounded-remote, and Atlas Doctor checks passed.
+
+This closes the implementation prerequisite for the managed-service overview,
+service health cards, and service detail views. It does **not** by itself
+complete User Acceptance Certification. Representative administrator journey
+execution, responsive phone/tablet validation, touch interaction, mobile-safe
+layout validation, remaining lifecycle presentation surfaces, and final v1.0
+approval remain open.
