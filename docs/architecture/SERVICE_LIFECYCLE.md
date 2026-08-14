@@ -591,3 +591,67 @@ Rollback if required
 ```
 
 Those operations remain outside the v1.0 read-only boundary.
+
+## M-018.29 Guarded Lifecycle Planning Contracts
+
+M-018.29 implements the domain contracts required before Atlas can expose
+guarded lifecycle mutation.
+
+The public Service Lifecycle package now exports:
+
+- `ServiceUpdateOutcome`;
+- `ServiceUpdatePlan`;
+- `ServiceUpdateResult`; and
+- `MaintenanceEvent`.
+
+`ServiceUpdatePlan` is an immutable dry-run planning contract for one managed
+service. It binds normalized plan and service identity, the current and target
+image references, requester identity, dependency identities, creation time,
+correlation identity, warnings, and structured details. A plan cannot claim to
+be an applied operation, and its target image must differ from its current
+image.
+
+`ServiceUpdateResult` records the normalized outcome of a later guarded update
+operation without providing that operation itself. It binds the plan and
+operation identities, service identity, previous/resulting image state,
+normalized start/completion timestamps, rollback state, warnings/errors,
+correlation identity, and structured details. Rollback identifiers cannot be
+reported unless rollback actually occurred, and a `rolled-back` outcome
+requires `rollback_performed=true`.
+
+`MaintenanceEvent` implements the audit-domain shape defined by ADR 0010. It
+records event/service/operation/requester identity, timestamps,
+previous/resulting state, maintenance outcome, warnings/errors, rollback
+information, and correlation identity. The model is not itself an event
+publisher.
+
+All four contracts follow the existing Atlas model contract: inputs are
+normalized, identity and child contracts are validated, timestamps are
+normalized to UTC, objects are immutable where practical, deterministic
+`to_dict()` serialization is provided, dedicated tests exist, and public
+exports are defined through `atlas.service_lifecycle`.
+
+### Current Mutation Boundary
+
+M-018.29 does **not** expose lifecycle mutation.
+
+The following remain intentionally open:
+
+- administrator authorization for lifecycle mutation;
+- allow-listed mutation targets;
+- lifecycle dry-run orchestration;
+- guarded service update and restart execution;
+- pre/post-update orchestration;
+- dependency-aware execution ordering;
+- lifecycle operation locking;
+- failed-update rollback execution;
+- bulk-update and maintenance-window orchestration;
+- lifecycle maintenance-event publication;
+- `atlas service update <service> --dry-run`;
+- guarded lifecycle API endpoints and authorization tests; and
+- Service Lifecycle administration in the Portal.
+
+The existing Service Lifecycle CLI and provider boundary therefore remain
+read-only after M-018.29. These contracts establish the normalized planning,
+result, and audit data model required by later guarded-mutation work; they do
+not claim that guarded mutation is complete.

@@ -18,6 +18,7 @@ from .recovery_models import (
 
 from .maintenance_models import (
     MaintenanceAction,
+    MaintenanceEvent,
     MaintenanceRecord,
     MaintenanceReport,
     MaintenanceResult,
@@ -49,6 +50,11 @@ from .services import (
     ServiceRestartRecoveryService,
     ServiceUpdateService,
 )
+from .planning_models import (
+    ServiceUpdateOutcome,
+    ServiceUpdatePlan,
+    ServiceUpdateResult,
+)
 from .provider import ServiceLifecycleProvider
 from .providers import (
     DockerComposeProvider,
@@ -70,6 +76,10 @@ __all__ = [
     "ImageReference",
     "ServiceUpdate",
     "ServiceUpdateService",
+    "ServiceUpdateResult",
+    "ServiceUpdatePlan",
+    "ServiceUpdateOutcome",
+    "MaintenanceEvent",
     "UpdateReport",
     "UpdateStatus",
     "DockerComposeProvider",
