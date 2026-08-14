@@ -6554,3 +6554,67 @@ Responsive phone/tablet acceptance, touch-friendly lifecycle interaction,
 mobile-safe service-card/table acceptance, Update Availability presentation,
 Maintenance History presentation, PWA evaluation, and final v1.0 user
 acceptance remain separate release work.
+
+---
+
+## M-018.32 — Responsive & Mobile Service Lifecycle Acceptance
+
+### Scope
+
+M-018.32 closes the responsive/mobile presentation prerequisites for the
+read-only Administration Portal Service Lifecycle experience without expanding
+the M-018.30/M-018.31 lifecycle contract or introducing mutation.
+
+### Implemented
+
+- Reused the existing responsive `dashboard-metric-grid` used by the Service
+  Lifecycle summary and managed-service cards.
+- Hardened the shared dashboard retry control to the Portal's established
+  `2.75rem` minimum touch-target convention and enabled touch manipulation.
+- Added Service Lifecycle-specific minimum-width and overflow wrapping so long
+  identifiers and read-only detail values cannot force critical horizontal
+  overflow on narrow screens.
+- Preserved the existing card-based managed-service presentation and semantic
+  read-only detail list; no artificial mobile table or alternate mobile route
+  was introduced.
+
+### Responsive / Touch Acceptance
+
+- Existing Portal phone/tablet breakpoints remain the responsive architecture.
+- Managed-service cards use an auto-fitting grid with
+  `minmax(min(100%, 16rem), 1fr)`.
+- Retry interaction is explicitly touch-sized.
+- Long managed-service/detail values may wrap rather than forcing horizontal
+  overflow.
+- The Service Lifecycle presentation remains GET-only and exposes no restart,
+  update, rollback, stop, start, or other lifecycle mutation control.
+
+### PWA Evaluation
+
+Tracked Portal source contains no PWA manifest, service worker, Workbox
+integration, install prompt, or other PWA runtime owner. PWA support was
+evaluated after responsive validation and is deferred beyond v1.0. The
+responsive authenticated Portal is the supported v1.0 mobile administration
+experience.
+
+### Validation
+
+- Focused Service Lifecycle presentation tests passed: 7.
+- Complete Portal regression suite passed: 218 tests across 27 files.
+- TypeScript typecheck passed.
+- ESLint passed.
+- Production Next.js build passed.
+- `git diff --check` passed.
+- Certified responsive/touch CSS candidate SHA-256:
+  `7711b98a13c5dde62f7fcd79c0d5110c42f008629c53bf36cc99866b1273b139`.
+
+### Release Boundary
+
+M-018.32 closes the ROADMAP gates for responsive phone/tablet administration,
+touch-friendly lifecycle controls, mobile-safe Service Lifecycle cards/tables,
+and PWA evaluation.
+
+This milestone does **not** certify final representative User Acceptance.
+Update Availability presentation, Maintenance History presentation,
+representative administrator journey execution, and final v1.0 approval remain
+open. Guarded lifecycle mutation remains outside the v1.0 read-only boundary.

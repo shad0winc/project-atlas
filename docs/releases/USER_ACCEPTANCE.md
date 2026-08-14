@@ -1561,3 +1561,27 @@ complete User Acceptance Certification. Representative administrator journey
 execution, responsive phone/tablet validation, touch interaction, mobile-safe
 layout validation, remaining lifecycle presentation surfaces, and final v1.0
 approval remain open.
+
+## M-018.32 — Responsive & Mobile Service Lifecycle Acceptance
+
+M-018.32 completes the engineering acceptance prerequisite for responsive
+phone/tablet Service Lifecycle presentation. The existing responsive Portal
+architecture and auto-fitting managed-service card grid are retained; shared
+retry interaction is explicitly touch-sized, and long Service Lifecycle
+identifiers/detail values are permitted to wrap rather than forcing critical
+horizontal overflow.
+
+The Service Lifecycle experience remains read-only. No restart, update,
+rollback, stop, start, or other lifecycle mutation control is introduced.
+
+Progressive Web App support was evaluated after responsive validation. No
+tracked Portal PWA runtime owner exists, so PWA implementation is deferred
+beyond v1.0 and the responsive authenticated Portal remains the supported v1.0
+mobile administration experience.
+
+This milestone closes the responsive phone/tablet, touch-friendly lifecycle,
+mobile-safe service-card/table, and PWA-evaluation implementation/presentation
+gates. It does **not** mark the broader Responsive Review checklist above as
+complete and does **not** constitute final User Acceptance Certification.
+Representative administrator journey execution, Update Availability,
+Maintenance History, and final v1.0 approval remain open.

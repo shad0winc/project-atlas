@@ -1491,6 +1491,7 @@ a {
 
 .dashboard-retry-button {
   flex: 0 0 auto;
+  min-height: 2.75rem;
   padding: 0.65rem 0.9rem;
   border: 1px solid rgba(248, 250, 252, 0.2);
   border-radius: 0.7rem;
@@ -1500,6 +1501,7 @@ a {
   font-size: 0.78rem;
   font-weight: 800;
   cursor: pointer;
+  touch-action: manipulation;
 }
 
 .dashboard-retry-button:hover {
@@ -1524,6 +1526,20 @@ a {
   .dashboard-generated-at {
     text-align: left;
   }
+}
+
+/* M-018.32 — Responsive & Mobile Service Lifecycle Acceptance */
+
+section[aria-labelledby="managed-services-title"] .card,
+section[aria-labelledby="service-detail-title"] .card,
+section[aria-labelledby="service-detail-title"] dl > div {
+  min-width: 0;
+}
+
+section[aria-labelledby="managed-services-title"] .card p,
+section[aria-labelledby="service-detail-title"] .card p,
+section[aria-labelledby="service-detail-title"] dd {
+  overflow-wrap: anywhere;
 }
 
 /* PAI-0004.2: portal-page-authorization-boundary */
