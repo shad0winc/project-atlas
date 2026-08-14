@@ -353,6 +353,14 @@ All notable changes to Project Atlas are documented in this file.
   enrichment from the already-loaded overview.
 - Registered the Services route in the canonical Portal navigation model and
   reconciled authorization-aware navigation tests.
+- Completed M-018.32 responsive/mobile Service Lifecycle acceptance:
+  preserved the existing responsive managed-service card grid, hardened shared
+  retry interaction to the Portal's 2.75rem touch-target convention, and added
+  mobile-safe shrinking/wrapping for Service Lifecycle cards and read-only
+  detail values.
+- Evaluated Progressive Web App support after responsive validation and deferred
+  PWA runtime implementation beyond v1.0; the responsive authenticated Portal
+  remains the supported v1.0 mobile administration experience.
 
 - Service Lifecycle domain architecture documented in ADR 0010.
 - Immutable `ManagedService`, `ServiceImage`, `ServiceRuntime`,

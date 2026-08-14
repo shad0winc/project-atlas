@@ -279,10 +279,10 @@ for Atlas-managed infrastructure.
 - [ ] Add guarded update confirmation workflow
 - [ ] Add maintenance-history view
 - [ ] Add failure and rollback reporting
-- [ ] Add responsive phone and tablet administration layouts
-- [ ] Add touch-friendly lifecycle controls
-- [ ] Add mobile-safe service cards and tables
-- [ ] Evaluate Progressive Web App support after responsive validation
+- [x] Add responsive phone and tablet administration layouts
+- [x] Add touch-friendly lifecycle controls
+- [x] Add mobile-safe service cards and tables
+- [x] Evaluate Progressive Web App support after responsive validation
 
 ---
 

@@ -1003,3 +1003,29 @@ phone/tablet acceptance, touch-friendly lifecycle interaction, mobile-safe
 service-card/table acceptance, PWA evaluation, representative user acceptance,
 and final v1.0 approval remain required. Guarded lifecycle mutation remains
 outside the v1.0 read-only boundary.
+
+## M-018.32 — Responsive & Mobile Service Lifecycle Acceptance
+
+M-018.32 closes the responsive/mobile presentation prerequisites for the
+read-only Administration Portal Service Lifecycle experience. The implementation
+reuses the Portal's existing responsive architecture and shared dashboard grid,
+adds explicit touch-target hardening to the shared retry interaction, and
+protects Service Lifecycle cards and read-only detail values from narrow-screen
+overflow.
+
+The managed-service presentation remains card-based and the detail surface
+remains semantic/read-only. No mobile-only route, duplicate lifecycle
+presentation architecture, lifecycle mutation control, or artificial table was
+introduced.
+
+Progressive Web App support was evaluated after responsive validation. Atlas has
+no tracked Portal manifest, service worker, Workbox integration, install prompt,
+or other PWA runtime owner. PWA implementation is therefore deferred beyond
+v1.0; the responsive authenticated Portal is the supported v1.0 mobile
+administration experience.
+
+M-018.32 closes the responsive phone/tablet, touch-friendly lifecycle,
+mobile-safe service-card/table, and PWA-evaluation ROADMAP gates. Update
+Availability presentation, Maintenance History presentation, representative
+administrator User Acceptance, and final v1.0 approval remain required. Guarded
+lifecycle mutation remains outside the v1.0 read-only boundary.

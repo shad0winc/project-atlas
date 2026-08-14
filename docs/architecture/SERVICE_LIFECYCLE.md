@@ -602,14 +602,26 @@ aligned with the production API shape instead of inventing browser-side domain
 fields. Detail responses are enriched only with already-loaded normalized
 overview state.
 
-Remaining v1.0 Portal work includes:
+M-018.32 completes the responsive/mobile Service Lifecycle presentation
+prerequisites. The existing Portal responsive architecture remains authoritative:
+managed-service cards continue to use the shared auto-fitting dashboard grid,
+touch interaction follows the shared Portal control conventions, and
+Service Lifecycle cards/read-only detail values are protected against narrow
+viewport overflow.
 
-- Update Discovery presentation;
-- Maintenance History presentation;
-- responsive phone and tablet acceptance;
-- touch-friendly lifecycle interaction;
-- mobile-safe service-card/table acceptance; and
-- PWA evaluation after responsive validation.
+Progressive Web App support was evaluated after responsive validation. No
+tracked Portal manifest, service worker, Workbox integration, install prompt, or
+other PWA runtime owner exists, and PWA implementation is deferred beyond v1.0.
+The responsive authenticated Portal remains the supported v1.0 mobile
+administration experience.
+
+Remaining v1.0 Portal Service Lifecycle presentation work includes:
+
+- Update Discovery presentation; and
+- Maintenance History presentation.
+
+Representative administrator User Acceptance and final v1.0 approval remain
+separate release gates.
 
 The Portal must not duplicate Service Lifecycle business logic. Restart, update,
 rollback, and other lifecycle mutation controls remain outside the v1.0
