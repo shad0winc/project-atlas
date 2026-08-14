@@ -6485,3 +6485,72 @@ This backend transport foundation satisfies the API prerequisite for v1.0
 service visibility. It does not by itself certify the Administration Portal
 health/service-visibility journey. Portal presentation and user-acceptance
 validation remain separate release work.
+
+---
+
+## M-018.31 — Portal Service Lifecycle Foundation
+
+### Scope
+
+M-018.31 consumes the M-018.30 GET-only Service Lifecycle API in the protected
+Administration Portal. The slice closes the first three service-visibility
+presentation gates without introducing lifecycle mutation.
+
+### Implemented
+
+- Added the protected `/portal/services` page.
+- Added authenticated GET-only Portal adapters for managed-service collection,
+  managed-service detail, aggregate health, and infrastructure summary.
+- Added a Service Lifecycle hook with loading, failure, refresh, detail
+  selection, cancellation, and stale-request protection.
+- Added managed-service overview cards and aggregate service-health
+  presentation.
+- Added read-only service-detail inspection with normalized runtime and health
+  enrichment.
+- Joined managed-service identities with the production aggregate runtime and
+  health payloads instead of assuming runtime/health fields exist on collection
+  identities.
+- Preserved the `unavailable` health state in the Portal normalization layer.
+- Registered Services in the canonical Portal route/navigation model under
+  `system.health.read`.
+- Added and reconciled Service Lifecycle presentation and navigation regression
+  tests.
+
+### Architecture Boundary
+
+The Portal consumes Atlas API contracts only. It does not call Docker, Docker
+Compose, or Service Lifecycle providers directly and does not duplicate
+provider-side lifecycle business rules.
+
+M-018.31 remains strictly read-only. Restart, update, rollback, maintenance
+writes, operation locking, audit-event publication, Update Discovery
+presentation, Maintenance History presentation, and guarded lifecycle controls
+remain outside this slice.
+
+### Validation
+
+- M-018.31 final eleven-file source review passed.
+- Production-shaped per-service runtime mapping passed.
+- Production-shaped per-service health mapping passed.
+- `unavailable` health preservation passed.
+- Read-only detail enrichment passed.
+- TypeScript typecheck passed.
+- Focused Service Lifecycle/navigation Portal tests passed: 23.
+- Complete Portal regression suite passed: 218 tests across 27 files.
+- Prettier and ESLint passed.
+- Complete reviewed eleven-file diff and whitespace validation passed.
+- Bounded remote race guard passed.
+- Atlas Doctor passed.
+- Reviewed source diff SHA-256:
+  `1411f7e0ed45e65ba586fae08bee659345f67338eb560e7174f1b2bb1d74cd49`.
+
+### Release Boundary
+
+M-018.31 closes the ROADMAP implementation gates for managed-service overview,
+service health cards, and service detail views.
+
+It does **not** certify the complete administrator user-acceptance journey.
+Responsive phone/tablet acceptance, touch-friendly lifecycle interaction,
+mobile-safe service-card/table acceptance, Update Availability presentation,
+Maintenance History presentation, PWA evaluation, and final v1.0 user
+acceptance remain separate release work.

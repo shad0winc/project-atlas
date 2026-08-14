@@ -17,7 +17,7 @@ stop, restart, pull, update, recreate, or remove containers.
 - Keep orchestration and reporting provider-independent.
 - Make human and JSON output consume the same service-layer reports.
 - Preserve deterministic ordering, validation, serialization, and timestamps.
-- Support API and future Portal consumers without duplicating business logic.
+- Support API and Portal consumers without duplicating business logic.
 - Establish safe boundaries before guarded lifecycle mutations are introduced.
 
 ## Non-Goals
@@ -34,7 +34,7 @@ The current subsystem does not provide:
 ## Layered Architecture
 
 ```text
-Atlas CLI / Atlas API / Future Portal
+Atlas CLI / Atlas API / Atlas Portal
                  │
                  ▼
       ServiceLifecycleService
@@ -583,21 +583,37 @@ Service Lifecycle documentation is split by audience:
 
 ## Administration Portal Integration
 
-The Administration Portal should consume the same normalized service layer used
-by the CLI.
+The Administration Portal consumes Service Lifecycle through the Atlas API and
+the same provider-independent service-layer contracts used by the CLI. It does
+not call Docker or Docker Compose directly.
 
-Supported v1.0 Portal surfaces may include:
+M-018.31 implements the first Portal Service Lifecycle surfaces:
 
-- service inventory;
-- runtime and health overview;
-- aggregate health;
-- dependency relationships;
-- Service Doctor diagnostics;
-- Update Discovery;
-- Maintenance History.
+- protected `/portal/services` navigation under `system.health.read`;
+- managed-service inventory and overview cards;
+- aggregate Service Lifecycle health presentation;
+- normalized runtime and health state on service cards; and
+- read-only per-service detail inspection.
 
-The Portal must not call Docker directly or duplicate Service Lifecycle business
-logic. API and Portal adapters should serialize the existing report contracts.
+The Portal joins managed-service collection identities with the per-service
+runtime entries from the infrastructure-summary response and the per-service
+health entries from the aggregate-health response. This keeps presentation
+aligned with the production API shape instead of inventing browser-side domain
+fields. Detail responses are enriched only with already-loaded normalized
+overview state.
+
+Remaining v1.0 Portal work includes:
+
+- Update Discovery presentation;
+- Maintenance History presentation;
+- responsive phone and tablet acceptance;
+- touch-friendly lifecycle interaction;
+- mobile-safe service-card/table acceptance; and
+- PWA evaluation after responsive validation.
+
+The Portal must not duplicate Service Lifecycle business logic. Restart, update,
+rollback, and other lifecycle mutation controls remain outside the v1.0
+read-only boundary.
 
 ## Post-v1.0 Extension Boundary
 

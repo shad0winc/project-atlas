@@ -342,6 +342,18 @@ All notable changes to Project Atlas are documented in this file.
 - API dependency construction backed by the existing provider-independent
   `ServiceLifecycleService` and `DockerComposeProvider`.
 
+- Added M-018.31 Administration Portal Service Lifecycle foundation at
+  `/portal/services`, protected by `system.health.read`.
+- Added production-payload-aligned managed-service overview cards, aggregate
+  service-health presentation, and read-only per-service detail inspection.
+- Added authenticated GET-only Portal adapters for the M-018.30 Service
+  Lifecycle collection, detail, health, and summary endpoints.
+- Added runtime/health normalization from aggregate API payloads, including
+  preservation of the `unavailable` health state and read-only detail
+  enrichment from the already-loaded overview.
+- Registered the Services route in the canonical Portal navigation model and
+  reconciled authorization-aware navigation tests.
+
 - Service Lifecycle domain architecture documented in ADR 0010.
 - Immutable `ManagedService`, `ServiceImage`, `ServiceRuntime`,
   `ServiceHealth`, and `ServiceHealthStatus` contracts with normalization,
@@ -401,6 +413,15 @@ All notable changes to Project Atlas are documented in this file.
 - Preserved the v1.0 read-only boundary: restart, update, rollback, lifecycle
   writes, Update Discovery API, Maintenance History API, and Portal UI remain
   outside M-018.30.
+
+- M-018.31 focused Portal validation passed 23 tests across the Service
+  Lifecycle presentation and navigation contracts.
+- The complete Portal regression suite passed with 218 tests across 27 files;
+  TypeScript typecheck, Prettier, ESLint, whitespace checks, bounded remote
+  race validation, and Atlas Doctor also passed.
+- M-018.31 preserves the GET-only v1.0 boundary: no restart, update, rollback,
+  maintenance mutation, or other lifecycle write control is exposed by the
+  Portal.
 
 - Validated live read-only discovery across 15 Docker Compose services.
 - Validated live identity, runtime, image, and health output for Jellyfin,

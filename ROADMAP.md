@@ -271,10 +271,10 @@ for Atlas-managed infrastructure.
 
 ### Admin Portal Integration
 
-- [ ] Add managed-service overview
-- [ ] Add service health cards
+- [x] Add managed-service overview
+- [x] Add service health cards
 - [ ] Add update-availability indicators
-- [ ] Add service detail views
+- [x] Add service detail views
 - [ ] Add restart confirmation workflow
 - [ ] Add guarded update confirmation workflow
 - [ ] Add maintenance-history view

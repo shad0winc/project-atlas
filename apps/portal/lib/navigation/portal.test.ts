@@ -37,6 +37,7 @@ describe("Portal route model", () => {
       "requests",
       "downloads",
       "users",
+      "services",
       "administration",
       "settings"
     ]);
@@ -73,7 +74,7 @@ describe("Portal route model", () => {
       },
       {
         label: PORTAL_ROUTE_SECTIONS.management,
-        routes: ["users", "administration", "settings"]
+        routes: ["users", "services", "administration", "settings"]
       }
     ]);
   });
@@ -144,6 +145,7 @@ describe("Portal navigation authorization", () => {
       "Requests",
       "Downloads",
       "Users",
+      "Services",
       "Administration",
       "Settings"
     ]);
@@ -157,6 +159,7 @@ describe("Portal navigation authorization", () => {
       "Requests",
       "Downloads",
       "Users",
+      "Services",
       "Administration",
       "Settings"
     ]);
@@ -175,7 +178,10 @@ describe("Portal navigation authorization", () => {
   });
 
   it("supports direct grants without role knowledge", () => {
-    expect(visibleLabels(authorization(["system.health.read"]))).toEqual(["Administration"]);
+    expect(visibleLabels(authorization(["system.health.read"]))).toEqual([
+      "Services",
+      "Administration"
+    ]);
   });
 
   it("removes empty navigation sections", () => {
