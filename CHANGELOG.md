@@ -333,6 +333,15 @@ All notable changes to Project Atlas are documented in this file.
 
 #### Added
 
+- M-018.30 read-only Service Lifecycle HTTP API foundation.
+- `GET /api/v1/services` for normalized managed-service collection.
+- `GET /api/v1/services/{service_identifier}` for managed-service detail.
+- `GET /api/v1/services/health` for aggregate infrastructure health.
+- `GET /api/v1/services/summary` for normalized infrastructure summary.
+- Typed Service Lifecycle API response schemas and dedicated HTTP contract tests.
+- API dependency construction backed by the existing provider-independent
+  `ServiceLifecycleService` and `DockerComposeProvider`.
+
 - Service Lifecycle domain architecture documented in ADR 0010.
 - Immutable `ManagedService`, `ServiceImage`, `ServiceRuntime`,
   `ServiceHealth`, and `ServiceHealthStatus` contracts with normalization,
@@ -379,6 +388,19 @@ All notable changes to Project Atlas are documented in this file.
   distinct from roadmap planning, changelog release notes, and build history.
 
 #### Validation
+
+- Verified 9 dedicated Service Lifecycle API route tests.
+- Verified the complete Atlas API regression suite with 357 passing tests and
+  15 passing subtests.
+- Verified all 597 Service Lifecycle regression tests.
+- Verified all 225 Docker Compose provider regression tests.
+- Verified the OpenAPI surface exposes exactly four Service Lifecycle GET
+  operations and no POST, PUT, PATCH, or DELETE lifecycle operations.
+- Verified the read-only HTTP surface requires `system.health.read`.
+- Verified Atlas Doctor after the implementation.
+- Preserved the v1.0 read-only boundary: restart, update, rollback, lifecycle
+  writes, Update Discovery API, Maintenance History API, and Portal UI remain
+  outside M-018.30.
 
 - Validated live read-only discovery across 15 Docker Compose services.
 - Validated live identity, runtime, image, and health output for Jellyfin,

@@ -17,7 +17,7 @@ stop, restart, pull, update, recreate, or remove containers.
 - Keep orchestration and reporting provider-independent.
 - Make human and JSON output consume the same service-layer reports.
 - Preserve deterministic ordering, validation, serialization, and timestamps.
-- Support future API and Portal consumers without duplicating business logic.
+- Support API and future Portal consumers without duplicating business logic.
 - Establish safe boundaries before guarded lifecycle mutations are introduced.
 
 ## Non-Goals
@@ -34,7 +34,7 @@ The current subsystem does not provide:
 ## Layered Architecture
 
 ```text
-Atlas CLI / Future API / Future Portal
+Atlas CLI / Atlas API / Future Portal
                  │
                  ▼
       ServiceLifecycleService
@@ -272,6 +272,40 @@ checks, missing dependencies, and configuration warnings.
 Service Graph will expose the dependency contract in human-readable and JSON
 forms. Update discovery will inspect image identity and registry state without
 applying changes. Maintenance history will provide durable audit visibility.
+
+## Read-Only API Contract
+
+M-018.30 exposes the first Service Lifecycle HTTP transport boundary. The API
+remains a presentation/transport adapter over the existing
+`ServiceLifecycleService`; it does not move provider or lifecycle business logic
+into FastAPI routes.
+
+The v1 read-only surface is:
+
+```text
+GET /api/v1/services
+GET /api/v1/services/{service_identifier}
+GET /api/v1/services/health
+GET /api/v1/services/summary
+```
+
+The endpoints adapt the existing normalized managed-service,
+`InfrastructureHealthReport`, and `InfrastructureSummary` contracts. They use
+the existing `system.health.read` authorization permission and return
+non-leaking HTTP errors when the Service Lifecycle provider is unavailable.
+
+The API does not call Docker Compose directly. Default dependency construction
+creates `DockerComposeProvider` behind `ServiceLifecycleService`, preserving the
+same provider-independent orchestration boundary used by the CLI.
+
+M-018.30 introduces no POST, PUT, PATCH, or DELETE Service Lifecycle operations.
+Restart, update, rollback, operation locking, maintenance writes, audit-event
+publication, Update Discovery API, Maintenance History API, and Portal
+integration remain outside this slice.
+
+Dedicated route tests cover collection, detail, unknown-service handling,
+aggregate health, infrastructure summary, provider failure, authorization,
+static route precedence, and the GET-only OpenAPI contract.
 
 ## Future Guarded Lifecycle Operations
 
@@ -648,7 +682,7 @@ The following remain intentionally open:
 - bulk-update and maintenance-window orchestration;
 - lifecycle maintenance-event publication;
 - `atlas service update <service> --dry-run`;
-- guarded lifecycle API endpoints and authorization tests; and
+- guarded lifecycle mutation API endpoints and authorization tests; and
 - Service Lifecycle administration in the Portal.
 
 The existing Service Lifecycle CLI and provider boundary therefore remain

@@ -6,6 +6,11 @@ from functools import lru_cache
 import os
 from pathlib import Path
 
+from atlas.service_lifecycle import (
+    DockerComposeProvider,
+    ServiceLifecycleService,
+)
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -251,6 +256,44 @@ def get_operations_repository() -> OperationsRepository:
     return FileOperationsRepository(
         normalized_root,
     )
+
+
+
+@lru_cache(maxsize=1)
+def get_service_lifecycle_service() -> ServiceLifecycleService:
+    """Return the process-wide read-only Service Lifecycle service."""
+
+    project_root = Path(
+        os.environ.get(
+            "ATLAS_PROJECT_ROOT",
+            "/opt/project-atlas",
+        )
+    )
+
+    compose_file = Path(
+        os.environ.get(
+            "ATLAS_SERVICE_LIFECYCLE_COMPOSE_FILE",
+            str(project_root / "docker-compose.yml"),
+        )
+    )
+
+    project_directory_value = os.environ.get(
+        "ATLAS_SERVICE_LIFECYCLE_PROJECT_DIRECTORY"
+    )
+
+    project_directory = (
+        Path(project_directory_value)
+        if project_directory_value
+        else compose_file.parent
+    )
+
+    provider = DockerComposeProvider(
+        compose_file=compose_file,
+        project_directory=project_directory,
+        environment=os.environ,
+    )
+
+    return ServiceLifecycleService(provider)
 
 
 def get_current_user(

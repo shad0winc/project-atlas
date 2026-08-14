@@ -6428,3 +6428,60 @@ lifecycle operations. Administrator authorization, allow-listed mutation
 targets, update/restart execution, dependency-aware execution, locking,
 rollback execution, bulk planning, maintenance windows, CLI/API mutation, and
 Portal lifecycle administration remain separate M-018 work.
+
+## M-018.30 — Read-Only Service Lifecycle API Foundation
+
+### Scope
+
+M-018.30 adds the first HTTP transport adapter over the existing
+provider-independent Service Lifecycle read-only contracts. The slice is
+intentionally limited to operational visibility required by the v1.0
+administrator experience.
+
+### Implemented
+
+- Added `GET /api/v1/services` for normalized managed-service collection.
+- Added `GET /api/v1/services/{service_identifier}` for managed-service detail.
+- Added `GET /api/v1/services/health` for aggregate infrastructure health.
+- Added `GET /api/v1/services/summary` for normalized infrastructure summary.
+- Added typed API response schemas that adapt canonical domain `to_dict()`
+  serialization.
+- Added the API dependency factory for `ServiceLifecycleService` backed by the
+  existing `DockerComposeProvider`.
+- Registered the Service Lifecycle v1 router.
+- Reused the existing `system.health.read` authorization permission.
+- Added nine dedicated Service Lifecycle HTTP route tests.
+
+### Architecture Boundary
+
+The API is a typed transport layer only. It consumes
+`ServiceLifecycleService`; routes do not call Docker or Docker Compose directly
+and do not duplicate lifecycle business rules.
+
+M-018.30 exposes exactly four GET operations. It does not add restart, update,
+rollback, lifecycle writes, operation locks, maintenance writes, audit-event
+publication, Update Discovery API, Maintenance History API, or Portal UI.
+
+The ROADMAP API items are therefore split between the completed read-only
+transport/authorization boundary and the still-open guarded mutation API
+boundary. M-018 remains in progress.
+
+### Validation
+
+- 9 dedicated Service Lifecycle API route tests passed.
+- 357 Atlas API tests and 15 subtests passed.
+- 597 Service Lifecycle regression tests passed.
+- 225 Docker Compose provider regression tests passed.
+- GET-only OpenAPI mutation-exclusion validation passed.
+- Complete five-file whitespace validation passed.
+- Atlas Doctor passed.
+- The final five-file source review reconstructed the frozen implementation diff
+  byte-for-byte with SHA-256
+  `66d60207f6956913c8bf4effabfd0da869e4e949bd7e6ed421c60298d0034ba2`.
+
+### Release Boundary
+
+This backend transport foundation satisfies the API prerequisite for v1.0
+service visibility. It does not by itself certify the Administration Portal
+health/service-visibility journey. Portal presentation and user-acceptance
+validation remain separate release work.
