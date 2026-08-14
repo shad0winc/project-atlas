@@ -373,100 +373,44 @@ episode.
 
 ### 8.4.1 Seerr Monitoring and Migration Gate
 
+**Status: PASSED under E2.5 production acceptance.**
+
 Series-request certification requires the canonical Seerr runtime rather than
-the legacy deployed Jellyseerr image. The repository pins Seerr v3.4.1, while
-the B3.3.3C read-only runtime review confirmed that the production container
-still uses the legacy `fallenbagel/jellyseerr:latest` lineage and does not expose
-`monitorNewItems`.
+the legacy Jellyseerr image. E2.5 completed that controlled production
+migration to the repository-pinned Seerr v3.4.1 runtime.
 
-The production deployment gate must therefore:
+The production gate completed the required controls:
 
-1. create and verify a pre-change backup of the Seerr/Jellyseerr configuration;
-2. verify the mounted configuration directory is writable by the account used
-   by the pinned Seerr image before recreation;
-3. preserve the current image identity and rollback path;
-4. recreate/migrate the service only inside maintenance control;
-5. verify the migrated standard-TV and anime-TV Sonarr service identities still
-   match Atlas's server-owned routing configuration;
-6. set and verify `monitorNewItems=all` on both supported Sonarr services;
-7. verify Atlas API connectivity and request preflight after migration; and
-8. complete production E2E validation for both ongoing standard TV and ongoing
-   anime TV before the monitoring acceptance item is marked complete.
+1. pre-change Seerr/Jellyseerr configuration and rollback evidence were
+   preserved;
+2. the migration ran inside Atlas maintenance and deployment-lock control;
+3. post-migration standard-TV and anime-TV service identities were revalidated
+   against Atlas's server-owned routing configuration;
+4. `monitorNewItems=all` was verified for both supported Sonarr services;
+5. Atlas API/provider connectivity and request preflight were reverified after
+   migration; and
+6. controlled production acceptance exercised both the retained standard-TV
+   path and the Anime-TV path.
 
-`monitorNewItems` is a Seerr Sonarr-service policy. Atlas must not represent it
-as caller-controlled Request state or silently imply that a season-scope choice
-changes the downstream service policy.
+The passing Anime-TV acceptance used Demon Slayer: Kimetsu no Yaiba Season 2.
+Atlas persisted `media_type=anime_tv`, Seerr routed provider request `3` to
+server `1`, Anime Sonarr created the target under `/media/Anime TV` with
+`seriesType=anime`, Season 2 remained monitored, and standard Sonarr had zero
+matching targets after submission.
 
-## 8.5 Favorites and Protection
+The preceding Mushoku Tensei acceptance attempt exposed a routing-harness
+defect. It failed closed and was explicitly reconciled without media loss; it
+is recovery/hardening evidence rather than the passing Anime-TV case.
 
-The favorites workflow must be complete from the user's perspective.
+`monitorNewItems` remains Seerr Sonarr-service policy. Atlas Request season
+scope remains explicit user-selected Request state and must not be represented
+as a caller-controlled future-monitoring toggle.
 
-A user must be able to:
-
-- add a favorite;
-- see it in personal favorites;
-- understand that it is protected where applicable;
-- remove the favorite;
-- observe the corresponding protection-state update.
-
-The user-facing behavior must remain consistent with the underlying retention
-and cleanup contracts.
-
-## 8.6 Core Health Visibility
-
-Administrators must be able to inspect, through supported interfaces:
-
-- overall system health;
-- individual service health;
-- storage state;
-- recent significant failures.
-
-Forecasting, advanced correlation, and predictive operational recommendations
-are deferred beyond v1.0 unless required to resolve a discovered release risk.
-
-## 8.7 Core Notifications
-
-Atlas v1.0 must provide or clearly surface the essential notifications required
-for supported workflows:
-
-- invitation issued;
-- request submitted;
-- request approved or otherwise resolved;
-- requested media available;
-- significant administrative failure.
-
-Additional sports, retention, enforcement, and preference notifications may be
-deferred when they do not prevent completion of the core user journey.
-
-## 8.8 Operational Readiness
-
-The platform must have validated procedures for:
-
-- installation;
-- configuration;
-- upgrades;
-- backups;
-- restoration or recovery;
-- service diagnostics;
-- common failure handling;
-- release rollback where practical.
-
-Operational readiness must be based on documented and reproducible procedures.
-
-## 8.9 Release Packaging and Certification
-
-Before release:
-
-- version sources must agree;
-- release notes must be complete;
-- migration or upgrade guidance must be complete;
-- known limitations must be explicit;
-- release validation must pass;
-- user acceptance must pass;
-- release certification must be approved;
-- the release commit and tag must be prepared correctly.
-
----
+Passing this gate closes the production Seerr migration, post-migration route
+verification, service-level monitoring verification, and TV/anime
+ongoing-series acceptance requirements. It does not by itself close the
+remaining release-candidate, broader journey, accessibility, performance,
+sustained-use, pilot, stabilization, or final v1.0 approval gates.
 
 # 9. Acceptance Criteria
 

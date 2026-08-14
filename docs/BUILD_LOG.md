@@ -6244,3 +6244,133 @@ The following remain open before v1.0 release acceptance:
 - final release-candidate and v1.0 certification gates.
 
 No production mutation is performed by M-023.27C documentation reconciliation.
+
+---
+
+# 2026-08-14
+
+## M-023.27C2 — E2.5 Seerr Migration and TV / Anime Production Acceptance Closure
+
+### Objective
+
+Complete the controlled production Seerr migration and close the remaining E2.5
+TV/anime routing and ongoing-series acceptance gates without rewriting the
+failed first migration attempt or bypassing Atlas's fail-closed deployment
+boundary.
+
+### Controlled Migration
+
+The subsequent production migration ran under transaction
+`seerr-migration-20260813T001057Z-760620`.
+
+The transaction retained:
+
+- the verified pre-change deployment baseline;
+- maintenance isolation;
+- deployment-lock ownership;
+- explicit rollback and recovery evidence;
+- exact `main` / `release/v1.0.0` source guards; and
+- fail-closed transaction state through runtime verification.
+
+The migrated Seerr runtime reached deployment phase `runtime_verified` and
+status `migration_runtime_ready`.
+
+Post-migration inspection confirmed the two supported Sonarr routes remained
+server-owned and distinct:
+
+- standard TV uses Seerr server `0`;
+- anime TV uses Seerr server `1`;
+- the Anime route resolves to `sonarr-anime`;
+- the Anime root is `/media/Anime TV`; and
+- `monitorNewItems=all` remains the service-level monitoring policy rather than
+  caller-controlled Atlas Request state.
+
+### Anime Acceptance Recovery
+
+The first Anime-TV production acceptance candidate used Mushoku Tensei:
+Jobless Reincarnation.
+
+That acceptance attempt exposed a harness/discriminator routing defect and did
+not count as successful Anime-TV certification. The resulting series metadata
+was observed in standard Sonarr while seven Season 3 media files had already
+been acquired.
+
+Atlas remained fail closed. Recovery:
+
+- preserved all seven files totaling `9082576845` bytes;
+- removed the incorrect standard-Sonarr series metadata without deleting media;
+- moved the preserved media into the Anime TV library;
+- adopted the series into Anime Sonarr as `seriesType=anime`;
+- verified all seven S03E01-S03E07 files were registered after reconciliation;
+- removed only the stale Seerr and Atlas request artifacts; and
+- left the certified standard-TV acceptance request intact.
+
+This recovery is incident/reconciliation evidence, not the successful Anime-TV
+acceptance case.
+
+### Successful Anime-TV Production Acceptance
+
+A fresh candidate was selected through the running Atlas discovery/provider
+contract:
+
+- title: `Demon Slayer: Kimetsu no Yaiba`;
+- TMDB ID: `85937`;
+- selected scope: Season `2` (`Mugen Train Arc`);
+- Atlas mutation type: `anime_tv`.
+
+Immediately before mutation, Atlas, Seerr, standard Sonarr, and Anime Sonarr
+all verified that Demon Slayer was absent.
+
+The single production request then succeeded:
+
+- Atlas request:
+  `req_b76ef6ae564a46b4981222b447cce7fb`;
+- provider request: `3`;
+- Atlas status: `approved`;
+- persisted media type: `anime_tv`;
+- Seerr `serverId`: `1`;
+- requested Seerr seasons: `[2]`;
+- Anime Sonarr series ID: `2`;
+- Anime Sonarr path:
+  `/media/Anime TV/Demon Slayer - Kimetsu no Yaiba`;
+- Anime Sonarr series type: `anime`;
+- Season 2 monitored: `true`; and
+- standard Sonarr Demon Slayer matches after submission: `0`.
+
+`atlas doctor` and the final fail-closed transaction guard passed after the
+state-changing acceptance.
+
+### Closure
+
+The immutable closure certification is:
+
+```text
+/tmp/project-atlas-e2-5-anime-tv-closure-certification.txt
+SHA-256:
+8a974fb51ff1f0d8651cf4e17f0f36a430cb1de63b50bebfdc0201ca4f79e385
+```
+
+The closure reverified:
+
+- exactly two Atlas requests, preserving the standard-TV acceptance request;
+- exactly two Seerr requests;
+- Anime-TV request `3` on server `1`;
+- one authoritative Demon Slayer target in Anime Sonarr;
+- no Demon Slayer target in standard Sonarr;
+- `anime_tv -> server 1`;
+- standard TV -> server `0`;
+- Atlas Doctor PASS;
+- repository cleanliness; and
+- retained maintenance/deployment-lock ownership.
+
+### Result
+
+E2.5 production migration, post-migration routing, service-level monitoring,
+standard-TV acceptance, and Anime-TV acceptance are certified complete.
+
+E2.5 attempt #1 remains historical failure/recovery evidence and is not
+reclassified as a successful migration.
+
+Final release-candidate creation, remaining user-acceptance journeys,
+accessibility/performance/sustained-use validation, controlled pilot,
+stabilization, and final v1.0 approval remain separate release gates.

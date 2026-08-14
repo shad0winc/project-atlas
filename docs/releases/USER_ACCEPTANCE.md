@@ -477,20 +477,47 @@ The monitoring policy is service-owned. Season scope selected by the user is
 Atlas Request state; `monitorNewItems` is not a caller-controlled Request field
 and must not be presented as a per-request toggle.
 
-At source checkpoint `ad84a30d`, Atlas has normalized TV-series/season metadata,
-fail-closed per-season requestability, explicit server-owned TV/anime-TV routing
-and submission preflight, and Portal explicit one-season mutation. Source
-completion does not certify production. The controlled Seerr migration,
-post-migration route verification, `monitorNewItems=all` validation, and
-ongoing-series production E2E acceptance remain open.
+The source-level explicit-season TV/anime workflow was subsequently exercised
+through controlled production E2.5 acceptance. The repository-pinned Seerr
+runtime was deployed under maintenance, backup, rollback, and deployment-lock
+control. Post-migration validation confirmed server-owned standard-TV and
+anime-TV routing and service-level `monitorNewItems=all` ownership.
+
+The passing Anime-TV acceptance used Demon Slayer: Kimetsu no Yaiba Season 2.
+Atlas persisted `media_type=anime_tv`; Seerr request `3` used server `1`; the
+series appeared only in `sonarr-anime` under `/media/Anime TV`; Season 2 was
+monitored; and standard Sonarr remained free of the Anime target.
+
+A prior Mushoku Tensei acceptance attempt exposed a routing-harness defect,
+failed closed, and was reconciled without media loss. That attempt is retained
+as recovery evidence and is not counted as the passing Anime-TV case.
 
 ### Observed Result
 
-______________________________________________
+E2.5 production acceptance passed.
+
+- Controlled Jellyseerr-to-Seerr migration completed under the Atlas deployment
+  transaction.
+- Standard-TV and Anime-TV provider routing were revalidated after migration.
+- `monitorNewItems=all` was verified as service-owned downstream policy.
+- Standard-TV acceptance remained valid.
+- Demon Slayer: Kimetsu no Yaiba Season 2 was submitted as `anime_tv`.
+- Seerr routed the request to server `1`.
+- Anime Sonarr owned the resulting target at
+  `/media/Anime TV/Demon Slayer - Kimetsu no Yaiba`.
+- Anime Sonarr reported `seriesType=anime`.
+- Season 2 remained monitored.
+- Standard Sonarr had zero Demon Slayer matches after submission.
+- Atlas Doctor and the final fail-closed transaction guard passed.
+
+Closure evidence:
+
+`8a974fb51ff1f0d8651cf4e17f0f36a430cb1de63b50bebfdc0201ca4f79e385`
 
 ### Pass / Fail
 
-______________________________________________
+**PASS — E2.5 TV / Anime production request routing and ongoing-series
+monitoring acceptance.**
 
 ### Reviewer
 
