@@ -37,6 +37,7 @@ check "Sports media directory present" test -d "$ATLAS_MEDIA_ROOT/Sports"
 check "Module compose valid" \
   docker compose \
     --env-file "$OPERATOR_ENV_FILE" \
+    --env-file "$MODULE_ENV_FILE" \
     -f "$ATLAS_PROJECT_DIR/modules/sports/docker-compose.yml" \
     config
 check "Module metadata present" test -f "$ATLAS_PROJECT_DIR/modules/sports/module.conf"
