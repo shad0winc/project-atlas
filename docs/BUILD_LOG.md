@@ -6618,3 +6618,17 @@ This milestone does **not** certify final representative User Acceptance.
 Update Availability presentation, Maintenance History presentation,
 representative administrator journey execution, and final v1.0 approval remain
 open. Guarded lifecycle mutation remains outside the v1.0 read-only boundary.
+
+---
+
+## M-018.33 — Update Availability
+
+Repository-wide discovery established that Atlas already owned the canonical Update Discovery domain, so M-018.33 evolved that architecture rather than creating a duplicate subsystem.
+
+M-018.33A added read-only registry comparison through `docker buildx imagetools inspect --raw <reference>`. Focused certification passed 233 provider tests, 63 Update Discovery model/service tests, and 53 CLI contract tests. Live discovery observed 15 services: 8 current, 5 update-available, and 2 unknown.
+
+M-018.33B added GET-only `GET /api/v1/services/updates`, reusing the canonical lifecycle service, `ServiceUpdateService`, and `UpdateReport`. Certification passed 11 focused route tests, 359 full API tests, 15 API subtests, OpenAPI GET-only validation, and live in-process API validation.
+
+M-018.33C extended the existing Service Lifecycle Portal snapshot with Update Availability while leaving the existing hook and M-018.32 responsive CSS unchanged. The public feature index exports `createServiceUpdateReport`, `ServiceUpdate`, `ServiceUpdateReport`, and `ServiceUpdateStatus`.
+
+Final live acceptance exercised registry -> provider -> domain -> API -> Portal normalizer -> ServiceOverview rendering. Bazarr, Dozzle, Homepage, qBittorrent, and Tautulli rendered update-available; Jellyseerr and Maintainerr rendered unknown; the remaining eight services rendered current. No lifecycle mutation control was introduced.

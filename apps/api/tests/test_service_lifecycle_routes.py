@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from atlas.service_lifecycle import ServiceLifecycleError
 from atlas_api.dependencies import (
     get_service_lifecycle_service,
+    get_service_update_service,
 )
 from atlas_api.main import create_app
 from atlas_api.routes.v1.services import (
@@ -143,16 +144,73 @@ class FakeServiceLifecycleService:
         )
 
 
+class FakeServiceUpdateService:
+    """Deterministic read-only Update Discovery HTTP double."""
+
+    def __init__(self) -> None:
+        self.fail = False
+        self.calls = 0
+
+    def inspect_updates(self):
+        self.calls += 1
+
+        if self.fail:
+            raise ServiceLifecycleError(
+                "service provider failed to inspect update"
+            )
+
+        return Serializable(
+            {
+                "status": "updates-available",
+                "provider": "docker-compose",
+                "total_services": 2,
+                "counts": {
+                    "current": 1,
+                    "update-available": 1,
+                    "mutable-tag": 0,
+                    "unknown": 0,
+                    "unsupported": 0,
+                },
+                "requires_attention": True,
+                "attention": [
+                    {
+                        "service_identifier": "sonarr",
+                        "service_name": "Sonarr",
+                        "status": "update-available",
+                    }
+                ],
+                "updates": [
+                    {
+                        "service_identifier": "sonarr",
+                        "service_name": "Sonarr",
+                        "status": "update-available",
+                    },
+                    {
+                        "service_identifier": "jellyfin",
+                        "service_name": "Jellyfin",
+                        "status": "current",
+                    },
+                ],
+                "evaluated_at": "2026-08-15T00:00:00Z",
+            }
+        )
+
+
 class ServiceLifecycleRouteTests(unittest.TestCase):
     """Verify GET-only Service Lifecycle HTTP behavior."""
 
     def setUp(self) -> None:
         self.app = create_app()
         self.service = FakeServiceLifecycleService()
+        self.update_service = FakeServiceUpdateService()
 
         self.app.dependency_overrides[
             get_service_lifecycle_service
         ] = lambda: self.service
+
+        self.app.dependency_overrides[
+            get_service_update_service
+        ] = lambda: self.update_service
 
         self.app.dependency_overrides[
             require_service_lifecycle_read
@@ -267,6 +325,62 @@ class ServiceLifecycleRouteTests(unittest.TestCase):
             payload["total_services"],
         )
 
+    def test_reads_service_update_report(self) -> None:
+        response = self.client.get(
+            "/api/v1/services/updates"
+        )
+
+        self.assertEqual(
+            status.HTTP_200_OK,
+            response.status_code,
+        )
+
+        report = response.json()["report"]
+
+        self.assertEqual(
+            "updates-available",
+            report["status"],
+        )
+        self.assertEqual(
+            "docker-compose",
+            report["provider"],
+        )
+        self.assertEqual(
+            2,
+            report["total_services"],
+        )
+        self.assertEqual(
+            1,
+            report["counts"]["update-available"],
+        )
+        self.assertTrue(
+            report["requires_attention"]
+        )
+        self.assertEqual(
+            1,
+            self.update_service.calls,
+        )
+
+    def test_update_provider_failure_returns_503(self) -> None:
+        self.update_service.fail = True
+
+        response = self.client.get(
+            "/api/v1/services/updates"
+        )
+
+        self.assertEqual(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            response.status_code,
+        )
+
+        self.assertEqual(
+            {
+                "detail":
+                    "Service Lifecycle is unavailable."
+            },
+            response.json(),
+        )
+
     def test_provider_failure_returns_503(self) -> None:
         self.service.fail_list = True
 
@@ -298,16 +412,18 @@ class ServiceLifecycleRouteTests(unittest.TestCase):
             require_service_lifecycle_read
         ] = forbidden
 
-        response = self.client.get(
-            "/api/v1/services"
-        )
+        for path in (
+            "/api/v1/services",
+            "/api/v1/services/updates",
+        ):
+            response = self.client.get(path)
 
-        self.assertEqual(
-            status.HTTP_403_FORBIDDEN,
-            response.status_code,
-        )
+            self.assertEqual(
+                status.HTTP_403_FORBIDDEN,
+                response.status_code,
+            )
 
-    def test_static_health_and_summary_routes_are_not_detail(
+    def test_static_routes_are_not_detail(
         self,
     ) -> None:
         health = self.client.get(
@@ -316,10 +432,15 @@ class ServiceLifecycleRouteTests(unittest.TestCase):
         summary = self.client.get(
             "/api/v1/services/summary"
         )
+        updates = self.client.get(
+            "/api/v1/services/updates"
+        )
 
         self.assertEqual(200, health.status_code)
         self.assertEqual(200, summary.status_code)
+        self.assertEqual(200, updates.status_code)
         self.assertEqual([], self.service.inspect_calls)
+        self.assertEqual(1, self.update_service.calls)
 
     def test_openapi_registers_get_only_service_routes(
         self,
@@ -330,6 +451,7 @@ class ServiceLifecycleRouteTests(unittest.TestCase):
             "/api/v1/services",
             "/api/v1/services/health",
             "/api/v1/services/summary",
+            "/api/v1/services/updates",
             "/api/v1/services/{service_identifier}",
         )
 

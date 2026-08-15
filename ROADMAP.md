@@ -273,7 +273,7 @@ for Atlas-managed infrastructure.
 
 - [x] Add managed-service overview
 - [x] Add service health cards
-- [ ] Add update-availability indicators
+- [x] Add update-availability indicators
 - [x] Add service detail views
 - [ ] Add restart confirmation workflow
 - [ ] Add guarded update confirmation workflow

@@ -327,9 +327,35 @@ for path in files:
             raise SystemExit(f"{path.name} missing {sorted(missing)}")
         if payload["total_services"] != len(payload["updates"]):
             raise SystemExit("updates total_services mismatch")
-        if payload["counts"].get("update-available", 0) != 0:
+        canonical_statuses = {
+            "current",
+            "update-available",
+            "mutable-tag",
+            "unknown",
+            "unsupported",
+        }
+
+        observed_statuses = {
+            str(update.get("status"))
+            for update in payload["updates"]
+        }
+
+        unexpected_statuses = observed_statuses - canonical_statuses
+
+        if unexpected_statuses:
             raise SystemExit(
-                "Local-only update discovery claimed an available update"
+                "updates contain non-canonical statuses: "
+                f"{sorted(unexpected_statuses)}"
+            )
+
+        counted_services = sum(
+            int(payload["counts"].get(status, 0))
+            for status in canonical_statuses
+        )
+
+        if counted_services != payload["total_services"]:
+            raise SystemExit(
+                "updates counts do not reconcile with total_services"
             )
 
     if path.name.startswith("history"):

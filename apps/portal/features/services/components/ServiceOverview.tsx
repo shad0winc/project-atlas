@@ -3,7 +3,8 @@ import { Card } from "../../../components/ui/Card";
 import type {
   ManagedService,
   ManagedServiceDetail,
-  ServiceLifecycleSnapshot
+  ServiceLifecycleSnapshot,
+  ServiceUpdateStatus
 } from "../types/services";
 
 import { ServiceHealthCard } from "./ServiceHealthCard";
@@ -42,6 +43,21 @@ function displayRawValue(value: unknown): string {
   return JSON.stringify(value);
 }
 
+function updateStatusLabel(status: ServiceUpdateStatus): string {
+  switch (status) {
+    case "current":
+      return "Current";
+    case "update-available":
+      return "Update available";
+    case "mutable-tag":
+      return "Mutable tag";
+    case "unsupported":
+      return "Unsupported";
+    default:
+      return "Unknown";
+  }
+}
+
 export function ServiceOverview({
   snapshot,
   detail,
@@ -51,6 +67,13 @@ export function ServiceOverview({
   onSelectService,
   onClearSelection
 }: ServiceOverviewProps): React.ReactElement {
+  const updateStatusByService = new Map(
+    snapshot.updates.updates.map((update) => [
+      update.serviceIdentifier,
+      update.status
+    ])
+  );
+
   return (
     <div className="dashboard-runtime">
       <section aria-label="Service Lifecycle summary" className="dashboard-metric-grid">
@@ -66,6 +89,19 @@ export function ServiceOverview({
           <p>
             Running {snapshot.summary.running} · Stopped {snapshot.summary.stopped} · Restarting{" "}
             {snapshot.summary.restarting} · Failed {snapshot.summary.failed}
+          </p>
+        </Card>
+
+        <Card>
+          <p>Update availability</p>
+          <h3>
+            {snapshot.updates.updateAvailable === 1
+              ? "1 update available"
+              : `${snapshot.updates.updateAvailable} updates available`}
+          </h3>
+          <p>
+            Current {snapshot.updates.current} · Unknown {snapshot.updates.unknown} · Unsupported{" "}
+            {snapshot.updates.unsupported}
           </p>
         </Card>
       </section>
@@ -89,6 +125,12 @@ export function ServiceOverview({
                 <p>Status: {serviceStatus(service)}</p>
                 <p>Runtime: {service.runtimeStatus}</p>
                 <p>Health: {service.healthStatus}</p>
+                <p>
+                  Updates:{" "}
+                  {updateStatusLabel(
+                    updateStatusByService.get(service.identifier) ?? "unknown"
+                  )}
+                </p>
                 <button
                   className="dashboard-retry-button"
                   onClick={() => onSelectService(service.identifier)}

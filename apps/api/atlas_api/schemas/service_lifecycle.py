@@ -102,6 +102,28 @@ class ServiceLifecycleSummaryResponse(BaseModel):
         )
 
 
+class ServiceUpdateReportResponse(BaseModel):
+    """Canonical read-only Update Discovery report."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+    )
+
+    report: dict[str, Any]
+
+    @classmethod
+    def from_domain(
+        cls,
+        report: object,
+    ) -> "ServiceUpdateReportResponse":
+        """Adapt one canonical UpdateReport."""
+
+        return cls(
+            report=_serialize_domain(report),
+        )
+
+
 def _serialize_domain(
     value: object,
 ) -> dict[str, Any]:
@@ -129,4 +151,5 @@ __all__ = [
     "ManagedServiceListResponse",
     "ServiceLifecycleHealthResponse",
     "ServiceLifecycleSummaryResponse",
+    "ServiceUpdateReportResponse",
 ]

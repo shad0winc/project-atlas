@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from json import JSONDecodeError, loads
@@ -308,23 +310,60 @@ class DockerComposeProvider(ServiceLifecycleProvider):
         self,
         identifier: str,
     ) -> ServiceUpdate:
-        """Return locally verifiable image update metadata."""
+        """Return bounded read-only registry update metadata."""
 
         service = self.inspect_service(identifier)
         runtime = self.inspect_runtime(service.identifier)
         current_image = _update_image_from_runtime(runtime)
 
-        if current_image.is_mutable:
+        local_digest: str | None = None
+        remote_digest: str | None = None
+        registry_comparison = False
+        available_image: ImageReference | None = None
+
+        # A digest-only reference identifies one immutable object but provides
+        # no tag target from which Atlas can discover a newer replacement.
+        if current_image.tag is not None:
+            local_digest = self._inspect_local_image_descriptor_digest(
+                runtime.image.image_id,
+            )
+            remote_digest = self._inspect_remote_image_digest(
+                runtime.image.reference,
+            )
+            registry_comparison = (
+                local_digest is not None
+                and remote_digest is not None
+            )
+
+        if registry_comparison:
+            if local_digest == remote_digest:
+                status = UpdateStatus.CURRENT
+                reason = (
+                    "The local image descriptor matches the current "
+                    "registry manifest digest."
+                )
+            else:
+                status = UpdateStatus.UPDATE_AVAILABLE
+                reason = (
+                    "The registry manifest digest differs from the local "
+                    "image descriptor."
+                )
+                available_image = ImageReference(
+                    repository=current_image.repository,
+                    tag=current_image.tag,
+                    digest=remote_digest,
+                )
+        elif current_image.is_mutable:
             status = UpdateStatus.MUTABLE_TAG
             reason = (
                 "The configured image uses the mutable latest tag; "
-                "registry comparison has not been performed."
+                "registry comparison could not be completed."
             )
         else:
             status = UpdateStatus.UNKNOWN
             reason = (
-                "The local image identity is known, but no registry "
-                "comparison has been performed."
+                "The configured image does not have a comparable registry "
+                "identity, or registry comparison could not be completed."
             )
 
         return ServiceUpdate(
@@ -332,14 +371,83 @@ class DockerComposeProvider(ServiceLifecycleProvider):
             service_name=service.name,
             current_image=current_image,
             status=status,
+            available_image=available_image,
             reason=reason,
             details={
                 "source": "local-docker",
-                "registry_comparison": False,
+                "registry_comparison": registry_comparison,
                 "configured_reference": runtime.image.reference,
                 "local_image_id": runtime.image.image_id,
                 "local_image_created_at": runtime.image.created_at,
+                "local_descriptor_digest": local_digest,
+                "remote_manifest_digest": remote_digest,
             },
+        )
+
+    def _inspect_local_image_descriptor_digest(
+        self,
+        image_id: str | None,
+    ) -> str | None:
+        """Return Docker's stored top-level descriptor digest."""
+
+        if image_id is None or not image_id.strip():
+            return None
+
+        try:
+            result = self._run_docker(
+                "image",
+                "inspect",
+                "--format",
+                "{{json .Descriptor}}",
+                image_id,
+            )
+        except DockerComposeProviderError:
+            return None
+
+        if not result.stdout.strip():
+            return None
+
+        try:
+            descriptor = loads(result.stdout)
+        except JSONDecodeError:
+            return None
+
+        if not isinstance(descriptor, dict):
+            return None
+
+        digest = descriptor.get("digest")
+
+        if not _is_sha256_digest(digest):
+            return None
+
+        assert isinstance(digest, str)
+        return digest.strip().casefold()
+
+    def _inspect_remote_image_digest(
+        self,
+        reference: str,
+    ) -> str | None:
+        """Return the digest of the registry's raw top-level manifest."""
+
+        try:
+            result = self._run_docker(
+                "buildx",
+                "imagetools",
+                "inspect",
+                "--raw",
+                reference,
+            )
+        except DockerComposeProviderError:
+            return None
+
+        if not result.stdout:
+            return None
+
+        return (
+            "sha256:"
+            + hashlib.sha256(
+                result.stdout.encode("utf-8"),
+            ).hexdigest()
         )
 
     def _resolve_container_identifier(
@@ -935,6 +1043,28 @@ def _docker_status_message(
         return error.strip()
 
     return runtime_state
+
+
+def _is_sha256_digest(value: object) -> bool:
+    """Return whether value is one normalized SHA-256 digest."""
+
+    if not isinstance(value, str):
+        return False
+
+    normalized = value.strip().casefold()
+
+    if not normalized.startswith("sha256:"):
+        return False
+
+    digest = normalized.removeprefix("sha256:")
+
+    return (
+        len(digest) == 64
+        and all(
+            character in "0123456789abcdef"
+            for character in digest
+        )
+    )
 
 
 def _split_image_reference(

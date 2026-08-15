@@ -5,6 +5,7 @@ import {
   createManagedService,
   createManagedServiceDetail,
   createServiceLifecycleSnapshot,
+  createServiceUpdateReport,
   mergeManagedServiceDetail
 } from "../types/services";
 
@@ -107,6 +108,51 @@ describe("Service Lifecycle presentation", () => {
         }
       ],
       evaluated_at: "2026-08-14T00:00:00Z"
+    },
+    updates: {
+      status: "updates-available",
+      provider: "docker-compose",
+      total_services: 2,
+      counts: {
+        current: 1,
+        "update-available": 1,
+        "mutable-tag": 0,
+        unknown: 0,
+        unsupported: 0
+      },
+      requires_attention: true,
+      attention: [
+        {
+          service_identifier: "sonarr",
+          service_name: "Sonarr",
+          status: "update-available"
+        }
+      ],
+      updates: [
+        {
+          service_identifier: "jellyfin",
+          service_name: "Jellyfin",
+          status: "current",
+          available_image: null,
+          details: {
+            registry_comparison: true
+          }
+        },
+        {
+          service_identifier: "sonarr",
+          service_name: "Sonarr",
+          status: "update-available",
+          available_image: {
+            repository: "lscr.io/linuxserver/sonarr",
+            tag: "latest",
+            digest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          details: {
+            registry_comparison: true
+          }
+        }
+      ],
+      evaluated_at: "2026-08-14T00:00:00Z"
     }
   });
 
@@ -119,6 +165,68 @@ describe("Service Lifecycle presentation", () => {
     expect(snapshot.services[1]?.healthStatus).toBe("degraded");
     expect(snapshot.health.score).toBe(75);
     expect(snapshot.summary.composeProject).toBe("project-atlas");
+    expect(snapshot.updates.totalServices).toBe(2);
+    expect(snapshot.updates.current).toBe(1);
+    expect(snapshot.updates.updateAvailable).toBe(1);
+    expect(snapshot.updates.requiresAttention).toBe(true);
+    expect(snapshot.updates.updates[0]?.status).toBe("current");
+    expect(snapshot.updates.updates[1]?.status).toBe("update-available");
+  });
+
+  it("normalizes every canonical Update Discovery status", () => {
+    const report = createServiceUpdateReport({
+      status: "updates-available",
+      provider: "docker-compose",
+      total_services: 5,
+      counts: {
+        current: 1,
+        "update-available": 1,
+        "mutable-tag": 1,
+        unknown: 1,
+        unsupported: 1
+      },
+      requires_attention: true,
+      updates: [
+        {
+          service_identifier: "jellyfin",
+          service_name: "Jellyfin",
+          status: "current"
+        },
+        {
+          service_identifier: "sonarr",
+          service_name: "Sonarr",
+          status: "update-available"
+        },
+        {
+          service_identifier: "radarr",
+          service_name: "Radarr",
+          status: "mutable-tag"
+        },
+        {
+          service_identifier: "jellyseerr",
+          service_name: "Jellyseerr",
+          status: "unknown"
+        },
+        {
+          service_identifier: "legacy",
+          service_name: "Legacy",
+          status: "unsupported"
+        }
+      ]
+    });
+
+    expect(report.updates.map((update) => update.status)).toEqual([
+      "current",
+      "update-available",
+      "mutable-tag",
+      "unknown",
+      "unsupported"
+    ]);
+    expect(report.current).toBe(1);
+    expect(report.updateAvailable).toBe(1);
+    expect(report.mutableTag).toBe(1);
+    expect(report.unknown).toBe(1);
+    expect(report.unsupported).toBe(1);
   });
 
   it("preserves unavailable service-health status", () => {
@@ -176,10 +284,37 @@ describe("Service Lifecycle presentation", () => {
     expect(markup).toContain("Runtime: running");
     expect(markup).toContain("Health: healthy");
     expect(markup).toContain("Health: degraded");
+    expect(markup).toContain("Update availability");
+    expect(markup).toContain("1 update available");
+    expect(markup).toContain("Updates:");
+    expect(markup).toContain("Current");
+    expect(markup).toContain("Update available");
     expect(markup).toContain("View details");
     expect(markup).not.toContain(">Restart<");
     expect(markup).not.toContain(">Update service<");
     expect(markup).not.toContain(">Rollback<");
+  });
+
+  it("renders missing update observations as unknown", () => {
+    const partialSnapshot = {
+      ...snapshot,
+      updates: {
+        ...snapshot.updates,
+        updates: []
+      }
+    };
+
+    const markup = renderToStaticMarkup(
+      <ServiceOverview
+        onClearSelection={() => undefined}
+        onSelectService={() => undefined}
+        snapshot={partialSnapshot}
+      />
+    );
+
+    expect(markup).toContain("Updates:");
+    expect(markup).toContain("Unknown");
+    expect(markup).not.toContain(">Update service<");
   });
 
   it("merges overview runtime and health into read-only service detail", () => {

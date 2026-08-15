@@ -28,6 +28,10 @@ type ServiceLifecycleSummaryTransportResponse = Readonly<{
   summary: Readonly<Record<string, unknown>>;
 }>;
 
+type ServiceUpdateReportTransportResponse = Readonly<{
+  report: Readonly<Record<string, unknown>>;
+}>;
+
 function getRequestOptions(signal: AbortSignal | undefined) {
   return {
     method: "GET",
@@ -39,7 +43,7 @@ function getRequestOptions(signal: AbortSignal | undefined) {
 export async function loadServiceLifecycleOverview({
   signal
 }: LoadServiceLifecycleOptions = {}): Promise<ServiceLifecycleSnapshot> {
-  const [services, health, summary] = await Promise.all([
+  const [services, health, summary, updates] = await Promise.all([
     authenticatedAtlasApiRequest<ManagedServiceListTransportResponse>(
       "/services",
       getRequestOptions(signal)
@@ -51,13 +55,18 @@ export async function loadServiceLifecycleOverview({
     authenticatedAtlasApiRequest<ServiceLifecycleSummaryTransportResponse>(
       "/services/summary",
       getRequestOptions(signal)
+    ),
+    authenticatedAtlasApiRequest<ServiceUpdateReportTransportResponse>(
+      "/services/updates",
+      getRequestOptions(signal)
     )
   ]);
 
   return createServiceLifecycleSnapshot({
     services: services.services,
     health: health.health,
-    summary: summary.summary
+    summary: summary.summary,
+    updates: updates.report
   });
 }
 

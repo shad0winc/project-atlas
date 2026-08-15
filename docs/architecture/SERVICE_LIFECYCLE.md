@@ -717,3 +717,33 @@ The existing Service Lifecycle CLI and provider boundary therefore remain
 read-only after M-018.29. These contracts establish the normalized planning,
 result, and audit data model required by later guarded-mutation work; they do
 not claim that guarded mutation is complete.
+
+---
+
+## M-018.33 — Read-Only Update Availability
+
+M-018.33 extends the established Service Lifecycle Update Discovery domain without creating a second update model or lifecycle mutation path.
+
+The authoritative domain remains `ImageReference`, `ServiceUpdate`, `UpdateReport`, and `ServiceUpdateService`.
+
+### Registry identity contract
+
+For tag-addressable images, the Docker Compose provider performs bounded read-only registry comparison. Atlas compares Docker's locally stored top-level image descriptor digest with the SHA-256 identity of the registry's raw top-level manifest or image index obtained with:
+
+```text
+docker buildx imagetools inspect --raw <reference>
+```
+
+Platform child-manifest digests and image configuration IDs are not treated as interchangeable update identities.
+
+A completed trusted comparison classifies matching identities as `current` and differing identities as `update-available`. If trustworthy comparison cannot be completed, Atlas preserves conservative `mutable-tag`, `unknown`, or `unsupported` semantics. Digest-only references do not claim knowledge of a newer replacement target.
+
+### API transport
+
+Update Availability is exposed through GET-only `GET /api/v1/services/updates`. The route reuses the existing `system.health.read` permission boundary and canonical `UpdateReport`. It exposes no image pull, restart, Compose recreation, update execution, rollback, or other mutation.
+
+### Portal presentation
+
+The Service Lifecycle Portal snapshot composes read-only services, health, summary, and updates observations. The existing `useServices()` state machine and M-018.32 responsive/mobile-safe presentation are reused unchanged.
+
+The Portal presents aggregate and per-service `current`, `update-available`, `mutable-tag`, `unknown`, and `unsupported` state. Missing observations render as `Unknown`, never `Current`. No Update, Restart, Start, Stop, or Rollback control is introduced.
