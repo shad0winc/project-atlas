@@ -1,6 +1,6 @@
 # ADR-0024: Security Trust Boundaries
 
-Status: Accepted — M-023.26 engineering implementation complete
+Status: Accepted — M-023.26 implementation and v1.0 Security Acceptance complete
 
 ## Context
 
@@ -139,28 +139,32 @@ explicit, bounded acceptance.
 
 ## Release Acceptance
 
-M-023.26 engineering implementation is complete and all ten Security roadmap
-reviews are supported by automated tests, deterministic inspection, or
-controlled runtime evidence appropriate to the reviewed boundary.
+M-023.26 engineering implementation and final v1.0 Security Acceptance are
+complete. The release certification combined automated tests, deterministic
+inspection, protected source promotion, current vulnerability evidence,
+controlled runtime validation, and explicit human residual-risk disposition.
 
-This does not constitute v1.0 Security Acceptance. Before release, current
-certification evidence must still prove:
+The accepted v1.0 boundary records:
 
-- authentication configuration is present and fail-closed;
-- unauthenticated protected API access is rejected;
-- permission enforcement remains deny-by-default;
-- invitation material does not persist in plaintext durable state or logs;
-- browser/session exposure and security headers satisfy the documented policy;
-- only accepted public/network surfaces remain exposed;
-- secret files and secret injection obey least-readable/least-consumer rules;
-- security audit records contain no credential material;
-- dependency scans have no unreviewed release-blocking findings;
-- retained container privileges have explicit justification, including any
-  retained Docker-socket capability;
-- the non-root module ownership transition has been completed and validated
-  through the controlled deployment path;
-- the repository, verified deployment baseline, recovery boundary, and normal
-  maintenance state remain intact through validation.
+- protected PR #23 merged Docker socket hardening into `main`;
+- protected PR #24 reconciled certified `main` into `release/v1.0.0`;
+- both branches share certified tree
+  `9aec3998255306b72521643901b587afe1b314d2`;
+- Notifications runs non-root and six Discord webhooks were rotated and
+  recertified;
+- Anime TV routing and sports-feed nginx runtime corrections are certified;
+- Homepage and Dozzle have zero direct Docker-socket mounts;
+- Dozzle uses the private read-only Docker socket proxy, whose POST mutation
+  path is denied with HTTP 403 and whose image scan reports zero HIGH and zero
+  CRITICAL findings;
+- Atlas-owned fixable CRITICAL findings are zero;
+- the runtime is certified at 22 running containers and zero unhealthy; and
+- 19 remaining fixable HIGH observations attributed to the current Caddy
+  image/runtime are explicitly `ACCEPTED_FOR_V1.0`.
+
+The Caddy acceptance is bounded residual risk, not a claim that the findings
+are fixed. It remains subject to future remediation when a safe supported
+upstream fix becomes available.
 
 ## Consequences
 

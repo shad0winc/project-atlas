@@ -6686,3 +6686,45 @@ M-018.34 closes the v1.0 Maintenance History presentation gate. All v1.0 present
 Separate lifecycle mutation/reporting ROADMAP work remains open, including restart confirmation, guarded update confirmation, and failure/rollback reporting. Those items do not expand the read-only v1.0 presentation contract.
 
 The next release activity is final representative v1.0 User Acceptance and release certification.
+
+---
+
+## V1.0 Final Security Acceptance and Docker Socket Hardening
+
+Final v1.0 Security Acceptance is complete.
+
+The certified security closure established the following permanent release
+facts:
+
+- protected PR #23 merged the Docker socket hardening into `main`;
+- protected PR #24 reconciled certified `main` into `release/v1.0.0`;
+- `main` and `release/v1.0.0` resolve to the identical certified tree
+  `9aec3998255306b72521643901b587afe1b314d2`;
+- Notifications runs as the non-root Atlas runtime identity;
+- six Discord webhooks were rotated and recertified;
+- the Anime TV route correction and sports-feed nginx refresh were completed
+  and certified;
+- Homepage has no direct Docker-socket mount;
+- Dozzle has no direct Docker-socket mount and consumes Docker metadata through
+  the private read-only `atlas-docker-socket-proxy`;
+- Docker API POST mutation through that proxy is denied with HTTP 403;
+- the proxy image has zero HIGH and zero CRITICAL scan findings;
+- Atlas-owned fixable CRITICAL findings are zero; and
+- the certified runtime contains 22 running containers and zero unhealthy
+  containers.
+
+### Residual Caddy Risk
+
+Current certification retained 19 fixable HIGH observations attributed to the
+deployed Caddy image/runtime. The feasibility/freshness review found no simple
+supported upstream refresh that removes those findings without broader redesign
+or unsupported package surgery.
+
+The operator explicitly accepted those 19 Caddy HIGH observations for v1.0 on
+2026-08-15. The disposition is `ACCEPTED_FOR_V1.0`; it is bounded to this
+release and does not waive future remediation when a safe supported upstream
+fix becomes available.
+
+Security Acceptance is therefore closed. Remaining v1.0 work is governed by
+the independent Quality, Documentation, User Acceptance, release-candidate,
+pilot, stabilization, tagging, and publication gates.
