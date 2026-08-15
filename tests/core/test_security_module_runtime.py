@@ -89,6 +89,34 @@ def test_module_updates_use_explicit_operator_environment() -> None:
         assert "Numeric PUID and PGID are required" in content
 
 
+def test_sports_update_uses_operator_then_module_environment() -> None:
+    content = SPORTS_UPDATE.read_text(encoding="utf-8")
+
+    operator = '--env-file "$OPERATOR_ENV_FILE"'
+    module = '--env-file "$MODULE_ENV_FILE"'
+
+    assert content.count(operator) == 3
+    assert content.count(module) == 3
+
+    positions = []
+    start = 0
+
+    while True:
+        operator_index = content.find(operator, start)
+        if operator_index == -1:
+            break
+
+        module_index = content.find(module, operator_index)
+
+        assert module_index != -1
+        assert operator_index < module_index
+
+        positions.append((operator_index, module_index))
+        start = module_index + len(module)
+
+    assert len(positions) == 3
+
+
 def test_sports_update_fails_closed_on_ownership_mismatch() -> None:
     content = SPORTS_UPDATE.read_text(encoding="utf-8")
 
