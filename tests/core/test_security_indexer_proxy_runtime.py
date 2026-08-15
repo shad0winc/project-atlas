@@ -63,7 +63,8 @@ def test_flaresolverr_is_confined_to_indexer_proxy_bridge() -> None:
 def test_indexer_proxy_bridge_preserves_egress() -> None:
     content = CORE_COMPOSE.read_text(encoding="utf-8")
     start = content.index("  atlas-indexer-proxy:\n")
-    end = content.index("\nservices:\n", start)
-    network = content[start:end]
+    remainder = content[start + 1 :]
+    next_network = remainder.index("\n  ")
+    network = remainder[:next_network]
 
     assert "internal: true" not in network
