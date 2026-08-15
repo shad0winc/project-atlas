@@ -9,6 +9,7 @@ from pathlib import Path
 from atlas.service_lifecycle import (
     DockerComposeProvider,
     ServiceLifecycleService,
+    ServiceUpdateService,
 )
 
 from fastapi import Depends, HTTPException, status
@@ -294,6 +295,15 @@ def get_service_lifecycle_service() -> ServiceLifecycleService:
     )
 
     return ServiceLifecycleService(provider)
+
+
+@lru_cache(maxsize=1)
+def get_service_update_service() -> ServiceUpdateService:
+    """Return the process-wide read-only Update Discovery service."""
+
+    return ServiceUpdateService(
+        get_service_lifecycle_service()
+    )
 
 
 def get_current_user(

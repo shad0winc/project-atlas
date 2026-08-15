@@ -8,6 +8,7 @@ export {
   createServiceLifecycleHealth,
   createServiceLifecycleSnapshot,
   createServiceLifecycleSummary,
+  createServiceUpdateReport,
   mergeManagedServiceDetail,
   type ManagedService,
   type ManagedServiceDetail,
@@ -17,5 +18,8 @@ export {
   type ServiceLifecycleSnapshot,
   type ServiceLifecycleState,
   type ServiceLifecycleSummary,
-  type ServiceRuntimeStatus
+  type ServiceRuntimeStatus,
+  type ServiceUpdate,
+  type ServiceUpdateReport,
+  type ServiceUpdateStatus
 } from "./types/services";

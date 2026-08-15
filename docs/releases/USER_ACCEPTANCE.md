@@ -1585,3 +1585,19 @@ gates. It does **not** mark the broader Responsive Review checklist above as
 complete and does **not** constitute final User Acceptance Certification.
 Representative administrator journey execution, Update Availability,
 Maintenance History, and final v1.0 approval remain open.
+
+---
+
+## M-018.33 — Update Availability Acceptance
+
+**Status: ACCEPTED**
+
+M-018.33 closes the v1.0 Update Availability presentation gate.
+
+Acceptance verified the read-only path from registry through the Docker Compose provider, canonical Update Discovery domain, `ServiceUpdateService`, GET-only API, Portal normalization, and Service Lifecycle presentation.
+
+Accepted behavior includes trusted digest comparison, fail-closed unresolved discovery, preservation of `system.health.read`, aggregate/per-service Portal status, `Unknown` for missing observations, reuse of the existing hook and M-018.32 responsive behavior, and absence of lifecycle mutation controls.
+
+The live acceptance observed 15 services: 8 `current`, 5 `update-available`, 2 `unknown`, 0 `mutable-tag`, and 0 `unsupported`. These counts are evidence from that acceptance run rather than a persistent expected inventory.
+
+Bazarr, Dozzle, Homepage, qBittorrent, and Tautulli were observed as `update-available`; Jellyseerr and Maintainerr remained `unknown`. End-to-end acceptance proved the real API statuses survived Portal normalization and rendering without semantic drift.

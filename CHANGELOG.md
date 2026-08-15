@@ -735,3 +735,18 @@ All notable changes to Project Atlas are documented in this file.
 - Verified cleanup regression suite (70 passing).
 - Verified full Atlas Core regression suite (229 passing).
 - Live-tested `atlas cleanup execute jellyfin --dry-run` in human-readable and JSON modes.
+
+---
+
+## M-018.33 — Update Availability
+
+- Extended existing Update Discovery with read-only Docker registry comparison.
+- Added truthful `current` and `update-available` classification using local descriptor and remote top-level manifest/index identity.
+- Preserved fail-closed `mutable-tag`, `unknown`, and `unsupported` behavior.
+- Added GET-only `GET /api/v1/services/updates`.
+- Reused the existing Service Lifecycle permission and canonical `UpdateReport`.
+- Added Portal aggregate and per-service Update Availability.
+- Reused the existing hook and M-018.32 responsive/mobile-safe presentation.
+- Added no update, restart, pull, rollback, or other lifecycle mutation control.
+- Closed the v1.0 Update Availability presentation gate.
+- Leaves Maintenance History as the final remaining v1.0 presentation gate.

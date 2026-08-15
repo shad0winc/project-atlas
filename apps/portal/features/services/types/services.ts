@@ -39,10 +39,39 @@ export type ServiceLifecycleSummary = Readonly<{
   evaluatedAt?: string;
 }>;
 
+export type ServiceUpdateStatus =
+  | "current"
+  | "update-available"
+  | "mutable-tag"
+  | "unknown"
+  | "unsupported";
+
+export type ServiceUpdate = Readonly<{
+  serviceIdentifier: string;
+  serviceName: string;
+  status: ServiceUpdateStatus;
+  raw: Readonly<Record<string, unknown>>;
+}>;
+
+export type ServiceUpdateReport = Readonly<{
+  status: string;
+  provider: string;
+  totalServices: number;
+  current: number;
+  updateAvailable: number;
+  mutableTag: number;
+  unknown: number;
+  unsupported: number;
+  requiresAttention: boolean;
+  updates: readonly ServiceUpdate[];
+  evaluatedAt?: string;
+}>;
+
 export type ServiceLifecycleSnapshot = Readonly<{
   services: readonly ManagedService[];
   health: ServiceLifecycleHealth;
   summary: ServiceLifecycleSummary;
+  updates: ServiceUpdateReport;
 }>;
 
 export type ServiceLifecycleState =
@@ -109,6 +138,21 @@ function healthStatusValue(value: unknown): ServiceHealthStatus {
     normalized === "degraded" ||
     normalized === "unhealthy" ||
     normalized === "unavailable"
+  ) {
+    return normalized;
+  }
+
+  return "unknown";
+}
+
+function updateStatusValue(value: unknown): ServiceUpdateStatus {
+  const normalized = stringValue(value, "unknown").toLowerCase();
+
+  if (
+    normalized === "current" ||
+    normalized === "update-available" ||
+    normalized === "mutable-tag" ||
+    normalized === "unsupported"
   ) {
     return normalized;
   }
@@ -236,14 +280,46 @@ export function createServiceLifecycleSummary(value: unknown): ServiceLifecycleS
   };
 }
 
+export function createServiceUpdateReport(value: unknown): ServiceUpdateReport {
+  const report = recordValue(value);
+  const counts = recordValue(report.counts);
+  const updates = recordArray(report.updates).map((entry) => ({
+    serviceIdentifier: stringValue(entry.service_identifier, ""),
+    serviceName: stringValue(
+      entry.service_name,
+      stringValue(entry.service_identifier, "Unknown service")
+    ),
+    status: updateStatusValue(entry.status),
+    raw: entry
+  }));
+
+  return {
+    status: stringValue(report.status, "unknown"),
+    provider: stringValue(report.provider, "unknown"),
+    totalServices: integerValue(report.total_services),
+    current: integerValue(counts.current),
+    updateAvailable: integerValue(counts["update-available"]),
+    mutableTag: integerValue(counts["mutable-tag"]),
+    unknown: integerValue(counts.unknown),
+    unsupported: integerValue(counts.unsupported),
+    requiresAttention: report.requires_attention === true,
+    updates,
+    ...(typeof report.evaluated_at === "string" && report.evaluated_at.trim()
+      ? { evaluatedAt: report.evaluated_at.trim() }
+      : {})
+  };
+}
+
 export function createServiceLifecycleSnapshot({
   services,
   health,
-  summary
+  summary,
+  updates
 }: Readonly<{
   services: readonly unknown[];
   health: unknown;
   summary: unknown;
+  updates: unknown;
 }>): ServiceLifecycleSnapshot {
   const runtimeEntries = serviceEntryMap(summary);
   const healthEntries = serviceEntryMap(health);
@@ -260,6 +336,7 @@ export function createServiceLifecycleSnapshot({
       );
     }),
     health: createServiceLifecycleHealth(health),
-    summary: createServiceLifecycleSummary(summary)
+    summary: createServiceLifecycleSummary(summary),
+    updates: createServiceUpdateReport(updates)
   };
 }

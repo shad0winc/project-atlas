@@ -1029,3 +1029,23 @@ mobile-safe service-card/table, and PWA-evaluation ROADMAP gates. Update
 Availability presentation, Maintenance History presentation, representative
 administrator User Acceptance, and final v1.0 approval remain required. Guarded
 lifecycle mutation remains outside the v1.0 read-only boundary.
+
+---
+
+## M-018.33 — Read-Only Update Availability
+
+**Status: CLOSED**
+
+M-018.33 completes the v1.0 Update Availability prerequisite and Portal presentation using the Update Discovery domain already established in Atlas.
+
+The certified progression is M-018.33A read-only registry comparison, M-018.33B GET-only Update Discovery API, M-018.33C Portal Update Availability presentation, and M-018.33D documentation/release reconciliation.
+
+No replacement update domain, image pull, update execution, restart, recreation, rollback, or other lifecycle mutation was introduced.
+
+After M-018.33, the only remaining v1.0 presentation gate is:
+
+```text
+[ ] Add maintenance-history view
+```
+
+Maintenance History is the recommended M-018.34 milestone before final v1.0 acceptance/certification. Separate lifecycle mutation/reporting ROADMAP work remains outside this presentation-gate statement.

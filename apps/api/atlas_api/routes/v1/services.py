@@ -14,16 +14,19 @@ from fastapi import (
 from atlas.service_lifecycle import (
     ServiceLifecycleError,
     ServiceLifecycleService,
+    ServiceUpdateService,
 )
 from atlas_api.auth.models import AuthenticatedUser
 from atlas_api.dependencies import (
     get_service_lifecycle_service,
+    get_service_update_service,
 )
 from atlas_api.schemas.service_lifecycle import (
     ManagedServiceDetailResponse,
     ManagedServiceListResponse,
     ServiceLifecycleHealthResponse,
     ServiceLifecycleSummaryResponse,
+    ServiceUpdateReportResponse,
 )
 from atlas_api.security import require_permission
 
@@ -123,6 +126,34 @@ def read_service_lifecycle_summary(
 
     return ServiceLifecycleSummaryResponse.from_domain(
         summary
+    )
+
+
+@router.get(
+    "/updates",
+    response_model=ServiceUpdateReportResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Read Atlas service update availability",
+)
+def read_service_updates(
+    _current_user: Annotated[
+        AuthenticatedUser,
+        Depends(require_service_lifecycle_read),
+    ],
+    service: Annotated[
+        ServiceUpdateService,
+        Depends(get_service_update_service),
+    ],
+) -> ServiceUpdateReportResponse:
+    """Return canonical read-only Update Discovery metadata."""
+
+    try:
+        report = service.inspect_updates()
+    except ServiceLifecycleError as error:
+        raise _unavailable() from error
+
+    return ServiceUpdateReportResponse.from_domain(
+        report
     )
 
 
