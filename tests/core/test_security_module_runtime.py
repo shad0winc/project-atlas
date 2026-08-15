@@ -126,3 +126,40 @@ def test_sports_update_does_not_remove_cross_project_orphans() -> None:
     content = SPORTS_UPDATE.read_text(encoding="utf-8")
 
     assert "--remove-orphans" not in content
+
+
+def test_sports_runtime_event_publisher_uses_repo_atlas_cli() -> None:
+    content = SPORTS_COMPOSE.read_text(encoding="utf-8")
+
+    assert (
+        '      ATLAS_BINARY: "/opt/project-atlas/scripts/atlas"\n'
+        in content
+    )
+
+
+def test_sports_feed_mounts_state_directory_read_only() -> None:
+    content = SPORTS_COMPOSE.read_text(encoding="utf-8")
+
+    assert (
+        "      - /mnt/storage/configs/sportyfin/state:"
+        "/etc/nginx/sports-state:ro\n"
+        in content
+    )
+    assert (
+        "/mnt/storage/configs/sportyfin/state/health.json:"
+        "/etc/nginx/sports-health.json:ro"
+        not in content
+    )
+
+
+def test_sports_health_alias_uses_directory_backed_state_mount() -> None:
+    nginx = (
+        PROJECT_ROOT
+        / "modules"
+        / "sports"
+        / "config"
+        / "nginx.conf"
+    ).read_text(encoding="utf-8")
+
+    assert "alias /etc/nginx/sports-state/health.json;" in nginx
+    assert "alias /etc/nginx/sports-health.json;" not in nginx

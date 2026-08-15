@@ -6,7 +6,7 @@ services:
 
     volumes:
       - /mnt/storage/configs/sportyfin/output:/usr/share/nginx/html:ro
-      - /mnt/storage/configs/sportyfin/state/health.json:/etc/nginx/sports-health.json:ro
+      - /mnt/storage/configs/sportyfin/state:/etc/nginx/sports-state:ro
       - ./config/nginx.conf:/etc/nginx/conf.d/default.conf:ro
 
     ports:
@@ -51,6 +51,7 @@ services:
 
     environment:
       PYTHONUNBUFFERED: "1"
+      ATLAS_BINARY: "/opt/project-atlas/scripts/atlas"
       SPORTS_CONTROLLER_INTERVAL_SECONDS: "${SPORTS_CONTROLLER_INTERVAL_SECONDS:-30}"
       SPORTS_CONTROLLER_HEARTBEAT_FILE: "${SPORTS_CONTROLLER_HEARTBEAT_FILE:-/mnt/storage/configs/sportyfin/state/controller-heartbeat}"
       SPORTS_PROVIDER_HEALTH_FILE: "${SPORTS_PROVIDER_HEALTH_FILE:-/mnt/storage/configs/sportyfin/state/provider-health.json}"
