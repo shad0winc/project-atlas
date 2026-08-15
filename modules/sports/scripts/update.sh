@@ -59,18 +59,21 @@ echo
 
 docker compose \
   --env-file "$OPERATOR_ENV_FILE" \
+  --env-file "$MODULE_ENV_FILE" \
   --project-name sports \
   -f "$MODULE_DIR/docker-compose.yml" \
   pull
 
 docker compose \
   --env-file "$OPERATOR_ENV_FILE" \
+  --env-file "$MODULE_ENV_FILE" \
   --project-name sports \
   -f "$MODULE_DIR/docker-compose.yml" \
   build
 
 docker compose \
   --env-file "$OPERATOR_ENV_FILE" \
+  --env-file "$MODULE_ENV_FILE" \
   --project-name sports \
   -f "$MODULE_DIR/docker-compose.yml" \
   up -d
