@@ -5,6 +5,7 @@ import {
   createManagedService,
   createManagedServiceDetail,
   createServiceLifecycleSnapshot,
+  createServiceMaintenanceHistory,
   createServiceUpdateReport,
   mergeManagedServiceDetail
 } from "../types/services";
@@ -153,6 +154,50 @@ describe("Service Lifecycle presentation", () => {
         }
       ],
       evaluated_at: "2026-08-14T00:00:00Z"
+    },
+    history: {
+      provider: "docker-compose",
+      generated_at: "2026-08-14T00:05:00Z",
+      total_records: 2,
+      counts: {
+        success: 1,
+        partial: 0,
+        failed: 1,
+        skipped: 0,
+        unknown: 0
+      },
+      requires_attention: true,
+      latest_record: null,
+      latest_success: null,
+      latest_failure: null,
+      records: [
+        {
+          service_identifier: "sonarr",
+          service_name: "Sonarr",
+          provider: "docker-compose",
+          action: "update",
+          result: "failed",
+          succeeded: false,
+          failed: true,
+          started_at: "2026-08-14T00:02:00Z",
+          completed_at: "2026-08-14T00:02:10Z",
+          duration_seconds: 10,
+          summary: "Update failed"
+        },
+        {
+          service_identifier: "jellyfin",
+          service_name: "Jellyfin",
+          provider: "docker-compose",
+          action: "restart",
+          result: "success",
+          succeeded: true,
+          failed: false,
+          started_at: "2026-08-14T00:01:00Z",
+          completed_at: "2026-08-14T00:01:05Z",
+          duration_seconds: 5,
+          summary: "Restart completed"
+        }
+      ]
     }
   });
 
@@ -171,6 +216,44 @@ describe("Service Lifecycle presentation", () => {
     expect(snapshot.updates.requiresAttention).toBe(true);
     expect(snapshot.updates.updates[0]?.status).toBe("current");
     expect(snapshot.updates.updates[1]?.status).toBe("update-available");
+    expect(snapshot.history.totalRecords).toBe(2);
+    expect(snapshot.history.success).toBe(1);
+    expect(snapshot.history.failed).toBe(1);
+    expect(snapshot.history.requiresAttention).toBe(true);
+    expect(snapshot.history.records[0]?.serviceIdentifier).toBe("sonarr");
+    expect(snapshot.history.records[0]?.result).toBe("failed");
+  });
+
+  it("normalizes canonical Maintenance History results", () => {
+    const history = createServiceMaintenanceHistory({
+      provider: "docker-compose",
+      total_records: 5,
+      counts: {
+        success: 1,
+        partial: 1,
+        failed: 1,
+        skipped: 1,
+        unknown: 1
+      },
+      requires_attention: true,
+      records: [
+        { service_identifier: "a", service_name: "A", result: "success" },
+        { service_identifier: "b", service_name: "B", result: "partial" },
+        { service_identifier: "c", service_name: "C", result: "failed" },
+        { service_identifier: "d", service_name: "D", result: "skipped" },
+        { service_identifier: "e", service_name: "E", result: "unexpected" }
+      ]
+    });
+
+    expect(history.records.map((record) => record.result)).toEqual([
+      "success",
+      "partial",
+      "failed",
+      "skipped",
+      "unknown"
+    ]);
+    expect(history.totalRecords).toBe(5);
+    expect(history.requiresAttention).toBe(true);
   });
 
   it("normalizes every canonical Update Discovery status", () => {
@@ -286,10 +369,53 @@ describe("Service Lifecycle presentation", () => {
     expect(markup).toContain("Health: degraded");
     expect(markup).toContain("Update availability");
     expect(markup).toContain("1 update available");
+    expect(markup).toContain("Maintenance history");
+    expect(markup).toContain("2 maintenance records");
+    expect(markup).toContain("Action: update");
+    expect(markup).toContain("Result: Failed");
+    expect(markup).toContain("Update failed");
+    expect(markup).toContain("Action: restart");
+    expect(markup).toContain("Result: Success");
+    expect(markup).toContain("Restart completed");
     expect(markup).toContain("Updates:");
     expect(markup).toContain("Current");
     expect(markup).toContain("Update available");
     expect(markup).toContain("View details");
+    expect(markup).not.toContain(">Restart<");
+    expect(markup).not.toContain(">Update service<");
+    expect(markup).not.toContain(">Rollback<");
+  });
+
+
+  it("renders an empty Maintenance History report truthfully", () => {
+    const emptySnapshot = {
+      ...snapshot,
+      history: createServiceMaintenanceHistory({
+        provider: "unknown",
+        total_records: 0,
+        counts: {
+          success: 0,
+          partial: 0,
+          failed: 0,
+          skipped: 0,
+          unknown: 0
+        },
+        requires_attention: false,
+        records: []
+      })
+    };
+
+    const markup = renderToStaticMarkup(
+      <ServiceOverview
+        onClearSelection={() => undefined}
+        onSelectService={() => undefined}
+        snapshot={emptySnapshot}
+      />
+    );
+
+    expect(markup).toContain("0 maintenance records");
+    expect(markup).toContain("No maintenance history recorded");
+    expect(markup).toContain("unknown");
     expect(markup).not.toContain(">Restart<");
     expect(markup).not.toContain(">Update service<");
     expect(markup).not.toContain(">Rollback<");

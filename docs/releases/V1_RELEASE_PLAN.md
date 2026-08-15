@@ -1049,3 +1049,39 @@ After M-018.33, the only remaining v1.0 presentation gate is:
 ```
 
 Maintenance History is the recommended M-018.34 milestone before final v1.0 acceptance/certification. Separate lifecycle mutation/reporting ROADMAP work remains outside this presentation-gate statement.
+
+## M-018.34 — Read-Only Maintenance History
+
+**Status: CLOSED**
+
+M-018.34 completes the final v1.0 presentation prerequisite by publishing the existing Service Lifecycle Maintenance History domain through GET-only API transport and the Administration Portal.
+
+The certified progression is:
+
+- M-018.34A — GET-only `GET /api/v1/services/history`;
+- M-018.34B — Portal Maintenance History normalization and responsive presentation;
+- M-018.34C — live real API -> Portal normalization/render acceptance; and
+- M-018.34D — documentation/release reconciliation.
+
+No replacement history domain, cleanup-history merge, Operations History proxy, restart, update execution, rollback, start, stop, or other lifecycle mutation was introduced.
+
+After M-018.34, all six v1.0 presentation gates that remained after M-018.31 are resolved:
+
+```text
+[x] Add update-availability indicators
+[x] Add maintenance-history view
+[x] Add responsive phone and tablet administration layouts
+[x] Add touch-friendly lifecycle controls
+[x] Add mobile-safe service cards and tables
+[x] Evaluate Progressive Web App support after responsive validation
+```
+
+Separate lifecycle mutation/reporting ROADMAP gates remain intentionally open and outside this presentation-gate statement:
+
+```text
+[ ] Add restart confirmation workflow
+[ ] Add guarded update confirmation workflow
+[ ] Add failure and rollback reporting
+```
+
+The release now advances to final representative administrator User Acceptance, final v1.0 certification, and v1.0.0 release approval.

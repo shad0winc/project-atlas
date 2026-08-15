@@ -277,7 +277,7 @@ for Atlas-managed infrastructure.
 - [x] Add service detail views
 - [ ] Add restart confirmation workflow
 - [ ] Add guarded update confirmation workflow
-- [ ] Add maintenance-history view
+- [x] Add maintenance-history view
 - [ ] Add failure and rollback reporting
 - [x] Add responsive phone and tablet administration layouts
 - [x] Add touch-friendly lifecycle controls

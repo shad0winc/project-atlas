@@ -1601,3 +1601,28 @@ Accepted behavior includes trusted digest comparison, fail-closed unresolved dis
 The live acceptance observed 15 services: 8 `current`, 5 `update-available`, 2 `unknown`, 0 `mutable-tag`, and 0 `unsupported`. These counts are evidence from that acceptance run rather than a persistent expected inventory.
 
 Bazarr, Dozzle, Homepage, qBittorrent, and Tautulli were observed as `update-available`; Jellyseerr and Maintainerr remained `unknown`. End-to-end acceptance proved the real API statuses survived Portal normalization and rendering without semantic drift.
+
+## M-018.34 — Maintenance History Acceptance
+
+**Status: ACCEPTED**
+
+M-018.34 closes the v1.0 Maintenance History presentation gate.
+
+Acceptance verified the read-only path from the established Service Lifecycle Maintenance History domain through `ServiceMaintenanceHistoryService`, GET-only `GET /api/v1/services/history`, Portal normalization, and responsive `ServiceOverview` rendering.
+
+Accepted behavior includes:
+
+- reuse of the canonical `MaintenanceReport` rather than a duplicate history contract;
+- preservation of `system.health.read`;
+- valid empty-history provider truth;
+- aggregate success/partial/failed/skipped/unknown counts;
+- read-only responsive maintenance-record cards;
+- reuse of the existing Service Lifecycle hook and M-018.32 responsive CSS;
+- explicit separation from Cleanup History and Operations History; and
+- absence of restart, update, rollback, start, stop, or other lifecycle mutation controls.
+
+Live acceptance exercised the real five-source Service Lifecycle HTTP snapshot and passed it through the real Portal normalizer and renderer. The observed live Maintenance History response contained zero records with provider `unknown` and `requires_attention=false`; this is accepted as a valid provider state rather than a persistent expected inventory.
+
+Engineering acceptance passed 27 Portal test files / 222 Portal tests, Portal typecheck/lint/production build, 13 focused Service Lifecycle API tests, and 3,141 full Python tests plus 104 subtests.
+
+M-018.34 completes the remaining v1.0 presentation prerequisite. Final representative administrator User Acceptance and release certification remain separate required release activities.

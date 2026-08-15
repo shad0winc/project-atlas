@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from atlas.service_lifecycle import ServiceLifecycleError
 from atlas_api.dependencies import (
     get_service_lifecycle_service,
+    get_service_maintenance_history_service,
     get_service_update_service,
 )
 from atlas_api.main import create_app
@@ -196,6 +197,32 @@ class FakeServiceUpdateService:
         )
 
 
+class FakeServiceMaintenanceHistoryService:
+    """Deterministic read-only Maintenance History HTTP double."""
+
+    def __init__(self) -> None:
+        self.fail = False
+        self.calls = 0
+
+    def inspect_history(self):
+        self.calls += 1
+        if self.fail:
+            raise ServiceLifecycleError(
+                "service provider failed to inspect maintenance history"
+            )
+        return Serializable({
+            "provider": "docker-compose",
+            "generated_at": "2026-08-15T00:00:00Z",
+            "total_records": 2,
+            "counts": {"success": 1, "partial": 0, "failed": 1},
+            "requires_attention": True,
+            "latest_record": None,
+            "latest_success": None,
+            "latest_failure": None,
+            "records": [],
+        })
+
+
 class ServiceLifecycleRouteTests(unittest.TestCase):
     """Verify GET-only Service Lifecycle HTTP behavior."""
 
@@ -203,6 +230,7 @@ class ServiceLifecycleRouteTests(unittest.TestCase):
         self.app = create_app()
         self.service = FakeServiceLifecycleService()
         self.update_service = FakeServiceUpdateService()
+        self.history_service = FakeServiceMaintenanceHistoryService()
 
         self.app.dependency_overrides[
             get_service_lifecycle_service
@@ -211,6 +239,10 @@ class ServiceLifecycleRouteTests(unittest.TestCase):
         self.app.dependency_overrides[
             get_service_update_service
         ] = lambda: self.update_service
+
+        self.app.dependency_overrides[
+            get_service_maintenance_history_service
+        ] = lambda: self.history_service
 
         self.app.dependency_overrides[
             require_service_lifecycle_read
@@ -381,6 +413,22 @@ class ServiceLifecycleRouteTests(unittest.TestCase):
             response.json(),
         )
 
+    def test_reads_service_maintenance_history(self) -> None:
+        response = self.client.get("/api/v1/services/history")
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        report = response.json()["report"]
+        self.assertEqual("docker-compose", report["provider"])
+        self.assertEqual(2, report["total_records"])
+        self.assertEqual(1, report["counts"]["failed"])
+        self.assertTrue(report["requires_attention"])
+        self.assertEqual(1, self.history_service.calls)
+
+    def test_maintenance_history_provider_failure_returns_503(self) -> None:
+        self.history_service.fail = True
+        response = self.client.get("/api/v1/services/history")
+        self.assertEqual(status.HTTP_503_SERVICE_UNAVAILABLE, response.status_code)
+        self.assertEqual({"detail": "Service Lifecycle is unavailable."}, response.json())
+
     def test_provider_failure_returns_503(self) -> None:
         self.service.fail_list = True
 
@@ -414,6 +462,7 @@ class ServiceLifecycleRouteTests(unittest.TestCase):
 
         for path in (
             "/api/v1/services",
+            "/api/v1/services/history",
             "/api/v1/services/updates",
         ):
             response = self.client.get(path)
@@ -432,14 +481,19 @@ class ServiceLifecycleRouteTests(unittest.TestCase):
         summary = self.client.get(
             "/api/v1/services/summary"
         )
+        history = self.client.get(
+            "/api/v1/services/history"
+        )
         updates = self.client.get(
             "/api/v1/services/updates"
         )
 
         self.assertEqual(200, health.status_code)
         self.assertEqual(200, summary.status_code)
+        self.assertEqual(200, history.status_code)
         self.assertEqual(200, updates.status_code)
         self.assertEqual([], self.service.inspect_calls)
+        self.assertEqual(1, self.history_service.calls)
         self.assertEqual(1, self.update_service.calls)
 
     def test_openapi_registers_get_only_service_routes(
@@ -451,6 +505,7 @@ class ServiceLifecycleRouteTests(unittest.TestCase):
             "/api/v1/services",
             "/api/v1/services/health",
             "/api/v1/services/summary",
+            "/api/v1/services/history",
             "/api/v1/services/updates",
             "/api/v1/services/{service_identifier}",
         )

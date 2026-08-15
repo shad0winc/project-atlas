@@ -14,11 +14,13 @@ from fastapi import (
 from atlas.service_lifecycle import (
     ServiceLifecycleError,
     ServiceLifecycleService,
+    ServiceMaintenanceHistoryService,
     ServiceUpdateService,
 )
 from atlas_api.auth.models import AuthenticatedUser
 from atlas_api.dependencies import (
     get_service_lifecycle_service,
+    get_service_maintenance_history_service,
     get_service_update_service,
 )
 from atlas_api.schemas.service_lifecycle import (
@@ -26,6 +28,7 @@ from atlas_api.schemas.service_lifecycle import (
     ManagedServiceListResponse,
     ServiceLifecycleHealthResponse,
     ServiceLifecycleSummaryResponse,
+    ServiceMaintenanceHistoryResponse,
     ServiceUpdateReportResponse,
 )
 from atlas_api.security import require_permission
@@ -155,6 +158,32 @@ def read_service_updates(
     return ServiceUpdateReportResponse.from_domain(
         report
     )
+
+
+@router.get(
+    "/history",
+    response_model=ServiceMaintenanceHistoryResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Read Atlas service maintenance history",
+)
+def read_service_maintenance_history(
+    _current_user: Annotated[
+        AuthenticatedUser,
+        Depends(require_service_lifecycle_read),
+    ],
+    service: Annotated[
+        ServiceMaintenanceHistoryService,
+        Depends(get_service_maintenance_history_service),
+    ],
+) -> ServiceMaintenanceHistoryResponse:
+    """Return canonical read-only Service Lifecycle maintenance history."""
+
+    try:
+        report = service.inspect_history()
+    except ServiceLifecycleError as error:
+        raise _unavailable() from error
+
+    return ServiceMaintenanceHistoryResponse.from_domain(report)
 
 
 @router.get(
