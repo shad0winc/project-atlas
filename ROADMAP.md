@@ -789,6 +789,16 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 - [x] Complete audit-event review
 - [x] Complete dependency vulnerability review
 - [x] Complete least-privilege review
+- [x] Complete final v1.0 Security Acceptance
+  - [x] Run current vulnerability and runtime security certification
+  - [x] Remove Homepage direct Docker-socket access
+  - [x] Replace Dozzle direct Docker-socket access with a private read-only proxy
+  - [x] Prove Docker API mutation through the proxy is denied
+  - [x] Certify proxy image at zero HIGH / zero CRITICAL findings
+  - [x] Certify Atlas-owned fixable CRITICAL findings at zero
+  - [x] Accept 19 remaining upstream Caddy HIGH findings for v1.0
+  - [x] Reconcile certified `main` into `release/v1.0.0`
+  - [x] Certify 22 running containers and zero unhealthy containers
 
 ### Quality
 

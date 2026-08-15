@@ -8,10 +8,10 @@ the resulting source security contracts, intentionally retained capabilities,
 deployment-only transitions, and the evidence still required for final v1.0
 security certification.
 
-M-023.26 engineering review is complete. Final release security acceptance
-remains separate and requires controlled deployment, current vulnerability
-evidence, runtime validation, documented residual-risk acceptance where
-applicable, and release approval.
+M-023.26 engineering review is complete, and final v1.0 Security Acceptance
+has also been completed. Controlled deployment, current vulnerability evidence,
+runtime validation, Docker-socket hardening, residual-risk disposition, and
+explicit operator approval were completed against the certified v1.0 tree.
 
 ## Trust Model
 
@@ -169,11 +169,13 @@ relevant deployed container-image selections. Atlas now protects reviewed
 third-party image choices with immutable source contracts where required,
 including the maintained Seerr and Maintainerr selections.
 
-Advisory information remains time-sensitive. Final v1.0 security certification
-therefore requires current scan evidence and does not treat historical review
-or an immutable image selection as proof that future vulnerability findings do
-not exist. Any release-blocking finding must be remediated or explicitly
-accepted with bounded scope and rationale before publication.
+Advisory information remains time-sensitive. Final v1.0 Security Acceptance
+used current scan evidence rather than historical review or immutable image
+selection alone. Atlas-owned fixable CRITICAL findings were certified at zero.
+Nineteen remaining fixable HIGH observations attributed to the current Caddy
+image/runtime were explicitly accepted for v1.0 after review found no simple
+supported upstream refresh. That bounded acceptance does not waive future
+remediation when a safe supported upstream fix becomes available.
 
 ## Validation Strategy
 
@@ -210,22 +212,26 @@ The resulting v1.0 source boundary includes:
 - first-party non-root runtime identities and reduced module mount capability;
 - explicit network trust boundaries for identity and indexer-proxy access.
 
-Some capabilities intentionally remain outside source-only closure. Homepage
-and Dozzle retain read-only Docker-socket access for operational functionality;
-the Docker API is still a privileged host-control boundary and this capability
-must remain explicitly documented and accepted for v1.0 if retained.
+The Docker control plane remains a privileged host-control boundary, but the
+v1.0 runtime no longer grants Homepage or Dozzle direct Docker-socket mounts.
+Homepage direct socket exposure is zero. Dozzle consumes the required read-only
+metadata through the private `atlas-docker-socket-proxy`; the proxy is the sole
+Docker-socket owner for this boundary, Docker API POST mutation through it is
+denied with HTTP 403, and its image was certified at zero HIGH and zero CRITICAL
+scan findings.
 
-The hardened Notifications and Sports images are source-validated as non-root,
-but production ownership migration and container recreation are deployment
-operations. They must occur only through the backed-up, maintenance-controlled
-deployment path after filesystem ownership and Runtime Bus access preconditions
-are satisfied.
+The Notifications runtime ownership transition has been completed and
+validated in production under the controlled deployment path. The final
+security certification also preserved the corrected Anime TV route, refreshed
+sports-feed nginx runtime, rotated and recertified six Discord webhooks, and
+returned 22 running containers with zero unhealthy containers.
 
-Accordingly, completion of the Security roadmap engineering review does not
-certify the v1.0 release. Final Security Acceptance remains governed by the
-release checklist and requires current vulnerability evidence, controlled
-runtime validation, accepted residual limitations, and explicit security
-approval.
+Final v1.0 Security Acceptance is complete. Protected PR #23 merged the Docker
+socket hardening into `main`; protected PR #24 reconciled certified `main` into
+`release/v1.0.0`; and both branches were certified at tree
+`9aec3998255306b72521643901b587afe1b314d2`. The only retained security
+disposition is the explicitly accepted set of 19 upstream Caddy HIGH
+observations described above.
 
 ## Media Discovery and Request Mutation Boundary
 

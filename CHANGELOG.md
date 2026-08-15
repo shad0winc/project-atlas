@@ -58,6 +58,22 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Fixed
 
+- Closed final v1.0 Security Acceptance after protected PR #23 merged Docker
+  socket hardening into `main` and protected PR #24 reconciled the certified
+  `main` tree into `release/v1.0.0`.
+- Removed direct Docker-socket access from Homepage and Dozzle. Dozzle now uses
+  the private read-only `atlas-docker-socket-proxy`; mutation through the proxy
+  is denied with HTTP 403, and the proxy image scan reported zero HIGH and zero
+  CRITICAL findings.
+- Certified the final security runtime with Notifications running non-root, six
+  Discord webhooks rotated and recertified, Anime TV routing corrected,
+  sports-feed nginx refreshed, and 22 containers running with zero unhealthy.
+- Closed Atlas-owned fixable CRITICAL risk at zero. Nineteen remaining fixable
+  HIGH observations attributed to the current Caddy image/runtime were
+  explicitly accepted for v1.0 after feasibility/freshness review found no
+  simple supported upstream refresh; that acceptance does not waive future
+  remediation when a safe supported upstream fix becomes available.
+
 - Completed the M-023.26 Security engineering review across authentication,
   authorization, invitations, sessions, reverse proxy and API exposure,
   secret storage, audit events, dependency/image risk, network trust
