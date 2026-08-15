@@ -6244,3 +6244,445 @@ The following remain open before v1.0 release acceptance:
 - final release-candidate and v1.0 certification gates.
 
 No production mutation is performed by M-023.27C documentation reconciliation.
+
+---
+
+# 2026-08-14
+
+## M-023.27C2 — E2.5 Seerr Migration and TV / Anime Production Acceptance Closure
+
+### Objective
+
+Complete the controlled production Seerr migration and close the remaining E2.5
+TV/anime routing and ongoing-series acceptance gates without rewriting the
+failed first migration attempt or bypassing Atlas's fail-closed deployment
+boundary.
+
+### Controlled Migration
+
+The subsequent production migration ran under transaction
+`seerr-migration-20260813T001057Z-760620`.
+
+The transaction retained:
+
+- the verified pre-change deployment baseline;
+- maintenance isolation;
+- deployment-lock ownership;
+- explicit rollback and recovery evidence;
+- exact `main` / `release/v1.0.0` source guards; and
+- fail-closed transaction state through runtime verification.
+
+The migrated Seerr runtime reached deployment phase `runtime_verified` and
+status `migration_runtime_ready`.
+
+Post-migration inspection confirmed the two supported Sonarr routes remained
+server-owned and distinct:
+
+- standard TV uses Seerr server `0`;
+- anime TV uses Seerr server `1`;
+- the Anime route resolves to `sonarr-anime`;
+- the Anime root is `/media/Anime TV`; and
+- `monitorNewItems=all` remains the service-level monitoring policy rather than
+  caller-controlled Atlas Request state.
+
+### Anime Acceptance Recovery
+
+The first Anime-TV production acceptance candidate used Mushoku Tensei:
+Jobless Reincarnation.
+
+That acceptance attempt exposed a harness/discriminator routing defect and did
+not count as successful Anime-TV certification. The resulting series metadata
+was observed in standard Sonarr while seven Season 3 media files had already
+been acquired.
+
+Atlas remained fail closed. Recovery:
+
+- preserved all seven files totaling `9082576845` bytes;
+- removed the incorrect standard-Sonarr series metadata without deleting media;
+- moved the preserved media into the Anime TV library;
+- adopted the series into Anime Sonarr as `seriesType=anime`;
+- verified all seven S03E01-S03E07 files were registered after reconciliation;
+- removed only the stale Seerr and Atlas request artifacts; and
+- left the certified standard-TV acceptance request intact.
+
+This recovery is incident/reconciliation evidence, not the successful Anime-TV
+acceptance case.
+
+### Successful Anime-TV Production Acceptance
+
+A fresh candidate was selected through the running Atlas discovery/provider
+contract:
+
+- title: `Demon Slayer: Kimetsu no Yaiba`;
+- TMDB ID: `85937`;
+- selected scope: Season `2` (`Mugen Train Arc`);
+- Atlas mutation type: `anime_tv`.
+
+Immediately before mutation, Atlas, Seerr, standard Sonarr, and Anime Sonarr
+all verified that Demon Slayer was absent.
+
+The single production request then succeeded:
+
+- Atlas request:
+  `req_b76ef6ae564a46b4981222b447cce7fb`;
+- provider request: `3`;
+- Atlas status: `approved`;
+- persisted media type: `anime_tv`;
+- Seerr `serverId`: `1`;
+- requested Seerr seasons: `[2]`;
+- Anime Sonarr series ID: `2`;
+- Anime Sonarr path:
+  `/media/Anime TV/Demon Slayer - Kimetsu no Yaiba`;
+- Anime Sonarr series type: `anime`;
+- Season 2 monitored: `true`; and
+- standard Sonarr Demon Slayer matches after submission: `0`.
+
+`atlas doctor` and the final fail-closed transaction guard passed after the
+state-changing acceptance.
+
+### Closure
+
+The immutable closure certification is:
+
+```text
+/tmp/project-atlas-e2-5-anime-tv-closure-certification.txt
+SHA-256:
+8a974fb51ff1f0d8651cf4e17f0f36a430cb1de63b50bebfdc0201ca4f79e385
+```
+
+The closure reverified:
+
+- exactly two Atlas requests, preserving the standard-TV acceptance request;
+- exactly two Seerr requests;
+- Anime-TV request `3` on server `1`;
+- one authoritative Demon Slayer target in Anime Sonarr;
+- no Demon Slayer target in standard Sonarr;
+- `anime_tv -> server 1`;
+- standard TV -> server `0`;
+- Atlas Doctor PASS;
+- repository cleanliness; and
+- retained maintenance/deployment-lock ownership.
+
+### Result
+
+E2.5 production migration, post-migration routing, service-level monitoring,
+standard-TV acceptance, and Anime-TV acceptance are certified complete.
+
+E2.5 attempt #1 remains historical failure/recovery evidence and is not
+reclassified as a successful migration.
+
+Final release-candidate creation, remaining user-acceptance journeys,
+accessibility/performance/sustained-use validation, controlled pilot,
+stabilization, and final v1.0 approval remain separate release gates.
+
+---
+
+## M-018.29 — Guarded Lifecycle Planning Contracts
+
+**Status:** Complete — domain contracts only
+
+M-018.29 closes the remaining Service Lifecycle foundation-model gap without
+opening a production mutation surface.
+
+Implemented:
+
+- immutable `ServiceUpdatePlan`;
+- immutable `ServiceUpdateResult`;
+- normalized `ServiceUpdateOutcome`;
+- immutable `MaintenanceEvent`;
+- normalized identifiers and UTC timestamps;
+- child-contract validation for image references and structured state;
+- deterministic `to_dict()` serialization;
+- public package exports;
+- dedicated planning/result tests; and
+- dedicated maintenance-event tests.
+
+`ServiceUpdatePlan` is constrained to dry-run planning and rejects an update
+whose target image equals its current image. `ServiceUpdateResult` records
+operation outcome and rollback state while enforcing rollback consistency.
+`MaintenanceEvent` implements the ADR 0010 audit-domain field set while
+preserving the pre-existing maintenance-history contracts byte-for-byte.
+
+Validation established:
+
+- 11 dedicated planning/result model tests;
+- 6 dedicated maintenance-event tests;
+- all 13 authoritative `test_service_lifecycle*.py` test files passed;
+- Docker Compose provider regression passed;
+- `git diff --check` passed;
+- Atlas Doctor passed;
+- existing `maintenance_models.py` content before `MaintenanceEvent` remained
+  byte-for-byte identical to its pre-M-018.29 source; and
+- the implementation introduces no Docker/provider/CLI/API/Portal execution
+  primitive.
+
+Frozen source evidence:
+
+- final source review diff:
+  `c87ef73721b4080ab25ae5816e3d647d70ea43b13de47d84856f5b57cb172ea1`;
+- final source certification:
+  `de733ad88dda053baa00e48f50c33c6f1cca5e256565a058738f9c2d03eb66da`.
+
+This milestone does **not** close lifecycle audit-event publication or guarded
+lifecycle operations. Administrator authorization, allow-listed mutation
+targets, update/restart execution, dependency-aware execution, locking,
+rollback execution, bulk planning, maintenance windows, CLI/API mutation, and
+Portal lifecycle administration remain separate M-018 work.
+
+## M-018.30 — Read-Only Service Lifecycle API Foundation
+
+### Scope
+
+M-018.30 adds the first HTTP transport adapter over the existing
+provider-independent Service Lifecycle read-only contracts. The slice is
+intentionally limited to operational visibility required by the v1.0
+administrator experience.
+
+### Implemented
+
+- Added `GET /api/v1/services` for normalized managed-service collection.
+- Added `GET /api/v1/services/{service_identifier}` for managed-service detail.
+- Added `GET /api/v1/services/health` for aggregate infrastructure health.
+- Added `GET /api/v1/services/summary` for normalized infrastructure summary.
+- Added typed API response schemas that adapt canonical domain `to_dict()`
+  serialization.
+- Added the API dependency factory for `ServiceLifecycleService` backed by the
+  existing `DockerComposeProvider`.
+- Registered the Service Lifecycle v1 router.
+- Reused the existing `system.health.read` authorization permission.
+- Added nine dedicated Service Lifecycle HTTP route tests.
+
+### Architecture Boundary
+
+The API is a typed transport layer only. It consumes
+`ServiceLifecycleService`; routes do not call Docker or Docker Compose directly
+and do not duplicate lifecycle business rules.
+
+M-018.30 exposes exactly four GET operations. It does not add restart, update,
+rollback, lifecycle writes, operation locks, maintenance writes, audit-event
+publication, Update Discovery API, Maintenance History API, or Portal UI.
+
+The ROADMAP API items are therefore split between the completed read-only
+transport/authorization boundary and the still-open guarded mutation API
+boundary. M-018 remains in progress.
+
+### Validation
+
+- 9 dedicated Service Lifecycle API route tests passed.
+- 357 Atlas API tests and 15 subtests passed.
+- 597 Service Lifecycle regression tests passed.
+- 225 Docker Compose provider regression tests passed.
+- GET-only OpenAPI mutation-exclusion validation passed.
+- Complete five-file whitespace validation passed.
+- Atlas Doctor passed.
+- The final five-file source review reconstructed the frozen implementation diff
+  byte-for-byte with SHA-256
+  `66d60207f6956913c8bf4effabfd0da869e4e949bd7e6ed421c60298d0034ba2`.
+
+### Release Boundary
+
+This backend transport foundation satisfies the API prerequisite for v1.0
+service visibility. It does not by itself certify the Administration Portal
+health/service-visibility journey. Portal presentation and user-acceptance
+validation remain separate release work.
+
+---
+
+## M-018.31 — Portal Service Lifecycle Foundation
+
+### Scope
+
+M-018.31 consumes the M-018.30 GET-only Service Lifecycle API in the protected
+Administration Portal. The slice closes the first three service-visibility
+presentation gates without introducing lifecycle mutation.
+
+### Implemented
+
+- Added the protected `/portal/services` page.
+- Added authenticated GET-only Portal adapters for managed-service collection,
+  managed-service detail, aggregate health, and infrastructure summary.
+- Added a Service Lifecycle hook with loading, failure, refresh, detail
+  selection, cancellation, and stale-request protection.
+- Added managed-service overview cards and aggregate service-health
+  presentation.
+- Added read-only service-detail inspection with normalized runtime and health
+  enrichment.
+- Joined managed-service identities with the production aggregate runtime and
+  health payloads instead of assuming runtime/health fields exist on collection
+  identities.
+- Preserved the `unavailable` health state in the Portal normalization layer.
+- Registered Services in the canonical Portal route/navigation model under
+  `system.health.read`.
+- Added and reconciled Service Lifecycle presentation and navigation regression
+  tests.
+
+### Architecture Boundary
+
+The Portal consumes Atlas API contracts only. It does not call Docker, Docker
+Compose, or Service Lifecycle providers directly and does not duplicate
+provider-side lifecycle business rules.
+
+M-018.31 remains strictly read-only. Restart, update, rollback, maintenance
+writes, operation locking, audit-event publication, Update Discovery
+presentation, Maintenance History presentation, and guarded lifecycle controls
+remain outside this slice.
+
+### Validation
+
+- M-018.31 final eleven-file source review passed.
+- Production-shaped per-service runtime mapping passed.
+- Production-shaped per-service health mapping passed.
+- `unavailable` health preservation passed.
+- Read-only detail enrichment passed.
+- TypeScript typecheck passed.
+- Focused Service Lifecycle/navigation Portal tests passed: 23.
+- Complete Portal regression suite passed: 218 tests across 27 files.
+- Prettier and ESLint passed.
+- Complete reviewed eleven-file diff and whitespace validation passed.
+- Bounded remote race guard passed.
+- Atlas Doctor passed.
+- Reviewed source diff SHA-256:
+  `1411f7e0ed45e65ba586fae08bee659345f67338eb560e7174f1b2bb1d74cd49`.
+
+### Release Boundary
+
+M-018.31 closes the ROADMAP implementation gates for managed-service overview,
+service health cards, and service detail views.
+
+It does **not** certify the complete administrator user-acceptance journey.
+Responsive phone/tablet acceptance, touch-friendly lifecycle interaction,
+mobile-safe service-card/table acceptance, Update Availability presentation,
+Maintenance History presentation, PWA evaluation, and final v1.0 user
+acceptance remain separate release work.
+
+---
+
+## M-018.32 — Responsive & Mobile Service Lifecycle Acceptance
+
+### Scope
+
+M-018.32 closes the responsive/mobile presentation prerequisites for the
+read-only Administration Portal Service Lifecycle experience without expanding
+the M-018.30/M-018.31 lifecycle contract or introducing mutation.
+
+### Implemented
+
+- Reused the existing responsive `dashboard-metric-grid` used by the Service
+  Lifecycle summary and managed-service cards.
+- Hardened the shared dashboard retry control to the Portal's established
+  `2.75rem` minimum touch-target convention and enabled touch manipulation.
+- Added Service Lifecycle-specific minimum-width and overflow wrapping so long
+  identifiers and read-only detail values cannot force critical horizontal
+  overflow on narrow screens.
+- Preserved the existing card-based managed-service presentation and semantic
+  read-only detail list; no artificial mobile table or alternate mobile route
+  was introduced.
+
+### Responsive / Touch Acceptance
+
+- Existing Portal phone/tablet breakpoints remain the responsive architecture.
+- Managed-service cards use an auto-fitting grid with
+  `minmax(min(100%, 16rem), 1fr)`.
+- Retry interaction is explicitly touch-sized.
+- Long managed-service/detail values may wrap rather than forcing horizontal
+  overflow.
+- The Service Lifecycle presentation remains GET-only and exposes no restart,
+  update, rollback, stop, start, or other lifecycle mutation control.
+
+### PWA Evaluation
+
+Tracked Portal source contains no PWA manifest, service worker, Workbox
+integration, install prompt, or other PWA runtime owner. PWA support was
+evaluated after responsive validation and is deferred beyond v1.0. The
+responsive authenticated Portal is the supported v1.0 mobile administration
+experience.
+
+### Validation
+
+- Focused Service Lifecycle presentation tests passed: 7.
+- Complete Portal regression suite passed: 218 tests across 27 files.
+- TypeScript typecheck passed.
+- ESLint passed.
+- Production Next.js build passed.
+- `git diff --check` passed.
+- Certified responsive/touch CSS candidate SHA-256:
+  `7711b98a13c5dde62f7fcd79c0d5110c42f008629c53bf36cc99866b1273b139`.
+
+### Release Boundary
+
+M-018.32 closes the ROADMAP gates for responsive phone/tablet administration,
+touch-friendly lifecycle controls, mobile-safe Service Lifecycle cards/tables,
+and PWA evaluation.
+
+This milestone does **not** certify final representative User Acceptance.
+Update Availability presentation, Maintenance History presentation,
+representative administrator journey execution, and final v1.0 approval remain
+open. Guarded lifecycle mutation remains outside the v1.0 read-only boundary.
+
+---
+
+## M-018.33 — Update Availability
+
+Repository-wide discovery established that Atlas already owned the canonical Update Discovery domain, so M-018.33 evolved that architecture rather than creating a duplicate subsystem.
+
+M-018.33A added read-only registry comparison through `docker buildx imagetools inspect --raw <reference>`. Focused certification passed 233 provider tests, 63 Update Discovery model/service tests, and 53 CLI contract tests. Live discovery observed 15 services: 8 current, 5 update-available, and 2 unknown.
+
+M-018.33B added GET-only `GET /api/v1/services/updates`, reusing the canonical lifecycle service, `ServiceUpdateService`, and `UpdateReport`. Certification passed 11 focused route tests, 359 full API tests, 15 API subtests, OpenAPI GET-only validation, and live in-process API validation.
+
+M-018.33C extended the existing Service Lifecycle Portal snapshot with Update Availability while leaving the existing hook and M-018.32 responsive CSS unchanged. The public feature index exports `createServiceUpdateReport`, `ServiceUpdate`, `ServiceUpdateReport`, and `ServiceUpdateStatus`.
+
+Final live acceptance exercised registry -> provider -> domain -> API -> Portal normalizer -> ServiceOverview rendering. Bazarr, Dozzle, Homepage, qBittorrent, and Tautulli rendered update-available; Jellyseerr and Maintainerr rendered unknown; the remaining eight services rendered current. No lifecycle mutation control was introduced.
+
+## M-018.34 — Maintenance History Presentation
+
+Repository-first discovery established that Service Lifecycle Maintenance History was already implemented below the Portal through `MaintenanceAction`, `MaintenanceResult`, `MaintenanceRecord`, `MaintenanceReport`, `ServiceMaintenanceHistoryService`, provider inspection contracts, and the read-only `atlas service history` CLI. Cleanup execution history and `/api/v1/operations/history` were inspected and intentionally retained as separate subsystems.
+
+### M-018.34A — GET-only Maintenance History API
+
+Added `GET /api/v1/services/history` through the existing Service Lifecycle router, `system.health.read` permission boundary, canonical `ServiceMaintenanceHistoryService`, and transport-only response schema. The route is static and remains ordered before `/{service_identifier}`.
+
+Certification passed:
+
+- 13 focused Service Lifecycle API route tests;
+- 361 API tests plus 15 subtests;
+- Python compilation and `git diff --check`;
+- OpenAPI GET-only validation; and
+- live in-process real-service validation returning a valid empty `MaintenanceReport` when provider persistence was unavailable.
+
+The live acceptance report observed provider `unknown`, zero records, zero failures/partials/successes/skips/unknowns, and `requires_attention=false`. Empty history is valid provider truth, not an error.
+
+### M-018.34B — Portal Maintenance History
+
+Extended the existing Service Lifecycle Portal snapshot with a fifth GET-only history source. Added canonical Portal-side Maintenance History normalization, aggregate counts, responsive card-based history presentation, and truthful empty-history rendering.
+
+The existing `useServices()` hook and M-018.32 responsive/touch CSS remained byte-identical. No separate history state machine, mobile route, table architecture, or lifecycle mutation control was introduced.
+
+Focused Portal validation passed 11 Service Lifecycle presentation tests, TypeScript typecheck, ESLint, and the production Next.js build.
+
+### M-018.34C — Live Acceptance
+
+Live acceptance exercised the real five-source Service Lifecycle HTTP surface:
+
+- managed services;
+- health;
+- summary;
+- Update Availability; and
+- Maintenance History.
+
+Real API output was passed through the real Portal normalizer and `ServiceOverview` renderer using a temporary repository-native Vitest acceptance owner that was removed after execution.
+
+Final engineering validation passed:
+
+- 27 Portal test files / 222 Portal tests;
+- Portal typecheck, lint, and production build;
+- 13 focused Service Lifecycle API tests;
+- 3,141 full Python tests plus 104 subtests; and
+- `git diff --check`.
+
+### Release Boundary
+
+M-018.34 closes the v1.0 Maintenance History presentation gate. All v1.0 presentation gates identified by M-018.31 through M-018.34 are now closed.
+
+Separate lifecycle mutation/reporting ROADMAP work remains open, including restart confirmation, guarded update confirmation, and failure/rollback reporting. Those items do not expand the read-only v1.0 presentation contract.
+
+The next release activity is final representative v1.0 User Acceptance and release certification.

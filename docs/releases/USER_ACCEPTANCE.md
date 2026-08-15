@@ -477,20 +477,47 @@ The monitoring policy is service-owned. Season scope selected by the user is
 Atlas Request state; `monitorNewItems` is not a caller-controlled Request field
 and must not be presented as a per-request toggle.
 
-At source checkpoint `ad84a30d`, Atlas has normalized TV-series/season metadata,
-fail-closed per-season requestability, explicit server-owned TV/anime-TV routing
-and submission preflight, and Portal explicit one-season mutation. Source
-completion does not certify production. The controlled Seerr migration,
-post-migration route verification, `monitorNewItems=all` validation, and
-ongoing-series production E2E acceptance remain open.
+The source-level explicit-season TV/anime workflow was subsequently exercised
+through controlled production E2.5 acceptance. The repository-pinned Seerr
+runtime was deployed under maintenance, backup, rollback, and deployment-lock
+control. Post-migration validation confirmed server-owned standard-TV and
+anime-TV routing and service-level `monitorNewItems=all` ownership.
+
+The passing Anime-TV acceptance used Demon Slayer: Kimetsu no Yaiba Season 2.
+Atlas persisted `media_type=anime_tv`; Seerr request `3` used server `1`; the
+series appeared only in `sonarr-anime` under `/media/Anime TV`; Season 2 was
+monitored; and standard Sonarr remained free of the Anime target.
+
+A prior Mushoku Tensei acceptance attempt exposed a routing-harness defect,
+failed closed, and was reconciled without media loss. That attempt is retained
+as recovery evidence and is not counted as the passing Anime-TV case.
 
 ### Observed Result
 
-______________________________________________
+E2.5 production acceptance passed.
+
+- Controlled Jellyseerr-to-Seerr migration completed under the Atlas deployment
+  transaction.
+- Standard-TV and Anime-TV provider routing were revalidated after migration.
+- `monitorNewItems=all` was verified as service-owned downstream policy.
+- Standard-TV acceptance remained valid.
+- Demon Slayer: Kimetsu no Yaiba Season 2 was submitted as `anime_tv`.
+- Seerr routed the request to server `1`.
+- Anime Sonarr owned the resulting target at
+  `/media/Anime TV/Demon Slayer - Kimetsu no Yaiba`.
+- Anime Sonarr reported `seriesType=anime`.
+- Season 2 remained monitored.
+- Standard Sonarr had zero Demon Slayer matches after submission.
+- Atlas Doctor and the final fail-closed transaction guard passed.
+
+Closure evidence:
+
+`8a974fb51ff1f0d8651cf4e17f0f36a430cb1de63b50bebfdc0201ca4f79e385`
 
 ### Pass / Fail
 
-______________________________________________
+**PASS — E2.5 TV / Anime production request routing and ongoing-series
+monitoring acceptance.**
 
 ### Reviewer
 
@@ -1495,3 +1522,107 @@ This document is complete only when:
 
 Planned validation, incomplete notes, or assumed success do not satisfy User
 Acceptance Certification.
+
+## M-018.30 — Read-Only Service Lifecycle API Foundation
+
+M-018.30 establishes the backend read-only Service Lifecycle transport required
+for the administrator health/service-visibility journey. Authorized
+administrators can now be served normalized managed-service collection/detail,
+aggregate health, and infrastructure-summary data through
+`GET /api/v1/services`, `GET /api/v1/services/{service_identifier}`,
+`GET /api/v1/services/health`, and `GET /api/v1/services/summary`, guarded by
+`system.health.read`.
+
+This backend certification does **not** certify the Portal experience itself.
+The health/service-visibility journey remains open until the Administration
+Portal consumes these contracts and representative user-acceptance validation
+is completed. M-018.30 introduces no lifecycle mutation.
+
+## M-018.31 — Portal Service Lifecycle Foundation
+
+M-018.31 implements the first Administration Portal consumer of the read-only
+Service Lifecycle API. Authorized administrators with `system.health.read` can
+open `/portal/services` and receive managed-service overview cards, aggregate
+service-health presentation, and read-only individual service details.
+
+The Portal consumes production-shaped Atlas API responses: managed-service
+identity is joined with aggregate runtime and health entries, the `unavailable`
+health state is preserved, and detail inspection is enriched with normalized
+overview runtime/health state. No lifecycle mutation control is exposed.
+
+Engineering validation for this slice is complete: focused Service
+Lifecycle/navigation tests passed 23 tests, the complete Portal suite passed
+218 tests across 27 files, and typecheck, formatting, lint, whitespace,
+bounded-remote, and Atlas Doctor checks passed.
+
+This closes the implementation prerequisite for the managed-service overview,
+service health cards, and service detail views. It does **not** by itself
+complete User Acceptance Certification. Representative administrator journey
+execution, responsive phone/tablet validation, touch interaction, mobile-safe
+layout validation, remaining lifecycle presentation surfaces, and final v1.0
+approval remain open.
+
+## M-018.32 — Responsive & Mobile Service Lifecycle Acceptance
+
+M-018.32 completes the engineering acceptance prerequisite for responsive
+phone/tablet Service Lifecycle presentation. The existing responsive Portal
+architecture and auto-fitting managed-service card grid are retained; shared
+retry interaction is explicitly touch-sized, and long Service Lifecycle
+identifiers/detail values are permitted to wrap rather than forcing critical
+horizontal overflow.
+
+The Service Lifecycle experience remains read-only. No restart, update,
+rollback, stop, start, or other lifecycle mutation control is introduced.
+
+Progressive Web App support was evaluated after responsive validation. No
+tracked Portal PWA runtime owner exists, so PWA implementation is deferred
+beyond v1.0 and the responsive authenticated Portal remains the supported v1.0
+mobile administration experience.
+
+This milestone closes the responsive phone/tablet, touch-friendly lifecycle,
+mobile-safe service-card/table, and PWA-evaluation implementation/presentation
+gates. It does **not** mark the broader Responsive Review checklist above as
+complete and does **not** constitute final User Acceptance Certification.
+Representative administrator journey execution, Update Availability,
+Maintenance History, and final v1.0 approval remain open.
+
+---
+
+## M-018.33 — Update Availability Acceptance
+
+**Status: ACCEPTED**
+
+M-018.33 closes the v1.0 Update Availability presentation gate.
+
+Acceptance verified the read-only path from registry through the Docker Compose provider, canonical Update Discovery domain, `ServiceUpdateService`, GET-only API, Portal normalization, and Service Lifecycle presentation.
+
+Accepted behavior includes trusted digest comparison, fail-closed unresolved discovery, preservation of `system.health.read`, aggregate/per-service Portal status, `Unknown` for missing observations, reuse of the existing hook and M-018.32 responsive behavior, and absence of lifecycle mutation controls.
+
+The live acceptance observed 15 services: 8 `current`, 5 `update-available`, 2 `unknown`, 0 `mutable-tag`, and 0 `unsupported`. These counts are evidence from that acceptance run rather than a persistent expected inventory.
+
+Bazarr, Dozzle, Homepage, qBittorrent, and Tautulli were observed as `update-available`; Jellyseerr and Maintainerr remained `unknown`. End-to-end acceptance proved the real API statuses survived Portal normalization and rendering without semantic drift.
+
+## M-018.34 — Maintenance History Acceptance
+
+**Status: ACCEPTED**
+
+M-018.34 closes the v1.0 Maintenance History presentation gate.
+
+Acceptance verified the read-only path from the established Service Lifecycle Maintenance History domain through `ServiceMaintenanceHistoryService`, GET-only `GET /api/v1/services/history`, Portal normalization, and responsive `ServiceOverview` rendering.
+
+Accepted behavior includes:
+
+- reuse of the canonical `MaintenanceReport` rather than a duplicate history contract;
+- preservation of `system.health.read`;
+- valid empty-history provider truth;
+- aggregate success/partial/failed/skipped/unknown counts;
+- read-only responsive maintenance-record cards;
+- reuse of the existing Service Lifecycle hook and M-018.32 responsive CSS;
+- explicit separation from Cleanup History and Operations History; and
+- absence of restart, update, rollback, start, stop, or other lifecycle mutation controls.
+
+Live acceptance exercised the real five-source Service Lifecycle HTTP snapshot and passed it through the real Portal normalizer and renderer. The observed live Maintenance History response contained zero records with provider `unknown` and `requires_attention=false`; this is accepted as a valid provider state rather than a persistent expected inventory.
+
+Engineering acceptance passed 27 Portal test files / 222 Portal tests, Portal typecheck/lint/production build, 13 focused Service Lifecycle API tests, and 3,141 full Python tests plus 104 subtests.
+
+M-018.34 completes the remaining v1.0 presentation prerequisite. Final representative administrator User Acceptance and release certification remain separate required release activities.

@@ -201,8 +201,8 @@ for Atlas-managed infrastructure.
 - [x] Add normalized managed-service models
 - [x] Add service image and runtime-state models
 - [x] Add service health models
-- [ ] Add update-plan and update-result models
-- [ ] Add maintenance-event models
+- [x] Add update-plan and update-result models
+- [x] Add maintenance-event models
 - [x] Add provider-independent service contracts
 - [x] Add provider-independent orchestration service
 - [x] Add dedicated domain tests
@@ -263,24 +263,26 @@ for Atlas-managed infrastructure.
 - [x] Add `atlas service updates`
 - [x] Add `atlas service history`
 - [ ] Add `atlas service update <service> --dry-run`
-- [ ] Add guarded lifecycle API endpoints
-- [ ] Add lifecycle API authorization tests
+- [x] Add read-only Service Lifecycle API endpoints
+- [ ] Add guarded lifecycle mutation API endpoints
+- [x] Add read-only lifecycle API authorization tests
+- [ ] Add guarded lifecycle mutation API authorization tests
 - [x] Add lifecycle CLI contract tests
 
 ### Admin Portal Integration
 
-- [ ] Add managed-service overview
-- [ ] Add service health cards
-- [ ] Add update-availability indicators
-- [ ] Add service detail views
+- [x] Add managed-service overview
+- [x] Add service health cards
+- [x] Add update-availability indicators
+- [x] Add service detail views
 - [ ] Add restart confirmation workflow
 - [ ] Add guarded update confirmation workflow
-- [ ] Add maintenance-history view
+- [x] Add maintenance-history view
 - [ ] Add failure and rollback reporting
-- [ ] Add responsive phone and tablet administration layouts
-- [ ] Add touch-friendly lifecycle controls
-- [ ] Add mobile-safe service cards and tables
-- [ ] Evaluate Progressive Web App support after responsive validation
+- [x] Add responsive phone and tablet administration layouts
+- [x] Add touch-friendly lifecycle controls
+- [x] Add mobile-safe service cards and tables
+- [x] Evaluate Progressive Web App support after responsive validation
 
 ---
 
@@ -428,14 +430,14 @@ with backend services.
   - [x] Add explicit server-owned standard-TV routing and submission preflight
   - [x] Add explicit Portal one-season request UX with no generic/all/current shortcut
   - [x] Derive the Portal TV request type from server-provided series classification
-  - [ ] Validate ongoing-series monitoring so future episodes can be acquired
+  - [x] Validate ongoing-series monitoring so future episodes can be acquired
         automatically through Seerr and Sonarr without a new Atlas request per episode
     - [x] Define Seerr service-level `monitorNewItems` ownership
     - [x] Pin the canonical Seerr runtime image in repository source
-    - [ ] Migrate the deployed Jellyseerr runtime to the canonical Seerr image
+    - [x] Migrate the deployed Jellyseerr runtime to the canonical Seerr image
           under backed-up maintenance control
-    - [ ] Verify the standard-TV Sonarr service uses `monitorNewItems=all`
-    - [ ] Complete production E2E future-episode monitoring validation
+    - [x] Verify the standard-TV Sonarr service uses `monitorNewItems=all`
+    - [x] Complete production E2E future-episode monitoring validation
 - [ ] Request anime movies
 - [ ] Request anime series
   - [x] Preserve server-side anime-TV request/provider capability
@@ -444,11 +446,11 @@ with backend services.
   - [x] Add explicit server-owned anime-TV routing and submission preflight
   - [x] Add explicit Portal one-season request UX with no generic/all/current shortcut
   - [x] Derive `anime_tv` from server-provided series classification
-  - [ ] Validate ongoing-series monitoring so future episodes can be acquired
+  - [x] Validate ongoing-series monitoring so future episodes can be acquired
         automatically through Seerr and Sonarr Anime without a new Atlas request per episode
     - [x] Define shared Seerr service-level `monitorNewItems` ownership
-    - [ ] Verify the Anime-TV Sonarr service uses `monitorNewItems=all`
-    - [ ] Complete production E2E future-episode monitoring validation
+    - [x] Verify the Anime-TV Sonarr service uses `monitorNewItems=all`
+    - [x] Complete production E2E future-episode monitoring validation
 - [x] View request history
 - [x] View request status
 - [x] Cancel eligible requests
@@ -758,6 +760,8 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
   - [x] Validate failed migration ownership through maintenance and deployment-lock retention
   - [x] Validate explicit recovery without rewriting the failed deployment outcome
   - [x] Repair and verify Sports writable-runtime ownership discovered during production recovery
+  - [x] Complete the second controlled Jellyseerr-to-Seerr migration with the verified deployment transaction retained through runtime acceptance
+  - [x] Certify standard-TV and Anime-TV server-owned routing, monitoring policy, and production E2E isolation under E2.5
   - [x] Harden target-artifact, isolation, lifecycle-ordering, and recovery contracts from E2.5 attempt #1
 
 ### Backup and Recovery
@@ -803,7 +807,7 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 
 ### Documentation
 
-- [x] Reconcile Media discovery and Request architecture through M-023.27.3B3
+- [x] Reconcile Media discovery and Request architecture through E2.5 production acceptance
 - [ ] Update architecture documentation for remaining v1.0 surfaces
 - [ ] Complete administrator guide
 - [ ] Complete user guide

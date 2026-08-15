@@ -4,6 +4,19 @@ All notable changes to Project Atlas are documented in this file.
 
 ## [Unreleased]
 
+- Added M-018.29 guarded lifecycle planning contracts: immutable
+  `ServiceUpdatePlan`, `ServiceUpdateResult`, and `ServiceUpdateOutcome`
+  contracts now normalize managed-service identity, image state, dependency
+  identities, UTC timestamps, rollback metadata, warnings/errors, correlation
+  identity, and deterministic `to_dict()` serialization.
+- Added the `MaintenanceEvent` audit-domain contract required by the Service
+  Lifecycle architecture, including requester identity, operation identity,
+  previous/resulting state, outcome, warnings/errors, rollback information,
+  timestamps, and correlation identity.
+- M-018.29 is intentionally domain-only: Service Lifecycle provider mutation,
+  audit-event publication, guarded update/restart execution, CLI/API mutation,
+  and Portal lifecycle administration remain open.
+
 ### Added
 
 - Added Seerr-backed Media discovery/search through the Atlas API and the
@@ -30,14 +43,18 @@ All notable changes to Project Atlas are documented in this file.
   server-owned Seerr routing for standard TV and anime TV so missing or invalid
   routing fails before new Request persistence or provider HTTP.
 - Established Seerr ongoing-series monitoring ownership as a service-level
-  runtime concern: the canonical repository image is pinned to Seerr v3.4.1,
-  while production migration, `monitorNewItems=all` verification for both
-  Sonarr routes, and end-to-end future-episode validation remain release gates.
+  runtime concern and completed the controlled production migration to the
+  repository-pinned Seerr v3.4.1 runtime under backup, maintenance, deployment
+  lock, rollback, and post-change verification control.
+- Verified `monitorNewItems=all` for both supported Sonarr routes and revalidated
+  Atlas's server-owned routing after migration.
+- Certified production TV/anime routing through E2.5: standard TV remains on
+  server `0`, while `anime_tv` routes to Seerr server `1`, `sonarr-anime`, and
+  `/media/Anime TV`; ongoing-series acceptance proved monitored downstream
+  ownership without exposing `serverId` or monitoring policy to the browser.
 - Added a Docker healthcheck to the repository-pinned Seerr service using the
   unauthenticated public-settings endpoint, while preserving the pinned image,
   `init: true`, existing configuration path, and current dependency topology.
-  Production remains on the legacy Jellyseerr runtime until the controlled
-  migration and post-migration acceptance gates are completed.
 
 ### Fixed
 
@@ -316,6 +333,35 @@ All notable changes to Project Atlas are documented in this file.
 
 #### Added
 
+- M-018.30 read-only Service Lifecycle HTTP API foundation.
+- `GET /api/v1/services` for normalized managed-service collection.
+- `GET /api/v1/services/{service_identifier}` for managed-service detail.
+- `GET /api/v1/services/health` for aggregate infrastructure health.
+- `GET /api/v1/services/summary` for normalized infrastructure summary.
+- Typed Service Lifecycle API response schemas and dedicated HTTP contract tests.
+- API dependency construction backed by the existing provider-independent
+  `ServiceLifecycleService` and `DockerComposeProvider`.
+
+- Added M-018.31 Administration Portal Service Lifecycle foundation at
+  `/portal/services`, protected by `system.health.read`.
+- Added production-payload-aligned managed-service overview cards, aggregate
+  service-health presentation, and read-only per-service detail inspection.
+- Added authenticated GET-only Portal adapters for the M-018.30 Service
+  Lifecycle collection, detail, health, and summary endpoints.
+- Added runtime/health normalization from aggregate API payloads, including
+  preservation of the `unavailable` health state and read-only detail
+  enrichment from the already-loaded overview.
+- Registered the Services route in the canonical Portal navigation model and
+  reconciled authorization-aware navigation tests.
+- Completed M-018.32 responsive/mobile Service Lifecycle acceptance:
+  preserved the existing responsive managed-service card grid, hardened shared
+  retry interaction to the Portal's 2.75rem touch-target convention, and added
+  mobile-safe shrinking/wrapping for Service Lifecycle cards and read-only
+  detail values.
+- Evaluated Progressive Web App support after responsive validation and deferred
+  PWA runtime implementation beyond v1.0; the responsive authenticated Portal
+  remains the supported v1.0 mobile administration experience.
+
 - Service Lifecycle domain architecture documented in ADR 0010.
 - Immutable `ManagedService`, `ServiceImage`, `ServiceRuntime`,
   `ServiceHealth`, and `ServiceHealthStatus` contracts with normalization,
@@ -362,6 +408,28 @@ All notable changes to Project Atlas are documented in this file.
   distinct from roadmap planning, changelog release notes, and build history.
 
 #### Validation
+
+- Verified 9 dedicated Service Lifecycle API route tests.
+- Verified the complete Atlas API regression suite with 357 passing tests and
+  15 passing subtests.
+- Verified all 597 Service Lifecycle regression tests.
+- Verified all 225 Docker Compose provider regression tests.
+- Verified the OpenAPI surface exposes exactly four Service Lifecycle GET
+  operations and no POST, PUT, PATCH, or DELETE lifecycle operations.
+- Verified the read-only HTTP surface requires `system.health.read`.
+- Verified Atlas Doctor after the implementation.
+- Preserved the v1.0 read-only boundary: restart, update, rollback, lifecycle
+  writes, Update Discovery API, Maintenance History API, and Portal UI remain
+  outside M-018.30.
+
+- M-018.31 focused Portal validation passed 23 tests across the Service
+  Lifecycle presentation and navigation contracts.
+- The complete Portal regression suite passed with 218 tests across 27 files;
+  TypeScript typecheck, Prettier, ESLint, whitespace checks, bounded remote
+  race validation, and Atlas Doctor also passed.
+- M-018.31 preserves the GET-only v1.0 boundary: no restart, update, rollback,
+  maintenance mutation, or other lifecycle write control is exposed by the
+  Portal.
 
 - Validated live read-only discovery across 15 Docker Compose services.
 - Validated live identity, runtime, image, and health output for Jellyfin,
@@ -551,7 +619,10 @@ All notable changes to Project Atlas are documented in this file.
 - Corrected the bounded Sports writable-path ownership, recreated the controller, verified a fresh heartbeat, and returned the Sports module to healthy operation.
 - Final recovery verification returned `atlas doctor` to 100%, preserved the verified deployment baseline, disabled maintenance only after successful validation, and released the deployment lock.
 - Hardened deployment/update and Sports lifecycle contracts from the production evidence before a second Seerr migration attempt.
-- The deployed Seerr migration, `monitorNewItems=all` verification, routing validation, ongoing-series production E2E validation, and final v1.0 release certification remain open.
+- Completed the subsequent controlled Jellyseerr-to-Seerr production migration under transaction `seerr-migration-20260813T001057Z-760620`; the migrated runtime reached `runtime_verified` / `migration_runtime_ready` while maintenance and deployment-lock ownership remained fail closed through acceptance.
+- Recovered a first Anime-TV acceptance misroute involving Mushoku Tensei without deleting the seven preserved media files; reconciled the stale Seerr and Atlas request artifacts and restored authoritative Anime Sonarr ownership before continuing.
+- Certified E2.5 Anime-TV production acceptance with Demon Slayer: Kimetsu no Yaiba Season 2: Atlas persisted `media_type=anime_tv`, Seerr request `3` routed to server `1`, Anime Sonarr created the target under `/media/Anime TV`, Season 2 remained monitored, and standard Sonarr remained untouched.
+- E2.5 production migration, routing, monitoring, and TV/anime acceptance are closed; final release-candidate, pilot, stabilization, and v1.0 certification gates remain open.
 
 
 ### Added
@@ -664,3 +735,30 @@ All notable changes to Project Atlas are documented in this file.
 - Verified cleanup regression suite (70 passing).
 - Verified full Atlas Core regression suite (229 passing).
 - Live-tested `atlas cleanup execute jellyfin --dry-run` in human-readable and JSON modes.
+
+---
+
+## M-018.33 — Update Availability
+
+- Extended existing Update Discovery with read-only Docker registry comparison.
+- Added truthful `current` and `update-available` classification using local descriptor and remote top-level manifest/index identity.
+- Preserved fail-closed `mutable-tag`, `unknown`, and `unsupported` behavior.
+- Added GET-only `GET /api/v1/services/updates`.
+- Reused the existing Service Lifecycle permission and canonical `UpdateReport`.
+- Added Portal aggregate and per-service Update Availability.
+- Reused the existing hook and M-018.32 responsive/mobile-safe presentation.
+- Added no update, restart, pull, rollback, or other lifecycle mutation control.
+- Closed the v1.0 Update Availability presentation gate.
+- Leaves Maintenance History as the final remaining v1.0 presentation gate.
+
+## M-018.34 — Maintenance History
+
+- Reused the established Service Lifecycle Maintenance History domain rather than creating a duplicate history subsystem.
+- Added GET-only `GET /api/v1/services/history` using the canonical `ServiceMaintenanceHistoryService` and `MaintenanceReport`.
+- Preserved the existing `system.health.read` authorization boundary and static-route ordering ahead of service detail.
+- Added Portal Maintenance History normalization, aggregate status, responsive read-only record cards, and truthful empty-history presentation.
+- Reused the existing Service Lifecycle hook and M-018.32 responsive/mobile-safe CSS unchanged.
+- Kept Cleanup History and Operations History separate from Service Lifecycle Maintenance History.
+- Added no restart, update, rollback, start, stop, or other lifecycle mutation control.
+- Closed the final v1.0 Maintenance History presentation gate.
+- Final representative v1.0 User Acceptance and release certification remain required.

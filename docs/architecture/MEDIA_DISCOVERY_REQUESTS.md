@@ -57,8 +57,9 @@ translation, and mutation ordering.
 
 The current provider implementation retains some `Jellyseerr` names for
 compatibility with the established Atlas package and environment contracts.
-Repository source now selects the pinned Seerr runtime, while the deployed
-production container remains a separate migration and release-acceptance gate.
+Repository source and the deployed production service now use the
+repository-pinned Seerr runtime. E2.5 completed the controlled production
+migration and revalidated the server-owned standard-TV and anime-TV routes.
 
 ## Discovery Read Path
 
@@ -250,54 +251,45 @@ supply downstream `serverId` routing.
 
 ## Ongoing TV and Anime Series
 
-Ongoing-series automation remains a v1.0 requirement. The source-level
-TV/anime Portal request workflow now lets the user choose an explicit season
-scope. The downstream Seerr/Sonarr or Seerr/Sonarr Anime configuration is
-expected to keep a supported ongoing series monitored so future episodes can be
-acquired automatically under the configured monitoring, quality, and release
-rules.
+Ongoing-series automation is a v1.0 requirement. The source-level TV/anime
+Portal workflow lets the user choose one explicit positive season scope, while
+the downstream Seerr/Sonarr service configuration remains responsible for
+future-series monitoring.
 
-Atlas should not require a new user Request for every future episode of an
-already monitored ongoing series.
+E2.5 completed the controlled production migration to the repository-pinned
+Seerr runtime and certified the production routing boundary:
 
-### Monitoring Ownership and Runtime Gate
+- standard TV remains server-owned on Seerr server `0`;
+- anime TV uses `media_type=anime_tv` and Seerr server `1`;
+- server `1` resolves to `sonarr-anime`;
+- the Anime library root is `/media/Anime TV`; and
+- `monitorNewItems=all` is a service-level policy for the supported Sonarr
+  services, not caller-controlled Request state.
 
-Ongoing-series monitoring is owned by the configured Seerr Sonarr service, not
-by caller-controlled Atlas Request fields. The target Seerr runtime exposes
-`monitorNewItems` as a Sonarr-service setting and forwards that value when a new
-series is added to Sonarr. Atlas therefore does not add a per-request
-`monitorNewItems` field or allow the browser to control that downstream
-monitoring policy.
+Production acceptance used explicit-season requests and preserved the
+distinction between Request scope and future monitoring. The successful
+Anime-TV acceptance requested Demon Slayer: Kimetsu no Yaiba Season 2. Seerr
+recorded only season `2`, Anime Sonarr created the series as
+`seriesType=anime`, Season 2 remained monitored, and standard Sonarr had zero
+matching targets after submission.
 
-The canonical repository runtime is pinned to Seerr v3.4.1. The production
-container observed during B3.3.3C still used the legacy
-`fallenbagel/jellyseerr:latest` lineage and exposed neither a
-`monitorNewItems` setting on its two sanitized Sonarr service records nor
-`monitorNewItems` support in its deployed application code. Source ownership and
-production runtime state are therefore intentionally distinguished.
+The first Anime acceptance candidate, Mushoku Tensei: Jobless Reincarnation,
+exposed a harness/discriminator misroute. That attempt failed closed and was
+reconciled without media loss; it is recovery evidence rather than the passing
+Anime-TV case.
 
-Before v1.0 series-request acceptance can pass, the controlled production
-deployment must:
+Season request scope and future-season monitoring remain separate concepts. An
+explicit season request represents the authenticated user's Atlas Request
+scope. Seerr's service-level monitoring policy determines whether downstream
+Sonarr continues monitoring future upstream metadata. The Portal does not
+expose `serverId`, `monitorNewItems`, generic TV, all-seasons shortcuts, or
+browser-inferred anime routing.
 
-1. back up the existing Seerr/Jellyseerr configuration and preserve rollback;
-2. migrate/recreate the service on the repository-pinned Seerr image;
-3. verify the standard-TV route and anime-TV route still resolve to the intended
-   Sonarr service IDs;
-4. set and verify `monitorNewItems=all` for both supported Sonarr services; and
-5. prove through production E2E validation that a newly requested ongoing
-   standard series and anime series remain monitored for future episodes.
-
-Season request scope and future-season monitoring are separate concepts. An
-explicit season request still represents that Atlas Request's user-selected
-season scope, while Seerr's service-level monitoring policy determines whether
-Sonarr automatically monitors later seasons added to upstream metadata. The
-Portal must not present service-level monitoring as a per-request toggle unless
-Atlas later implements a separate authoritative downstream control.
-
-This section defines the required end-user/operational acceptance target. The
-source-level Portal TV/anime explicit-season workflow is complete, but this does
-not claim that the production Seerr migration, service-level monitoring
-configuration, or ongoing-series production acceptance is complete.
+E2.5 therefore closes the production Seerr migration, TV/anime route
+verification, service-level monitoring verification, and ongoing-series
+production acceptance gates. End-to-end journey breadth, accessibility,
+performance, sustained-use, pilot, stabilization, and final v1.0 approval
+remain separate release gates.
 
 ## Security Properties
 
@@ -334,6 +326,6 @@ suite, typecheck, lint, and production build while adding explicit one-season
 TV/anime mutation.
 
 Production deployment, Seerr migration, `monitorNewItems=all` verification,
-ongoing-series runtime acceptance, end-to-end journey certification,
-accessibility, performance, sustained-use, pilot, stabilization, and v1.0
-release approval remain separate gates.
+and ongoing-series TV/anime runtime acceptance passed under E2.5. Broader
+end-to-end journey certification, accessibility, performance, sustained-use,
+pilot, stabilization, and final v1.0 release approval remain separate gates.

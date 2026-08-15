@@ -19,6 +19,7 @@ export type PortalRouteId =
   | "requests"
   | "downloads"
   | "users"
+  | "services"
   | "administration"
   | "settings";
 
@@ -104,6 +105,16 @@ export const portalRoutes: readonly PortalRoute[] = [
     section: PORTAL_ROUTE_SECTIONS.management
   },
   {
+    id: "services",
+    path: "/portal/services",
+    label: "Services",
+    navigationDescription: "Managed service health and details",
+    abbreviation: "SV",
+    permission: ATLAS_PERMISSIONS.systemHealthRead,
+    section: PORTAL_ROUTE_SECTIONS.management,
+    pageDescription: "Review Atlas-managed service health and read-only runtime details."
+  },
+  {
     id: "administration",
     path: "/portal/administration",
     label: "Administration",
@@ -140,6 +151,7 @@ export const PORTAL_ROUTES = {
   requests: routeById("requests"),
   downloads: routeById("downloads"),
   users: routeById("users"),
+  services: routeById("services"),
   administration: routeById("administration"),
   settings: routeById("settings")
 } as const satisfies Readonly<Record<PortalRouteId, PortalRoute>>;

@@ -17,7 +17,7 @@ stop, restart, pull, update, recreate, or remove containers.
 - Keep orchestration and reporting provider-independent.
 - Make human and JSON output consume the same service-layer reports.
 - Preserve deterministic ordering, validation, serialization, and timestamps.
-- Support future API and Portal consumers without duplicating business logic.
+- Support API and Portal consumers without duplicating business logic.
 - Establish safe boundaries before guarded lifecycle mutations are introduced.
 
 ## Non-Goals
@@ -34,7 +34,7 @@ The current subsystem does not provide:
 ## Layered Architecture
 
 ```text
-Atlas CLI / Future API / Future Portal
+Atlas CLI / Atlas API / Atlas Portal
                  │
                  ▼
       ServiceLifecycleService
@@ -272,6 +272,40 @@ checks, missing dependencies, and configuration warnings.
 Service Graph will expose the dependency contract in human-readable and JSON
 forms. Update discovery will inspect image identity and registry state without
 applying changes. Maintenance history will provide durable audit visibility.
+
+## Read-Only API Contract
+
+M-018.30 exposes the first Service Lifecycle HTTP transport boundary. The API
+remains a presentation/transport adapter over the existing
+`ServiceLifecycleService`; it does not move provider or lifecycle business logic
+into FastAPI routes.
+
+The v1 read-only surface is:
+
+```text
+GET /api/v1/services
+GET /api/v1/services/{service_identifier}
+GET /api/v1/services/health
+GET /api/v1/services/summary
+```
+
+The endpoints adapt the existing normalized managed-service,
+`InfrastructureHealthReport`, and `InfrastructureSummary` contracts. They use
+the existing `system.health.read` authorization permission and return
+non-leaking HTTP errors when the Service Lifecycle provider is unavailable.
+
+The API does not call Docker Compose directly. Default dependency construction
+creates `DockerComposeProvider` behind `ServiceLifecycleService`, preserving the
+same provider-independent orchestration boundary used by the CLI.
+
+M-018.30 introduces no POST, PUT, PATCH, or DELETE Service Lifecycle operations.
+Restart, update, rollback, operation locking, maintenance writes, audit-event
+publication, Update Discovery API, Maintenance History API, and Portal
+integration remain outside this slice.
+
+Dedicated route tests cover collection, detail, unknown-service handling,
+aggregate health, infrastructure summary, provider failure, authorization,
+static route precedence, and the GET-only OpenAPI contract.
 
 ## Future Guarded Lifecycle Operations
 
@@ -549,21 +583,49 @@ Service Lifecycle documentation is split by audience:
 
 ## Administration Portal Integration
 
-The Administration Portal should consume the same normalized service layer used
-by the CLI.
+The Administration Portal consumes Service Lifecycle through the Atlas API and
+the same provider-independent service-layer contracts used by the CLI. It does
+not call Docker or Docker Compose directly.
 
-Supported v1.0 Portal surfaces may include:
+M-018.31 implements the first Portal Service Lifecycle surfaces:
 
-- service inventory;
-- runtime and health overview;
-- aggregate health;
-- dependency relationships;
-- Service Doctor diagnostics;
-- Update Discovery;
-- Maintenance History.
+- protected `/portal/services` navigation under `system.health.read`;
+- managed-service inventory and overview cards;
+- aggregate Service Lifecycle health presentation;
+- normalized runtime and health state on service cards; and
+- read-only per-service detail inspection.
 
-The Portal must not call Docker directly or duplicate Service Lifecycle business
-logic. API and Portal adapters should serialize the existing report contracts.
+The Portal joins managed-service collection identities with the per-service
+runtime entries from the infrastructure-summary response and the per-service
+health entries from the aggregate-health response. This keeps presentation
+aligned with the production API shape instead of inventing browser-side domain
+fields. Detail responses are enriched only with already-loaded normalized
+overview state.
+
+M-018.32 completes the responsive/mobile Service Lifecycle presentation
+prerequisites. The existing Portal responsive architecture remains authoritative:
+managed-service cards continue to use the shared auto-fitting dashboard grid,
+touch interaction follows the shared Portal control conventions, and
+Service Lifecycle cards/read-only detail values are protected against narrow
+viewport overflow.
+
+Progressive Web App support was evaluated after responsive validation. No
+tracked Portal manifest, service worker, Workbox integration, install prompt, or
+other PWA runtime owner exists, and PWA implementation is deferred beyond v1.0.
+The responsive authenticated Portal remains the supported v1.0 mobile
+administration experience.
+
+Remaining v1.0 Portal Service Lifecycle presentation work includes:
+
+- Update Discovery presentation; and
+- Maintenance History presentation.
+
+Representative administrator User Acceptance and final v1.0 approval remain
+separate release gates.
+
+The Portal must not duplicate Service Lifecycle business logic. Restart, update,
+rollback, and other lifecycle mutation controls remain outside the v1.0
+read-only boundary.
 
 ## Post-v1.0 Extension Boundary
 
@@ -591,3 +653,152 @@ Rollback if required
 ```
 
 Those operations remain outside the v1.0 read-only boundary.
+
+## M-018.29 Guarded Lifecycle Planning Contracts
+
+M-018.29 implements the domain contracts required before Atlas can expose
+guarded lifecycle mutation.
+
+The public Service Lifecycle package now exports:
+
+- `ServiceUpdateOutcome`;
+- `ServiceUpdatePlan`;
+- `ServiceUpdateResult`; and
+- `MaintenanceEvent`.
+
+`ServiceUpdatePlan` is an immutable dry-run planning contract for one managed
+service. It binds normalized plan and service identity, the current and target
+image references, requester identity, dependency identities, creation time,
+correlation identity, warnings, and structured details. A plan cannot claim to
+be an applied operation, and its target image must differ from its current
+image.
+
+`ServiceUpdateResult` records the normalized outcome of a later guarded update
+operation without providing that operation itself. It binds the plan and
+operation identities, service identity, previous/resulting image state,
+normalized start/completion timestamps, rollback state, warnings/errors,
+correlation identity, and structured details. Rollback identifiers cannot be
+reported unless rollback actually occurred, and a `rolled-back` outcome
+requires `rollback_performed=true`.
+
+`MaintenanceEvent` implements the audit-domain shape defined by ADR 0010. It
+records event/service/operation/requester identity, timestamps,
+previous/resulting state, maintenance outcome, warnings/errors, rollback
+information, and correlation identity. The model is not itself an event
+publisher.
+
+All four contracts follow the existing Atlas model contract: inputs are
+normalized, identity and child contracts are validated, timestamps are
+normalized to UTC, objects are immutable where practical, deterministic
+`to_dict()` serialization is provided, dedicated tests exist, and public
+exports are defined through `atlas.service_lifecycle`.
+
+### Current Mutation Boundary
+
+M-018.29 does **not** expose lifecycle mutation.
+
+The following remain intentionally open:
+
+- administrator authorization for lifecycle mutation;
+- allow-listed mutation targets;
+- lifecycle dry-run orchestration;
+- guarded service update and restart execution;
+- pre/post-update orchestration;
+- dependency-aware execution ordering;
+- lifecycle operation locking;
+- failed-update rollback execution;
+- bulk-update and maintenance-window orchestration;
+- lifecycle maintenance-event publication;
+- `atlas service update <service> --dry-run`;
+- guarded lifecycle mutation API endpoints and authorization tests; and
+- Service Lifecycle administration in the Portal.
+
+The existing Service Lifecycle CLI and provider boundary therefore remain
+read-only after M-018.29. These contracts establish the normalized planning,
+result, and audit data model required by later guarded-mutation work; they do
+not claim that guarded mutation is complete.
+
+---
+
+## M-018.33 — Read-Only Update Availability
+
+M-018.33 extends the established Service Lifecycle Update Discovery domain without creating a second update model or lifecycle mutation path.
+
+The authoritative domain remains `ImageReference`, `ServiceUpdate`, `UpdateReport`, and `ServiceUpdateService`.
+
+### Registry identity contract
+
+For tag-addressable images, the Docker Compose provider performs bounded read-only registry comparison. Atlas compares Docker's locally stored top-level image descriptor digest with the SHA-256 identity of the registry's raw top-level manifest or image index obtained with:
+
+```text
+docker buildx imagetools inspect --raw <reference>
+```
+
+Platform child-manifest digests and image configuration IDs are not treated as interchangeable update identities.
+
+A completed trusted comparison classifies matching identities as `current` and differing identities as `update-available`. If trustworthy comparison cannot be completed, Atlas preserves conservative `mutable-tag`, `unknown`, or `unsupported` semantics. Digest-only references do not claim knowledge of a newer replacement target.
+
+### API transport
+
+Update Availability is exposed through GET-only `GET /api/v1/services/updates`. The route reuses the existing `system.health.read` permission boundary and canonical `UpdateReport`. It exposes no image pull, restart, Compose recreation, update execution, rollback, or other mutation.
+
+### Portal presentation
+
+The Service Lifecycle Portal snapshot composes read-only services, health, summary, and updates observations. The existing `useServices()` state machine and M-018.32 responsive/mobile-safe presentation are reused unchanged.
+
+The Portal presents aggregate and per-service `current`, `update-available`, `mutable-tag`, `unknown`, and `unsupported` state. Missing observations render as `Unknown`, never `Current`. No Update, Restart, Start, Stop, or Rollback control is introduced.
+
+## M-018.34 — Read-Only Maintenance History Presentation
+
+M-018.34 publishes and presents the Service Lifecycle Maintenance History domain that Atlas already owned. It does not create a second maintenance-history model, persistence store, or orchestration layer.
+
+The authoritative contracts remain:
+
+- `MaintenanceAction`;
+- `MaintenanceResult`;
+- `MaintenanceRecord`;
+- `MaintenanceReport`; and
+- `ServiceMaintenanceHistoryService`.
+
+Provider inspection remains the source of Maintenance History truth. A provider that has no persisted maintenance records may truthfully return a valid empty `MaintenanceReport`.
+
+### API transport
+
+Maintenance History is exposed through GET-only:
+
+```text
+GET /api/v1/services/history
+```
+
+The endpoint reuses `system.health.read`, the existing Service Lifecycle dependency composition, and canonical `MaintenanceReport` serialization. The static `/history` route is declared before the dynamic `/{service_identifier}` detail route.
+
+No POST, PUT, PATCH, DELETE, restart, update execution, rollback, Compose recreation, or other lifecycle mutation is introduced by this transport.
+
+### Portal presentation
+
+The Service Lifecycle Portal snapshot now composes five read-only sources:
+
+1. managed services;
+2. lifecycle health;
+3. lifecycle summary;
+4. Update Availability; and
+5. Maintenance History.
+
+The existing `useServices()` hook remains the single overview loading state machine. Maintenance History uses the established responsive card/grid presentation and M-018.32 mobile-safe behavior rather than introducing a second Portal architecture.
+
+The Portal normalizes maintenance results to `success`, `partial`, `failed`, `skipped`, or `unknown`, presents aggregate counts, renders read-only record details, and truthfully renders a valid empty-history state.
+
+### History-domain separation
+
+Service Lifecycle Maintenance History is not interchangeable with:
+
+- Cleanup execution history; or
+- Operations History exposed through `/api/v1/operations/history`.
+
+Those systems retain their existing ownership and persistence contracts. M-018.34 does not merge or proxy them into the Service Lifecycle history surface.
+
+### Mutation boundary
+
+The M-018.34 Portal remains presentation-only. It exposes no Restart, Update service, Rollback, Start, Stop, or other lifecycle mutation control.
+
+Guarded lifecycle mutation, rollback execution, maintenance-event publication, and other mutation/reporting work remain separate future ROADMAP concerns.

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
@@ -2734,6 +2735,16 @@ def test_inspect_update_reports_mutable_tag_without_registry_claim(
     )
     monkeypatch.setattr(DockerComposeProvider, "inspect_service", lambda self, identifier: service)
     monkeypatch.setattr(DockerComposeProvider, "inspect_runtime", lambda self, identifier: runtime)
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_inspect_local_image_descriptor_digest",
+        lambda self, image_id: None,
+    )
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_inspect_remote_image_digest",
+        lambda self, reference: None,
+    )
 
     update = provider.inspect_update(" SONARR ")
 
@@ -2762,6 +2773,16 @@ def test_inspect_update_reports_unknown_for_pinned_tag(
     )
     monkeypatch.setattr(DockerComposeProvider, "inspect_service", lambda self, identifier: service)
     monkeypatch.setattr(DockerComposeProvider, "inspect_runtime", lambda self, identifier: runtime)
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_inspect_local_image_descriptor_digest",
+        lambda self, image_id: None,
+    )
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_inspect_remote_image_digest",
+        lambda self, reference: None,
+    )
 
     update = provider.inspect_update("sonarr")
 
@@ -2769,6 +2790,324 @@ def test_inspect_update_reports_unknown_for_pinned_tag(
     assert update.requires_attention is False
     assert update.current_image.tag == "4.0.15"
     assert update.available_image is None
+
+
+def test_inspect_update_reports_current_when_registry_digest_matches(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+    service = ManagedService(
+        identifier="sonarr",
+        name="Sonarr",
+        provider="docker-compose",
+    )
+    runtime = ServiceRuntime(
+        state="running",
+        health="healthy",
+        image=ServiceImage(
+            reference="lscr.io/linuxserver/sonarr:latest",
+            repository="lscr.io/linuxserver/sonarr",
+            tag="latest",
+            image_id="sha256:" + ("a" * 64),
+        ),
+    )
+    digest = "sha256:" + ("b" * 64)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "inspect_service",
+        lambda self, identifier: service,
+    )
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "inspect_runtime",
+        lambda self, identifier: runtime,
+    )
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_inspect_local_image_descriptor_digest",
+        lambda self, image_id: digest,
+    )
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_inspect_remote_image_digest",
+        lambda self, reference: digest,
+    )
+
+    update = provider.inspect_update("sonarr")
+
+    assert update.status is UpdateStatus.CURRENT
+    assert update.available_image is None
+    assert update.requires_attention is False
+    assert update.details["registry_comparison"] is True
+    assert update.details["local_descriptor_digest"] == digest
+    assert update.details["remote_manifest_digest"] == digest
+
+
+def test_inspect_update_reports_available_when_registry_digest_differs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+    service = ManagedService(
+        identifier="homepage",
+        name="Homepage",
+        provider="docker-compose",
+    )
+    runtime = ServiceRuntime(
+        state="running",
+        health="healthy",
+        image=ServiceImage(
+            reference="ghcr.io/gethomepage/homepage:latest",
+            repository="ghcr.io/gethomepage/homepage",
+            tag="latest",
+            image_id="sha256:" + ("a" * 64),
+        ),
+    )
+    local_digest = "sha256:" + ("a" * 64)
+    remote_digest = "sha256:" + ("b" * 64)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "inspect_service",
+        lambda self, identifier: service,
+    )
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "inspect_runtime",
+        lambda self, identifier: runtime,
+    )
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_inspect_local_image_descriptor_digest",
+        lambda self, image_id: local_digest,
+    )
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_inspect_remote_image_digest",
+        lambda self, reference: remote_digest,
+    )
+
+    update = provider.inspect_update("homepage")
+
+    assert update.status is UpdateStatus.UPDATE_AVAILABLE
+    assert update.available_image is not None
+    assert update.available_image.repository == (
+        "ghcr.io/gethomepage/homepage"
+    )
+    assert update.available_image.tag == "latest"
+    assert update.available_image.digest == remote_digest
+    assert update.requires_attention is True
+    assert update.details["registry_comparison"] is True
+
+
+def test_inspect_update_preserves_mutable_tag_when_registry_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+    service = ManagedService(
+        identifier="sonarr",
+        name="Sonarr",
+        provider="docker-compose",
+    )
+    runtime = ServiceRuntime(
+        state="running",
+        health="healthy",
+        image=ServiceImage(
+            reference="lscr.io/linuxserver/sonarr:latest",
+            repository="lscr.io/linuxserver/sonarr",
+            tag="latest",
+            image_id="sha256:" + ("a" * 64),
+        ),
+    )
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "inspect_service",
+        lambda self, identifier: service,
+    )
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "inspect_runtime",
+        lambda self, identifier: runtime,
+    )
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_inspect_local_image_descriptor_digest",
+        lambda self, image_id: "sha256:" + ("a" * 64),
+    )
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_inspect_remote_image_digest",
+        lambda self, reference: None,
+    )
+
+    update = provider.inspect_update("sonarr")
+
+    assert update.status is UpdateStatus.MUTABLE_TAG
+    assert update.available_image is None
+    assert update.details["registry_comparison"] is False
+
+
+def test_inspect_update_does_not_compare_digest_only_reference(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+    digest = "sha256:" + ("b" * 64)
+    service = ManagedService(
+        identifier="sonarr",
+        name="Sonarr",
+        provider="docker-compose",
+    )
+    runtime = ServiceRuntime(
+        state="running",
+        health="healthy",
+        image=ServiceImage(
+            reference=f"registry.example/team/sonarr@{digest}",
+            repository="registry.example/team/sonarr",
+            tag=None,
+            digest=digest,
+            image_id="sha256:" + ("a" * 64),
+        ),
+    )
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "inspect_service",
+        lambda self, identifier: service,
+    )
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "inspect_runtime",
+        lambda self, identifier: runtime,
+    )
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_inspect_local_image_descriptor_digest",
+        lambda self, image_id: calls.append("local"),
+    )
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_inspect_remote_image_digest",
+        lambda self, reference: calls.append("remote"),
+    )
+
+    update = provider.inspect_update("sonarr")
+
+    assert update.status is UpdateStatus.UNKNOWN
+    assert update.available_image is None
+    assert update.details["registry_comparison"] is False
+    assert calls == []
+
+
+def test_inspect_local_image_descriptor_digest_parses_descriptor(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+    digest = "sha256:" + ("a" * 64)
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_docker",
+        lambda self, *arguments: SimpleNamespace(
+            stdout='{"digest":"' + digest + '","mediaType":"test"}',
+        ),
+    )
+
+    assert (
+        provider._inspect_local_image_descriptor_digest(
+            "sha256:" + ("b" * 64),
+        )
+        == digest
+    )
+
+
+def test_inspect_local_image_descriptor_digest_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    def fail(
+        self: DockerComposeProvider,
+        *arguments: str,
+    ) -> object:
+        raise DockerComposeProviderError(
+            "Docker inspection failed"
+        )
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_docker",
+        fail,
+    )
+
+    assert (
+        provider._inspect_local_image_descriptor_digest(
+            "sha256:" + ("b" * 64),
+        )
+        is None
+    )
+
+
+def test_remote_image_digest_hashes_raw_registry_manifest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+    raw = '{"schemaVersion":2,"mediaType":"test"}'
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_docker",
+        lambda self, *arguments: SimpleNamespace(
+            stdout=raw,
+        ),
+    )
+
+    digest = provider._inspect_remote_image_digest(
+        "example.invalid/service:latest",
+    )
+
+    assert digest == (
+        "sha256:"
+        + hashlib.sha256(
+            raw.encode("utf-8"),
+        ).hexdigest()
+    )
+
+
+def test_remote_image_digest_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = make_provider(tmp_path)
+
+    def fail(
+        self: DockerComposeProvider,
+        *arguments: str,
+    ) -> object:
+        raise DockerComposeProviderError(
+            "Docker inspection failed"
+        )
+
+    monkeypatch.setattr(
+        DockerComposeProvider,
+        "_run_docker",
+        fail,
+    )
+
+    assert (
+        provider._inspect_remote_image_digest(
+            "example.invalid/service:latest",
+        )
+        is None
+    )
 
 
 def test_inspect_update_preserves_digest_pinned_identity(
