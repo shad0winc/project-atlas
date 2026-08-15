@@ -9,6 +9,7 @@ from pathlib import Path
 from atlas.service_lifecycle import (
     DockerComposeProvider,
     ServiceLifecycleService,
+    ServiceMaintenanceHistoryService,
     ServiceUpdateService,
 )
 
@@ -302,6 +303,16 @@ def get_service_update_service() -> ServiceUpdateService:
     """Return the process-wide read-only Update Discovery service."""
 
     return ServiceUpdateService(
+        get_service_lifecycle_service()
+    )
+
+
+@lru_cache(maxsize=1)
+def get_service_maintenance_history_service(
+) -> ServiceMaintenanceHistoryService:
+    """Return the process-wide read-only Maintenance History service."""
+
+    return ServiceMaintenanceHistoryService(
         get_service_lifecycle_service()
     )
 

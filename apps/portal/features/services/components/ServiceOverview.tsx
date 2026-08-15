@@ -4,6 +4,7 @@ import type {
   ManagedService,
   ManagedServiceDetail,
   ServiceLifecycleSnapshot,
+  ServiceMaintenanceResult,
   ServiceUpdateStatus
 } from "../types/services";
 
@@ -41,6 +42,35 @@ function displayRawValue(value: unknown): string {
   }
 
   return JSON.stringify(value);
+}
+
+function maintenanceResultLabel(result: ServiceMaintenanceResult): string {
+  switch (result) {
+    case "success":
+      return "Success";
+    case "partial":
+      return "Partial";
+    case "failed":
+      return "Failed";
+    case "skipped":
+      return "Skipped";
+    default:
+      return "Unknown";
+  }
+}
+
+function maintenanceTime(value: string | undefined): string {
+  if (!value) {
+    return "Not reported";
+  }
+
+  const timestamp = new Date(value);
+
+  if (Number.isNaN(timestamp.getTime())) {
+    return value;
+  }
+
+  return timestamp.toLocaleString();
 }
 
 function updateStatusLabel(status: ServiceUpdateStatus): string {
@@ -104,6 +134,19 @@ export function ServiceOverview({
             {snapshot.updates.unsupported}
           </p>
         </Card>
+
+        <Card>
+          <p>Maintenance history</p>
+          <h3>
+            {snapshot.history.totalRecords === 1
+              ? "1 maintenance record"
+              : `${snapshot.history.totalRecords} maintenance records`}
+          </h3>
+          <p>
+            Success {snapshot.history.success} · Partial {snapshot.history.partial} · Failed{" "}
+            {snapshot.history.failed}
+          </p>
+        </Card>
       </section>
 
       <section aria-labelledby="managed-services-title">
@@ -138,6 +181,36 @@ export function ServiceOverview({
                 >
                   View details
                 </button>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
+
+
+      <section aria-labelledby="maintenance-history-title">
+        <h2 id="maintenance-history-title">Maintenance history</h2>
+        <p>Read-only maintenance observations reported by the Service Lifecycle provider.</p>
+
+        {snapshot.history.records.length === 0 ? (
+          <Card>
+            <h3>No maintenance history recorded</h3>
+            <p>
+              Atlas has not received persisted Service Lifecycle maintenance records from{" "}
+              {snapshot.history.provider}.
+            </p>
+          </Card>
+        ) : (
+          <div className="dashboard-metric-grid">
+            {snapshot.history.records.map((record, index) => (
+              <Card key={`${record.serviceIdentifier}-${record.startedAt ?? "unknown"}-${index}`}>
+                <p>{record.provider}</p>
+                <h3>{record.serviceName}</h3>
+                <p>Action: {record.action}</p>
+                <p>Result: {maintenanceResultLabel(record.result)}</p>
+                <p>Started: {maintenanceTime(record.startedAt)}</p>
+                <p>Completed: {maintenanceTime(record.completedAt)}</p>
+                <p>{record.summary}</p>
               </Card>
             ))}
           </div>

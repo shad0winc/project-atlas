@@ -67,11 +67,47 @@ export type ServiceUpdateReport = Readonly<{
   evaluatedAt?: string;
 }>;
 
+export type ServiceMaintenanceResult =
+  | "success"
+  | "partial"
+  | "failed"
+  | "skipped"
+  | "unknown";
+
+export type ServiceMaintenanceRecord = Readonly<{
+  serviceIdentifier: string;
+  serviceName: string;
+  provider: string;
+  action: string;
+  result: ServiceMaintenanceResult;
+  succeeded: boolean;
+  failed: boolean;
+  startedAt?: string;
+  completedAt?: string;
+  durationSeconds: number | null;
+  summary: string;
+  raw: Readonly<Record<string, unknown>>;
+}>;
+
+export type ServiceMaintenanceHistory = Readonly<{
+  provider: string;
+  totalRecords: number;
+  success: number;
+  partial: number;
+  failed: number;
+  skipped: number;
+  unknown: number;
+  requiresAttention: boolean;
+  records: readonly ServiceMaintenanceRecord[];
+  generatedAt?: string;
+}>;
+
 export type ServiceLifecycleSnapshot = Readonly<{
   services: readonly ManagedService[];
   health: ServiceLifecycleHealth;
   summary: ServiceLifecycleSummary;
   updates: ServiceUpdateReport;
+  history: ServiceMaintenanceHistory;
 }>;
 
 export type ServiceLifecycleState =
@@ -153,6 +189,21 @@ function updateStatusValue(value: unknown): ServiceUpdateStatus {
     normalized === "update-available" ||
     normalized === "mutable-tag" ||
     normalized === "unsupported"
+  ) {
+    return normalized;
+  }
+
+  return "unknown";
+}
+
+function maintenanceResultValue(value: unknown): ServiceMaintenanceResult {
+  const normalized = stringValue(value, "unknown").toLowerCase();
+
+  if (
+    normalized === "success" ||
+    normalized === "partial" ||
+    normalized === "failed" ||
+    normalized === "skipped"
   ) {
     return normalized;
   }
@@ -310,16 +361,65 @@ export function createServiceUpdateReport(value: unknown): ServiceUpdateReport {
   };
 }
 
+export function createServiceMaintenanceHistory(
+  value: unknown
+): ServiceMaintenanceHistory {
+  const report = recordValue(value);
+  const counts = recordValue(report.counts);
+
+  const records = recordArray(report.records).map((entry) => ({
+    serviceIdentifier: stringValue(entry.service_identifier, ""),
+    serviceName: stringValue(
+      entry.service_name,
+      stringValue(entry.service_identifier, "Unknown service")
+    ),
+    provider: stringValue(entry.provider, stringValue(report.provider, "unknown")),
+    action: stringValue(entry.action, "unknown"),
+    result: maintenanceResultValue(entry.result),
+    succeeded: entry.succeeded === true,
+    failed: entry.failed === true,
+    ...(typeof entry.started_at === "string" && entry.started_at.trim()
+      ? { startedAt: entry.started_at.trim() }
+      : {}),
+    ...(typeof entry.completed_at === "string" && entry.completed_at.trim()
+      ? { completedAt: entry.completed_at.trim() }
+      : {}),
+    durationSeconds:
+      typeof entry.duration_seconds === "number" && Number.isFinite(entry.duration_seconds)
+        ? entry.duration_seconds
+        : null,
+    summary: stringValue(entry.summary, "No maintenance summary was reported."),
+    raw: entry
+  }));
+
+  return {
+    provider: stringValue(report.provider, "unknown"),
+    totalRecords: integerValue(report.total_records),
+    success: integerValue(counts.success),
+    partial: integerValue(counts.partial),
+    failed: integerValue(counts.failed),
+    skipped: integerValue(counts.skipped),
+    unknown: integerValue(counts.unknown),
+    requiresAttention: report.requires_attention === true,
+    records,
+    ...(typeof report.generated_at === "string" && report.generated_at.trim()
+      ? { generatedAt: report.generated_at.trim() }
+      : {})
+  };
+}
+
 export function createServiceLifecycleSnapshot({
   services,
   health,
   summary,
-  updates
+  updates,
+  history
 }: Readonly<{
   services: readonly unknown[];
   health: unknown;
   summary: unknown;
   updates: unknown;
+  history: unknown;
 }>): ServiceLifecycleSnapshot {
   const runtimeEntries = serviceEntryMap(summary);
   const healthEntries = serviceEntryMap(health);
@@ -337,6 +437,7 @@ export function createServiceLifecycleSnapshot({
     }),
     health: createServiceLifecycleHealth(health),
     summary: createServiceLifecycleSummary(summary),
-    updates: createServiceUpdateReport(updates)
+    updates: createServiceUpdateReport(updates),
+    history: createServiceMaintenanceHistory(history)
   };
 }

@@ -747,3 +747,58 @@ Update Availability is exposed through GET-only `GET /api/v1/services/updates`. 
 The Service Lifecycle Portal snapshot composes read-only services, health, summary, and updates observations. The existing `useServices()` state machine and M-018.32 responsive/mobile-safe presentation are reused unchanged.
 
 The Portal presents aggregate and per-service `current`, `update-available`, `mutable-tag`, `unknown`, and `unsupported` state. Missing observations render as `Unknown`, never `Current`. No Update, Restart, Start, Stop, or Rollback control is introduced.
+
+## M-018.34 — Read-Only Maintenance History Presentation
+
+M-018.34 publishes and presents the Service Lifecycle Maintenance History domain that Atlas already owned. It does not create a second maintenance-history model, persistence store, or orchestration layer.
+
+The authoritative contracts remain:
+
+- `MaintenanceAction`;
+- `MaintenanceResult`;
+- `MaintenanceRecord`;
+- `MaintenanceReport`; and
+- `ServiceMaintenanceHistoryService`.
+
+Provider inspection remains the source of Maintenance History truth. A provider that has no persisted maintenance records may truthfully return a valid empty `MaintenanceReport`.
+
+### API transport
+
+Maintenance History is exposed through GET-only:
+
+```text
+GET /api/v1/services/history
+```
+
+The endpoint reuses `system.health.read`, the existing Service Lifecycle dependency composition, and canonical `MaintenanceReport` serialization. The static `/history` route is declared before the dynamic `/{service_identifier}` detail route.
+
+No POST, PUT, PATCH, DELETE, restart, update execution, rollback, Compose recreation, or other lifecycle mutation is introduced by this transport.
+
+### Portal presentation
+
+The Service Lifecycle Portal snapshot now composes five read-only sources:
+
+1. managed services;
+2. lifecycle health;
+3. lifecycle summary;
+4. Update Availability; and
+5. Maintenance History.
+
+The existing `useServices()` hook remains the single overview loading state machine. Maintenance History uses the established responsive card/grid presentation and M-018.32 mobile-safe behavior rather than introducing a second Portal architecture.
+
+The Portal normalizes maintenance results to `success`, `partial`, `failed`, `skipped`, or `unknown`, presents aggregate counts, renders read-only record details, and truthfully renders a valid empty-history state.
+
+### History-domain separation
+
+Service Lifecycle Maintenance History is not interchangeable with:
+
+- Cleanup execution history; or
+- Operations History exposed through `/api/v1/operations/history`.
+
+Those systems retain their existing ownership and persistence contracts. M-018.34 does not merge or proxy them into the Service Lifecycle history surface.
+
+### Mutation boundary
+
+The M-018.34 Portal remains presentation-only. It exposes no Restart, Update service, Rollback, Start, Stop, or other lifecycle mutation control.
+
+Guarded lifecycle mutation, rollback execution, maintenance-event publication, and other mutation/reporting work remain separate future ROADMAP concerns.

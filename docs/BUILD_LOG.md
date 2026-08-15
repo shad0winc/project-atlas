@@ -6632,3 +6632,57 @@ M-018.33B added GET-only `GET /api/v1/services/updates`, reusing the canonical l
 M-018.33C extended the existing Service Lifecycle Portal snapshot with Update Availability while leaving the existing hook and M-018.32 responsive CSS unchanged. The public feature index exports `createServiceUpdateReport`, `ServiceUpdate`, `ServiceUpdateReport`, and `ServiceUpdateStatus`.
 
 Final live acceptance exercised registry -> provider -> domain -> API -> Portal normalizer -> ServiceOverview rendering. Bazarr, Dozzle, Homepage, qBittorrent, and Tautulli rendered update-available; Jellyseerr and Maintainerr rendered unknown; the remaining eight services rendered current. No lifecycle mutation control was introduced.
+
+## M-018.34 — Maintenance History Presentation
+
+Repository-first discovery established that Service Lifecycle Maintenance History was already implemented below the Portal through `MaintenanceAction`, `MaintenanceResult`, `MaintenanceRecord`, `MaintenanceReport`, `ServiceMaintenanceHistoryService`, provider inspection contracts, and the read-only `atlas service history` CLI. Cleanup execution history and `/api/v1/operations/history` were inspected and intentionally retained as separate subsystems.
+
+### M-018.34A — GET-only Maintenance History API
+
+Added `GET /api/v1/services/history` through the existing Service Lifecycle router, `system.health.read` permission boundary, canonical `ServiceMaintenanceHistoryService`, and transport-only response schema. The route is static and remains ordered before `/{service_identifier}`.
+
+Certification passed:
+
+- 13 focused Service Lifecycle API route tests;
+- 361 API tests plus 15 subtests;
+- Python compilation and `git diff --check`;
+- OpenAPI GET-only validation; and
+- live in-process real-service validation returning a valid empty `MaintenanceReport` when provider persistence was unavailable.
+
+The live acceptance report observed provider `unknown`, zero records, zero failures/partials/successes/skips/unknowns, and `requires_attention=false`. Empty history is valid provider truth, not an error.
+
+### M-018.34B — Portal Maintenance History
+
+Extended the existing Service Lifecycle Portal snapshot with a fifth GET-only history source. Added canonical Portal-side Maintenance History normalization, aggregate counts, responsive card-based history presentation, and truthful empty-history rendering.
+
+The existing `useServices()` hook and M-018.32 responsive/touch CSS remained byte-identical. No separate history state machine, mobile route, table architecture, or lifecycle mutation control was introduced.
+
+Focused Portal validation passed 11 Service Lifecycle presentation tests, TypeScript typecheck, ESLint, and the production Next.js build.
+
+### M-018.34C — Live Acceptance
+
+Live acceptance exercised the real five-source Service Lifecycle HTTP surface:
+
+- managed services;
+- health;
+- summary;
+- Update Availability; and
+- Maintenance History.
+
+Real API output was passed through the real Portal normalizer and `ServiceOverview` renderer using a temporary repository-native Vitest acceptance owner that was removed after execution.
+
+Final engineering validation passed:
+
+- 27 Portal test files / 222 Portal tests;
+- Portal typecheck, lint, and production build;
+- 13 focused Service Lifecycle API tests;
+- 3,141 full Python tests plus 104 subtests; and
+- `git diff --check`.
+
+### Release Boundary
+
+M-018.34 closes the v1.0 Maintenance History presentation gate. All v1.0 presentation gates identified by M-018.31 through M-018.34 are now closed.
+
+Separate lifecycle mutation/reporting ROADMAP work remains open, including restart confirmation, guarded update confirmation, and failure/rollback reporting. Those items do not expand the read-only v1.0 presentation contract.
+
+The next release activity is final representative v1.0 User Acceptance and release certification.

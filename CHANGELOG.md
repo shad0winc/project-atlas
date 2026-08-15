@@ -750,3 +750,15 @@ All notable changes to Project Atlas are documented in this file.
 - Added no update, restart, pull, rollback, or other lifecycle mutation control.
 - Closed the v1.0 Update Availability presentation gate.
 - Leaves Maintenance History as the final remaining v1.0 presentation gate.
+
+## M-018.34 — Maintenance History
+
+- Reused the established Service Lifecycle Maintenance History domain rather than creating a duplicate history subsystem.
+- Added GET-only `GET /api/v1/services/history` using the canonical `ServiceMaintenanceHistoryService` and `MaintenanceReport`.
+- Preserved the existing `system.health.read` authorization boundary and static-route ordering ahead of service detail.
+- Added Portal Maintenance History normalization, aggregate status, responsive read-only record cards, and truthful empty-history presentation.
+- Reused the existing Service Lifecycle hook and M-018.32 responsive/mobile-safe CSS unchanged.
+- Kept Cleanup History and Operations History separate from Service Lifecycle Maintenance History.
+- Added no restart, update, rollback, start, stop, or other lifecycle mutation control.
+- Closed the final v1.0 Maintenance History presentation gate.
+- Final representative v1.0 User Acceptance and release certification remain required.
