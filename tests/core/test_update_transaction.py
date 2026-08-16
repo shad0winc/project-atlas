@@ -27,6 +27,7 @@ def prepare_runtime(tmp_path: Path, *, branch: str = "main") -> dict[str, str]:
     runtime.mkdir()
     bin_dir.mkdir()
     (project / "scripts").mkdir()
+    (project / "scripts" / "lib").mkdir()
     (project / "stack").mkdir()
     (project / "docker-compose.yml").write_text("services: {}\n", encoding="utf-8")
     (project / "stack" / "ingress.yml").write_text("services: {}\n", encoding="utf-8")
@@ -37,6 +38,17 @@ def prepare_runtime(tmp_path: Path, *, branch: str = "main") -> dict[str, str]:
         #!/usr/bin/env bash
         echo ingress-verify >> "$ATLAS_TEST_EVENTS"
         exit "${ATLAS_TEST_INGRESS_STATUS:-0}"
+        """,
+    )
+
+    write_executable(
+        project / "scripts" / "lib" / "audit-runtime.sh",
+        """
+        #!/usr/bin/env bash
+        atlas_audit_runtime_provision() {
+          echo audit-runtime:provision >> "$ATLAS_TEST_EVENTS"
+          return "${ATLAS_TEST_AUDIT_RUNTIME_STATUS:-0}"
+        }
         """,
     )
 
