@@ -213,7 +213,7 @@ def test_audit_runtime_normalizes_stale_extended_acl(
     )
 
     stale_acl = subprocess.run(
-        ["getfacl", "-cp", str(journal)],
+        ["getfacl", "-cpn", str(journal)],
         check=True,
         capture_output=True,
         text=True,
@@ -232,7 +232,7 @@ def test_audit_runtime_normalizes_stale_extended_acl(
     assert result.returncode == 0, result.stderr
 
     acl = subprocess.run(
-        ["getfacl", "-cp", str(journal)],
+        ["getfacl", "-cpn", str(journal)],
         check=True,
         capture_output=True,
         text=True,
