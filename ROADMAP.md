@@ -814,7 +814,7 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 - [x] Add favorite-protection journey test
 - [x] Add Sports request journey test
 - [x] Add administrator journey test
-- [ ] Complete responsive UI review
+- [x] Complete responsive UI review
 - [ ] Complete accessibility review
 - [ ] Complete performance baseline
 - [ ] Complete sustained-use test

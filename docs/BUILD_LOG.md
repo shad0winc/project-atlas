@@ -7142,3 +7142,63 @@ files.
 This certification does not declare the broader Administration Portal product
 scope complete, does not certify human Administrator User Acceptance, and does
 not declare v1.0.0 release readiness.
+
+## M-023 Release Quality Q.2 — Responsive UI Review Certification
+
+Q.2 responsive engineering review is complete.
+
+### Scope
+
+The deterministic browser review covered three viewport classes:
+
+- Phone: `390x844`
+- Tablet: `768x1024`
+- Desktop: `1280x800`
+
+Each viewport was reviewed across six critical Portal surfaces:
+
+- Login
+- Dashboard
+- Media
+- Favorites
+- Sports
+- Services
+
+This produced a complete `3 x 6` matrix of 18 responsive-review
+screenshots.
+
+### Certification result
+
+The final evidence confirms that the reviewed critical surfaces remain
+usable at the certified phone, tablet, and desktop viewport sizes. The
+compact Portal navigation closes fully off-screen before final capture,
+and the reviewed evidence does not show residual sidebar exposure or
+material horizontal clipping.
+
+An earlier apparent sidebar defect on compact Favorites and Sports
+captures was isolated to capture timing during the navigation drawer
+closing transition. After correcting the external `/tmp` capture harness
+to wait for the actual closed state, the resulting screenshots were
+clean. No production Portal shell or CSS correction was required for
+that observation.
+
+The responsive Playwright contract remains the Q.2 repository
+engineering candidate. Q.2 screenshot capture and review infrastructure
+remained external test evidence under `/tmp`; production Atlas
+API/Portal runtime behavior was not mutated by the review.
+
+### ROADMAP effect
+
+`Complete responsive UI review` is certified complete and may be closed.
+
+The following broader v1.0 release-quality gates remain open and are not
+satisfied by Q.2:
+
+- `Run full automated test suite`
+- `Complete accessibility review`
+- `Complete performance baseline`
+- `Complete sustained-use test`
+- `Resolve release-blocking defects`
+
+Q.2 responsive certification therefore closes only the responsive-review
+gate and does not constitute final v1.0 release certification.

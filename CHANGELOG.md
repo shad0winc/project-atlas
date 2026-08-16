@@ -832,3 +832,25 @@ All notable changes to Project Atlas are documented in this file.
 - Added no restart, update, rollback, start, stop, or other lifecycle mutation control.
 - Closed the final v1.0 Maintenance History presentation gate.
 - Final representative v1.0 User Acceptance and release certification remain required.
+
+## Q.2 — Responsive UI Review Certification
+
+- Completed the v1.0 responsive UI review across the critical Portal
+  surfaces.
+- Certified a deterministic visual review matrix covering three
+  viewports (`390x844`, `768x1024`, and `1280x800`) across six critical
+  surfaces (Login, Dashboard, Media, Favorites, Sports, and Services),
+  for 18 screenshots total.
+- Confirmed the previously observed compact-navigation/sidebar artifact
+  was caused by screenshot capture timing during the drawer-closing
+  transition rather than a production Portal responsive defect.
+- Final review evidence showed the compact navigation fully off-screen
+  after close, with no residual sidebar exposure or material horizontal
+  clipping on the reviewed critical surfaces.
+- The responsive Playwright contract remains the only Q.2 source/test
+  candidate; the responsive certification did not require a production
+  Portal or API source change.
+- Closed the ROADMAP item `Complete responsive UI review`.
+- The broader v1.0 quality gates for the full automated test suite,
+  accessibility review, performance baseline, sustained-use testing, and
+  release-blocking defect closure remain open.
