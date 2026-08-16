@@ -1626,3 +1626,66 @@ Live acceptance exercised the real five-source Service Lifecycle HTTP snapshot a
 Engineering acceptance passed 27 Portal test files / 222 Portal tests, Portal typecheck/lint/production build, 13 focused Service Lifecycle API tests, and 3,141 full Python tests plus 104 subtests.
 
 M-018.34 completes the remaining v1.0 presentation prerequisite. Final representative administrator User Acceptance and release certification remain separate required release activities.
+
+---
+
+## M-019.4 — Security Audit Invalid-Login Acceptance
+
+**Status: ACCEPTED**
+
+M-019.4 certifies the production invalid-login security-audit path after the
+M-019.3 audit-journal provisioning and ACL remediation.
+
+### Accepted Runtime Boundary
+
+Acceptance required the production security journal to satisfy all of the
+following before the transaction:
+
+- owner UID `0`;
+- writer GID `20000`;
+- mode `0660`;
+- minimal ACL `user::rw-`, `group::rw-`, `other::---`;
+- no stale extended ACL entries;
+- effective write access from `atlas-api`;
+- maintenance initially enabled;
+- no deployment lock;
+- synchronized certified `main` and `release/v1.0.0`; and
+- 22 running containers with zero unhealthy.
+
+### Real Ingress Path
+
+The supported production hostname is `atlas.shadowinc.co`.
+
+Acceptance proved the request path using correct production TLS SNI through
+Caddy rather than a synthetic or unresolved hostname. Maintenance isolation was
+verified through the same hostname before the acceptance window opened.
+
+### Invalid-Login Transaction
+
+Exactly one controlled invalid login was submitted through the real production
+ingress path.
+
+Accepted behavior:
+
+- HTTP response status: `401`;
+- one and only one journal record appended;
+- event: `security.authentication.failed`;
+- source: `atlas-api`;
+- reason: `invalid_credentials`;
+- the unique test username was recorded;
+- the supplied password was not recorded;
+- sensitive credential field names were not present; and
+- no unrelated audit record was appended by the transaction.
+
+The acceptance window was closed immediately afterward and maintenance mode was
+restored before final certification.
+
+### Final Result
+
+**M-019.4 Security Audit Invalid-Login Acceptance: ACCEPTED**
+
+This acceptance closes the specific final-security audit path. It does not
+replace or waive the remaining representative end-user and administrator
+journeys, accessibility review, performance baseline, sustained-use testing,
+controlled pilot, stabilization, or final release approval required elsewhere
+by this document.

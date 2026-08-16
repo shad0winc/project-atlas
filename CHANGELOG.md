@@ -58,9 +58,23 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Fixed
 
-- Closed final v1.0 Security Acceptance after protected PR #23 merged Docker
-  socket hardening into `main` and protected PR #24 reconciled the certified
-  `main` tree into `release/v1.0.0`.
+- Closed the initial final-v1.0 Security Acceptance baseline after protected
+  PR #23 merged Docker socket hardening into `main` and protected PR #24
+  reconciled the certified `main` tree into `release/v1.0.0`.
+- Re-certified final v1.0 Security Acceptance after a later production
+  audit-journal write-boundary defect was discovered during manual acceptance.
+  Protected PRs #31/#32 added deterministic security-audit journal provisioning
+  on `main` and `release/v1.0.0`; protected PRs #33/#34 added stale extended-ACL
+  normalization and portable numeric ACL regression coverage.
+- Remediated the live security audit journal in place to owner `root`, writer
+  group `20000`, mode `0660`, and minimal ACL `rw-/rw-/---`, preserving the
+  existing inode and journal content while restoring effective Atlas API write
+  access.
+- Certified the real `atlas.shadowinc.co` Caddy/TLS/SNI path and executed one
+  controlled invalid-login production acceptance transaction. The request
+  returned HTTP 401 and appended exactly one
+  `security.authentication.failed` / `invalid_credentials` audit record without
+  recording the supplied password or sensitive credential fields.
 - Removed direct Docker-socket access from Homepage and Dozzle. Dozzle now uses
   the private read-only `atlas-docker-socket-proxy`; mutation through the proxy
   is denied with HTTP 403, and the proxy image scan reported zero HIGH and zero

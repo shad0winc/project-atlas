@@ -1085,3 +1085,41 @@ Separate lifecycle mutation/reporting ROADMAP gates remain intentionally open an
 ```
 
 The release now advances to final representative administrator User Acceptance, final v1.0 certification, and v1.0.0 release approval.
+
+---
+
+## M-019.3 / M-019.4 — Final Security Audit Acceptance Re-Certification
+
+**Status: CLOSED**
+
+The final-security baseline established by the Docker-socket hardening work was
+subsequently revalidated after manual acceptance discovered that the production
+security audit journal was not writable by the non-root Atlas API runtime.
+
+M-019.3 added the permanent provisioning contract for the security audit
+journal, then extended that contract to remove stale extended ACL state and
+verify the minimal writer ACL. The corrected source was promoted through
+protected pull requests on both `main` and `release/v1.0.0`.
+
+The live journal was remediated in place to `root:20000 / 0660` with minimal ACL
+`rw-/rw-/---`. Existing journal content and object identity were preserved, and
+effective Atlas API write access was certified.
+
+M-019.4 then exercised the real `atlas.shadowinc.co` production ingress path
+with correct TLS SNI. One controlled invalid login returned HTTP 401 and
+appended exactly one `security.authentication.failed` record with reason
+`invalid_credentials`. The supplied password and sensitive credential fields
+were absent from the audit record.
+
+The final synchronized source boundary is:
+
+- `main`: `a5348d32573cfac5674b38fd6fb71f88bd5f0bae`;
+- `release/v1.0.0`: `dc0e1bb784e506bbacaa6cece45060dc6aee6175`;
+- certified identical tree:
+  `8f1bdf3f68c7789fce20233c50626c2902d22c72`.
+
+This closes and re-certifies the v1.0 Security Acceptance boundary. It does not
+close the remaining Engineering, Documentation, representative User Experience,
+Administrator Experience, accessibility, performance, sustained-use,
+release-candidate, pilot, stabilization, tagging, publication, or final release
+approval criteria defined by this plan.
