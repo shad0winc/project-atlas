@@ -48,6 +48,13 @@ def _write_fake_docker(path: Path) -> None:
               exit 0
             fi
 
+            if [[ "${1:-} ${2:-} ${3:-}" == "exec atlas-api test" ]]; then
+              args=" $* "
+              if [[ "$args" == *" -w /mnt/storage/configs/atlas/runtime/events.jsonl "* ]]; then
+                exit "${ATLAS_TEST_AUDIT_WRITABLE_STATUS:-0}"
+              fi
+            fi
+
             if [[ "${1:-} ${2:-} ${3:-}" == "exec atlas-caddy caddy" ]]; then
               exit 0
             fi
@@ -88,9 +95,27 @@ def _run_verifier(tmp_path: Path, *, maintenance: bool, public_status: str = "50
     runtime = tmp_path / "runtime"
     bin_dir = tmp_path / "bin"
     (project / "stack").mkdir(parents=True)
+    (project / "scripts" / "lib").mkdir(parents=True)
     runtime.mkdir()
     bin_dir.mkdir()
-    (project / "stack" / "ingress.yml").write_text("services: {}\n", encoding="utf-8")
+    (project / "stack" / "ingress.yml").write_text(
+        "services: {}\n",
+        encoding="utf-8",
+    )
+    audit_runtime = project / "scripts" / "lib" / "audit-runtime.sh"
+    audit_runtime.write_text(
+        textwrap.dedent(
+            """
+            #!/usr/bin/env bash
+            atlas_audit_runtime_verify() {
+              return "${ATLAS_TEST_AUDIT_RUNTIME_STATUS:-0}"
+            }
+            """
+        ).lstrip(),
+        encoding="utf-8",
+    )
+    audit_runtime.chmod(0o755)
+
     if maintenance:
         maintenance_dir = runtime / "maintenance"
         maintenance_dir.mkdir()
