@@ -6728,3 +6728,115 @@ fix becomes available.
 Security Acceptance is therefore closed. Remaining v1.0 work is governed by
 the independent Quality, Documentation, User Acceptance, release-candidate,
 pilot, stabilization, tagging, and publication gates.
+
+---
+
+# 2026-08-15
+
+## M-019.3 / M-019.4 — Security Audit Journal Remediation and Live Acceptance Closure
+
+### Objective
+
+Reconcile the final v1.0 Security Acceptance with the production security-audit
+journal write boundary discovered during manual acceptance, correct the defect
+through protected source promotion, and certify the real invalid-login audit
+path without weakening maintenance, release, or runtime safety boundaries.
+
+The earlier M-023.26 statement that final Security Acceptance remained open is
+historical and remains correct for that milestone. The earlier PR #23/#24
+Docker-socket certification established the first final-security baseline. This
+entry records the subsequent defect discovery, remediation, and authoritative
+re-certification.
+
+### M-019.3 — Audit-Journal Provisioning
+
+Manual production acceptance found that
+`/mnt/storage/configs/atlas/runtime/events.jsonl` remained `root:root / 0640`.
+The `atlas-api` process ran non-root and could not write the security journal.
+
+A bounded six-file correction introduced the canonical
+`scripts/lib/audit-runtime.sh` provisioning contract, integrated it into the
+update and ingress-verification paths, and added regression coverage. Protected
+PR #31 merged the certified feature into `main`; protected PR #32 reconciled the
+identical certified tree into `release/v1.0.0`.
+
+The first controlled live remediation correctly converged metadata to
+`root:20000 / 0660` but still failed effective API write access. The transaction
+failed closed and restored the original metadata.
+
+Read-only diagnosis established that a stale extended ACL remained on the
+journal and constrained effective access despite the intended group/mode
+contract.
+
+### ACL-Aware Correction
+
+A second bounded correction extended the audit-runtime primitive to remove
+stale extended ACL state and verify the minimal journal ACL contract. Regression
+tests were made portable by requiring numeric `getfacl` identity output.
+
+Protected PR #33 merged the ACL-aware contract into `main`; protected PR #34
+reconciled the identical certified tree into `release/v1.0.0`.
+
+The controlled live remediation then converged the existing journal in place
+to:
+
+- owner UID: `0`;
+- writer GID: `20000`;
+- mode: `0660`;
+- ACL: `user::rw-`, `group::rw-`, `other::---`;
+- extended ACL entries: removed; and
+- Atlas API effective write access: confirmed.
+
+The existing journal inode, device, size, and content hash were preserved
+through the permission remediation. Maintenance remained enabled, the shared
+deployment lock remained clear, and all 22 containers remained running with
+zero unhealthy.
+
+### M-019.4 — Real Invalid-Login Acceptance
+
+The production ingress hostname was frozen as `atlas.shadowinc.co`. Read-only
+probes proved:
+
+- public hostname resolution;
+- HTTP 200 public health behavior;
+- correct TLS SNI through loopback Caddy;
+- HTTP 503 maintenance isolation through the same real hostname; and
+- no audit-journal mutation during ingress discovery.
+
+A fail-closed acceptance window then executed exactly one invalid login through
+the real Caddy/TLS/SNI path. The transaction returned HTTP 401 and appended
+exactly one new audit record:
+
+- event: `security.authentication.failed`;
+- source: `atlas-api`;
+- reason: `invalid_credentials`; and
+- username: the unique M-019.4 acceptance identity.
+
+The supplied password was absent from the appended audit record. Sensitive
+credential field names were also absent.
+
+The post-transaction journal contained 194 lines and retained the remediated
+`root:20000 / 0660` minimal ACL contract with Atlas API write access.
+
+### Final Certification
+
+Final read-only certification proved:
+
+- `main`: `a5348d32573cfac5674b38fd6fb71f88bd5f0bae`;
+- `release/v1.0.0`: `dc0e1bb784e506bbacaa6cece45060dc6aee6175`;
+- identical source tree:
+  `8f1bdf3f68c7789fce20233c50626c2902d22c72`;
+- security audit journal writer contract: PASS;
+- real production ingress path: PASS;
+- invalid-login HTTP 401 contract: PASS;
+- exact one-record security audit append: PASS;
+- supplied-password non-disclosure: PASS;
+- maintenance enabled;
+- deployment lock clear; and
+- 22 running containers / 0 unhealthy.
+
+M-019 Security Acceptance is therefore closed and re-certified after the
+audit-journal defect remediation. This does **not** certify the remaining
+independent Quality, broader representative User Acceptance,
+accessibility/performance/sustained-use, release-candidate, pilot,
+stabilization, tagging, publication, or final v1.0 approval gates.
