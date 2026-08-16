@@ -8,6 +8,8 @@ RUNTIME_CONFIG_DIR="${ATLAS_RUNTIME_CONFIG_DIR:-/mnt/storage/configs/atlas}"
 MAINTENANCE_DIR="${ATLAS_MAINTENANCE_DIR:-$RUNTIME_CONFIG_DIR/maintenance}"
 MAINTENANCE_FLAG="$MAINTENANCE_DIR/enabled"
 
+source "$PROJECT_DIR/scripts/lib/audit-runtime.sh"
+
 EXPECTED_CADDY_MEMORY=536870912
 EXPECTED_CADDY_CPUS=1000000000
 EXPECTED_CADDY_PIDS=256
@@ -66,6 +68,23 @@ container_value() {
 }
 
 printf '%s\n\n' 'Atlas Ingress Verification'
+
+if atlas_audit_runtime_verify >/dev/null 2>&1; then
+  pass "Security audit journal ownership / mode contract"
+else
+  fail "Security audit journal ownership / mode contract"
+fi
+
+if docker inspect atlas-api >/dev/null 2>&1; then
+  if docker exec atlas-api     test -w /mnt/storage/configs/atlas/runtime/events.jsonl
+  then
+    pass "Atlas API can write security audit journal"
+  else
+    fail "Atlas API can write security audit journal"
+  fi
+else
+  fail "Atlas API can write security audit journal"
+fi
 
 if [[ -f "$COMPOSE_FILE" ]]; then
   pass "Ingress Compose source present"
