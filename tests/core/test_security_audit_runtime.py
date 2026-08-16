@@ -1,6 +1,9 @@
 """Source contracts for the isolated API security-audit boundary."""
 
 from pathlib import Path
+import os
+import shutil
+import subprocess
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -144,3 +147,187 @@ def test_ingress_verification_enforces_audit_runtime_contract() -> None:
         "test -w /mnt/storage/configs/atlas/runtime/events.jsonl"
         in content
     )
+
+
+
+def _require_acl_tools() -> None:
+    if shutil.which("getfacl") is None or shutil.which("setfacl") is None:
+        import pytest
+
+        pytest.skip("POSIX ACL tools are unavailable")
+
+
+def _run_audit_runtime(
+    command: str,
+    *,
+    runtime: Path,
+    journal: Path,
+) -> subprocess.CompletedProcess[str]:
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "ATLAS_AUDIT_RUNTIME_DIR": str(runtime),
+            "ATLAS_AUDIT_JOURNAL": str(journal),
+        }
+    )
+
+    return subprocess.run(
+        [
+            "bash",
+            "-c",
+            (
+                "set -euo pipefail; "
+                f"source {str(AUDIT_RUNTIME)!r}; "
+                f"{command}"
+            ),
+        ],
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_audit_runtime_normalizes_stale_extended_acl(
+    tmp_path: Path,
+) -> None:
+    _require_acl_tools()
+
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+
+    journal = runtime / "events.jsonl"
+    journal.write_text('{"event":"preserved"}\n', encoding="utf-8")
+
+    before_inode = journal.stat().st_ino
+    before_content = journal.read_bytes()
+
+    subprocess.run(
+        [
+            "setfacl",
+            "-m",
+            "u:1000:r--,g::---,m::r--",
+            str(journal),
+        ],
+        check=True,
+    )
+
+    stale_acl = subprocess.run(
+        ["getfacl", "-cpn", str(journal)],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+
+    assert "user:1000:r--" in stale_acl
+    assert "group::---" in stale_acl
+    assert "mask::r--" in stale_acl
+
+    result = _run_audit_runtime(
+        "atlas_audit_runtime_normalize_acl",
+        runtime=runtime,
+        journal=journal,
+    )
+
+    assert result.returncode == 0, result.stderr
+
+    acl = subprocess.run(
+        ["getfacl", "-cpn", str(journal)],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+
+    assert "user:1000:" not in acl
+    assert "mask::" not in acl
+    assert journal.stat().st_ino == before_inode
+    assert journal.read_bytes() == before_content
+
+
+def test_audit_runtime_acl_normalization_is_idempotent(
+    tmp_path: Path,
+) -> None:
+    _require_acl_tools()
+
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+
+    journal = runtime / "events.jsonl"
+    journal.write_text("event\n", encoding="utf-8")
+
+    first = _run_audit_runtime(
+        "atlas_audit_runtime_normalize_acl",
+        runtime=runtime,
+        journal=journal,
+    )
+    second = _run_audit_runtime(
+        "atlas_audit_runtime_normalize_acl",
+        runtime=runtime,
+        journal=journal,
+    )
+
+    assert first.returncode == 0, first.stderr
+    assert second.returncode == 0, second.stderr
+
+
+def test_audit_runtime_verify_acl_rejects_extended_acl(
+    tmp_path: Path,
+) -> None:
+    _require_acl_tools()
+
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+
+    journal = runtime / "events.jsonl"
+    journal.write_text("event\n", encoding="utf-8")
+    journal.chmod(0o660)
+
+    subprocess.run(
+        ["setfacl", "-m", "u:1000:r--", str(journal)],
+        check=True,
+    )
+
+    result = _run_audit_runtime(
+        "atlas_audit_runtime_verify_acl",
+        runtime=runtime,
+        journal=journal,
+    )
+
+    assert result.returncode != 0
+    assert "unexpected ACL" in result.stderr
+
+
+def test_audit_runtime_source_requires_acl_normalization() -> None:
+    content = AUDIT_RUNTIME.read_text(encoding="utf-8")
+
+    assert "atlas_audit_runtime_require_acl_tools()" in content
+    assert "atlas_audit_runtime_normalize_acl()" in content
+    assert "atlas_audit_runtime_verify_acl()" in content
+
+    assert 'setfacl -b -- "$journal"' in content
+    assert 'getfacl -cp -- "$journal"' in content
+
+    provision_start = content.index("atlas_audit_runtime_provision()")
+    verify_start = content.index(
+        "atlas_audit_runtime_verify()",
+        provision_start,
+    )
+    provision = content[provision_start:verify_start]
+
+    normalize = provision.index("atlas_audit_runtime_normalize_acl")
+    chown = provision.index("chown")
+    chmod = provision.index("chmod")
+
+    assert normalize < chown < chmod
+
+
+def test_audit_runtime_verify_enforces_minimal_acl() -> None:
+    content = AUDIT_RUNTIME.read_text(encoding="utf-8")
+
+    verify_start = content.index("atlas_audit_runtime_verify()")
+    verify = content[verify_start:]
+
+    assert "atlas_audit_runtime_verify_acl" in verify
+    assert "'user::rw-'" in content
+    assert "'group::rw-'" in content
+    assert "'other::---'" in content
