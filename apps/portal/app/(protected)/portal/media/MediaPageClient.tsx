@@ -1,7 +1,7 @@
 "use client";
 
 import { PortalPage } from "../../../../components/portal/PortalPage";
-import { MediaDiscoveryView } from "../../../../features/media";
+import { MediaCatalogView, MediaDiscoveryView } from "../../../../features/media";
 import { PORTAL_ROUTES } from "../../../../lib/navigation/portal";
 
 const mediaRoute = PORTAL_ROUTES.media;
@@ -19,6 +19,7 @@ export function MediaPageClient(): React.ReactElement {
       title="Browse media"
     >
       <MediaDiscoveryView />
+      <MediaCatalogView />
     </PortalPage>
   );
 }

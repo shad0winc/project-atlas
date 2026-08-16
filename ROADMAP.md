@@ -499,9 +499,9 @@ with backend services.
 - [x] Sports health integration
 - [x] Sports scheduling foundation
 - [x] Sports recording foundation
-- [ ] Browse upcoming events
+- [x] Browse upcoming events
 - [ ] Search teams and leagues
-- [ ] Request sporting events
+- [x] Request sporting events
 - [ ] View sports request status
 - [ ] View scheduled recordings
 - [ ] View completed recordings
@@ -809,10 +809,10 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 
 - [ ] Run full automated test suite
 - [ ] Add critical end-to-end tests
-- [ ] Add login journey test
-- [ ] Add media request journey test
-- [ ] Add favorite-protection journey test
-- [ ] Add Sports request journey test
+- [x] Add login journey test
+- [x] Add media request journey test
+- [x] Add favorite-protection journey test
+- [x] Add Sports request journey test
 - [ ] Add administrator journey test
 - [ ] Complete responsive UI review
 - [ ] Complete accessibility review

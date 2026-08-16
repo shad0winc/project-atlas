@@ -13,6 +13,16 @@ export type ReadFavoritesOptions = Readonly<{
   signal?: AbortSignal;
 }>;
 
+export type CreateFavoriteOptions = Readonly<{
+  expectedUserId: string;
+  signal?: AbortSignal;
+}>;
+
+export type FavoriteCreateInput = Readonly<{
+  provider: string;
+  itemId: string;
+}>;
+
 export type RemoveFavoriteOptions = Readonly<{
   expectedUserId: string;
   signal?: AbortSignal;
@@ -48,6 +58,51 @@ function mapFavorite(response: FavoriteTransportResponse): Favorite {
     createdAt: response.created_at,
     updatedAt: response.updated_at
   });
+}
+
+export async function createFavoriteRecord(
+  input: FavoriteCreateInput,
+  { expectedUserId, signal }: CreateFavoriteOptions
+): Promise<Favorite> {
+  const normalizedUserId = normalizeFavoriteUserId(expectedUserId);
+
+  const provider = input.provider.trim().toLowerCase();
+  const itemId = input.itemId.trim();
+
+  if (!provider) {
+    throw new Error("favorite.provider must not be empty.");
+  }
+
+  if (!itemId) {
+    throw new Error("favorite.itemId must not be empty.");
+  }
+
+  const response = await authenticatedAtlasApiRequest<FavoriteTransportResponse>("/favorites", {
+    method: "POST",
+    cache: "no-store",
+    signal,
+    body: {
+      provider,
+      item_id: itemId
+    },
+    retryPolicy: {
+      maxRetries: 0,
+      baseDelayMs: 250,
+      maxDelayMs: 5_000
+    }
+  });
+
+  const created = mapFavorite(response);
+
+  if (created.userId !== normalizedUserId) {
+    throw new Error("Favorite creation response crossed the authenticated-user boundary.");
+  }
+
+  if (created.provider !== provider || created.itemId !== itemId) {
+    throw new Error("Favorite creation response did not match the requested media identity.");
+  }
+
+  return created;
 }
 
 export async function readFavorites({

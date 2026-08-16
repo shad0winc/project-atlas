@@ -35,6 +35,7 @@ describe("Portal route model", () => {
       "media",
       "favorites",
       "requests",
+      "sports",
       "downloads",
       "users",
       "services",
@@ -70,7 +71,7 @@ describe("Portal route model", () => {
     ).toEqual([
       {
         label: PORTAL_ROUTE_SECTIONS.workspace,
-        routes: ["dashboard", "media", "favorites", "requests", "downloads"]
+        routes: ["dashboard", "media", "favorites", "requests", "sports", "downloads"]
       },
       {
         label: PORTAL_ROUTE_SECTIONS.management,
@@ -143,6 +144,7 @@ describe("Portal navigation authorization", () => {
       "Media",
       "Favorites",
       "Requests",
+      "Sports",
       "Downloads",
       "Users",
       "Services",
@@ -157,6 +159,7 @@ describe("Portal navigation authorization", () => {
       "Media",
       "Favorites",
       "Requests",
+      "Sports",
       "Downloads",
       "Users",
       "Services",
@@ -168,7 +171,7 @@ describe("Portal navigation authorization", () => {
   it("honors explicit denials before wildcard grants", () => {
     expect(
       visibleLabels(authorization(["*"], ["favorites.read", "users.read", "system.health.read"]))
-    ).toEqual(["Dashboard", "Media", "Requests", "Downloads", "Settings"]);
+    ).toEqual(["Dashboard", "Media", "Requests", "Sports", "Downloads", "Settings"]);
   });
 
   it("uses favorites.read rather than favorites.write for navigation", () => {

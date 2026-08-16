@@ -6840,3 +6840,148 @@ audit-journal defect remediation. This does **not** certify the remaining
 independent Quality, broader representative User Acceptance,
 accessibility/performance/sustained-use, release-candidate, pilot,
 stabilization, tagging, publication, or final v1.0 approval gates.
+
+---
+
+# 2026-08-16
+
+## M-023 Critical E2E D.4 — Sports Request Journey Certification
+
+### Objective
+
+Complete the smallest v1.0 Sports request journey required by the release plan
+without expanding Sports into the unfinished post-v1 experience or weakening
+Atlas identity, authorization, provider, process, or production-safety
+boundaries.
+
+The certified browser journey is:
+
+`login -> Sports -> upcoming event -> request event -> Requested`
+
+### Contract and Source Freeze
+
+D.4 began with a strictly read-only contract/source freeze against the
+certified D.1-D.3 worktree.
+
+The freeze established that the smallest v1.0 Sports browser surface requires:
+
+- authenticated access to upcoming supported Sports events;
+- authenticated submission of one event request;
+- `sports.read` for the read surface;
+- `sports.events.request` for the mutation;
+- provider and provider-event identity in the browser request;
+- Atlas-owned user and subscription identity on the server; and
+- no browser ownership of recording/process identity.
+
+The existing Sports module remained authoritative for provider integration,
+subscriptions, scheduling, recording, recovery, and maintenance. D.4 did not
+replace or duplicate those boundaries.
+
+### API and Portal Implementation
+
+The bounded API slice added normalized Sports schema, service, and v1 route
+contracts for event discovery and event subscription.
+
+The Portal added:
+
+- normalized Sports transport/domain types;
+- authenticated Sports event loading and request services;
+- `SportsRequestView`;
+- the protected `/portal/sports` route;
+- `sports.read` and `sports.events.request` permission constants;
+- Workspace navigation integration; and
+- explicit success/error/loading behavior.
+
+The default API adapter consumes the configured existing Sports provider
+environment. No second provider framework was introduced.
+
+### Critical Browser Certification
+
+The deterministic Playwright fixture and `sports-request.spec.ts` prove:
+
+- authentication before Sports access;
+- authenticated `GET /api/v1/sports/events?provider=thesportsdb`;
+- the deterministic event is rendered through the real Portal;
+- authenticated `POST /api/v1/sports/subscriptions`;
+- the browser POST body contains only `provider` and `provider_event_id`;
+- the browser does not control `user_id`, `subscription_id`, subscription
+  `type`, or event `name`;
+- the server derives the authenticated Atlas user identity;
+- Atlas subscription identity remains distinct from provider-event identity;
+- HTTP 201 is returned for the first deterministic subscription; and
+- the resulting `Requested` state disables duplicate UI submission.
+
+The final critical-browser inventory is four specs containing five tests:
+Favorites, two Login tests, Media Request, and Sports Request.
+
+### Broader Certification
+
+D.4.4H.3 certified the complete accumulated D.1-D.4 worktree:
+
+- exact critical-E2E worktree: 47 files;
+- Core pytest: 3,156 passed plus 104 subtests;
+- API pytest: 400 passed plus 15 subtests;
+- Sports integration suite: five passed, zero failed;
+- Portal Vitest: 34 files / 247 tests passed;
+- Portal TypeScript typecheck: PASS;
+- Portal ESLint: PASS;
+- 25 D.1-D.4-owned Portal files: Prettier GREEN;
+- production Next.js build: PASS;
+- `/portal/sports` present in the production route build;
+- full Playwright suite: five passed;
+- generated Playwright `.last-run.json` reconciled; and
+- production runtime preserved at 22 running containers and zero unhealthy.
+
+### Formatting Provenance
+
+The repository-wide Prettier check still identifies exactly five files outside
+the D.1-D.4 47-file boundary:
+
+- `apps/portal/features/media/components/MediaDiscoveryView.test.tsx`;
+- `apps/portal/features/media/components/MediaDiscoveryView.tsx`;
+- `apps/portal/features/services/components/ServiceOverview.tsx`;
+- `apps/portal/features/services/components/ServiceView.test.tsx`; and
+- `apps/portal/features/services/types/services.ts`.
+
+Read-only provenance proved those five paths were clean tracked paths outside
+the critical-E2E worktree. They remain unchanged as pre-existing formatting
+debt and are not reinterpreted as D.4 defects.
+
+### Documentation Reconciliation
+
+The v1.0 ROADMAP now records as complete:
+
+- Browse upcoming events;
+- Request sporting events;
+- Login journey test;
+- Media Request journey test;
+- Favorite-protection journey test; and
+- Sports request journey test.
+
+The broader Quality item `Add critical end-to-end tests` remains open because
+the Administrator journey is not yet certified.
+
+`Run full automated test suite` also remains open as a final release gate. The
+current accumulated D.1-D.4 suite is fully green, but Administrator work will
+change the releasable candidate and must be included in the final suite.
+
+Responsive UI review, accessibility review, performance baseline, sustained-use
+testing, release-blocking-defect closure, representative human User Acceptance,
+controlled pilot, stabilization, and final release approval remain separate
+unfinished v1.0 gates.
+
+`docs/releases/USER_ACCEPTANCE.md` is intentionally unchanged. Its governing
+contract states that automated testing is necessary but does not replace human
+validation.
+
+### Result
+
+D.4 Sports critical-browser engineering certification is complete.
+
+Atlas now provides the smallest required v1.0 Sports request journey through its
+own authenticated API and Portal boundaries while preserving provider, user,
+subscription, and process identities.
+
+This documentation reconciliation does not deploy production source, certify
+representative human User Acceptance, close Administrator D.5, or declare
+v1.0.0 release readiness.

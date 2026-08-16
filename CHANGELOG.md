@@ -19,6 +19,21 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Added
 
+- Added the v1.0 Sports request surface through the authenticated Atlas API and
+  `/portal/sports`, using the existing TheSportsDB provider boundary while
+  preserving Atlas-owned user and subscription identity.
+- Added deterministic critical-browser coverage for login, Media Request,
+  Favorites, and Sports. The Sports journey proves authenticated event discovery,
+  an authenticated single event-request POST, provider/event identity preservation,
+  server-owned user/subscription identity, and duplicate UI submission prevention.
+- Certified the accumulated D.1-D.4 critical-E2E worktree with 3,156 Core tests
+  plus 104 subtests, 400 API tests plus 15 subtests, all five Sports integration
+  suites, 247 Portal tests, TypeScript, ESLint, a production Next.js build, and
+  five Playwright tests across four critical-browser specs.
+- Reconciled formatting only for the 25 D.1-D.4-owned Portal files. Five unrelated
+  pre-existing Portal Prettier warnings remain unchanged and are not attributed to
+  the critical-E2E work.
+
 - Added Seerr-backed Media discovery/search through the Atlas API and the
   authenticated `/portal/media` experience without exposing browser-to-provider
   access or rendering raw provider media identifiers.
