@@ -49,6 +49,64 @@ atlas_audit_runtime_require_journal_shape() {
   fi
 }
 
+atlas_audit_runtime_require_acl_tools() {
+  command -v getfacl >/dev/null 2>&1 || {
+    echo 'ERROR: getfacl is required for audit journal provisioning.' >&2
+    return 1
+  }
+
+  command -v setfacl >/dev/null 2>&1 || {
+    echo 'ERROR: setfacl is required for audit journal provisioning.' >&2
+    return 1
+  }
+}
+
+atlas_audit_runtime_normalize_acl() {
+  local journal="$ATLAS_AUDIT_JOURNAL"
+
+  atlas_audit_runtime_require_journal_shape || return 1
+  atlas_audit_runtime_require_acl_tools || return 1
+
+  [[ -f "$journal" ]] || {
+    printf 'ERROR: audit journal is missing: %s\n' "$journal" >&2
+    return 1
+  }
+
+  setfacl -b -- "$journal" || return 1
+}
+
+atlas_audit_runtime_verify_acl() {
+  local journal="$ATLAS_AUDIT_JOURNAL"
+  local actual
+  local expected
+
+  atlas_audit_runtime_require_journal_shape || return 1
+  atlas_audit_runtime_require_acl_tools || return 1
+
+  [[ -f "$journal" ]] || {
+    printf 'ERROR: audit journal is missing: %s\n' "$journal" >&2
+    return 1
+  }
+
+  actual="$(
+    getfacl -cp -- "$journal" |
+    sed '/^[[:space:]]*$/d'
+  )" || return 1
+
+  expected="$(
+    printf '%s\n' \
+      'user::rw-' \
+      'group::rw-' \
+      'other::---'
+  )"
+
+  [[ "$actual" == "$expected" ]] || {
+    echo 'ERROR: audit journal contains an unexpected ACL.' >&2
+    printf '%s\n' "$actual" >&2
+    return 1
+  }
+}
+
 atlas_audit_runtime_provision() {
   local journal="$ATLAS_AUDIT_JOURNAL"
 
@@ -63,17 +121,19 @@ atlas_audit_runtime_provision() {
       /dev/null \
       "$journal" ||
       return 1
-  else
-    chown \
-      "$ATLAS_AUDIT_JOURNAL_UID:$ATLAS_AUDIT_JOURNAL_GID" \
-      "$journal" ||
-      return 1
-
-    chmod \
-      "$ATLAS_AUDIT_JOURNAL_MODE" \
-      "$journal" ||
-      return 1
   fi
+
+  atlas_audit_runtime_normalize_acl || return 1
+
+  chown \
+    "$ATLAS_AUDIT_JOURNAL_UID:$ATLAS_AUDIT_JOURNAL_GID" \
+    "$journal" ||
+    return 1
+
+  chmod \
+    "$ATLAS_AUDIT_JOURNAL_MODE" \
+    "$journal" ||
+    return 1
 
   atlas_audit_runtime_verify
 }
@@ -113,4 +173,6 @@ atlas_audit_runtime_verify() {
       "$ATLAS_AUDIT_JOURNAL_MODE" "$mode" >&2
     return 1
   }
+
+  atlas_audit_runtime_verify_acl || return 1
 }
