@@ -302,7 +302,7 @@ for Atlas-managed infrastructure.
 - [x] API health endpoint
 - [x] API contract tests
 - [x] Public routing architecture
-- [ ] Complete production Caddy routing
+- [x] Complete production Caddy routing
 - [ ] Complete service health checks
 - [ ] Complete portal and API deployment verification
 
@@ -799,6 +799,11 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
   - [x] Accept 19 remaining upstream Caddy HIGH findings for v1.0
   - [x] Reconcile certified `main` into `release/v1.0.0`
   - [x] Certify 22 running containers and zero unhealthy containers
+  - [x] Provision the security audit journal through the certified update path
+  - [x] Normalize stale extended ACL state and preserve minimal writer access
+  - [x] Certify Atlas API audit-journal write access in production
+  - [x] Certify real production Caddy hostname and TLS/SNI routing
+  - [x] Prove invalid-login audit publication without credential disclosure
 
 ### Quality
 
