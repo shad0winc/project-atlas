@@ -101,7 +101,8 @@ const server = http.createServer(async (request, response) => {
           "requests.*",
           "favorites.*",
           "sports.read",
-          "sports.events.request"
+          "sports.events.request",
+          "system.health.read"
         ],
         denied_permission_patterns: []
       });
@@ -368,6 +369,276 @@ const server = http.createServer(async (request, response) => {
         user_id: USER_ID,
         enabled: true,
         created_at: "2026-08-16T20:00:00Z"
+      });
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/v1/services") {
+      if (!authorized(request)) {
+        sendJson(response, 401, {
+          detail: "Authentication credentials were not provided."
+        });
+        return;
+      }
+
+      sendJson(response, 200, {
+        count: 2,
+        services: [
+          {
+            identifier: "jellyfin",
+            name: "Jellyfin",
+            provider: "docker-compose",
+            enabled: true
+          },
+          {
+            identifier: "sonarr",
+            name: "Sonarr",
+            provider: "docker-compose",
+            enabled: true
+          }
+        ]
+      });
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/v1/services/health") {
+      if (!authorized(request)) {
+        sendJson(response, 401, {
+          detail: "Authentication credentials were not provided."
+        });
+        return;
+      }
+
+      sendJson(response, 200, {
+        health: {
+          status: "degraded",
+          score: 75,
+          total_services: 2,
+          counts: {
+            healthy: 1,
+            degraded: 1,
+            unhealthy: 0,
+            unknown: 0
+          },
+          services: [
+            {
+              service: {
+                identifier: "jellyfin",
+                name: "Jellyfin",
+                provider: "docker-compose",
+                enabled: true
+              },
+              health: {
+                status: "healthy",
+                score: 100
+              },
+              requires_attention: false
+            },
+            {
+              service: {
+                identifier: "sonarr",
+                name: "Sonarr",
+                provider: "docker-compose",
+                enabled: true
+              },
+              health: {
+                status: "degraded",
+                score: 50
+              },
+              requires_attention: true
+            }
+          ],
+          evaluated_at: "2026-08-16T20:30:00Z"
+        }
+      });
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/v1/services/summary") {
+      if (!authorized(request)) {
+        sendJson(response, 401, {
+          detail: "Authentication credentials were not provided."
+        });
+        return;
+      }
+
+      sendJson(response, 200, {
+        summary: {
+          provider: "docker-compose",
+          compose_project: "project-atlas",
+          total_services: 2,
+          runtime_counts: {
+            running: 2,
+            stopped: 0,
+            restarting: 0,
+            failed: 0,
+            unknown: 0
+          },
+          services: [
+            {
+              service: {
+                identifier: "jellyfin",
+                name: "Jellyfin",
+                provider: "docker-compose",
+                enabled: true
+              },
+              runtime: {
+                state: "running",
+                health: "healthy"
+              },
+              category: "running"
+            },
+            {
+              service: {
+                identifier: "sonarr",
+                name: "Sonarr",
+                provider: "docker-compose",
+                enabled: true
+              },
+              runtime: {
+                state: "running",
+                health: "healthy"
+              },
+              category: "running"
+            }
+          ],
+          evaluated_at: "2026-08-16T20:30:00Z"
+        }
+      });
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/v1/services/updates") {
+      if (!authorized(request)) {
+        sendJson(response, 401, {
+          detail: "Authentication credentials were not provided."
+        });
+        return;
+      }
+
+      sendJson(response, 200, {
+        report: {
+          status: "updates-available",
+          provider: "docker-compose",
+          total_services: 2,
+          counts: {
+            current: 1,
+            "update-available": 1,
+            "mutable-tag": 0,
+            unknown: 0,
+            unsupported: 0
+          },
+          requires_attention: true,
+          attention: [
+            {
+              service_identifier: "sonarr",
+              service_name: "Sonarr",
+              status: "update-available"
+            }
+          ],
+          updates: [
+            {
+              service_identifier: "jellyfin",
+              service_name: "Jellyfin",
+              status: "current",
+              available_image: null,
+              details: {
+                registry_comparison: true
+              }
+            },
+            {
+              service_identifier: "sonarr",
+              service_name: "Sonarr",
+              status: "update-available",
+              available_image: {
+                repository: "lscr.io/linuxserver/sonarr",
+                tag: "latest",
+                digest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              },
+              details: {
+                registry_comparison: true
+              }
+            }
+          ],
+          evaluated_at: "2026-08-16T20:30:00Z"
+        }
+      });
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/v1/services/history") {
+      if (!authorized(request)) {
+        sendJson(response, 401, {
+          detail: "Authentication credentials were not provided."
+        });
+        return;
+      }
+
+      sendJson(response, 200, {
+        report: {
+          provider: "docker-compose",
+          generated_at: "2026-08-16T20:35:00Z",
+          total_records: 2,
+          counts: {
+            success: 1,
+            partial: 0,
+            failed: 1,
+            skipped: 0,
+            unknown: 0
+          },
+          requires_attention: true,
+          latest_record: null,
+          latest_success: null,
+          latest_failure: null,
+          records: [
+            {
+              service_identifier: "sonarr",
+              service_name: "Sonarr",
+              provider: "docker-compose",
+              action: "update",
+              result: "failed",
+              succeeded: false,
+              failed: true,
+              started_at: "2026-08-16T20:32:00Z",
+              completed_at: "2026-08-16T20:32:10Z",
+              duration_seconds: 10,
+              summary: "Update failed"
+            },
+            {
+              service_identifier: "jellyfin",
+              service_name: "Jellyfin",
+              provider: "docker-compose",
+              action: "restart",
+              result: "success",
+              succeeded: true,
+              failed: false,
+              started_at: "2026-08-16T20:31:00Z",
+              completed_at: "2026-08-16T20:31:05Z",
+              duration_seconds: 5,
+              summary: "Restart completed"
+            }
+          ]
+        }
+      });
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/v1/services/jellyfin") {
+      if (!authorized(request)) {
+        sendJson(response, 401, {
+          detail: "Authentication credentials were not provided."
+        });
+        return;
+      }
+
+      sendJson(response, 200, {
+        service: {
+          identifier: "jellyfin",
+          name: "Jellyfin",
+          provider: "docker-compose",
+          enabled: true,
+          container_name: "jellyfin"
+        }
       });
       return;
     }

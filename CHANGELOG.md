@@ -19,6 +19,31 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Added
 
+- Added deterministic Administrator critical-browser coverage for the existing
+  read-only Service Lifecycle Administration Portal. The certified journey
+  authenticates through the real Portal session path, requires
+  `system.health.read`, navigates to `/portal/services`, exercises the five
+  authenticated overview GET sources plus the Jellyfin read-only detail GET,
+  renders aggregate service health, managed-service state, Update Availability,
+  and Maintenance History, and proves that Restart, Update service, and Rollback
+  lifecycle mutation controls remain absent.
+- Completed the M-023 critical-browser engineering set across Login, Media
+  Request, Favorites, Sports Request, and Administrator Service Lifecycle. The
+  final deterministic Playwright inventory is six tests across five critical
+  browser specs.
+- Certified the D.5 Administrator delta with 3,156 Core tests plus 104 subtests,
+  400 API tests plus 15 subtests, all five Sports integration suites, 247 Portal
+  tests, TypeScript, ESLint, a production Next.js build, the targeted
+  Administrator browser journey, and the complete six-test critical-browser
+  regression.
+- Kept D.5 bounded to E2E infrastructure only:
+  `apps/portal/e2e/administrator.spec.ts` and
+  `apps/portal/e2e/fixtures/atlas-api-server.mjs`. Production Atlas API and
+  Portal source were unchanged, and production remained at 22 running
+  containers with zero unhealthy.
+- Preserved the five independently established pre-existing Portal Prettier
+  warnings outside the D.5 delta; D.5 introduced no additional formatting debt.
+
 - Added the v1.0 Sports request surface through the authenticated Atlas API and
   `/portal/sports`, using the existing TheSportsDB provider boundary while
   preserving Atlas-owned user and subscription identity.

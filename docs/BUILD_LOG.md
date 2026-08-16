@@ -6985,3 +6985,160 @@ subscription, and process identities.
 This documentation reconciliation does not deploy production source, certify
 representative human User Acceptance, close Administrator D.5, or declare
 v1.0.0 release readiness.
+
+---
+
+# 2026-08-16
+
+## M-023 Critical E2E D.5 — Administrator Service Lifecycle Journey Certification
+
+### Objective
+
+Complete the smallest defensible v1.0 Administrator critical-browser
+engineering journey without overstating completion of the broader
+Administration Portal product scope or representative human Administrator User
+Acceptance.
+
+The certified browser journey is:
+
+`login -> Services navigation -> /portal/services -> Service Lifecycle snapshot -> read-only service detail`
+
+### Contract and Source Freeze
+
+D.5 began from committed D.1-D.4 checkpoint
+`19dc08ee359dfbdc094cbc88488816fefe744b1f`.
+
+The read-only D.5 source freezes established that the strongest already-mature
+v1.0 Administrator browser surface is Service Lifecycle. Existing production
+Portal and API contracts already supported the journey; no production source
+correction was justified.
+
+The frozen Administrator contract requires:
+
+- authentication through the real Portal login/session path;
+- effective `system.health.read` authorization;
+- the real Services navigation item and `/portal/services` route;
+- authenticated `GET /api/v1/services`;
+- authenticated `GET /api/v1/services/health`;
+- authenticated `GET /api/v1/services/summary`;
+- authenticated `GET /api/v1/services/updates`;
+- authenticated `GET /api/v1/services/history`;
+- authenticated read-only `GET /api/v1/services/jellyfin`;
+- aggregate Service health visibility;
+- managed-service runtime and health visibility;
+- Update Availability visibility;
+- Maintenance History visibility;
+- read-only service-detail open/close behavior; and
+- explicit absence of Restart, Update service, and Rollback mutation controls.
+
+Lifecycle mutation, user management, invitation administration, request
+administration, Media/Sports administration, module administration, broader
+routine-operation acceptance, and representative human Administrator User
+Acceptance remain outside this automated D.5 contract.
+
+### Red Contract
+
+D.5.3A added only
+`apps/portal/e2e/administrator.spec.ts`.
+
+The deterministic fixture intentionally still lacked `system.health.read`.
+Playwright failed at the real Services navigation link because the authenticated
+fixture identity was not authorized to see `/portal/services`.
+
+That RED state certified the actual missing contract: deterministic E2E
+authorization/fixture coverage, not missing production API or Portal behavior.
+
+### Green Fixture
+
+D.5.3B changed only:
+
+- `apps/portal/e2e/administrator.spec.ts`; and
+- `apps/portal/e2e/fixtures/atlas-api-server.mjs`.
+
+The fixture now grants `system.health.read` and supplies deterministic responses
+for the five Service Lifecycle overview GETs plus the Jellyfin detail GET.
+
+No production Atlas API route, schema, service, Portal page, component,
+authorization registry, or navigation source was changed.
+
+### Browser Certification
+
+The Administrator Playwright journey proves:
+
+1. the user authenticates through the real Portal session path;
+2. `system.health.read` exposes the Services navigation entry;
+3. `/portal/services` loads through the real protected Portal;
+4. all five overview Service Lifecycle HTTP requests are authenticated GETs;
+5. Service health is rendered;
+6. Managed services are rendered;
+7. deterministic update availability is rendered;
+8. deterministic Maintenance History is rendered;
+9. Jellyfin managed-service runtime and health state are visible;
+10. View details issues the authenticated read-only Jellyfin detail GET;
+11. Read-only service detail is rendered;
+12. Restart is absent;
+13. Update service is absent;
+14. Rollback is absent;
+15. detail can be closed; and
+16. every observed Service Lifecycle browser request remains GET-only.
+
+### D.5.4 Broader Certification
+
+D.5.4 certified the committed D.1-D.4 base plus the exact two-file D.5 delta:
+
+- Core pytest: 3,156 passed plus 104 subtests;
+- API pytest: 400 passed plus 15 subtests;
+- Sports integration suite: five passed, zero failed;
+- Portal Vitest: 34 files / 247 tests passed;
+- Portal TypeScript typecheck: PASS;
+- Portal ESLint: PASS;
+- D.5 two-file Prettier gate: PASS;
+- repository-wide formatting provenance unchanged at the same five pre-existing
+  Portal warnings;
+- production Next.js build: PASS;
+- `/portal/services` present in the production route build;
+- `/portal/sports` remained present in the production route build;
+- targeted Administrator Playwright: one passed;
+- complete critical-browser suite: six passed;
+- critical-browser inventory: five specs / six tests;
+- read-only Administrator contract: PASS;
+- exact two-file D.5 worktree preserved;
+- production API / Portal source unchanged; and
+- production runtime preserved at 22 running containers and zero unhealthy.
+
+### Quality Reconciliation
+
+The ROADMAP Quality items now record as complete:
+
+- Login journey test;
+- Media Request journey test;
+- Favorite-protection journey test;
+- Sports request journey test;
+- Administrator journey test; and
+- aggregate critical end-to-end tests.
+
+`Run full automated test suite` remains open as the final release-candidate-wide
+automated certification gate rather than being inferred from this D.5 feature
+certification.
+
+Responsive UI review, accessibility review, performance baseline,
+sustained-use testing, release-blocking-defect closure, representative human
+User Acceptance, controlled pilot, stabilization, release-candidate freeze,
+tagging, publication, and final v1.0 approval remain separate unfinished gates.
+
+`docs/releases/USER_ACCEPTANCE.md` remains unchanged. Automated D.5
+Administrator certification does not replace the broader human Administrator
+acceptance contract.
+
+### Result
+
+D.5 Administrator critical-browser engineering certification is complete.
+
+The complete M-023 critical-browser engineering set now covers Login, Media
+Request, Favorites, Sports Request, and the read-only Administrator Service
+Lifecycle journey through six deterministic Playwright tests in five spec
+files.
+
+This certification does not declare the broader Administration Portal product
+scope complete, does not certify human Administrator User Acceptance, and does
+not declare v1.0.0 release readiness.

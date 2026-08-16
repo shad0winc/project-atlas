@@ -808,12 +808,12 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 ### Quality
 
 - [ ] Run full automated test suite
-- [ ] Add critical end-to-end tests
+- [x] Add critical end-to-end tests
 - [x] Add login journey test
 - [x] Add media request journey test
 - [x] Add favorite-protection journey test
 - [x] Add Sports request journey test
-- [ ] Add administrator journey test
+- [x] Add administrator journey test
 - [ ] Complete responsive UI review
 - [ ] Complete accessibility review
 - [ ] Complete performance baseline
