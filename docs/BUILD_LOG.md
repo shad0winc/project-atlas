@@ -7466,3 +7466,136 @@ release-quality requirements for:
 
 Q.4 certification therefore does not by itself constitute final v1.0 release
 certification.
+
+---
+
+## M-023 Release Quality Q.5 — Performance Baseline Certification
+
+Q.5 v1.0 performance-baseline certification is complete.
+
+### Scope
+
+Q.5 established a reproducible reference performance baseline for the exact
+committed v1.0 release candidate.
+
+The baseline is intended for future equivalent regression comparison. It is not
+a universal latency service-level objective, a stress benchmark, or a
+sustained-use certification.
+
+The certified candidate checkpoint was:
+
+`26a2455cf15c1978e9b1bfa5d46c7a9adc301350`
+
+### Certified Metric Inventory
+
+The Q.5 baseline contains exactly thirteen metrics:
+
+- API health;
+- Portal login HTTP;
+- CLI version;
+- CLI status;
+- CLI compact health;
+- CLI services;
+- browser Login;
+- browser Portal;
+- browser Media;
+- browser Favorites;
+- browser Requests;
+- browser Services; and
+- browser Sports.
+
+API health and Portal login HTTP each contain 20 successful samples.
+
+Each CLI metric contains 10 successful samples.
+
+Each exact-candidate browser metric contains seven samples.
+
+### Certified v1.0 Reference Baseline
+
+The certified measurements are:
+
+| Metric | Count | Min ms | Median ms | P95 ms | Max ms |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| API health | 20 | 1.141 | 1.474 | 1.696 | 1.703 |
+| Portal login HTTP | 20 | 1.213 | 1.539 | 1.672 | 1.741 |
+| CLI version | 10 | 44.637 | 47.030 | 48.744 | 48.744 |
+| CLI status | 10 | 111.071 | 116.395 | 134.926 | 134.926 |
+| CLI compact health | 10 | 425.473 | 432.506 | 443.114 | 443.114 |
+| CLI services | 10 | 182.503 | 186.621 | 188.744 | 188.744 |
+| Browser Login | 7 | 44.072 | 46.555 | 67.532 | 67.532 |
+| Browser Portal | 7 | 47.468 | 63.725 | 64.528 | 64.528 |
+| Browser Media | 7 | 51.686 | 52.819 | 53.496 | 53.496 |
+| Browser Favorites | 7 | 49.953 | 51.302 | 51.908 | 51.908 |
+| Browser Requests | 7 | 49.457 | 50.718 | 53.668 | 53.668 |
+| Browser Services | 7 | 56.528 | 58.564 | 69.694 | 69.694 |
+| Browser Sports | 7 | 50.290 | 50.909 | 52.402 | 52.402 |
+
+### Browser Measurement Boundary
+
+The seven Portal browser surfaces were measured against an isolated standalone
+production build of the exact candidate rather than against the older live
+Portal container.
+
+The authenticated browser measurement preserved Atlas's intentionally
+memory-backed authentication lifecycle by using canonical client-side protected
+navigation after login.
+
+This prevented hard document navigation from being misclassified as candidate
+performance behavior while preserving the real Portal authentication contract.
+
+### Runtime Drift Separation
+
+Read-only investigation identified older live Portal runtime drift during the
+performance work.
+
+That runtime was not used as evidence for the exact-candidate browser baseline.
+
+Q.5 therefore preserves a strict distinction between:
+
+- the exact committed candidate used for release-quality certification; and
+- independently managed live runtime state that may predate the candidate.
+
+No production deployment was performed as part of Q.5.
+
+### Performance Policy
+
+Q.5 deliberately does not introduce an arbitrary universal latency threshold.
+
+The certified values form a reference baseline against which future equivalent
+measurements can be compared.
+
+This certification also does not claim:
+
+- stress-test completion;
+- sustained-load validation;
+- sustained-use completion; or
+- final production-capacity certification.
+
+Those concerns remain separate release or operational gates.
+
+### Production Preservation
+
+The final Q.5 certification preserved:
+
+- 22 running production containers;
+- zero unhealthy production containers;
+- a clean repository working tree; and
+- a clean Git index.
+
+### Q.5 Release Decision
+
+Q.5 performance-baseline certification is **PASS**.
+
+The M-023 ROADMAP item `Complete performance baseline` is therefore certified
+complete.
+
+The following independent M-023 Quality gates remain open:
+
+- `Complete sustained-use test`; and
+- `Resolve release-blocking defects`.
+
+Controlled pilot, stabilization, release-candidate freeze, final v1.0 approval,
+tagging, and publication also remain independent later release gates.
+
+Q.5 does not constitute sustained-use certification or final v1.0 release
+certification.

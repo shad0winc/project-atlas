@@ -19,6 +19,25 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Added
 
+- Completed the M-023 Q.5 v1.0 performance-baseline certification against the
+  exact committed release candidate. The certified reference inventory contains
+  thirteen API, HTTP, CLI, and browser metrics, including seven authenticated
+  exact-candidate Portal surfaces.
+- Certified 20 successful samples each for API health and Portal login HTTP,
+  10 successful samples for each of the four CLI measurements, and seven
+  exact-candidate browser samples for Login, Portal, Media, Favorites, Requests,
+  Services, and Sports.
+- Established the measured Q.5 results as the v1.0 reference performance
+  baseline for future equivalent regression comparison. No candidate
+  performance blocker was identified.
+- Kept older live Portal runtime drift separate from the exact-candidate
+  baseline and introduced no arbitrary universal latency threshold.
+- Closed only the M-023 ROADMAP item `Complete performance baseline`.
+  `Complete sustained-use test`, release-blocking-defect resolution, pilot,
+  stabilization, and final v1.0 release certification remain independent gates.
+  Q.5 makes no stress-load or sustained-use certification claim.
+
+
 - Completed the M-023 Q.4 full automated release-candidate test-suite
   certification. The authoritative matrix passed the complete Core, API,
   Sports, Portal, and critical-browser validation layers together with Portal
