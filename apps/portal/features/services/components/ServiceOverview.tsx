@@ -98,10 +98,7 @@ export function ServiceOverview({
   onClearSelection
 }: ServiceOverviewProps): React.ReactElement {
   const updateStatusByService = new Map(
-    snapshot.updates.updates.map((update) => [
-      update.serviceIdentifier,
-      update.status
-    ])
+    snapshot.updates.updates.map((update) => [update.serviceIdentifier, update.status])
   );
 
   return (
@@ -170,9 +167,7 @@ export function ServiceOverview({
                 <p>Health: {service.healthStatus}</p>
                 <p>
                   Updates:{" "}
-                  {updateStatusLabel(
-                    updateStatusByService.get(service.identifier) ?? "unknown"
-                  )}
+                  {updateStatusLabel(updateStatusByService.get(service.identifier) ?? "unknown")}
                 </p>
                 <button
                   className="dashboard-retry-button"
@@ -186,7 +181,6 @@ export function ServiceOverview({
           </div>
         )}
       </section>
-
 
       <section aria-labelledby="maintenance-history-title">
         <h2 id="maintenance-history-title">Maintenance history</h2>

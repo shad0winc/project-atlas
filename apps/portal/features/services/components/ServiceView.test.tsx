@@ -386,7 +386,6 @@ describe("Service Lifecycle presentation", () => {
     expect(markup).not.toContain(">Rollback<");
   });
 
-
   it("renders an empty Maintenance History report truthfully", () => {
     const emptySnapshot = {
       ...snapshot,

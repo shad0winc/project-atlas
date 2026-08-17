@@ -467,5 +467,4 @@ describe("Media discovery presentation", () => {
     expect(conflict).toContain("This title already has an active Atlas request.");
     expect(conflict).not.toContain("1396");
   });
-
 });

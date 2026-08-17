@@ -202,7 +202,9 @@ function TvSeasonSelection({
       </p>
 
       {detail.seasons.length === 0 ? (
-        <p className="media-discovery-request-message">No requestable season metadata is available.</p>
+        <p className="media-discovery-request-message">
+          No requestable season metadata is available.
+        </p>
       ) : (
         <ul>
           {detail.seasons.map((season) => {
@@ -237,7 +239,9 @@ function TvSeasonSelection({
                     </>
                   ) : null
                 ) : (
-                  <p className="media-discovery-request-message">{seasonUnavailableMessage(season)}</p>
+                  <p className="media-discovery-request-message">
+                    {seasonUnavailableMessage(season)}
+                  </p>
                 )}
               </li>
             );
@@ -409,7 +413,10 @@ export function MediaDiscoveryContent({
                         <h3>{item.title}</h3>
                       </div>
 
-                      <span className="media-discovery-status" data-availability={item.availability}>
+                      <span
+                        className="media-discovery-status"
+                        data-availability={item.availability}
+                      >
                         {mediaDiscoveryAvailabilityLabel(item.availability)}
                       </span>
                     </header>
