@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 from typing import Sequence
 
-from atlas.events import publish_event
+from atlas.events import publish_core_event
 from atlas.module_scheduler import sync_module_jobs
 from atlas.operations_scheduler import (
     register_operations_collection,
@@ -33,9 +33,11 @@ def scheduler_lock_file() -> Path | None:
 
 
 def _publish_scheduler_event(event_name: str, payload: dict[str, object]) -> None:
-    module = payload.get("module")
-    if isinstance(module, str) and module.strip():
-        publish_event(module, event_name, payload)
+    publish_core_event(
+        event_name,
+        payload,
+        source="scheduler",
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:

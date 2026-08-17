@@ -457,3 +457,151 @@ def test_systemd_service_does_not_mask_dispatch_failures() -> None:
 
     for marker in forbidden:
         assert marker not in text
+
+
+def test_scheduler_event_publisher_uses_core_event_contract(
+    monkeypatch,
+) -> None:
+    import atlas.scheduler_cli as scheduler_cli
+
+    published = []
+
+    def fake_publish_core_event(
+        event_name,
+        payload,
+        *,
+        source="atlas",
+        atlas_binary=None,
+    ):
+        published.append(
+            {
+                "event_name": event_name,
+                "payload": payload,
+                "source": source,
+                "atlas_binary": atlas_binary,
+            }
+        )
+
+    monkeypatch.setattr(
+        scheduler_cli,
+        "publish_core_event",
+        fake_publish_core_event,
+    )
+
+    payload = {
+        "task": "sports.maintenance",
+        "module": "sports",
+        "return_code": 0,
+    }
+
+    scheduler_cli._publish_scheduler_event(
+        "scheduler.task.completed",
+        payload,
+    )
+
+    assert published == [
+        {
+            "event_name": "scheduler.task.completed",
+            "payload": payload,
+            "source": "scheduler",
+            "atlas_binary": None,
+        }
+    ]
+
+
+def test_scheduler_event_publisher_core_route_ignores_module_ownership(
+    monkeypatch,
+) -> None:
+    import atlas.scheduler_cli as scheduler_cli
+
+    published = []
+
+    def fake_publish_core_event(
+        event_name,
+        payload,
+        *,
+        source="atlas",
+        atlas_binary=None,
+    ):
+        published.append(
+            (
+                event_name,
+                payload,
+                source,
+            )
+        )
+
+    monkeypatch.setattr(
+        scheduler_cli,
+        "publish_core_event",
+        fake_publish_core_event,
+    )
+
+    scheduler_cli._publish_scheduler_event(
+        "scheduler.task.started",
+        {
+            "task": "sports.maintenance",
+            "module": "sports",
+        },
+    )
+
+    assert published == [
+        (
+            "scheduler.task.started",
+            {
+                "task": "sports.maintenance",
+                "module": "sports",
+            },
+            "scheduler",
+        )
+    ]
+
+
+def test_scheduler_event_publisher_core_route_supports_core_task(
+    monkeypatch,
+) -> None:
+    import atlas.scheduler_cli as scheduler_cli
+
+    published = []
+
+    def fake_publish_core_event(
+        event_name,
+        payload,
+        *,
+        source="atlas",
+        atlas_binary=None,
+    ):
+        published.append(
+            (
+                event_name,
+                payload,
+                source,
+            )
+        )
+
+    monkeypatch.setattr(
+        scheduler_cli,
+        "publish_core_event",
+        fake_publish_core_event,
+    )
+
+    scheduler_cli._publish_scheduler_event(
+        "scheduler.task.completed",
+        {
+            "task": "operations.collect",
+            "module": None,
+            "return_code": 0,
+        },
+    )
+
+    assert published == [
+        (
+            "scheduler.task.completed",
+            {
+                "task": "operations.collect",
+                "module": None,
+                "return_code": 0,
+            },
+            "scheduler",
+        )
+    ]
