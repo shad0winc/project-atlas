@@ -7950,3 +7950,75 @@ Before Q.6 can restart:
 
 `Complete sustained-use test` and `Resolve release-blocking defects` remain
 open until those requirements are satisfied.
+
+## M-023 Release Quality Q.6A.4.6B — Incomplete Sustained-Use Attempt Retirement
+
+### Objective
+
+Provide a repository-owned, explicit, and auditable way to retire an incomplete Q.6 sustained-use certification attempt without rewriting it as a completed certification failure and without deleting its evidence.
+
+The first Q.6 run, `q6-20260817T171504Z`, remains an incomplete production attempt at `1/193`. Its certification window became invalid when release testing exposed the missing recurring production Scheduler dispatcher. That infrastructure defect and the subsequent Scheduler lifecycle core-event routing defect were repaired and live-certified separately. The original Q.6 evidence therefore must be preserved historically before a fresh T0 is established.
+
+### Repository Archive Contract
+
+`FileSustainedUseRepository` now owns an immutable archive namespace:
+
+```text
+/mnt/storage/configs/atlas/sustained-use/
+└── archive/
+    └── <run-id>/
+        ├── session.json
+        ├── latest.json
+        └── history/
+```
+
+A terminal run can be moved from the active root into `archive/<run-id>/`.
+
+Archival preserves the safety boundary by moving evidence in this order:
+
+1. `history/`;
+2. `latest.json`;
+3. `session.json`.
+
+`session.json` moves last. If an interruption occurs before the final move, the current terminal-session boundary remains visible and prevents a replacement run from silently starting. A retry can resume the archive operation. Existing archived run identities cannot be recreated.
+
+### Abort Lifecycle
+
+The lifecycle now exposes `abort_session()` and `SustainedUseAbortResult`.
+
+The retirement path is intentionally distinct from normal Q.6 finalization:
+
+- `completed` means the full sustained-use history passed final hard and temporal evaluation;
+- `failed` means the full completed sustained-use history was evaluated and did not pass;
+- `aborted` means an incomplete certification attempt was explicitly retired and preserved as historical evidence.
+
+Only `active` or partially archived `aborted` sessions may enter the abort path. `completed` and `failed` sessions cannot be reinterpreted through it.
+
+For an active session, Atlas records a UTC `completed_at`, persists the `active -> aborted` transition, and then archives the run. If archival is interrupted after the transition, retry preserves the original completion timestamp.
+
+### Guarded Operator CLI
+
+The public command is:
+
+```bash
+atlas sustained-use abort \
+  --confirm-run-id <exact-current-run-id>
+```
+
+The exact current run identity is mandatory. There is no `--force` bypass.
+
+The Python CLI owns destructive confirmation validation. The shell command remains intentionally thin and only forwards arguments and propagates the Python exit status.
+
+### Certification
+
+Final code certification passed 55 focused abort/archive tests, 189 complete Sustained Use tests, and 71 Scheduler/systemd-dispatcher regression tests.
+
+During certification the failed first Q.6 attempt remained byte-identical at `1/193`, the live Scheduler state remained unchanged, `sustained-use.sample` remained absent, `atlas-scheduler.timer` remained enabled but intentionally stopped, Atlas health was `warning:99` solely because of the expected dirty Git working tree, production remained at 22 running containers with zero unhealthy containers, no production abort was executed, and no commit or push was performed.
+
+### Release Boundary
+
+This implementation does not itself retire the production attempt or start a replacement Q.6 window.
+
+The next controlled sequence is to publish this retirement implementation, execute the guarded abort against `q6-20260817T171504Z`, verify the immutable archive, restore `sustained-use.sample`, resume and prove autonomous Scheduler dispatch, establish a fresh T0, and collect a new uninterrupted 193-sample / 48-hour history.
+
+`Complete sustained-use test` and the aggregate `Resolve release-blocking defects` gate remain open.

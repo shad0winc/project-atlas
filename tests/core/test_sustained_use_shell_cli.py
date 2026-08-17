@@ -225,3 +225,55 @@ def test_root_help_registers_sustained_use(
     assert "atlas sustained-use [--help]" in completed.stdout
     assert completed.stderr == ""
     assert not capture_path.exists()
+
+
+def test_sustained_use_shell_forwards_abort_help(
+    tmp_path: Path,
+) -> None:
+    """Abort help arguments must cross the shell boundary unchanged."""
+
+    completed, capture_path = run_atlas(
+        tmp_path,
+        "sustained-use",
+        "abort",
+        "--help",
+    )
+
+    assert completed.returncode == 0
+    assert completed.stderr == ""
+
+    assert capture_path.read_text(
+        encoding="utf-8",
+    ).splitlines() == [
+        "-m",
+        "atlas.sustained_use.cli",
+        "abort",
+        "--help",
+    ]
+
+
+def test_sustained_use_shell_forwards_abort_confirmation_and_exit_code(
+    tmp_path: Path,
+) -> None:
+    """Abort confirmation and Python failure status must be preserved."""
+
+    completed, capture_path = run_atlas(
+        tmp_path,
+        "sustained-use",
+        "abort",
+        "--confirm-run-id",
+        "q6-example",
+        python_status=2,
+    )
+
+    assert completed.returncode == 2
+
+    assert capture_path.read_text(
+        encoding="utf-8",
+    ).splitlines() == [
+        "-m",
+        "atlas.sustained_use.cli",
+        "abort",
+        "--confirm-run-id",
+        "q6-example",
+    ]

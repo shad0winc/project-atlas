@@ -830,9 +830,13 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
   - [x] Establish the first T0 against the exact committed candidate
   - [x] Preserve the incomplete first Q.6 attempt at `1/193` after detecting missing recurring production Scheduler dispatch
   - [x] Design and certify the repository-owned one-shot systemd Scheduler dispatcher and one-minute timer contract
-  - [ ] Commit and publish the Scheduler dispatcher repair
-  - [ ] Install and live-certify recurring production Scheduler dispatch
-  - [ ] Close the incomplete first attempt as historical release evidence and establish a new T0 against the repaired committed candidate
+  - [x] Commit and publish the Scheduler dispatcher repair
+  - [x] Install and live-certify recurring production Scheduler dispatch
+  - [x] Repair and live-certify Scheduler lifecycle events through the core durable event stream
+  - [x] Implement and certify guarded retirement/archive support for incomplete Q.6 attempts
+  - [ ] Retire `q6-20260817T171504Z` as immutable `aborted` historical release evidence
+  - [ ] Restore `sustained-use.sample` and prove dormant autonomous Scheduler behavior
+  - [ ] Establish a new T0 against the repaired committed candidate
   - [ ] Collect 193 samples across a fresh uninterrupted 48-hour / 15-minute observation window
   - [ ] Finalize and certify the complete sustained-use history
 - [ ] Resolve release-blocking defects

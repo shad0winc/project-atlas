@@ -548,3 +548,485 @@ def test_main_sample_failure_returns_one(
 
     assert payload["passed"] is False
     assert "atlas.health.status" in payload["failed_codes"]
+
+
+def test_abort_session_archives_incomplete_active_run(
+    tmp_path,
+) -> None:
+    from datetime import datetime, timezone
+
+    from atlas.sustained_use import (
+        SustainedUseSampleNotFoundError,
+        abort_session,
+    )
+
+    repository = FileSustainedUseRepository(
+        tmp_path / "q6",
+    )
+
+    first = sample(
+        "2026-08-17T16:00:00Z",
+    )
+
+    started = start_session(
+        contract=contract(),
+        repository=repository,
+        collector=lambda: first,
+    )
+
+    result = abort_session(
+        repository=repository,
+        now=datetime(
+            2026,
+            8,
+            17,
+            17,
+            0,
+            tzinfo=timezone.utc,
+        ),
+    )
+
+    assert result.session.run_id == started.session.run_id
+    assert result.session.status == "aborted"
+    assert result.session.completed_at == "2026-08-17T17:00:00Z"
+
+    assert result.archive_path == (
+        repository.archive_directory
+        / started.session.run_id
+    )
+
+    assert (
+        result.archive_path
+        / "session.json"
+    ).exists()
+
+    assert (
+        result.archive_path
+        / "latest.json"
+    ).exists()
+
+    assert len(
+        tuple(
+            (
+                result.archive_path
+                / "history"
+            ).glob("*.json")
+        )
+    ) == 1
+
+    assert repository.session_path.exists() is False
+    assert repository.latest_path.exists() is False
+    assert repository.history_directory.exists() is False
+
+    with pytest.raises(
+        SustainedUseSampleNotFoundError,
+        match="session was not found",
+    ):
+        repository.session()
+
+
+def test_abort_session_rejects_naive_timestamp_before_mutation(
+    tmp_path,
+) -> None:
+    from datetime import datetime
+
+    from atlas.sustained_use import (
+        SustainedUseLifecycleError,
+        abort_session,
+    )
+
+    repository = FileSustainedUseRepository(
+        tmp_path / "q6",
+    )
+
+    start_session(
+        contract=contract(),
+        repository=repository,
+        collector=lambda: sample(
+            "2026-08-17T16:00:00Z",
+        ),
+    )
+
+    before = repository.session()
+
+    with pytest.raises(
+        SustainedUseLifecycleError,
+        match="abort timestamp must include a timezone",
+    ):
+        abort_session(
+            repository=repository,
+            now=datetime(
+                2026,
+                8,
+                17,
+                17,
+                0,
+            ),
+        )
+
+    assert repository.session() == before
+    assert repository.archive_directory.exists() is False
+
+
+@pytest.mark.parametrize(
+    "terminal_status",
+    [
+        "completed",
+        "failed",
+    ],
+)
+def test_abort_session_rejects_non_abort_terminal_session(
+    tmp_path,
+    terminal_status,
+) -> None:
+    from dataclasses import replace
+
+    from atlas.sustained_use import (
+        SustainedUseLifecycleError,
+        abort_session,
+    )
+
+    repository = FileSustainedUseRepository(
+        tmp_path / "q6",
+    )
+
+    started = start_session(
+        contract=contract(),
+        repository=repository,
+        collector=lambda: sample(
+            "2026-08-17T16:00:00Z",
+        ),
+    )
+
+    terminal = replace(
+        started.session,
+        status=terminal_status,
+        completed_at="2026-08-17T17:00:00Z",
+    )
+
+    repository.update_session(
+        terminal,
+    )
+
+    with pytest.raises(
+        SustainedUseLifecycleError,
+        match="only an active or partially archived aborted",
+    ):
+        abort_session(
+            repository=repository,
+        )
+
+    assert repository.session() == terminal
+
+
+def test_abort_session_retries_after_terminal_transition(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    from datetime import datetime, timezone
+
+    from atlas.sustained_use import (
+        SustainedUseRepositoryError,
+        abort_session,
+    )
+
+    repository = FileSustainedUseRepository(
+        tmp_path / "q6",
+    )
+
+    started = start_session(
+        contract=contract(),
+        repository=repository,
+        collector=lambda: sample(
+            "2026-08-17T16:00:00Z",
+        ),
+    )
+
+    original_archive = repository.archive_session
+    calls = {"count": 0}
+
+    def fail_once(session):
+        calls["count"] += 1
+
+        if calls["count"] == 1:
+            raise SustainedUseRepositoryError(
+                "simulated archive interruption",
+            )
+
+        return original_archive(
+            session,
+        )
+
+    monkeypatch.setattr(
+        repository,
+        "archive_session",
+        fail_once,
+    )
+
+    with pytest.raises(
+        SustainedUseRepositoryError,
+        match="simulated archive interruption",
+    ):
+        abort_session(
+            repository=repository,
+            now=datetime(
+                2026,
+                8,
+                17,
+                17,
+                0,
+                tzinfo=timezone.utc,
+            ),
+        )
+
+    partially_closed = repository.session()
+
+    assert partially_closed.run_id == started.session.run_id
+    assert partially_closed.status == "aborted"
+    assert (
+        partially_closed.completed_at
+        == "2026-08-17T17:00:00Z"
+    )
+
+    result = abort_session(
+        repository=repository,
+        now=datetime(
+            2026,
+            8,
+            17,
+            18,
+            0,
+            tzinfo=timezone.utc,
+        ),
+    )
+
+    assert calls["count"] == 2
+    assert result.session == partially_closed
+
+    # Retry preserves the original retirement timestamp rather than
+    # replacing it with the second invocation time.
+    assert result.session.completed_at == "2026-08-17T17:00:00Z"
+
+    assert (
+        result.archive_path
+        / "session.json"
+    ).exists()
+
+    assert repository.session_path.exists() is False
+
+
+def test_new_t0_can_start_after_abort_archive(
+    tmp_path,
+) -> None:
+    from datetime import datetime, timezone
+
+    from atlas.sustained_use import abort_session
+
+    repository = FileSustainedUseRepository(
+        tmp_path / "q6",
+    )
+
+    first = start_session(
+        contract=contract(),
+        repository=repository,
+        collector=lambda: sample(
+            "2026-08-17T16:00:00Z",
+        ),
+    )
+
+    abort = abort_session(
+        repository=repository,
+        now=datetime(
+            2026,
+            8,
+            17,
+            17,
+            0,
+            tzinfo=timezone.utc,
+        ),
+    )
+
+    second = start_session(
+        contract=contract(),
+        repository=repository,
+        collector=lambda: sample(
+            "2026-08-17T18:00:00Z",
+        ),
+    )
+
+    assert first.session.run_id != second.session.run_id
+
+    assert (
+        abort.archive_path
+        / "session.json"
+    ).exists()
+
+    assert repository.session() == second.session
+    assert len(repository.history()) == 1
+
+
+def test_abort_parser_requires_confirm_run_id() -> None:
+    from atlas.sustained_use.cli import build_parser
+
+    parser = build_parser()
+
+    with pytest.raises(SystemExit) as error:
+        parser.parse_args(
+            [
+                "abort",
+            ]
+        )
+
+    assert error.value.code == 2
+
+
+def test_main_abort_rejects_wrong_run_confirmation(
+    tmp_path,
+    capsys,
+) -> None:
+    from atlas.sustained_use.cli import main
+
+    repository = FileSustainedUseRepository(
+        tmp_path / "q6",
+    )
+
+    started = start_session(
+        contract=contract(),
+        repository=repository,
+        collector=lambda: sample(
+            "2026-08-17T16:00:00Z",
+        ),
+    )
+
+    result = main(
+        [
+            "--root",
+            str(repository.root),
+            "abort",
+            "--confirm-run-id",
+            "q6-wrong",
+            "--json",
+        ]
+    )
+
+    assert result == 1
+
+    captured = capsys.readouterr()
+
+    assert (
+        "abort confirmation run ID does not match"
+        in captured.err
+    )
+
+    assert repository.session() == started.session
+    assert repository.archive_directory.exists() is False
+
+
+def test_main_abort_archives_confirmed_run(
+    tmp_path,
+    capsys,
+) -> None:
+    import json
+
+    from atlas.sustained_use.cli import main
+
+    repository = FileSustainedUseRepository(
+        tmp_path / "q6",
+    )
+
+    started = start_session(
+        contract=contract(),
+        repository=repository,
+        collector=lambda: sample(
+            "2026-08-17T16:00:00Z",
+        ),
+    )
+
+    result = main(
+        [
+            "--root",
+            str(repository.root),
+            "abort",
+            "--confirm-run-id",
+            started.session.run_id,
+            "--json",
+        ]
+    )
+
+    assert result == 0
+
+    captured = capsys.readouterr()
+
+    payload = json.loads(
+        captured.out
+    )
+
+    assert payload["command"] == "abort"
+    assert payload["run_id"] == started.session.run_id
+    assert payload["status"] == "aborted"
+    assert payload["completed_at"] is not None
+    assert payload["archive_path"] == str(
+        repository.archive_directory
+        / started.session.run_id
+    )
+
+    archive = repository.archive_directory / started.session.run_id
+
+    assert (
+        archive
+        / "session.json"
+    ).exists()
+
+    assert (
+        archive
+        / "latest.json"
+    ).exists()
+
+    assert (
+        archive
+        / "history"
+    ).exists()
+
+    assert repository.session_path.exists() is False
+
+
+def test_main_abort_cannot_reuse_archived_run_identity(
+    tmp_path,
+    capsys,
+) -> None:
+    from atlas.sustained_use import SustainedUseRepositoryError
+    from atlas.sustained_use.cli import main
+
+    repository = FileSustainedUseRepository(
+        tmp_path / "q6",
+    )
+
+    started = start_session(
+        contract=contract(),
+        repository=repository,
+        collector=lambda: sample(
+            "2026-08-17T16:00:00Z",
+        ),
+    )
+
+    result = main(
+        [
+            "--root",
+            str(repository.root),
+            "abort",
+            "--confirm-run-id",
+            started.session.run_id,
+        ]
+    )
+
+    assert result == 0
+
+    capsys.readouterr()
+
+    with pytest.raises(
+        SustainedUseRepositoryError,
+        match="run is already archived",
+    ):
+        repository.create_session(
+            started.session,
+        )

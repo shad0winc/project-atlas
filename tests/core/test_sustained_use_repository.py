@@ -458,3 +458,324 @@ def test_invalid_session_json_is_rejected(
         match="invalid JSON",
     ):
         repository.session()
+
+
+def test_archive_terminal_session_moves_current_evidence(
+    tmp_path,
+) -> None:
+    from dataclasses import replace
+    import json
+
+    repository = FileSustainedUseRepository(
+        tmp_path / "sustained-use",
+    )
+
+    active = q6_session()
+
+    repository.create_session(
+        active,
+    )
+
+    repository.history_directory.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    history_payload = b'{"sample":"history"}\n'
+    latest_payload = b'{"sample":"latest"}\n'
+
+    history_path = (
+        repository.history_directory
+        / "2026-08-17T16-00-00Z.json"
+    )
+
+    history_path.write_bytes(
+        history_payload,
+    )
+
+    repository.latest_path.write_bytes(
+        latest_payload,
+    )
+
+    aborted = replace(
+        active,
+        status="aborted",
+        completed_at="2026-08-17T17:00:00Z",
+    )
+
+    repository.update_session(
+        aborted,
+    )
+
+    archive = repository.archive_session(
+        aborted,
+    )
+
+    assert archive == (
+        repository.archive_directory
+        / active.run_id
+    )
+
+    assert repository.session_path.exists() is False
+    assert repository.latest_path.exists() is False
+    assert repository.history_directory.exists() is False
+
+    archived_session = json.loads(
+        (
+            archive
+            / "session.json"
+        ).read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert archived_session == aborted.to_dict()
+
+    assert (
+        archive
+        / "latest.json"
+    ).read_bytes() == latest_payload
+
+    assert (
+        archive
+        / "history"
+        / history_path.name
+    ).read_bytes() == history_payload
+
+
+def test_archive_session_requires_terminal_status(
+    tmp_path,
+) -> None:
+    repository = FileSustainedUseRepository(
+        tmp_path / "sustained-use",
+    )
+
+    active = q6_session()
+
+    repository.create_session(
+        active,
+    )
+
+    with pytest.raises(
+        SustainedUseRepositoryError,
+        match="active sustained-use session cannot be archived",
+    ):
+        repository.archive_session(
+            active,
+        )
+
+    assert repository.session() == active
+
+
+def test_archive_session_requires_current_session_identity(
+    tmp_path,
+) -> None:
+    from dataclasses import replace
+
+    repository = FileSustainedUseRepository(
+        tmp_path / "sustained-use",
+    )
+
+    active = q6_session()
+
+    repository.create_session(
+        active,
+    )
+
+    aborted = replace(
+        active,
+        status="aborted",
+        completed_at="2026-08-17T17:00:00Z",
+    )
+
+    repository.update_session(
+        aborted,
+    )
+
+    other = replace(
+        aborted,
+        run_id="q6-other",
+    )
+
+    with pytest.raises(
+        SustainedUseRepositoryError,
+        match="does not match current session",
+    ):
+        repository.archive_session(
+            other,
+        )
+
+    assert repository.session() == aborted
+
+
+def test_archive_session_supports_partial_retry_before_session_move(
+    tmp_path,
+) -> None:
+    from dataclasses import replace
+
+    repository = FileSustainedUseRepository(
+        tmp_path / "sustained-use",
+    )
+
+    active = q6_session()
+
+    repository.create_session(
+        active,
+    )
+
+    repository.history_directory.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    history_path = (
+        repository.history_directory
+        / "sample.json"
+    )
+
+    history_path.write_text(
+        "{}\n",
+        encoding="utf-8",
+    )
+
+    repository.latest_path.write_text(
+        "{}\n",
+        encoding="utf-8",
+    )
+
+    aborted = replace(
+        active,
+        status="aborted",
+        completed_at="2026-08-17T17:00:00Z",
+    )
+
+    repository.update_session(
+        aborted,
+    )
+
+    archive = (
+        repository.archive_directory
+        / aborted.run_id
+    )
+
+    archive.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    repository.history_directory.rename(
+        archive / "history",
+    )
+
+    assert repository.session_path.exists()
+    assert repository.latest_path.exists()
+
+    result = repository.archive_session(
+        aborted,
+    )
+
+    assert result == archive
+    assert repository.session_path.exists() is False
+    assert repository.latest_path.exists() is False
+
+    assert (
+        archive
+        / "history"
+        / "sample.json"
+    ).exists()
+
+    assert (
+        archive
+        / "latest.json"
+    ).exists()
+
+    assert (
+        archive
+        / "session.json"
+    ).exists()
+
+
+def test_archived_run_identity_cannot_be_recreated(
+    tmp_path,
+) -> None:
+    from dataclasses import replace
+
+    repository = FileSustainedUseRepository(
+        tmp_path / "sustained-use",
+    )
+
+    active = q6_session()
+
+    repository.create_session(
+        active,
+    )
+
+    aborted = replace(
+        active,
+        status="aborted",
+        completed_at="2026-08-17T17:00:00Z",
+    )
+
+    repository.update_session(
+        aborted,
+    )
+
+    repository.archive_session(
+        aborted,
+    )
+
+    with pytest.raises(
+        SustainedUseRepositoryError,
+        match="run is already archived",
+    ):
+        repository.create_session(
+            active,
+        )
+
+
+def test_new_run_can_start_after_previous_run_is_archived(
+    tmp_path,
+) -> None:
+    from dataclasses import replace
+
+    repository = FileSustainedUseRepository(
+        tmp_path / "sustained-use",
+    )
+
+    original = q6_session()
+
+    repository.create_session(
+        original,
+    )
+
+    aborted = replace(
+        original,
+        status="aborted",
+        completed_at="2026-08-17T17:00:00Z",
+    )
+
+    repository.update_session(
+        aborted,
+    )
+
+    repository.archive_session(
+        aborted,
+    )
+
+    replacement = replace(
+        q6_session(),
+        run_id="q6-20260817T180000Z",
+    )
+
+    path = repository.create_session(
+        replacement,
+    )
+
+    assert path == repository.session_path
+    assert repository.session() == replacement
+
+    assert (
+        repository.archive_directory
+        / original.run_id
+        / "session.json"
+    ).exists()

@@ -10,10 +10,12 @@ import sys
 from typing import Sequence
 
 from .lifecycle import (
+    SustainedUseAbortResult,
     SustainedUseFinalizeResult,
     SustainedUseLifecycleError,
     SustainedUseStartResult,
     SustainedUseStatus,
+    abort_session,
     finalize_session,
     sample_session,
     start_session,
@@ -70,6 +72,10 @@ def build_parser() -> argparse.ArgumentParser:
             "finalize",
             "Evaluate and close the completed Q.6 session",
         ),
+        (
+            "abort",
+            "Abort and archive an incomplete Q.6 session",
+        ),
     ):
         subparser = subparsers.add_parser(
             name,
@@ -81,6 +87,16 @@ def build_parser() -> argparse.ArgumentParser:
             action="store_true",
             help="Render deterministic JSON output",
         )
+
+        if name == "abort":
+            subparser.add_argument(
+                "--confirm-run-id",
+                required=True,
+                help=(
+                    "Required exact run ID confirmation for "
+                    "destructive retirement"
+                ),
+            )
 
     return parser
 
@@ -177,6 +193,20 @@ def _status_payload(
             if result.latest_sample is not None
             else None
         ),
+    }
+
+
+def _abort_payload(
+    result: SustainedUseAbortResult,
+) -> dict[str, object]:
+    """Build deterministic CLI output for an aborted Q.6 run."""
+
+    return {
+        "command": "abort",
+        "run_id": result.session.run_id,
+        "status": result.session.status,
+        "completed_at": result.session.completed_at,
+        "archive_path": str(result.archive_path),
     }
 
 
@@ -298,6 +328,24 @@ def main(
             )
 
             return 0 if result.passed else 1
+
+        if args.command == "abort":
+            if args.confirm_run_id != session.run_id:
+                raise SustainedUseLifecycleError(
+                    "abort confirmation run ID does not match "
+                    "the active sustained-use session",
+                )
+
+            result = abort_session(
+                repository=repository,
+            )
+
+            _render(
+                _abort_payload(result),
+                as_json=args.json,
+            )
+
+            return 0
 
         parser.error(
             f"unknown sustained-use command: {args.command}"

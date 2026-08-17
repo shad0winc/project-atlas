@@ -19,6 +19,12 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Added
 
+- Added explicit Q.6 sustained-use session retirement for incomplete certification attempts. Active sessions can now be transitioned to the distinct terminal `aborted` state and archived without misclassifying an infrastructure-invalid run as a completed certification failure.
+- Added immutable sustained-use run archives under `archive/<run-id>/`, preserving `history/`, `latest.json`, and terminal `session.json` evidence while reopening the active sustained-use root for a future certification run.
+- Added retry-safe retirement semantics: archive movement is ordered `history -> latest -> session`, the current session boundary moves last, partially completed archival can resume without changing the original completion timestamp, and archived run identities cannot be reused.
+- Added the guarded `atlas sustained-use abort --confirm-run-id <run-id>` operator command. The exact current run ID is required, no force bypass exists, and the shell adapter remains a thin argument/exit-code forwarding boundary while the Python CLI owns confirmation validation.
+- Certified the seven-file abort/archive candidate with 55 focused abort/archive tests, 189 complete Sustained Use tests, and 71 Scheduler/dispatcher regression tests while preserving the production Q.6 attempt at `1/193` and leaving `sustained-use.sample` absent during the maintenance boundary.
+
 - Added M-023 Q.6A.2 sustained-use release-certification instrumentation without
   starting the certification clock. The new `atlas.sustained_use` domain
   provides immutable contracts, live read-only collectors, atomic evidence

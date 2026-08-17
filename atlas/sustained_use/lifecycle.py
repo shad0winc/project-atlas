@@ -60,6 +60,14 @@ class SustainedUseStatus:
 
 
 @dataclass(frozen=True)
+class SustainedUseAbortResult:
+    """Result of explicitly retiring an incomplete Q.6 run."""
+
+    session: SustainedUseSession
+    archive_path: Path
+
+
+@dataclass(frozen=True)
 class SustainedUseFinalizeResult:
     """Final hard + temporal certification result."""
 
@@ -229,6 +237,63 @@ def status_session(
         session=session,
         sample_count=len(history),
         latest_sample=latest,
+    )
+
+
+def abort_session(
+    *,
+    repository: SustainedUseRepository,
+    now: datetime | None = None,
+) -> SustainedUseAbortResult:
+    """Abort and archive one incomplete active Q.6 session.
+
+    If the session was already transitioned to ``aborted`` but
+    archival was interrupted before session.json moved, retry the
+    archive operation without changing the completion timestamp.
+    """
+
+    session = repository.session()
+
+    if session.status not in {
+        "active",
+        "aborted",
+    }:
+        raise SustainedUseLifecycleError(
+            "only an active or partially archived aborted "
+            "sustained-use session can be aborted",
+        )
+
+    if session.status == "active":
+        current = (
+            datetime.now(timezone.utc)
+            if now is None
+            else now
+        )
+
+        if current.tzinfo is None:
+            raise SustainedUseLifecycleError(
+                "abort timestamp must include a timezone",
+            )
+
+        closed = replace(
+            session,
+            status="aborted",
+            completed_at=_utc_timestamp(current),
+        )
+
+        repository.update_session(
+            closed,
+        )
+    else:
+        closed = session
+
+    archive_path = repository.archive_session(
+        closed,
+    )
+
+    return SustainedUseAbortResult(
+        session=closed,
+        archive_path=archive_path,
     )
 
 

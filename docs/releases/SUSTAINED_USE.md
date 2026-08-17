@@ -338,3 +338,37 @@ At the Q.6A.2 instrumentation documentation boundary:
 This document therefore describes the certified instrumentation and the
 procedure for the later production certification run. It is not itself Q.6
 completion evidence.
+
+## Aborted certification attempts
+
+`aborted` is the terminal state for an explicitly retired incomplete sustained-use certification attempt.
+
+| State | Meaning |
+|---|---|
+| `completed` | The complete scheduled history was finalized and passed release evaluation. |
+| `failed` | The complete scheduled history was finalized but did not pass release evaluation. |
+| `aborted` | The certification attempt was incomplete and was deliberately retired while preserving its evidence. |
+
+The supported operator boundary is:
+
+```bash
+atlas sustained-use abort \
+  --confirm-run-id <exact-current-run-id>
+```
+
+The confirmation is mandatory and must exactly equal the current session run ID. There is no force bypass.
+
+The abort lifecycle loads the current session, permits only `active` or partially archived `aborted` state, transitions an active session to `aborted`, records a UTC `completed_at`, persists the terminal session, archives the run, and returns the immutable archive path. If a previous archive attempt was interrupted after the status transition, retry preserves the original completion timestamp.
+
+Each retired run is stored at:
+
+```text
+archive/<run-id>/
+├── session.json
+├── latest.json
+└── history/
+```
+
+The move order is `history`, then `latest.json`, then `session.json`. Moving `session.json` last keeps the lifecycle closed until archival is complete. Archived run identities are not reusable.
+
+Before a replacement T0, the release candidate must be committed and published, Git health must be clean, `sustained-use.sample` must be registered at the canonical 900-second interval, the production Scheduler dispatcher must be enabled and active, dormant callback behavior must be reverified, and the previous aborted run must remain intact.

@@ -174,10 +174,12 @@ __all__.extend(
 
 
 from .lifecycle import (
+    SustainedUseAbortResult,
     SustainedUseFinalizeResult,
     SustainedUseLifecycleError,
     SustainedUseStartResult,
     SustainedUseStatus,
+    abort_session,
     finalize_session,
     sample_session,
     start_session,
@@ -186,10 +188,12 @@ from .lifecycle import (
 
 __all__.extend(
     [
+        "SustainedUseAbortResult",
         "SustainedUseFinalizeResult",
         "SustainedUseLifecycleError",
         "SustainedUseStartResult",
         "SustainedUseStatus",
+        "abort_session",
         "finalize_session",
         "sample_session",
         "start_session",

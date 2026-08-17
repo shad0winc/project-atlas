@@ -888,3 +888,41 @@ Project Atlas is considered operational only when these checks are complete.
                   │
                   ▼
                COMMIT
+
+## Retiring an incomplete sustained-use certification attempt
+
+An incomplete Q.6 certification attempt must not be deleted, manually rewritten as `failed`, or cleared by moving `session.json` by hand.
+
+Use the explicit retirement path:
+
+```bash
+atlas sustained-use status --json
+
+atlas sustained-use abort \
+  --confirm-run-id <exact-current-run-id>
+```
+
+The confirmation must exactly match the current session run ID. No force bypass exists.
+
+A successful abort transitions the session to `aborted`, records its UTC completion time, and archives the run under:
+
+```text
+/mnt/storage/configs/atlas/sustained-use/archive/<run-id>/
+```
+
+The archive preserves `session.json`, `latest.json`, and the complete `history/` directory. Atlas moves `session.json` last so an interrupted archive retains the terminal lifecycle boundary and can be retried safely.
+
+After archival, verify the historical run before starting another certification:
+
+```bash
+find /mnt/storage/configs/atlas/sustained-use/archive/<run-id> \
+  -maxdepth 2 \
+  -type f \
+  -print
+
+cat /mnt/storage/configs/atlas/sustained-use/archive/<run-id>/session.json
+```
+
+The archived session must report `status` as `aborted`. Keep the archive as historical release evidence.
+
+Start a new T0 only after the repaired candidate is clean and published, `sustained-use.sample` is restored at its canonical cadence, and autonomous Scheduler dispatch has been reverified.

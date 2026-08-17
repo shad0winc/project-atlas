@@ -79,6 +79,15 @@ class SustainedUseRepository(Protocol):
         ...
 
 
+    def archive_session(
+        self,
+        session: SustainedUseSession,
+    ) -> Path:
+        """Archive one terminal Q.6 run and reopen the active root."""
+
+        ...
+
+
 class FileSustainedUseRepository:
     """Persist sustained-use samples as atomic JSON files."""
 
@@ -112,6 +121,38 @@ class FileSustainedUseRepository:
 
         return self.root / "session.json"
 
+    @property
+    def archive_directory(self) -> Path:
+        """Return the immutable completed-run archive directory."""
+
+        return self.root / "archive"
+
+    def _archive_path(
+        self,
+        run_id: str,
+    ) -> Path:
+        """Return the archive path for one safe run identity."""
+
+        if (
+            not isinstance(run_id, str)
+            or not run_id.strip()
+        ):
+            raise SustainedUseRepositoryError(
+                "run_id must be a non-empty string",
+            )
+
+        normalized = run_id.strip()
+
+        if (
+            Path(normalized).name != normalized
+            or normalized in {".", ".."}
+        ):
+            raise SustainedUseRepositoryError(
+                "run_id is not safe for archive storage",
+            )
+
+        return self.archive_directory / normalized
+
     def create_session(
         self,
         session: SustainedUseSession,
@@ -121,6 +162,16 @@ class FileSustainedUseRepository:
         if not isinstance(session, SustainedUseSession):
             raise SustainedUseRepositoryError(
                 "session must be a SustainedUseSession",
+            )
+
+        archived = self._archive_path(
+            session.run_id,
+        )
+
+        if archived.exists():
+            raise SustainedUseRepositoryError(
+                "sustained-use run is already archived: "
+                f"{archived}",
             )
 
         if self.session_path.exists():
@@ -214,6 +265,112 @@ class FileSustainedUseRepository:
             ) from error
 
         return self.session_path
+
+    def archive_session(
+        self,
+        session: SustainedUseSession,
+    ) -> Path:
+        """Move one terminal run into its immutable archive."""
+
+        if not isinstance(
+            session,
+            SustainedUseSession,
+        ):
+            raise SustainedUseRepositoryError(
+                "session must be a SustainedUseSession",
+            )
+
+        current = self.session()
+
+        if current != session:
+            raise SustainedUseRepositoryError(
+                "archive session does not match current session",
+            )
+
+        if session.status == "active":
+            raise SustainedUseRepositoryError(
+                "active sustained-use session cannot be archived",
+            )
+
+        archive_path = self._archive_path(
+            session.run_id,
+        )
+
+        try:
+            archive_path.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+        except OSError as error:
+            raise SustainedUseRepositoryError(
+                "unable to create sustained-use archive: "
+                f"{archive_path}",
+            ) from error
+
+        moves = (
+            (
+                self.history_directory,
+                archive_path / "history",
+                False,
+            ),
+            (
+                self.latest_path,
+                archive_path / "latest.json",
+                False,
+            ),
+            (
+                self.session_path,
+                archive_path / "session.json",
+                True,
+            ),
+        )
+
+        for source, destination, required in moves:
+            source_exists = source.exists()
+            destination_exists = destination.exists()
+
+            if source_exists and destination_exists:
+                raise SustainedUseRepositoryError(
+                    "archive source and destination both exist: "
+                    f"{source} -> {destination}",
+                )
+
+            if not source_exists:
+                if destination_exists:
+                    continue
+
+                if required:
+                    raise SustainedUseRepositoryError(
+                        "required archive source is missing: "
+                        f"{source}",
+                    )
+
+                continue
+
+            try:
+                source.rename(
+                    destination,
+                )
+            except OSError as error:
+                raise SustainedUseRepositoryError(
+                    "unable to archive sustained-use evidence: "
+                    f"{source} -> {destination}",
+                ) from error
+
+        archived_session_path = (
+            archive_path / "session.json"
+        )
+
+        archived_session = self._load_session(
+            archived_session_path,
+        )
+
+        if archived_session != session:
+            raise SustainedUseRepositoryError(
+                "archived session failed identity validation",
+            )
+
+        return archive_path
 
     def save(
         self,
