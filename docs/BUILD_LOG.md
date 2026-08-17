@@ -7367,3 +7367,102 @@ The following independent M-023 Quality gates remain open:
 
 Q.3 accessibility certification does not constitute final v1.0 release
 certification.
+
+---
+
+## M-023 Release Quality Q.4 — Full Automated Test Suite Certification
+
+Q.4 release-candidate automated-suite certification is complete.
+
+### Scope
+
+Q.4 executed the authoritative release-candidate automated validation matrix
+against the committed M-023 critical-browser and accessibility candidate.
+
+The release-wide matrix covers the established Atlas validation layers,
+including:
+
+- Core Python tests;
+- API Python tests;
+- Sports integration tests;
+- Portal formatting;
+- Portal TypeScript validation;
+- Portal ESLint validation;
+- complete Portal Vitest regression;
+- Portal production build; and
+- complete critical-browser Playwright regression.
+
+This gate is intentionally broader than the focused validation performed by
+individual M-023 feature slices. Its purpose is to prove that the accumulated
+v1.0 release candidate remains coherent when the automated validation layers
+are executed as one release-quality boundary.
+
+### Formatter defect discovered by the release-wide gate
+
+The initial Q.4 execution correctly stopped when the repository-wide Portal
+Prettier gate identified five pre-existing formatting failures:
+
+- `features/media/components/MediaDiscoveryView.test.tsx`;
+- `features/media/components/MediaDiscoveryView.tsx`;
+- `features/services/components/ServiceOverview.tsx`;
+- `features/services/components/ServiceView.test.tsx`; and
+- `features/services/types/services.ts`.
+
+These files were already known outside the earlier bounded D.5 delta. Q.4 did
+not waive the failures merely because they were pre-existing.
+
+The formatter delta was frozen and inspected before mutation. The five files
+were then reconciled using canonical Prettier output only, preserving the
+existing Media Discovery and Service Lifecycle behavior.
+
+### Post-remediation validation
+
+The exact five-file formatting candidate passed:
+
+- repository-wide Portal `format:check`;
+- Portal TypeScript validation;
+- Portal ESLint validation;
+- 24 focused Media Discovery and Service Lifecycle tests;
+- the complete Portal Vitest suite with 247 tests across 34 files; and
+- the Portal production Next.js build.
+
+The remediation was committed as:
+
+`17337b23f66e560bd0dba241581687bd5f5708e3`
+`style(portal): reconcile release-gate formatting`
+
+Committed-checkpoint recertification confirmed that the feature branch and its
+remote were synchronized at that commit, the commit contained exactly the five
+formatter-remediation files, the working tree and index were clean, and the
+committed Portal formatting, typecheck, and lint gates remained green.
+
+### Production preservation
+
+Q.4 validation and formatting remediation did not deploy or mutate production
+Atlas runtime state.
+
+The certified runtime preservation boundary remained:
+
+- 22 running containers; and
+- zero unhealthy containers.
+
+### Q.4 Release Decision
+
+Q.4 full automated test-suite certification is **PASS**.
+
+The M-023 ROADMAP item `Run full automated test suite` is therefore certified
+complete.
+
+Q.4 closes only the release-candidate-wide automated-suite gate. It does not
+replace human User Acceptance Certification and does not close the independent
+release-quality requirements for:
+
+- performance baseline;
+- sustained-use testing;
+- release-blocking defect resolution;
+- controlled pilot;
+- stabilization; or
+- final v1.0 release approval.
+
+Q.4 certification therefore does not by itself constitute final v1.0 release
+certification.

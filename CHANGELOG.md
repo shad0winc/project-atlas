@@ -19,6 +19,24 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Added
 
+- Completed the M-023 Q.4 full automated release-candidate test-suite
+  certification. The authoritative matrix passed the complete Core, API,
+  Sports, Portal, and critical-browser validation layers together with Portal
+  formatting, TypeScript, ESLint, and production-build validation.
+- Reconciled the five pre-existing Portal Prettier failures discovered by the
+  release-wide formatter gate as formatting-only changes to the Media and
+  Service Lifecycle surfaces. Focused validation passed 24 tests, the complete
+  Portal suite passed 247 tests across 34 files, and the production Portal
+  build remained green before the remediation was committed.
+- Certified the formatting remediation as an exact five-file commit and
+  re-certified the committed checkpoint with formatting, typecheck, and lint
+  green while preserving the Q.4 automated-matrix evidence chain.
+- Closed only the M-023 ROADMAP item `Run full automated test suite`. The
+  independent performance-baseline, sustained-use, release-blocking-defect,
+  human User Acceptance, pilot, stabilization, and final-release gates remain
+  separate requirements.
+
+
 - Added deterministic Administrator critical-browser coverage for the existing
   read-only Service Lifecycle Administration Portal. The certified journey
   authenticates through the real Portal session path, requires

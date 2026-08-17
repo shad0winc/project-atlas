@@ -807,7 +807,7 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 
 ### Quality
 
-- [ ] Run full automated test suite
+- [x] Run full automated test suite
 - [x] Add critical end-to-end tests
 - [x] Add login journey test
 - [x] Add media request journey test
