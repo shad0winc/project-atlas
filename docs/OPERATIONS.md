@@ -288,6 +288,70 @@ directory. A successful run updates task health, counters, success time,
 duration, and scheduler history. Callback failures are normalized through
 the existing scheduler execution contract.
 
+## Production Scheduler dispatcher
+
+The shared `TaskScheduler` owns task definitions, individual
+`interval_seconds`, due-state calculation, runtime locking, callback execution,
+health/counters, and execution history. It remains the sole Atlas scheduler.
+
+Production uses a repository-owned systemd dispatcher to provide recurring
+opportunities for the existing scheduler to evaluate due work:
+
+```text
+atlas-scheduler.timer
+        |
+        | every 1 minute
+        v
+atlas-scheduler.service
+        |
+        | Type=oneshot
+        v
+/bin/atlas scheduler run
+        |
+        v
+TaskScheduler.run_due_tasks()
+```
+
+The tracked units are:
+
+- `systemd/atlas-scheduler.service`;
+- `systemd/atlas-scheduler.timer`.
+
+The service runs from `/opt/project-atlas` and invokes the public Atlas CLI.
+It does not run a daemon loop, implement task-specific cadence, maintain a
+second scheduler state file, or bypass the Scheduler runtime lock.
+
+The timer uses a one-minute dispatch opportunity:
+
+- `OnBootSec=1min`;
+- `OnUnitActiveSec=1min`;
+- `Persistent=true`.
+
+The one-minute systemd cadence is intentionally shorter than the shortest
+registered Atlas task interval. It bounds dispatch delay without encoding
+`operations.collect`, `sports.maintenance`, `sustained-use.sample`, module, or
+other task intervals in systemd. Atlas still decides whether each task is due.
+
+The dispatcher process exit contract is:
+
+- exit `0` when no work is due;
+- exit `0` when all due callbacks succeed;
+- exit `1` when any due callback fails;
+- exit `3` when the Scheduler runtime lock prevents execution.
+
+The systemd service does not mask these nonzero Atlas exit statuses. Operators
+should therefore treat a failed `atlas-scheduler.service` invocation as a
+Scheduler execution signal that requires inspection rather than silently
+restarting a second scheduler.
+
+Repository tracking alone does not install or enable these units. Host
+installation, `daemon-reload`, enablement, start, and live recurring-dispatch
+verification are controlled production deployment steps.
+
+Manual commands such as `atlas scheduler run <task>` remain supported for
+explicit operator actions, but they are not the production recurrence
+mechanism.
+
 ## Scheduled collection repository root
 
 The callback uses `/mnt/storage/configs/atlas/operations` by default.

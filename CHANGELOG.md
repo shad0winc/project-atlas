@@ -160,6 +160,29 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Fixed
 
+- Added the repository-owned production Scheduler dispatcher contract discovered
+  as missing during the first Q.6 sustained-use attempt. The dispatcher uses
+  `atlas-scheduler.timer` to provide a one-minute systemd dispatch opportunity
+  and `atlas-scheduler.service` to invoke `/bin/atlas scheduler run` as a
+  one-shot process; `TaskScheduler` remains the sole authority for registered
+  task cadence, due-state calculation, locking, execution, history, and
+  success/failure state.
+- Added 26 dedicated Scheduler systemd/dispatcher contract tests covering unit
+  structure, one-minute dispatch cadence, separation from the existing health
+  timer, zero-work success, successful due work, failed due work, mixed due
+  work, live-lock contention, and direct propagation of Atlas CLI exit status
+  to systemd without failure masking.
+- Recorded the first Q.6 production attempt,
+  `q6-20260817T171504Z`, as incomplete release evidence. T0 was successfully
+  established at `2026-08-17T17:15:04.595315Z` against commit
+  `b3dc4a1877285b627386fb989e1a71b0b2acb0eb`, but the run remained at
+  `1/193` samples because no recurring production dispatcher existed to invoke
+  due Scheduler work automatically.
+- Preserved the failed first Q.6 attempt rather than fabricating or backfilling
+  the missed 15-minute observations. A new uninterrupted 48-hour / 193-sample
+  certification window remains required after the dispatcher repair is
+  committed, published, installed, and live-certified.
+
 - Repaired the Notifications Runtime Bus reader contract discovered during
   release-quality preflight. The non-root Notifications worker remains
   `1000:1000` while receiving only supplementary Runtime Bus reader group

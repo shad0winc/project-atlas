@@ -7775,3 +7775,178 @@ the instrumentation commit, clean-Git recertification, live Scheduler
 registration, T0, the 48-hour observation window, all 193 samples, final hard and
 temporal evaluation, Q.6 finalization, and the independent release-blocking-defect
 decision remain outstanding.
+
+---
+
+# 2026-08-17
+
+## M-023 Release Quality Q.6A.3 — First Production Sustained-Use Attempt
+
+### Activation
+
+The Q.6A.2 instrumentation candidate was committed and published as:
+
+`b3dc4a1877285b627386fb989e1a71b0b2acb0eb`
+
+After clean-Git recertification returned Atlas to `healthy:100`, controlled
+unqualified Scheduler synchronization registered the core
+`sustained-use.sample` task at a 900-second interval. A deliberate no-session
+execution completed successfully and proved that the scheduled callback is a
+safe dormant no-op before T0.
+
+The first production Q.6 session was then established as:
+
+- run ID: `q6-20260817T171504Z`;
+- T0: `2026-08-17T17:15:04.595315Z`;
+- scheduled end: `2026-08-19T17:15:04.595315Z`;
+- expected duration: 48 hours;
+- expected interval: 15 minutes;
+- expected samples: 193 including T0;
+- candidate commit: `b3dc4a1877285b627386fb989e1a71b0b2acb0eb`.
+
+The T0 sample passed the hard-invariant evaluation, production remained at
+22 running containers with zero unhealthy containers, and the immediate
+Scheduler alignment execution correctly returned a not-due no-op without
+creating sample 2.
+
+### Release-Blocking Defect Discovery
+
+Read-only observation later showed that the session remained at `1/193`
+samples after the first automatic collection boundary had passed.
+
+The registered `sustained-use.sample` task was healthy but overdue. Further
+read-only diagnosis showed the same pattern for the pre-existing
+`operations.collect` and `sports.maintenance` tasks.
+
+Repository and runtime inspection established the root cause:
+
+- `TaskScheduler.run_due_tasks()` already owned due-work execution;
+- Scheduler runtime locking and success/failure persistence were present;
+- `atlas scheduler run` correctly invoked due-task execution;
+- no long-running Scheduler process existed;
+- no Atlas Scheduler systemd service or timer existed;
+- no cron entry invoked the Scheduler; and
+- no container owned recurring Scheduler dispatch.
+
+The defect was therefore not the shared Scheduler engine or the Q.6 callback.
+The missing layer was the production mechanism that periodically invokes the
+existing Scheduler engine.
+
+The first Q.6 attempt is preserved as incomplete factual evidence. Missed
+15-minute samples are not backfilled or reconstructed, and the attempt is not
+eligible for sustained-use certification.
+
+## M-023 Release Quality Q.6A.4 — Production Scheduler Dispatcher Repair
+
+### Architecture Decision
+
+Atlas retains `TaskScheduler` as the sole scheduler and recovery authority.
+
+The production dispatcher uses the existing Atlas systemd precedent:
+
+```text
+atlas-scheduler.timer
+        |
+        | one-minute dispatch opportunity
+        v
+atlas-scheduler.service
+        |
+        | Type=oneshot
+        v
+/bin/atlas scheduler run
+        |
+        v
+TaskScheduler.run_due_tasks()
+```
+
+systemd owns only the recurring opportunity to ask Atlas for due work.
+`TaskScheduler` continues to own registered task intervals, due-state
+calculation, the runtime lock, callback subprocess execution, task health,
+success/failure counters, and bounded execution history.
+
+The one-minute dispatcher interval intentionally does not duplicate the
+15-minute sustained-use cadence or the hourly Operations/Sports cadence.
+Individual task cadence remains stored and evaluated by Atlas.
+
+### Repository Contract
+
+Q.6A.4.2 added exactly three repository candidate files:
+
+- `systemd/atlas-scheduler.service`;
+- `systemd/atlas-scheduler.timer`; and
+- `tests/core/test_scheduler_systemd.py`.
+
+The service contract is:
+
+- `Type=oneshot`;
+- `WorkingDirectory=/opt/project-atlas`;
+- `ExecStart=/bin/atlas scheduler run`;
+- ordered after and wanting `docker.service`;
+- no daemon loop, watchdog, restart loop, or second scheduler.
+
+The timer contract is:
+
+- `OnBootSec=1min`;
+- `OnUnitActiveSec=1min`;
+- `Persistent=true`;
+- `Unit=atlas-scheduler.service`;
+- installable through `timers.target`.
+
+Tracking the units in the repository does not itself install or enable them on
+the production host. Live installation remains a separately guarded deployment
+step after commit and publication.
+
+### Dispatcher Exit Contract
+
+Isolated tests certify the process contract seen by systemd:
+
+- no due tasks -> exit `0`;
+- all due callbacks successful -> exit `0`;
+- any due callback failed -> exit `1`;
+- live Scheduler runtime lock contention -> exit `3`;
+- mixed due tasks are all attempted even when one fails;
+- systemd does not mask Atlas nonzero exit status.
+
+A task that has never succeeded may omit `last_success`; absence and `None`
+both represent the same never-successful semantic state.
+
+### Validation
+
+Repository certification passed:
+
+- 26 Scheduler systemd/dispatcher tests;
+- 42 core Scheduler regression tests;
+- 17 Operations Scheduler regression tests;
+- 26 Sustained Use Scheduler regression tests; and
+- `systemd-analyze verify` for both proposed units.
+
+The production Scheduler state remained byte-identical throughout isolated
+execution testing. No live dispatcher unit was installed, no production task
+was executed by the candidate, the incomplete Q.6 attempt remained at `1/193`,
+and production remained at 22 running containers with zero unhealthy
+containers.
+
+### Architecture and ADR Boundary
+
+No ADR-0015 amendment is required.
+
+The production dispatcher does not create another scheduler, status store,
+watchdog, retry daemon, or recovery engine. It supplies the missing recurring
+host-level invocation to the existing `TaskScheduler`, preserving the accepted
+Scheduler Recovery decision and fail-closed runtime-lock boundary.
+
+### Remaining Release Boundary
+
+Before Q.6 can restart:
+
+1. reconcile and certify repository documentation;
+2. commit and publish the dispatcher repair;
+3. restore clean-Git health;
+4. install the tracked systemd units through a guarded production change;
+5. prove recurring automatic dispatch across multiple timer cycles;
+6. preserve/close the first incomplete attempt as historical release evidence;
+7. establish a new T0 against the repaired committed candidate; and
+8. collect a fresh uninterrupted 193-sample / 48-hour history.
+
+`Complete sustained-use test` and `Resolve release-blocking defects` remain
+open until those requirements are satisfied.

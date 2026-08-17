@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Project Atlas Scheduler Dispatcher
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+Persistent=true
+Unit=atlas-scheduler.service
+
+[Install]
+WantedBy=timers.target
