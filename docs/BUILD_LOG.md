@@ -7599,3 +7599,100 @@ tagging, and publication also remain independent later release gates.
 
 Q.5 does not constitute sustained-use certification or final v1.0 release
 certification.
+
+---
+
+## M-023 Release Quality Q.6 Preflight — Notifications Runtime Bus Reader Contract Repair
+
+### Objective
+
+Resolve the Notifications runtime defect discovered immediately before
+sustained-use certification without weakening the established non-root or
+Runtime Bus security boundaries.
+
+This work is a release-quality preflight repair. It does not itself constitute
+Q.6 sustained-use certification.
+
+### Defect
+
+The Notifications worker had already been hardened to run as the non-root Atlas
+runtime identity `1000:1000`, while the shared Runtime Bus event journal was
+protected independently from Notifications-owned writable state.
+
+Controlled deployment exposed a mismatch between those two valid boundaries:
+the worker runtime identity could not read the protected Runtime Bus journal
+under the deployed group contract.
+
+The deployment guards correctly failed closed rather than recreating a worker
+whose effective runtime identity could not consume its required input.
+
+### Narrow Runtime-State Repair
+
+The Notifications-owned runtime directory and subscriber cursor were reconciled
+to the non-root Notifications runtime identity without changing the ownership
+model of the shared Runtime Bus event journal.
+
+The repair preserved the separation between:
+
+- Notifications-owned writable state;
+- the Notifications subscriber cursor;
+- the read-only Notifications filter; and
+- the shared Runtime Bus event journal.
+
+The shared journal was not made Notifications-owned.
+
+### Permanent Runtime Contract
+
+The repository repair establishes the following permanent contract:
+
+- Notifications continues to run as UID:GID `1000:1000`;
+- supplementary group `20000` is added only for Runtime Bus journal reader
+  access;
+- the Runtime Bus event journal remains mounted read-only in Notifications;
+- Notifications-owned runtime state remains independently writable;
+- worker health now requires actual Runtime Bus journal readability in addition
+  to heartbeat freshness;
+- the canonical update preflight checks journal readability using supplementary
+  reader group `20000`;
+- update refuses recreation when the effective runtime identity cannot read the
+  required journal; and
+- Compose validation, build, and deployment use the explicit project identity
+  `notifications`.
+
+The repair therefore restores required read capability without granting
+Notifications write authority over the shared Runtime Bus journal.
+
+### Regression Contract
+
+`tests/core/test_security_module_runtime.py` now freezes:
+
+- supplementary Notifications reader group `20000`;
+- the read-only Runtime Bus journal mount;
+- journal readability as part of Notifications health;
+- update-time use of the same reader group; and
+- the explicit `notifications` Compose project boundary for configuration,
+  build, and deployment.
+
+These tests prevent a future security-hardening or deployment change from
+silently removing the worker's effective Runtime Bus read capability or
+changing its canonical Compose identity.
+
+### Release Boundary
+
+This repair closes the specific Notifications Runtime Bus reader-contract
+defect discovered during release-quality preflight.
+
+It does not close:
+
+- `Complete sustained-use test`;
+- the aggregate `Resolve release-blocking defects` gate;
+- controlled pilot;
+- stabilization;
+- release-candidate freeze;
+- final v1.0 approval;
+- tagging; or
+- publication.
+
+Q.6 sustained-use certification must execute against the repaired candidate.
+Only after the sustained-use evidence is complete can the remaining
+release-blocking-defect gate be evaluated truthfully.

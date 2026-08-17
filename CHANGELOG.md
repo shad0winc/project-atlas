@@ -135,6 +135,26 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Fixed
 
+- Repaired the Notifications Runtime Bus reader contract discovered during
+  release-quality preflight. The non-root Notifications worker remains
+  `1000:1000` while receiving only supplementary Runtime Bus reader group
+  `20000`; the shared event journal remains mounted read-only.
+- Hardened Notifications health reporting so a worker is healthy only when the
+  Runtime Bus event journal is actually readable in addition to the existing
+  heartbeat freshness requirement.
+- Hardened the canonical Notifications update preflight to test journal
+  readability with the same supplementary reader group used by the deployed
+  worker and to fail closed before recreation when that access is unavailable.
+- Pinned canonical Notifications Compose operations to project
+  `notifications`, preventing container-identity drift during controlled module
+  update.
+- Added regression coverage for the supplementary reader group, read-only
+  journal mount, journal-aware healthcheck, update-time reader-group
+  validation, and explicit Compose project boundary.
+- This repair does not by itself certify sustained-use completion or close the
+  independent release-blocking-defect gate.
+
+
 - Closed the initial final-v1.0 Security Acceptance baseline after protected
   PR #23 merged Docker socket hardening into `main` and protected PR #24
   reconciled the certified `main` tree into `release/v1.0.0`.
