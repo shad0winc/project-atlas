@@ -7202,3 +7202,168 @@ satisfied by Q.2:
 
 Q.2 responsive certification therefore closes only the responsive-review
 gate and does not constitute final v1.0 release certification.
+
+---
+
+## M-023 Release Quality Q.3 — Accessibility Review Certification
+
+Q.3 accessibility engineering review is complete.
+
+The release-quality accessibility gate was evaluated as a bounded extension of
+the existing critical-browser candidate. The final repository candidate adds
+semantic/keyboard accessibility coverage, automated Axe analysis, the required
+Axe Playwright dependency, and the bounded Portal focus presentation change
+without changing production API behavior or introducing an alternate Portal
+architecture.
+
+### Q.3B — Semantic and Keyboard Accessibility Contract
+
+The critical accessibility contract covers the six release-review surfaces:
+
+- Login;
+- Portal Dashboard;
+- Media;
+- Favorites;
+- Sports; and
+- Services.
+
+The deterministic browser contract verifies the critical semantic structure and
+keyboard interaction path, including visible keyboard focus and compact
+navigation behavior.
+
+The compact-navigation contract specifically verifies that closed navigation is
+excluded from the accessibility tree and keyboard focus flow.
+
+### Q.3C — Compact Navigation Accessibility Repair
+
+The bounded Portal presentation repair hardened compact-navigation focus
+behavior while preserving the existing responsive application shell.
+
+Certification proved:
+
+- compact navigation can be opened through its canonical control;
+- the navigation closes through its canonical interaction;
+- closed compact navigation leaves the accessibility tree;
+- focus returns to `Open navigation`; and
+- hidden compact-navigation links do not remain reachable by keyboard.
+
+No alternate mobile route, duplicate navigation architecture, or production API
+change was introduced.
+
+### Q.3D — Automated Axe Accessibility Scan
+
+`@axe-core/playwright` was added as the Portal E2E accessibility dependency.
+
+A dedicated six-surface Axe contract scans Login, Dashboard, Media, Favorites,
+Sports, and Services.
+
+The release threshold is:
+
+- zero `serious` Axe violations;
+- zero `critical` Axe violations; and
+- no Axe rule exclusions or suppressions.
+
+The final six-surface Axe execution passed all six tests.
+
+Axe violation typing is derived from the native `AxeBuilder.analyze()` result
+rather than a hand-maintained approximation, preserving native cross-tree and
+shadow-DOM target evidence.
+
+### Q.3E — Deterministic Human Accessibility Review
+
+Human review used a frozen three-viewport matrix:
+
+- desktop: `1280x800`;
+- phone: `390x844`; and
+- tablet: `768x1024`.
+
+Each viewport covered all six critical surfaces.
+
+The final evidence inventory contains:
+
+- 18 baseline screenshots;
+- 18 keyboard-focus screenshots; and
+- 2 compact-navigation open-state screenshots.
+
+Human review evaluated:
+
+- keyboard-only operation;
+- logical Tab and Shift+Tab progression;
+- Enter / Space activation where applicable;
+- absence of keyboard traps;
+- visible and understandable focus;
+- contrast and distinguishability;
+- semantic usability;
+- responsive accessibility; and
+- interaction behavior.
+
+### Development-Runtime Artifact Provenance
+
+Development capture recorded hydration/caret warnings and focus entries
+associated with `NEXTJS-PORTAL`.
+
+Read-only provenance found:
+
+- zero Atlas-owned `caret-color` source anchors;
+- zero Atlas-owned `NEXTJS-PORTAL` source anchors;
+- zero capture-harness injection of either artifact.
+
+The same candidate was then built and executed through an isolated standalone
+Next.js production runtime.
+
+The development artifacts did not reproduce:
+
+- production hydration mismatch errors: `0`;
+- production caret-color errors: `0`; and
+- production `NEXTJS-PORTAL` focus entries: `0`.
+
+They are therefore classified as development-runtime artifacts rather than
+Atlas production accessibility defects.
+
+### Final Production Network Provenance
+
+A final isolated standalone production run recorded the exact browser/network
+error set.
+
+Observed results:
+
+- HTTP 404 responses: `0`;
+- console errors: `0`;
+- failed requests: `0`; and
+- page errors: `0`.
+
+No accessibility remediation was required from that provenance run.
+
+### Q.3 Release Decision
+
+Q.3 accessibility certification is **PASS**.
+
+Certified evidence includes:
+
+- semantic accessibility baseline green;
+- keyboard accessibility baseline green;
+- compact-navigation keyboard isolation green;
+- six-surface Axe scan green;
+- zero serious or critical Axe violations;
+- complete critical Portal E2E regression preserved;
+- complete three-viewport / six-surface human review;
+- development-only browser artifacts not reproduced in standalone production;
+  and
+- zero-error final isolated production network provenance.
+
+The M-023 ROADMAP item `Complete accessibility review` is therefore certified
+complete.
+
+The older M-019 `Accessibility baseline` remains open because it belongs to the
+broader Shared User Experience milestone and is not reinterpreted by this
+release-quality certification.
+
+The following independent M-023 Quality gates remain open:
+
+- `Run full automated test suite`;
+- `Complete performance baseline`;
+- `Complete sustained-use test`; and
+- `Resolve release-blocking defects`.
+
+Q.3 accessibility certification does not constitute final v1.0 release
+certification.

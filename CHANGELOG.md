@@ -854,3 +854,33 @@ All notable changes to Project Atlas are documented in this file.
 - The broader v1.0 quality gates for the full automated test suite,
   accessibility review, performance baseline, sustained-use testing, and
   release-blocking defect closure remain open.
+
+## Q.3 — Accessibility Review Certification
+
+- Completed the v1.0 accessibility review across the six critical Portal
+  surfaces: Login, Dashboard, Media, Favorites, Sports, and Services.
+- Added deterministic semantic and keyboard accessibility coverage for the
+  critical Portal surfaces, including visible focus behavior and compact
+  navigation isolation.
+- Added `@axe-core/playwright` and a six-surface Axe scan with a release
+  threshold of zero serious or critical violations and no Axe rule
+  exclusions or suppressions.
+- Certified the human-review matrix across desktop (`1280x800`), phone
+  (`390x844`), and tablet (`768x1024`) with 18 baseline screenshots,
+  18 keyboard-focus screenshots, and 2 compact-navigation open-state
+  screenshots.
+- Verified compact-navigation close behavior, accessibility-tree isolation,
+  focus return to `Open navigation`, and exclusion of hidden navigation links
+  from the keyboard focus flow.
+- Classified development-only hydration/caret warnings and `NEXTJS-PORTAL`
+  focus artifacts as non-production artifacts: neither had an Atlas-owned
+  source anchor and neither reproduced in the isolated standalone production
+  runtime.
+- Final isolated production provenance recorded zero HTTP 404 responses,
+  zero console errors, zero failed requests, and zero page errors.
+- Closed only the M-023 ROADMAP item `Complete accessibility review`.
+  The older M-019 `Accessibility baseline` remains open as part of that
+  milestone's broader Shared User Experience work.
+- The remaining v1.0 Quality gates for the full automated test suite,
+  performance baseline, sustained-use testing, and release-blocking defect
+  closure remain open.
