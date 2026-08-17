@@ -19,6 +19,31 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Added
 
+- Added M-023 Q.6A.2 sustained-use release-certification instrumentation without
+  starting the certification clock. The new `atlas.sustained_use` domain
+  provides immutable contracts, live read-only collectors, atomic evidence
+  persistence, hard and temporal evaluation, lifecycle orchestration, an
+  executable `atlas sustained-use` CLI, and Scheduler integration.
+- Established the v1.0 sustained-use policy at 48 hours with 15-minute
+  intervals and 193 expected samples including T0, while freezing the expected
+  production runtime at 22 running containers.
+- Added the canonical core Scheduler task `sustained-use.sample` at a
+  900-second interval. Its idempotent callback is a successful no-op when no
+  Q.6 session exists, when the session is inactive, or when the next interval
+  is not yet due; only an active due session captures evidence.
+- Extended unqualified `atlas scheduler sync` to register
+  `sustained-use.sample` alongside `operations.collect` while preserving
+  targeted module-sync isolation.
+- Added the release-engineering guide `docs/releases/SUSTAINED_USE.md`.
+- Q.6 instrumentation certification passed 171 Sustained Use tests together
+  with Scheduler, Operations Scheduler, shell-boundary, and Operations
+  repository regressions. Production remained at 22 running containers and
+  zero unhealthy containers.
+- The M-023 ROADMAP item `Complete sustained-use test` remains open.
+  Live Scheduler synchronization, production session creation, T0, the
+  48-hour observation window, finalization, and the release-blocking-defect
+  decision have not yet occurred.
+
 - Completed the M-023 Q.5 v1.0 performance-baseline certification against the
   exact committed release candidate. The certified reference inventory contains
   thirteen API, HTTP, CLI, and browser metrics, including seven authenticated

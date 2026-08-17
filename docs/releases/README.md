@@ -171,3 +171,10 @@ The Release Library builds upon the Governance Library.
 
 Governance defines how Atlas is engineered. Release documentation defines how
 Atlas is delivered.
+
+## Sustained Use Certification
+
+The v1.0 Q.6 sustained-use release-certification operator contract is documented in
+[`SUSTAINED_USE.md`](SUSTAINED_USE.md). The guide defines the 48-hour / 193-sample
+lifecycle, Scheduler behavior, activation gate, evidence boundary, and finalization
+requirements.

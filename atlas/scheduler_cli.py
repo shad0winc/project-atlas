@@ -13,6 +13,9 @@ from atlas.module_scheduler import sync_module_jobs
 from atlas.operations_scheduler import (
     register_operations_collection,
 )
+from atlas.sustained_use.scheduler import (
+    register_sustained_use_sampling,
+)
 from atlas.scheduler import SchedulerLockedError, TaskScheduler
 
 
@@ -96,11 +99,19 @@ def _sync_scheduler_jobs(
         operations_task["name"],
     )
 
+    sustained_use_task = register_sustained_use_sampling(
+        scheduler,
+    )
+    sustained_use_name = str(
+        sustained_use_task["name"],
+    )
+
     return {
         "registered": sorted(
             {
                 *result["registered"],
                 operations_name,
+                sustained_use_name,
             }
         ),
         "removed": result["removed"],

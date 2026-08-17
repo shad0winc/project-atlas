@@ -709,6 +709,7 @@ class OperationsSchedulerSyncCliTests(unittest.TestCase):
             {
                 "operations.collect",
                 "sports.sync",
+                "sustained-use.sample",
             },
         )
 

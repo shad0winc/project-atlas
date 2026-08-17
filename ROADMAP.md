@@ -818,6 +818,18 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 - [x] Complete accessibility review
 - [x] Complete performance baseline
 - [ ] Complete sustained-use test
+  - [x] Implement Q.6 sustained-use domain contracts and immutable evidence persistence
+  - [x] Implement live read-only health, container, Scheduler, Runtime Bus, filesystem, and ARI observation
+  - [x] Implement hard-invariant and temporal-history evaluation
+  - [x] Implement `atlas sustained-use start|sample|status|finalize`
+  - [x] Implement idempotent `sustained-use.sample` Scheduler callback
+  - [x] Integrate `sustained-use.sample` into unqualified Scheduler sync
+  - [x] Certify the pre-activation implementation candidate without live Scheduler mutation or Q.6 persistence
+  - [ ] Publish the Q.6 instrumentation commit and restore clean Git health
+  - [ ] Register and certify the dormant live `sustained-use.sample` task
+  - [ ] Establish T0 against the exact committed candidate
+  - [ ] Collect 193 samples across the 48-hour / 15-minute observation window
+  - [ ] Finalize and certify the complete sustained-use history
 - [ ] Resolve release-blocking defects
 
 ### Documentation

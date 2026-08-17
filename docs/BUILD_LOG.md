@@ -7696,3 +7696,82 @@ It does not close:
 Q.6 sustained-use certification must execute against the repaired candidate.
 Only after the sustained-use evidence is complete can the remaining
 release-blocking-defect gate be evaluated truthfully.
+
+---
+
+# 2026-08-17
+
+## M-023 Release Quality Q.6A.2 — Sustained-Use Instrumentation Readiness
+
+### Objective
+
+Implement and certify the repository-owned instrumentation required to execute
+the v1.0 Q.6 sustained-use release-quality gate without starting the production
+certification window prematurely.
+
+Q.6A.2 establishes the measurement, persistence, evaluation, lifecycle, CLI,
+and Scheduler contracts. It does not itself complete the 48-hour sustained-use
+test.
+
+### Certification Contract
+
+The frozen Q.6 policy is:
+
+- duration: 48 hours;
+- interval: 15 minutes / 900 seconds;
+- total expected samples: 193, including T0;
+- expected production container inventory: 22 running containers;
+- canonical Scheduler task: `sustained-use.sample`; and
+- canonical scheduled callback: `python3 -m atlas.sustained_use.scheduled_sample --json`.
+
+### Implemented
+
+Q.6A.2 added the `atlas.sustained_use` domain with normalized immutable model
+contracts, live read-only collectors, atomic evidence and session persistence,
+hard and temporal evaluation, lifecycle orchestration, CLI integration,
+canonical Scheduler registration, and an idempotent scheduled-sample callback.
+
+Unqualified Scheduler synchronization now includes the new core task while
+targeted module synchronization remains isolated from core task registration.
+
+### Validation
+
+The final Q.6A.2 pre-documentation implementation certification froze exactly
+4 tracked modified paths plus 21 new paths, for 25 total candidate paths.
+
+Validation passed 171 Sustained Use tests, 42 core Scheduler tests, 17 Operations
+Scheduler tests, 25 shell-boundary tests, 28 Operations repository tests, Python
+compilation, shell syntax, executable CLI stderr/runpy validation, Scheduler sync
+structure validation, and a production read-only in-memory sample.
+
+The live read-only observation reported Atlas health `warning:99` solely because
+of the expected dirty development Git working tree, 22 running containers, zero
+unhealthy containers, Runtime Bus backlog `0`, Runtime Bus readable `true`,
+Runtime Bus writable `false`, and accepted ARI baseline `warning:80`.
+
+### Production Preservation
+
+Q.6A.2 did not run live Scheduler synchronization, register
+`sustained-use.sample`, create `/mnt/storage/configs/atlas/sustained-use`, create
+a production Q.6 session, persist production sample evidence, or start the Q.6
+clock. The live Scheduler state remained byte-identical during certification.
+
+### Activation Boundary
+
+The real Q.6 run may begin only after the instrumentation candidate is committed
+and pushed, Git returns clean, Atlas health returns to `healthy:100`, production
+remains at 22 running / zero unhealthy, controlled unqualified Scheduler sync
+registers and certifies `sustained-use.sample`, and `atlas sustained-use start`
+successfully establishes T0.
+
+T0 becomes sample 1 of 193 and starts the 48-hour certification clock.
+
+### Release Boundary
+
+Q.6A.2 instrumentation readiness is **PASS**.
+
+The ROADMAP item `Complete sustained-use test` remains **OPEN**. Publication of
+the instrumentation commit, clean-Git recertification, live Scheduler
+registration, T0, the 48-hour observation window, all 193 samples, final hard and
+temporal evaluation, Q.6 finalization, and the independent release-blocking-defect
+decision remain outstanding.
