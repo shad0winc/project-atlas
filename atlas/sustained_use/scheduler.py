@@ -7,12 +7,21 @@ from typing import Any, Protocol
 
 
 SUSTAINED_USE_SAMPLE_TASK = "sustained-use.sample"
+
+# Q.6 certification observations remain fixed at 15-minute slots.
 SUSTAINED_USE_SAMPLE_INTERVAL_SECONDS = 900
+
+# The generic Scheduler polls the gate frequently enough that bounded
+# dispatcher jitter cannot accumulate into certification-clock drift.
+SUSTAINED_USE_DISPATCH_INTERVAL_SECONDS = 60
+
 SUSTAINED_USE_SAMPLE_CALLBACK = (
     "python3 -m atlas.sustained_use.scheduled_sample --json"
 )
+
 SUSTAINED_USE_SAMPLE_DESCRIPTION = (
-    "Capture one sample for the active Q.6 sustained-use session"
+    "Check the fixed Q.6 cadence and capture one due "
+    "sustained-use sample"
 )
 
 
@@ -35,17 +44,25 @@ class SchedulerRegistrar(Protocol):
 def register_sustained_use_sampling(
     scheduler: SchedulerRegistrar,
     *,
-    interval_seconds: int = SUSTAINED_USE_SAMPLE_INTERVAL_SECONDS,
+    interval_seconds: int = SUSTAINED_USE_DISPATCH_INTERVAL_SECONDS,
     enabled: bool = True,
 ) -> Mapping[str, Any]:
-    """Register the canonical Q.6 sampling task.
+    """Register the canonical Q.6 fixed-cadence polling task.
+
+    Scheduler execution cadence is intentionally shorter than the
+    certification sampling interval. The scheduled callback determines
+    whether a fixed T0-derived Q.6 slot is due.
 
     This function only defines Scheduler registration. It does not start a
     Q.6 session, collect a sample, finalize a session, or execute Scheduler
     work.
     """
 
-    register = getattr(scheduler, "register", None)
+    register = getattr(
+        scheduler,
+        "register",
+        None,
+    )
 
     if not callable(register):
         raise TypeError(
@@ -79,7 +96,10 @@ def register_sustained_use_sampling(
         module=None,
     )
 
-    if not isinstance(registered, Mapping):
+    if not isinstance(
+        registered,
+        Mapping,
+    ):
         raise TypeError(
             "scheduler register must return a mapping"
         )

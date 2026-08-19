@@ -10,6 +10,7 @@ from typing import Callable
 from .collector import collect_sample
 from .evaluator import (
     SustainedUseEvaluation,
+    evaluate_fixed_cadence,
     evaluate_history,
     evaluate_sample,
 )
@@ -365,9 +366,22 @@ def finalize_session(
         for evaluation in hard_evaluations
     )
 
-    temporal = evaluate_history(
+    temporal_history = evaluate_history(
         samples,
         contract,
+    )
+
+    cadence = evaluate_fixed_cadence(
+        samples,
+        contract,
+        started_at=session.started_at,
+    )
+
+    temporal = SustainedUseEvaluation(
+        findings=(
+            temporal_history.findings
+            + cadence.findings
+        ),
     )
 
     final_status = (

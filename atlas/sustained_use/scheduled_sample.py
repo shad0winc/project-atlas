@@ -10,6 +10,10 @@ from pathlib import Path
 import sys
 from typing import Callable, Sequence
 
+from .cadence import (
+    CadenceAction,
+    cadence_decision,
+)
 from .collector import collect_sample
 from .lifecycle import (
     SustainedUseLifecycleError,
@@ -39,6 +43,9 @@ class ScheduledSampleOutcome:
     sample_count: int
     expected_sample_count: int | None
     passed: bool | None = None
+    next_sample_number: int | None = None
+    expected_at: str | None = None
+    lateness_seconds: float | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -46,13 +53,10 @@ class ScheduledSampleOutcome:
             "sample_count": self.sample_count,
             "expected_sample_count": self.expected_sample_count,
             "passed": self.passed,
+            "next_sample_number": self.next_sample_number,
+            "expected_at": self.expected_at,
+            "lateness_seconds": self.lateness_seconds,
         }
-
-
-def _timestamp(value: str) -> datetime:
-    return datetime.fromisoformat(
-        value.replace("Z", "+00:00")
-    )
 
 
 def _contract_from_session(session) -> SustainedUseContract:
@@ -72,7 +76,7 @@ def run_scheduled_sample(
     collector: SampleCollector = collect_sample,
     now: datetime | None = None,
 ) -> ScheduledSampleOutcome:
-    """Capture one sample only when an active Q.6 interval is due."""
+    """Capture at most one sample for the next fixed T0-derived slot."""
 
     try:
         session = repository.session()
@@ -118,27 +122,52 @@ def run_scheduled_sample(
             "scheduled sample timestamp must include a timezone"
         )
 
-    if history:
-        latest = history[0]
+    cadence = cadence_decision(
+        session=session,
+        sample_count=sample_count,
+        now=current,
+    )
 
-        due_at = _timestamp(
-            latest.generated_at
-        ).astimezone(timezone.utc)
-
-        from datetime import timedelta
-
-        due_at = due_at + timedelta(
-            seconds=session.interval_seconds,
+    if cadence.action is CadenceAction.NOT_DUE:
+        return ScheduledSampleOutcome(
+            action="not_due",
+            sample_count=sample_count,
+            expected_sample_count=(
+                session.expected_sample_count
+            ),
+            next_sample_number=(
+                cadence.next_sample_number
+            ),
+            expected_at=cadence.expected_at,
+            lateness_seconds=(
+                cadence.lateness_seconds
+            ),
         )
 
-        if current.astimezone(timezone.utc) < due_at:
-            return ScheduledSampleOutcome(
-                action="not_due",
-                sample_count=sample_count,
-                expected_sample_count=(
-                    session.expected_sample_count
-                ),
-            )
+    if cadence.action is CadenceAction.MISSED:
+        return ScheduledSampleOutcome(
+            action="missed",
+            sample_count=sample_count,
+            expected_sample_count=(
+                session.expected_sample_count
+            ),
+            next_sample_number=(
+                cadence.next_sample_number
+            ),
+            expected_at=cadence.expected_at,
+            lateness_seconds=(
+                cadence.lateness_seconds
+            ),
+        )
+
+    if cadence.action is CadenceAction.COMPLETE:
+        return ScheduledSampleOutcome(
+            action="complete",
+            sample_count=sample_count,
+            expected_sample_count=(
+                session.expected_sample_count
+            ),
+        )
 
     contract = _contract_from_session(
         session,
@@ -157,6 +186,13 @@ def run_scheduled_sample(
             session.expected_sample_count
         ),
         passed=result.passed,
+        next_sample_number=(
+            cadence.next_sample_number
+        ),
+        expected_at=cadence.expected_at,
+        lateness_seconds=(
+            cadence.lateness_seconds
+        ),
     )
 
 
@@ -164,8 +200,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="atlas sustained-use scheduled-sample",
         description=(
-            "Capture one due Q.6 sample while an active "
-            "certification session exists."
+            "Evaluate the fixed Q.6 cadence and capture at most "
+            "one due certification sample."
         ),
     )
 
@@ -229,7 +265,13 @@ def main(
 
             print(f"{key}={rendered}")
 
-    if outcome.action == "sampled" and outcome.passed is False:
+    if outcome.action == "missed":
+        return 1
+
+    if (
+        outcome.action == "sampled"
+        and outcome.passed is False
+    ):
         return 1
 
     return 0

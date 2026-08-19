@@ -67,8 +67,10 @@ atlas sustained-use start
         +----> T0 / sample 1 of 193
         |
         v
-sustained-use.sample every 900 seconds
+sustained-use.sample polled every 60 seconds
         |
+        | fixed T0-derived slot gate
+        | certification observations every 900 seconds
         v
 atlas sustained-use status
         |
@@ -144,10 +146,11 @@ evaluation pass. Otherwise the session closes as `failed`.
 The canonical core Scheduler task is:
 
 ```text
-name:        sustained-use.sample
-interval:    900
-module:      null
-callback:    python3 -m atlas.sustained_use.scheduled_sample --json
+name:                   sustained-use.sample
+poll interval:          60 seconds
+certification interval: 900 seconds
+module:                 null
+callback:               python3 -m atlas.sustained_use.scheduled_sample --json
 ```
 
 It is registered only through an **unqualified**:
@@ -163,10 +166,11 @@ The scheduled callback is deliberately idempotent:
 | State | Result |
 | --- | --- |
 | No Q.6 session | Successful no-op |
-| Inactive completed/failed session | Successful no-op |
+| Inactive terminal session | Successful no-op |
 | Expected sample count already reached | Successful no-op |
-| Active but next interval not due | Successful no-op |
-| Active and due | Capture and persist one sample |
+| Active before next fixed T0-derived slot | Successful `not_due` no-op |
+| Active at fixed slot or <=180 seconds late | Capture and persist exactly one sample |
+| Active >180 seconds after next required slot | `missed`; return nonzero and do not backfill |
 | Due sample fails hard evaluation | Persist evidence and return nonzero |
 | Collection/runtime failure | Return nonzero |
 
@@ -223,6 +227,10 @@ single snapshot.
 
 The temporal contract includes:
 
+- every sample ordinal belonging to its immutable T0-derived slot;
+- no sample occurring before its required slot;
+- no sample occurring more than 180 seconds after its required slot;
+- no backfilled replacement observations for missed slots;
 - Scheduler progress across the observation window;
 - no Scheduler failure-count growth;
 - no Runtime Bus journal or subscriber-cursor regression;
@@ -230,6 +238,8 @@ The temporal contract includes:
 - no ARI score drop below the established T0 baseline;
 - no expansion of the ARI warning set; and
 - no worsening of the TV synchronization difference.
+
+Finalization evaluates fixed-slot cadence independently from the collection callback through `history.cadence.fixed_slots`. Chronological order and correct sample cardinality alone are not sufficient to certify Q.6.
 
 ---
 
@@ -304,6 +314,7 @@ Q.6 is complete only when all of the following are true:
 - the full 48-hour interval has elapsed;
 - exactly 193 samples are present;
 - every sample has been hard-evaluated;
+- every sample satisfies the fixed T0-derived slot contract;
 - the complete temporal history has been evaluated;
 - finalization succeeds;
 - the durable session records the final decision; and
@@ -339,6 +350,35 @@ This document therefore describes the certified instrumentation and the
 procedure for the later production certification run. It is not itself Q.6
 completion evidence.
 
+## Q.6A.5 Fixed-Cadence Repair
+
+The second production attempt, `q6-20260817T232028Z`, proved that Scheduler execution success is not by itself sufficient to guarantee the Q.6 temporal contract.
+
+The run reached `176/193` samples with zero Scheduler failures and otherwise healthy production, but its effective interval was approximately 16 minutes because each next Scheduler due time inherited the previous callback's execution/completion delay. The resulting cumulative phase drift made 193 observations impossible inside the exact 48-hour window.
+
+The attempt was explicitly retired as `aborted` and preserved under the immutable archive namespace.
+
+Q.6A.5 corrects the certification clock without changing generic `TaskScheduler` semantics.
+
+The certification schedule is fixed:
+
+```text
+required_time(sample_number)
+    = T0 + ((sample_number - 1) * 900 seconds)
+```
+
+The Scheduler polls `sustained-use.sample` every 60 seconds. The callback compares the current time with the next required T0-derived slot.
+
+The maximum accepted lateness is 180 seconds. Polls before the slot are no-ops, observations inside the lateness window may be captured, and observations outside that window are classified as missed. Missed observations are never backfilled.
+
+The complete history is independently rechecked during finalization through `history.cadence.fixed_slots`.
+
+The fixed-slot evaluator has been regression-tested against the archived `176/193` production history and correctly rejects that drifting run.
+
+A fresh Q.6 certification must not begin until this repair is committed, published, synchronized into the live Scheduler, and autonomously reverified.
+
+---
+
 ## Aborted certification attempts
 
 `aborted` is the terminal state for an explicitly retired incomplete sustained-use certification attempt.
@@ -371,4 +411,4 @@ archive/<run-id>/
 
 The move order is `history`, then `latest.json`, then `session.json`. Moving `session.json` last keeps the lifecycle closed until archival is complete. Archived run identities are not reusable.
 
-Before a replacement T0, the release candidate must be committed and published, Git health must be clean, `sustained-use.sample` must be registered at the canonical 900-second interval, the production Scheduler dispatcher must be enabled and active, dormant callback behavior must be reverified, and the previous aborted run must remain intact.
+Before a replacement T0, the release candidate must be committed and published, Git health must be clean, `sustained-use.sample` must be registered at the canonical 60-second polling interval while preserving the 900-second certification interval, the production Scheduler dispatcher must be enabled and active, dormant callback behavior must be reverified, and every previous aborted run must remain intact.

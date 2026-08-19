@@ -926,3 +926,58 @@ cat /mnt/storage/configs/atlas/sustained-use/archive/<run-id>/session.json
 The archived session must report `status` as `aborted`. Keep the archive as historical release evidence.
 
 Start a new T0 only after the repaired candidate is clean and published, `sustained-use.sample` is restored at its canonical cadence, and autonomous Scheduler dispatch has been reverified.
+
+## Q.6 fixed-cadence sustained-use operation
+
+Q.6 uses two distinct timing contracts.
+
+The **certification cadence** is fixed at 15 minutes / 900 seconds. Required observation times are derived from T0:
+
+```text
+sample 1   = T0
+sample 2   = T0 + 900 seconds
+sample 3   = T0 + 1800 seconds
+...
+sample 193 = T0 + 172800 seconds
+```
+
+The **Scheduler polling cadence** is 60 seconds. The shorter polling interval does not change the Q.6 observation frequency. It only gives Atlas repeated opportunities to recognize the next fixed certification slot without accumulating Scheduler completion-time drift.
+
+The scheduled callback behavior is:
+
+```text
+before fixed slot        -> successful not_due no-op
+0..180 seconds late      -> capture one real sample
+more than 180 seconds    -> missed-slot hard failure
+no active session        -> successful no-op
+terminal session         -> successful no-op
+history complete         -> successful no-op
+```
+
+A missed slot must never be repaired by backfilling multiple observations. Historical samples must represent real observations collected near their required temporal boundaries.
+
+During a real Q.6 run, inspect:
+
+```bash
+atlas sustained-use status --json
+atlas scheduler inspect sustained-use.sample
+atlas health --compact
+```
+
+The live Scheduler task should report:
+
+```text
+name:              sustained-use.sample
+interval_seconds:  60
+enabled:           true
+status:            healthy
+failure_count:     0
+```
+
+The `60` second value is the polling interval, **not** the Q.6 certification sample interval.
+
+If a scheduled callback reports a missed-slot failure, preserve the active evidence and treat the certification attempt as release-blocking. Do not manually create replacement samples and do not restart the Q.6 clock until the failure is investigated and the incomplete run is explicitly retired.
+
+Finalization independently validates every persisted observation against its T0-derived slot. Therefore a history with 193 chronologically ordered samples can still fail Q.6 if those observations violate the fixed cadence.
+
+The archived run `q6-20260817T232028Z` is the canonical production example of this distinction: Atlas and the Scheduler remained operationally healthy, but cumulative temporal drift made the run invalid for the exact 48-hour / 193-sample certification contract.

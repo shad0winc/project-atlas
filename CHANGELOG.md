@@ -19,6 +19,13 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Added
 
+- Added Q.6A.5 fixed-cadence sustained-use certification semantics after the second production Q.6 attempt exposed cumulative Scheduler phase drift.
+- Separated the 900-second Q.6 certification interval from the 60-second Scheduler polling interval. The fixed certification clock is anchored to T0 rather than to previous callback completion time.
+- Added a 180-second maximum lateness window for each T0-derived sampling slot. Early polls are successful no-ops, bounded lateness captures exactly one real observation, and a missed slot returns a hard failure.
+- Explicitly forbid certification backfill. Atlas never manufactures multiple historical observations after a missed slot.
+- Added independent finalization-time fixed-slot validation through `history.cadence.fixed_slots`, providing defense in depth even if collection scheduling regresses.
+- Added regression coverage against archived production run `q6-20260817T232028Z`, which was retired at `176/193` after accumulating deterministic temporal drift despite zero Scheduler failures and otherwise healthy production.
+
 - Added explicit Q.6 sustained-use session retirement for incomplete certification attempts. Active sessions can now be transitioned to the distinct terminal `aborted` state and archived without misclassifying an infrastructure-invalid run as a completed certification failure.
 - Added immutable sustained-use run archives under `archive/<run-id>/`, preserving `history/`, `latest.json`, and terminal `session.json` evidence while reopening the active sustained-use root for a future certification run.
 - Added retry-safe retirement semantics: archive movement is ordered `history -> latest -> session`, the current session boundary moves last, partially completed archival can resume without changing the original completion timestamp, and archived run identities cannot be reused.

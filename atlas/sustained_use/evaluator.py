@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Any, Final
+
+from .cadence import DEFAULT_CADENCE_LATENESS_SECONDS
 
 from .models import (
     SustainedUseContract,
@@ -411,6 +414,180 @@ def _tv_difference(
 
     return abs(
         jellyfin - filesystem
+    )
+
+
+def _fixed_cadence_timestamp(
+    value: str,
+) -> datetime:
+    """Parse one cadence timestamp as normalized UTC."""
+
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(
+            "cadence timestamp must be a non-empty string"
+        )
+
+    try:
+        parsed = datetime.fromisoformat(
+            value.strip().replace(
+                "Z",
+                "+00:00",
+            )
+        )
+    except ValueError as error:
+        raise ValueError(
+            f"invalid cadence timestamp: {value}"
+        ) from error
+
+    if parsed.tzinfo is None:
+        raise ValueError(
+            "cadence timestamp must include a timezone"
+        )
+
+    return parsed.astimezone(
+        timezone.utc
+    )
+
+
+def evaluate_fixed_cadence(
+    samples: tuple[SustainedUseSample, ...],
+    contract: SustainedUseContract,
+    *,
+    started_at: str,
+    max_lateness_seconds: int = DEFAULT_CADENCE_LATENESS_SECONDS,
+) -> SustainedUseEvaluation:
+    """Verify an ordered Q.6 history against immutable T0 slots.
+
+    This evaluator is deliberately independent of Scheduler runtime state.
+    Every sample ordinal is compared directly with:
+
+        T0 + ((sample_number - 1) * interval_seconds)
+
+    Samples may arrive after their fixed slot only within the configured
+    bounded lateness window. Early observations, cumulative drift, skipped
+    slots, or observations beyond the lateness window fail certification.
+    """
+
+    if not isinstance(samples, tuple):
+        raise TypeError(
+            "samples must be a tuple"
+        )
+
+    if not samples:
+        raise ValueError(
+            "samples cannot be empty"
+        )
+
+    if not all(
+        isinstance(item, SustainedUseSample)
+        for item in samples
+    ):
+        raise TypeError(
+            "samples must contain SustainedUseSample values"
+        )
+
+    if not isinstance(
+        contract,
+        SustainedUseContract,
+    ):
+        raise TypeError(
+            "contract must be a SustainedUseContract"
+        )
+
+    if (
+        isinstance(max_lateness_seconds, bool)
+        or not isinstance(max_lateness_seconds, int)
+    ):
+        raise TypeError(
+            "max_lateness_seconds must be an integer"
+        )
+
+    if (
+        max_lateness_seconds < 0
+        or max_lateness_seconds >= contract.interval_seconds
+    ):
+        raise ValueError(
+            "max_lateness_seconds must be non-negative "
+            "and less than interval_seconds"
+        )
+
+    if len(samples) > contract.expected_sample_count:
+        return SustainedUseEvaluation(
+            findings=(
+                _finding(
+                    "history.cadence.fixed_slots",
+                    False,
+                    (
+                        "Every Q.6 sample belongs to its immutable "
+                        "T0-derived certification slot."
+                    ),
+                    (
+                        "Q.6 history contains more samples than the "
+                        "certification contract permits."
+                    ),
+                ),
+            )
+        )
+
+    t0 = _fixed_cadence_timestamp(
+        started_at
+    )
+
+    lateness_values: list[float] = []
+
+    for index, sample in enumerate(
+        samples,
+    ):
+        expected = t0 + timedelta(
+            seconds=(
+                index
+                * contract.interval_seconds
+            )
+        )
+
+        actual = _fixed_cadence_timestamp(
+            sample.generated_at
+        )
+
+        lateness_values.append(
+            (
+                actual
+                - expected
+            ).total_seconds()
+        )
+
+    cadence_ok = all(
+        0 <= lateness <= max_lateness_seconds
+        for lateness in lateness_values
+    )
+
+    minimum = min(
+        lateness_values
+    )
+
+    maximum = max(
+        lateness_values
+    )
+
+    return SustainedUseEvaluation(
+        findings=(
+            _finding(
+                "history.cadence.fixed_slots",
+                cadence_ok,
+                (
+                    "Every Q.6 sample belongs to its immutable "
+                    "T0-derived certification slot within the "
+                    f"{max_lateness_seconds}s lateness window."
+                ),
+                (
+                    "One or more Q.6 samples violate the immutable "
+                    "T0-derived cadence: "
+                    f"minimum_lateness={minimum:.3f}s, "
+                    f"maximum_lateness={maximum:.3f}s, "
+                    f"allowed=0..{max_lateness_seconds}s."
+                ),
+            ),
+        )
     )
 
 

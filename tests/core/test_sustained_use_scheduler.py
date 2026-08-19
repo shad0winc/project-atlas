@@ -5,6 +5,7 @@ from typing import Any
 import pytest
 
 from atlas.sustained_use.scheduler import (
+    SUSTAINED_USE_DISPATCH_INTERVAL_SECONDS,
     SUSTAINED_USE_SAMPLE_CALLBACK,
     SUSTAINED_USE_SAMPLE_DESCRIPTION,
     SUSTAINED_USE_SAMPLE_INTERVAL_SECONDS,
@@ -39,7 +40,7 @@ class RecordingScheduler:
         return value
 
 
-def test_register_sustained_use_sampling_uses_canonical_contract() -> None:
+def test_register_sustained_use_sampling_uses_dispatch_polling() -> None:
     scheduler = RecordingScheduler()
 
     registered = register_sustained_use_sampling(
@@ -49,7 +50,7 @@ def test_register_sustained_use_sampling_uses_canonical_contract() -> None:
     assert registered == {
         "name": SUSTAINED_USE_SAMPLE_TASK,
         "interval_seconds": (
-            SUSTAINED_USE_SAMPLE_INTERVAL_SECONDS
+            SUSTAINED_USE_DISPATCH_INTERVAL_SECONDS
         ),
         "callback": SUSTAINED_USE_SAMPLE_CALLBACK,
         "description": SUSTAINED_USE_SAMPLE_DESCRIPTION,
@@ -57,20 +58,42 @@ def test_register_sustained_use_sampling_uses_canonical_contract() -> None:
         "module": None,
     }
 
-    assert scheduler.calls == [registered]
+    assert scheduler.calls == [
+        registered
+    ]
 
 
 def test_canonical_scheduler_values_are_frozen() -> None:
     assert SUSTAINED_USE_SAMPLE_TASK == (
         "sustained-use.sample"
     )
+
+    # Certification observations remain every 15 minutes.
     assert SUSTAINED_USE_SAMPLE_INTERVAL_SECONDS == 900
+
+    # Dispatcher polls the fixed cadence gate once per minute.
+    assert SUSTAINED_USE_DISPATCH_INTERVAL_SECONDS == 60
+
     assert SUSTAINED_USE_SAMPLE_CALLBACK == (
         "python3 -m atlas.sustained_use.scheduled_sample --json"
     )
+
     assert SUSTAINED_USE_SAMPLE_DESCRIPTION == (
-        "Capture one sample for the active Q.6 "
-        "sustained-use session"
+        "Check the fixed Q.6 cadence and capture one due "
+        "sustained-use sample"
+    )
+
+
+def test_dispatch_polling_is_shorter_than_certification_interval() -> None:
+    assert (
+        SUSTAINED_USE_DISPATCH_INTERVAL_SECONDS
+        < SUSTAINED_USE_SAMPLE_INTERVAL_SECONDS
+    )
+
+    assert (
+        SUSTAINED_USE_SAMPLE_INTERVAL_SECONDS
+        % SUSTAINED_USE_DISPATCH_INTERVAL_SECONDS
+        == 0
     )
 
 
@@ -79,11 +102,11 @@ def test_register_sustained_use_sampling_accepts_test_overrides() -> None:
 
     registered = register_sustained_use_sampling(
         scheduler,
-        interval_seconds=60,
+        interval_seconds=30,
         enabled=False,
     )
 
-    assert registered["interval_seconds"] == 60
+    assert registered["interval_seconds"] == 30
     assert registered["enabled"] is False
     assert registered["module"] is None
 
@@ -94,13 +117,14 @@ def test_register_sustained_use_sampling_is_repeatable() -> None:
     first = register_sustained_use_sampling(
         scheduler,
     )
+
     second = register_sustained_use_sampling(
         scheduler,
-        interval_seconds=1800,
+        interval_seconds=120,
     )
 
-    assert first["interval_seconds"] == 900
-    assert second["interval_seconds"] == 1800
+    assert first["interval_seconds"] == 60
+    assert second["interval_seconds"] == 120
     assert len(scheduler.calls) == 2
 
 
@@ -119,8 +143,8 @@ def test_register_sustained_use_sampling_requires_register() -> None:
     [
         True,
         False,
-        900.0,
-        "900",
+        60.0,
+        "60",
         None,
     ],
 )

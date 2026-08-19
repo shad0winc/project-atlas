@@ -8022,3 +8022,147 @@ This implementation does not itself retire the production attempt or start a rep
 The next controlled sequence is to publish this retirement implementation, execute the guarded abort against `q6-20260817T171504Z`, verify the immutable archive, restore `sustained-use.sample`, resume and prove autonomous Scheduler dispatch, establish a fresh T0, and collect a new uninterrupted 193-sample / 48-hour history.
 
 `Complete sustained-use test` and the aggregate `Resolve release-blocking defects` gate remain open.
+
+## M-023 Release Quality Q.6A.5 — Fixed-Cadence Sustained-Use Repair
+
+### Production Defect Discovery
+
+The second production Q.6 run, `q6-20260817T232028Z`, established a valid T0 and proved autonomous Scheduler dispatch, but read-only observation later showed deterministic sampling drift even though Atlas and the Scheduler remained healthy.
+
+The run was retired and archived at `176/193` samples.
+
+Observed evidence included:
+
+- zero Scheduler failures;
+- zero consecutive Scheduler failures;
+- healthy production runtime;
+- 22 running containers and zero unhealthy containers;
+- one evidence file per persisted sample;
+- approximately 960-second median collection cadence instead of the required 900 seconds; and
+- cumulative phase drift that made 193 observations impossible within the exact 48-hour certification window.
+
+The defect was therefore temporal rather than availability-related.
+
+The generic `TaskScheduler` intentionally derives a task's next due boundary from the previous successful completion. That behavior remains appropriate for ordinary recurring maintenance jobs, but it cannot serve as the authoritative clock for a fixed-wall-clock release certification.
+
+### Fixed-Cadence Architecture
+
+Q.6A.5 separates two concepts that were previously conflated:
+
+```text
+certification clock
+    T0 + (sample ordinal - 1) × 900 seconds
+
+dispatch clock
+    one Scheduler polling opportunity every 60 seconds
+```
+
+The canonical Q.6 certification contract remains unchanged:
+
+- duration: 172800 seconds / 48 hours;
+- certification sample interval: 900 seconds / 15 minutes;
+- expected observations: 193;
+- sample 1: T0;
+- sample 193: exactly T0 + 172800 seconds.
+
+The `sustained-use.sample` Scheduler registration now uses a 60-second polling interval. The callback does not treat each invocation as a required observation. Instead, it evaluates the next immutable T0-derived certification slot.
+
+### Slot Decision Contract
+
+For each next required sample:
+
+- invocation before the fixed slot -> `not_due`, successful no-op;
+- invocation at or up to 180 seconds after the fixed slot -> capture exactly one real observation;
+- invocation more than 180 seconds late -> `missed`, hard failure;
+- completed history -> successful no-op;
+- inactive or absent session -> successful no-op.
+
+Actual callback completion time never shifts later certification slots.
+
+The allowed lateness is intentionally bounded below the 900-second certification interval so a missed temporal observation cannot be mistaken for ordinary dispatch jitter.
+
+### No Backfill
+
+A missed certification slot is evidence of a failed temporal contract.
+
+Atlas does not create multiple rapid observations to replace missed historical slots and does not advance to a later slot while pretending the required earlier observation exists.
+
+No-backfill behavior preserves the meaning of sustained-use evidence: every sample represents an observation actually collected near its required wall-clock boundary.
+
+### Finalization Defense in Depth
+
+Collection-side fixed-slot behavior is not the only certification authority.
+
+Q.6A.5 adds independent `evaluate_fixed_cadence()` final-history validation. Finalization combines the existing sustained temporal evaluation with a new finding:
+
+```text
+history.cadence.fixed_slots
+```
+
+Every persisted sample ordinal is compared directly with:
+
+```text
+T0 + ((sample_number - 1) * interval_seconds)
+```
+
+Early observations or observations outside the permitted lateness window fail certification even if the history is chronologically ordered and contains the expected number of samples.
+
+The existing `evaluate_history()` contract remains preserved for Scheduler progression, Runtime Bus monotonicity, ARI behavior, Git consistency, and other sustained temporal properties.
+
+### Production Regression Proof
+
+The new fixed-slot evaluator was executed retrospectively against the immutable archived production run:
+
+```text
+q6-20260817T232028Z
+samples: 176/193
+status: aborted
+```
+
+The evaluator correctly rejected the real production history through `history.cadence.fixed_slots`.
+
+This proves Q.6A.5 detects the defect actually observed in production rather than only synthetic test fixtures.
+
+### Candidate Certification
+
+The pre-documentation Q.6A.5 repair candidate certified:
+
+- 63 focused fixed-cadence tests;
+- 204 complete Sustained Use regression tests;
+- 71 generic Scheduler/systemd regression tests;
+- exact T0/sample-193 mathematical boundary;
+- 900-second certification cadence;
+- 60-second dispatch polling contract;
+- 180-second maximum lateness;
+- hard missed-slot failure;
+- forbidden backfill;
+- retrospective detection of the archived production defect; and
+- preservation of the generic Scheduler contract.
+
+During candidate certification:
+
+- the live `sustained-use.sample` task remained intentionally unsynchronized at 900 seconds;
+- the production Scheduler timer remained enabled but stopped;
+- no active Q.6 session existed;
+- no new T0 was established;
+- production remained at 22 running containers with zero unhealthy containers; and
+- Atlas health was `warning:99` solely because of the expected development working tree.
+
+### Release Boundary
+
+Q.6A.5 does not itself complete sustained-use certification.
+
+The next controlled sequence is:
+
+1. certify this documentation reconciliation;
+2. commit and publish the complete fixed-cadence repair;
+3. restore clean Git health;
+4. perform guarded unqualified Scheduler synchronization so `sustained-use.sample` uses 60-second polling;
+5. prove dormant callback safety with no active session;
+6. prove autonomous fixed-slot behavior across multiple polling boundaries;
+7. establish a new T0 against the exact published repair candidate;
+8. certify the first autonomous fixed-slot sample;
+9. collect a fresh uninterrupted 193-sample / 48-hour history; and
+10. finalize the complete fixed-slot certification evidence.
+
+`Complete sustained-use test` and `Resolve release-blocking defects` remain open until the replacement Q.6 run passes.

@@ -819,25 +819,28 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 - [x] Complete performance baseline
 - [ ] Complete sustained-use test
   - [x] Implement Q.6 sustained-use domain contracts and immutable evidence persistence
-  - [x] Implement live read-only health, container, Scheduler, Runtime Bus, filesystem, and ARI observation
-  - [x] Implement hard-invariant and temporal-history evaluation
   - [x] Implement `atlas sustained-use start|sample|status|finalize`
   - [x] Implement idempotent `sustained-use.sample` Scheduler callback
   - [x] Integrate `sustained-use.sample` into unqualified Scheduler sync
   - [x] Certify the pre-activation implementation candidate without live Scheduler mutation or Q.6 persistence
   - [x] Publish the Q.6 instrumentation commit and restore clean Git health
   - [x] Register and certify the dormant live `sustained-use.sample` task
-  - [x] Establish the first T0 against the exact committed candidate
-  - [x] Preserve the incomplete first Q.6 attempt at `1/193` after detecting missing recurring production Scheduler dispatch
-  - [x] Design and certify the repository-owned one-shot systemd Scheduler dispatcher and one-minute timer contract
-  - [x] Commit and publish the Scheduler dispatcher repair
-  - [x] Install and live-certify recurring production Scheduler dispatch
-  - [x] Repair and live-certify Scheduler lifecycle events through the core durable event stream
+  - [x] Preserve and retire `q6-20260817T171504Z` as immutable `aborted` historical evidence after detecting missing recurring production Scheduler dispatch
+  - [x] Implement, publish, install, and live-certify the repository-owned one-minute Scheduler dispatcher
   - [x] Implement and certify guarded retirement/archive support for incomplete Q.6 attempts
-  - [ ] Retire `q6-20260817T171504Z` as immutable `aborted` historical release evidence
-  - [ ] Restore `sustained-use.sample` and prove dormant autonomous Scheduler behavior
-  - [ ] Establish a new T0 against the repaired committed candidate
-  - [ ] Collect 193 samples across a fresh uninterrupted 48-hour / 15-minute observation window
+  - [x] Restore `sustained-use.sample` and prove autonomous Scheduler dispatch
+  - [x] Establish fresh run `q6-20260817T232028Z` and certify its first autonomous production sample
+  - [x] Detect deterministic cumulative cadence drift during the second production attempt despite zero Scheduler failures
+  - [x] Retire `q6-20260817T232028Z` at `176/193` as immutable `aborted` temporal-cadence failure evidence
+  - [x] Implement and certify T0-anchored fixed sampling slots
+  - [x] Separate 900-second certification cadence from 60-second dispatch polling
+  - [x] Enforce bounded 180-second lateness, hard missed-slot failure, and no backfill
+  - [x] Add independent finalization-time fixed-slot validation
+  - [x] Prove the fixed-slot evaluator retrospectively rejects the archived drifting production history
+  - [ ] Publish the Q.6A.5 fixed-cadence repair and synchronize the live `sustained-use.sample` task to 60-second polling
+  - [ ] Reverify dormant and accelerated autonomous fixed-slot behavior against the published repair
+  - [ ] Establish the final fresh Q.6 T0 against the repaired published candidate
+  - [ ] Collect 193 samples across a fresh uninterrupted 48-hour / 15-minute fixed-slot observation window
   - [ ] Finalize and certify the complete sustained-use history
 - [ ] Resolve release-blocking defects
   - [ ] Close the missing production Scheduler dispatcher defect through committed, published, installed, and live-certified remediation

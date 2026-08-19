@@ -155,9 +155,17 @@ __all__.extend(
 )
 
 
-from .evaluator import evaluate_history
+from .evaluator import (
+    evaluate_fixed_cadence,
+    evaluate_history,
+)
 
-__all__.append("evaluate_history")
+__all__.extend(
+    [
+        "evaluate_fixed_cadence",
+        "evaluate_history",
+    ]
+)
 
 
 from .service import (
