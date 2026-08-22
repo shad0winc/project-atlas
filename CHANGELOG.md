@@ -19,6 +19,12 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Added
 
+- Added Q.6A.7 bounded Runtime Bus terminal-convergence semantics after the completed 193/193 production run exposed a finalization race between the frozen final sample and Notifications cursor convergence.
+- Replaced the historical final Runtime Bus backlog-equals-zero terminal gate with a bounded observer anchored to the Runtime Bus journal tail captured by sample 193. Finalization now requires Notifications to consume through that frozen target within 180 seconds; post-target journal growth is allowed and does not move the certification target.
+- Added explicit terminal evidence to the sustained-use lifecycle and CLI. `pending` is not success, convergence is required before `completed`, and timeout is a hard certification failure.
+- Certified the eight-file Q.6A.7 repair candidate with 22 terminal-convergence tests, 19 historical evaluator tests, 31 finalization regression tests, 251 complete Sustained Use tests, and 71 generic Scheduler regressions.
+- Preserved the production Q.6 record `q6-20260819T233234Z` byte-identically as `failed` at 193/193 while retrospective evaluation proved history PASS, fixed cadence PASS, and bounded terminal convergence PASS against the frozen sample-193 Runtime Bus target.
+
 - Added Q.6A.5 fixed-cadence sustained-use certification semantics after the second production Q.6 attempt exposed cumulative Scheduler phase drift.
 - Separated the 900-second Q.6 certification interval from the 60-second Scheduler polling interval. The fixed certification clock is anchored to T0 rather than to previous callback completion time.
 - Added a 180-second maximum lateness window for each T0-derived sampling slot. Early polls are successful no-ops, bounded lateness captures exactly one real observation, and a missed slot returns a hard failure.

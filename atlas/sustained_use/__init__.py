@@ -208,3 +208,19 @@ __all__.extend(
         "status_session",
     ]
 )
+
+from .terminal import (
+    RuntimeBusTerminalEvaluation,
+    RuntimeBusTerminalProbe,
+    TERMINAL_CONVERGENCE_TIMEOUT_SECONDS,
+    evaluate_runtime_bus_terminal_convergence,
+)
+
+__all__.extend(
+    [
+        "RuntimeBusTerminalEvaluation",
+        "RuntimeBusTerminalProbe",
+        "TERMINAL_CONVERGENCE_TIMEOUT_SECONDS",
+        "evaluate_runtime_bus_terminal_convergence",
+    ]
+)

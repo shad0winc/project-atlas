@@ -693,18 +693,6 @@ def evaluate_history(
         )
     )
 
-    findings.append(
-        _finding(
-            "runtime_bus.final_backlog",
-            final.runtime_bus.backlog == 0,
-            "Notifications finishes the Q.6 window caught up.",
-            (
-                "Notifications finishes with Runtime Bus backlog: "
-                f"{final.runtime_bus.backlog}"
-            ),
-        )
-    )
-
     baseline_schedulers = _scheduler_map(
         baseline,
     )

@@ -136,8 +136,9 @@ The final decision re-evaluates:
 - every persisted sample against the hard invariants; and
 - the complete ordered sample history against temporal invariants.
 
-The session transitions to `completed` only when both hard and temporal
-evaluation pass. Otherwise the session closes as `failed`.
+The session transitions to `completed` only when hard evaluation, temporal
+history evaluation, fixed-slot cadence validation, and bounded Runtime Bus
+terminal convergence all pass. Otherwise the session closes as `failed`.
 
 ---
 
@@ -234,7 +235,7 @@ The temporal contract includes:
 - Scheduler progress across the observation window;
 - no Scheduler failure-count growth;
 - no Runtime Bus journal or subscriber-cursor regression;
-- final Runtime Bus backlog of zero;
+- bounded Runtime Bus terminal convergence through the journal target frozen by sample 193;
 - no ARI score drop below the established T0 baseline;
 - no expansion of the ARI warning set; and
 - no worsening of the TV synchronization difference.
@@ -412,3 +413,30 @@ archive/<run-id>/
 The move order is `history`, then `latest.json`, then `session.json`. Moving `session.json` last keeps the lifecycle closed until archival is complete. Archived run identities are not reusable.
 
 Before a replacement T0, the release candidate must be committed and published, Git health must be clean, `sustained-use.sample` must be registered at the canonical 60-second polling interval while preserving the 900-second certification interval, the production Scheduler dispatcher must be enabled and active, dormant callback behavior must be reverified, and every previous aborted run must remain intact.
+
+## Q.6A.7 Runtime Bus terminal convergence
+
+The completed 193-sample production run exposed a terminal race that cannot be represented correctly by an instantaneous `final Runtime Bus backlog of zero` history rule.
+
+The final certification target is now frozen from sample 193:
+
+```text
+terminal_target = sample_193.runtime_bus.journal_tail
+terminal_timeout = 180 seconds
+```
+
+After the complete hard, temporal, and fixed-slot history passes, finalization observes Notifications until its Runtime Bus cursor reaches or exceeds that frozen target.
+
+| Terminal state | Meaning |
+|---|---|
+| `pending` | The cursor has not yet reached the frozen target and the bounded observation window remains open. This is not success. |
+| `passed` | The cursor reached or exceeded the frozen sample-193 target within 180 seconds. |
+| timeout/failure | The cursor did not reach the frozen target within 180 seconds. Certification fails. |
+
+Runtime Bus events published after sample 193 are explicitly allowed. They do not move the terminal target and do not require the subscriber to catch an ever-advancing journal tail before certification can complete.
+
+This terminal observer replaces the obsolete temporal invariant requiring final Runtime Bus backlog to equal zero at the exact history boundary. Historical evaluation still requires Runtime Bus journal and subscriber-cursor monotonicity; terminal convergence is evaluated separately by the lifecycle.
+
+The production run `q6-20260819T233234Z` remains immutable historical evidence. It reached `193/193`, passed retrospective history and fixed-cadence evaluation, but its original finalization closed as `failed` under the obsolete instantaneous backlog gate. Q.6A.7 does not rewrite that session. Retrospective bounded observation demonstrated that Notifications consumed through the frozen sample-193 target.
+
+The repair must be documented, certified, committed, and published before any post-repair release-certification action is taken.

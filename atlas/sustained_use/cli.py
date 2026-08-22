@@ -223,6 +223,14 @@ def _finalize_payload(
         "temporal_failed_codes": list(
             result.temporal_evaluation.failed_codes
         ),
+        "terminal_status": result.terminal_evaluation.status,
+        "terminal_failed_codes": list(
+            result.terminal_evaluation.failed_codes
+        ),
+        "terminal_target_journal_lines": result.terminal_evaluation.target_journal_lines,
+        "terminal_final_journal_lines": result.terminal_evaluation.final_journal_lines,
+        "terminal_final_cursor_value": result.terminal_evaluation.final_cursor_value,
+        "terminal_probe_count": result.terminal_evaluation.probe_count,
     }
 
 

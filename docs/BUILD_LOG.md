@@ -8166,3 +8166,85 @@ The next controlled sequence is:
 10. finalize the complete fixed-slot certification evidence.
 
 `Complete sustained-use test` and `Resolve release-blocking defects` remain open until the replacement Q.6 run passes.
+
+## M-023 Release Quality Q.6A.7 — Runtime Bus Terminal Convergence Repair
+
+### Production Defect Discovery
+
+The final fixed-cadence production run, `q6-20260819T233234Z`, completed the full 48-hour observation window with exactly `193/193` samples. Independent fixed-slot evaluation reported zero violations, the Scheduler recorded zero failures, Atlas remained `healthy:100`, and production remained at 22 running containers with zero unhealthy containers.
+
+Finalization nevertheless closed the durable production session as `failed`. The failure was preserved as immutable production evidence and was not retried or rewritten.
+
+The defect was isolated to the historical terminal Runtime Bus requirement that the final observed journal backlog equal zero at the instant of finalization. Sample 193 had frozen a Runtime Bus journal target of `3917` while the Notifications cursor was at `3916`, leaving a one-event terminal backlog even though the subscriber remained healthy and continued consuming.
+
+### Correct Terminal Contract
+
+Q.6A.7 replaces the instantaneous final-backlog gate with bounded terminal convergence.
+
+The authoritative target is the Runtime Bus journal tail captured by sample 193. That target is immutable for the terminal decision. Finalization observes Notifications for at most 180 seconds and requires the subscriber cursor to reach or pass that frozen target.
+
+The contract is:
+
+- terminal target = frozen sample-193 Runtime Bus journal tail;
+- terminal timeout = 180 seconds;
+- `pending` is not success;
+- cursor convergence through the frozen target is required for `completed`;
+- timeout is a hard certification failure;
+- Runtime Bus events written after sample 193 are allowed and do not move the target; and
+- historical sample evidence is never rewritten.
+
+This distinguishes a healthy asynchronous subscriber that is briefly behind at the exact sampling boundary from a subscriber that cannot converge within the bounded release-certification window.
+
+### Implementation
+
+The repair candidate contains exactly eight files:
+
+- `atlas/sustained_use/__init__.py`;
+- `atlas/sustained_use/cli.py`;
+- `atlas/sustained_use/evaluator.py`;
+- `atlas/sustained_use/lifecycle.py`;
+- `atlas/sustained_use/terminal.py`;
+- `tests/core/test_sustained_use_evaluator.py`;
+- `tests/core/test_sustained_use_terminal.py`; and
+- `tests/core/test_sustained_use_terminal_finalization.py`.
+
+The obsolete historical `final Runtime Bus backlog of zero` gate was removed from temporal history evaluation. Terminal observation is now a bounded lifecycle concern, and the CLI exposes the resulting terminal evidence.
+
+### Candidate Certification
+
+Q.6A.7.6 certified:
+
+- 22 terminal-convergence tests;
+- 19 historical evaluator tests;
+- 31 finalization regression tests;
+- 251 complete Sustained Use regression tests; and
+- 71 generic Scheduler regression tests.
+
+Retrospective evaluation of the immutable production evidence reported:
+
+- history evaluation: PASS;
+- fixed-cadence evaluation: PASS;
+- frozen terminal target: `3917`;
+- initial Notifications cursor: `3916`;
+- initial terminal state: `pending`; and
+- live bounded terminal convergence: PASS.
+
+The current Runtime Bus journal and cursor were allowed to advance beyond the frozen target. This proves the terminal decision is anchored to the certification boundary rather than to unrelated post-target event growth.
+
+### Safety Boundary
+
+During Q.6A.7 implementation and certification:
+
+- `q6-20260819T233234Z` remained byte-identical in terminal `failed` state at `193/193`;
+- no production finalization retry occurred;
+- no historical sample was rewritten;
+- the Scheduler timer remained enabled but stopped;
+- no new Q.6 session was started;
+- production remained at 22 running containers with zero unhealthy containers; and
+- Atlas health was `warning:99` only because of the expected development working tree.
+
+### Release Boundary
+
+Q.6A.7 repairs the release-certification semantics but does not retroactively rewrite the failed production record and does not, by itself, close `Complete sustained-use test`.
+
+The next controlled sequence is to reconcile and certify documentation, commit and publish the complete terminal-convergence repair, restore clean Git health, and then perform the explicitly approved post-publication certification step while preserving all historical Q.6 evidence.

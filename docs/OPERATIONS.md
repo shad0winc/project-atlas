@@ -981,3 +981,27 @@ If a scheduled callback reports a missed-slot failure, preserve the active evide
 Finalization independently validates every persisted observation against its T0-derived slot. Therefore a history with 193 chronologically ordered samples can still fail Q.6 if those observations violate the fixed cadence.
 
 The archived run `q6-20260817T232028Z` is the canonical production example of this distinction: Atlas and the Scheduler remained operationally healthy, but cumulative temporal drift made the run invalid for the exact 48-hour / 193-sample certification contract.
+
+## Q.6 Runtime Bus terminal convergence
+
+The final sustained-use decision must not require the Notifications subscriber cursor to equal the live Runtime Bus journal tail at one instantaneous read. Runtime Bus publication and subscriber consumption are asynchronous, so a healthy subscriber can be briefly behind at the exact sample-193 boundary.
+
+Q.6 freezes the terminal target from the Runtime Bus journal tail recorded by sample 193. Finalization then observes subscriber progress for a bounded 180-second window.
+
+The terminal contract is:
+
+```text
+target = sample_193.runtime_bus.journal_tail
+
+cursor >= target within 180 seconds -> terminal PASS
+cursor < target while time remains  -> pending, not success
+cursor < target after timeout       -> hard failure
+```
+
+Events published after sample 193 do not move the frozen target. The live journal may therefore continue to grow while Notifications converges through the certification target.
+
+Operators must not edit the final sample, advance the cursor manually, rewrite the failed session, or retry historical finalization merely to manufacture a pass. Preserve the original terminal record as evidence.
+
+When investigating terminal convergence, inspect the sustained-use finalization output together with current Runtime Bus journal/cursor and Notifications heartbeat evidence. A healthy current subscriber that has consumed through the frozen target demonstrates convergence; it does not alter the historical sample evidence.
+
+A production run may transition to `completed` only after hard evaluation, temporal history evaluation, fixed-slot evaluation, and bounded terminal convergence all pass. `pending` is never equivalent to success, and terminal timeout remains release-blocking.

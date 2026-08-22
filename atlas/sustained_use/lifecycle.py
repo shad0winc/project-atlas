@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable
 
-from .collector import collect_sample
+from .collector import collect_runtime_bus, collect_sample
 from .evaluator import (
     SustainedUseEvaluation,
     evaluate_fixed_cadence,
@@ -15,14 +16,24 @@ from .evaluator import (
     evaluate_sample,
 )
 from .models import (
+    RuntimeBusObservation,
     SustainedUseContract,
     SustainedUseSample,
     SustainedUseSession,
 )
 from .repository import SustainedUseRepository
+from .terminal import (
+    RuntimeBusTerminalEvaluation,
+    RuntimeBusTerminalProbe,
+    TERMINAL_CONVERGENCE_TIMEOUT_SECONDS,
+    evaluate_runtime_bus_terminal_convergence,
+)
 
 
 SampleCollector = Callable[[], SustainedUseSample]
+RuntimeBusCollector = Callable[[], RuntimeBusObservation]
+TerminalSleeper = Callable[[float], None]
+TerminalMonotonicClock = Callable[[], float]
 
 
 class SustainedUseLifecycleError(RuntimeError):
@@ -70,10 +81,11 @@ class SustainedUseAbortResult:
 
 @dataclass(frozen=True)
 class SustainedUseFinalizeResult:
-    """Final hard + temporal certification result."""
+    """Final hard + temporal + terminal certification result."""
 
     session: SustainedUseSession
     temporal_evaluation: SustainedUseEvaluation
+    terminal_evaluation: RuntimeBusTerminalEvaluation
     hard_failure_count: int
 
     @property
@@ -81,6 +93,7 @@ class SustainedUseFinalizeResult:
         return (
             self.session.status == "completed"
             and self.temporal_evaluation.passed
+            and self.terminal_evaluation.passed
             and self.hard_failure_count == 0
         )
 
@@ -298,11 +311,65 @@ def abort_session(
     )
 
 
+
+def _observe_runtime_bus_terminal_convergence(
+    initial: RuntimeBusObservation,
+    *,
+    collector: RuntimeBusCollector = collect_runtime_bus,
+    sleeper: TerminalSleeper = time.sleep,
+    monotonic: TerminalMonotonicClock = time.monotonic,
+    timeout_seconds: int = TERMINAL_CONVERGENCE_TIMEOUT_SECONDS,
+    poll_seconds: int = 1,
+) -> RuntimeBusTerminalEvaluation:
+    """Prove Notifications consumes through the frozen terminal journal tail."""
+
+    if not isinstance(initial, RuntimeBusObservation):
+        raise TypeError("initial must be a RuntimeBusObservation")
+    if isinstance(poll_seconds, bool) or not isinstance(poll_seconds, int):
+        raise TypeError("poll_seconds must be an integer")
+    if poll_seconds <= 0:
+        raise ValueError("poll_seconds must be greater than zero")
+
+    target = initial.journal_lines
+    probes = (RuntimeBusTerminalProbe(elapsed_seconds=0, runtime_bus=initial),)
+    evaluation = evaluate_runtime_bus_terminal_convergence(
+        probes, target_journal_lines=target, timeout_seconds=timeout_seconds
+    )
+    if not evaluation.pending:
+        return evaluation
+
+    started = monotonic()
+    while evaluation.pending:
+        previous_elapsed = probes[-1].elapsed_seconds
+        remaining = timeout_seconds - previous_elapsed
+        if remaining <= 0:
+            return evaluation
+        sleeper(float(min(poll_seconds, remaining)))
+        observed = collector()
+        if not isinstance(observed, RuntimeBusObservation):
+            raise TypeError("terminal collector must return RuntimeBusObservation")
+        raw_elapsed = monotonic() - started
+        if raw_elapsed < 0:
+            raise SustainedUseLifecycleError("terminal monotonic clock moved backward")
+        elapsed = min(timeout_seconds, max(previous_elapsed, int(raw_elapsed)))
+        if elapsed == previous_elapsed:
+            elapsed = min(timeout_seconds, previous_elapsed + 1)
+        probes = (*probes, RuntimeBusTerminalProbe(elapsed_seconds=elapsed, runtime_bus=observed))
+        evaluation = evaluate_runtime_bus_terminal_convergence(
+            probes, target_journal_lines=target, timeout_seconds=timeout_seconds
+        )
+    return evaluation
+
 def finalize_session(
     *,
     contract: SustainedUseContract,
     repository: SustainedUseRepository,
     now: datetime | None = None,
+    runtime_bus_collector: RuntimeBusCollector = collect_runtime_bus,
+    terminal_sleeper: TerminalSleeper = time.sleep,
+    terminal_monotonic: TerminalMonotonicClock = time.monotonic,
+    terminal_timeout_seconds: int = TERMINAL_CONVERGENCE_TIMEOUT_SECONDS,
+    terminal_poll_seconds: int = 1,
 ) -> SustainedUseFinalizeResult:
     """Evaluate the completed history and close the Q.6 run."""
 
@@ -384,11 +451,28 @@ def finalize_session(
         ),
     )
 
+    try:
+        terminal = _observe_runtime_bus_terminal_convergence(
+            samples[-1].runtime_bus,
+            collector=runtime_bus_collector,
+            sleeper=terminal_sleeper,
+            monotonic=terminal_monotonic,
+            timeout_seconds=terminal_timeout_seconds,
+            poll_seconds=terminal_poll_seconds,
+        )
+    except Exception as error:
+        if isinstance(error, SustainedUseLifecycleError):
+            raise
+        raise SustainedUseLifecycleError(
+            "Runtime Bus terminal convergence observation failed"
+        ) from error
+
     final_status = (
         "completed"
         if (
             hard_failure_count == 0
             and temporal.passed
+            and terminal.passed
         )
         else "failed"
     )
@@ -406,5 +490,6 @@ def finalize_session(
     return SustainedUseFinalizeResult(
         session=closed,
         temporal_evaluation=temporal,
+        terminal_evaluation=terminal,
         hard_failure_count=hard_failure_count,
     )

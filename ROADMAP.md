@@ -837,11 +837,18 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
   - [x] Enforce bounded 180-second lateness, hard missed-slot failure, and no backfill
   - [x] Add independent finalization-time fixed-slot validation
   - [x] Prove the fixed-slot evaluator retrospectively rejects the archived drifting production history
-  - [ ] Publish the Q.6A.5 fixed-cadence repair and synchronize the live `sustained-use.sample` task to 60-second polling
+  - [x] Publish the Q.6A.5 fixed-cadence repair and synchronize the live `sustained-use.sample` task to 60-second polling
   - [ ] Reverify dormant and accelerated autonomous fixed-slot behavior against the published repair
-  - [ ] Establish the final fresh Q.6 T0 against the repaired published candidate
+  - [x] Establish the final fresh Q.6 T0 against the repaired published candidate
   - [ ] Collect 193 samples across a fresh uninterrupted 48-hour / 15-minute fixed-slot observation window
   - [ ] Finalize and certify the complete sustained-use history
+    - [x] Collect the complete uninterrupted 193/193 fixed-slot production history
+    - [x] Preserve the original production finalization result as immutable failed evidence
+    - [x] Diagnose the final Runtime Bus backlog race as a terminal-convergence defect
+    - [x] Implement bounded Runtime Bus terminal convergence against the frozen sample-193 journal tail
+    - [x] Certify the Q.6A.7 eight-file terminal-convergence repair candidate
+    - [ ] Reconcile, certify, commit, and publish the Q.6A.7 repair
+    - [ ] Perform the controlled post-publication release-certification step without rewriting historical Q.6 evidence
 - [ ] Resolve release-blocking defects
   - [ ] Close the missing production Scheduler dispatcher defect through committed, published, installed, and live-certified remediation
 

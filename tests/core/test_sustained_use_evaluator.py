@@ -349,13 +349,10 @@ def test_good_temporal_history_passes() -> None:
     assert evaluation.failed_codes == ()
 
 
-def test_temporal_final_backlog_must_be_zero() -> None:
+def test_temporal_final_backlog_is_not_a_history_failure() -> None:
     from atlas.sustained_use import evaluate_history
 
-    values = list(
-        good_history()
-    )
-
+    values = list(good_history())
     values[-1] = replace(
         values[-1],
         runtime_bus=replace(
@@ -364,12 +361,12 @@ def test_temporal_final_backlog_must_be_zero() -> None:
         ),
     )
 
-    evaluation = evaluate_history(
-        tuple(values),
-        contract(),
-    )
+    assert values[-1].runtime_bus.backlog == 1
 
-    assert "runtime_bus.final_backlog" in evaluation.failed_codes
+    evaluation = evaluate_history(tuple(values), contract())
+
+    assert evaluation.passed is True
+    assert "runtime_bus.final_backlog" not in evaluation.failed_codes
 
 
 def test_temporal_cursor_cannot_move_backward() -> None:
