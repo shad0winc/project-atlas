@@ -54,6 +54,30 @@ Notifications Processor
 
 ## Runtime Bus subscription
 
+### Notifications Runtime Bus reader contract repair
+
+The Notifications worker runs as the non-root Atlas runtime identity
+`1000:1000`. Runtime Bus access does not require making the shared event
+journal Notifications-owned.
+
+The runtime contract is:
+
+- the worker runs as UID:GID `1000:1000`;
+- supplementary group `20000` grants event-journal reader access;
+- `/mnt/storage/configs/atlas/runtime/events.jsonl` is mounted read-only;
+- the Notifications cursor and Notifications-owned runtime state remain
+  writable by the Notifications runtime identity;
+- the worker healthcheck requires the event journal to be readable as well as
+  requiring a fresh worker heartbeat;
+- the canonical update preflight evaluates journal readability using
+  supplementary reader group `20000` and fails closed before recreation if the
+  runtime identity cannot read the journal; and
+- canonical module Compose validation, build, and deployment use the explicit
+  Compose project `notifications`.
+
+This preserves least privilege: Notifications can consume normalized Runtime
+Bus events without receiving write authority over the shared event journal.
+
 The module subscribes to:
 
 ```text

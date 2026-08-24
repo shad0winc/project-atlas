@@ -19,6 +19,132 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Added
 
+- Completed Q.6 sustained-use release certification against exact published candidate `13a48a5ce1a6e4c5f335f4ae6cd19ba61149fefa` with run `q6-20260822T011449Z`: 193/193 immutable samples across the full 48-hour fixed-slot window, zero fixed-slot violations, zero Scheduler failures, bounded Runtime Bus terminal convergence PASS, and durable terminal status `completed`.
+- Final terminal evidence froze the sample-193 Runtime Bus target at journal line `7053`; Notifications converged through that target within two bounded probes, with final cursor `7068` and journal line `7070`. Post-target event growth remained allowed and did not move the certification target.
+- Preserved all prior failed/aborted Q.6 evidence without rewrite, kept the 193 history samples byte-identical through finalization, and stopped the Scheduler timer at the certification boundary while leaving it enabled for controlled future operation.
+- Closed the M-023 `Complete sustained-use test` release gate and the production Scheduler-dispatcher release-blocking defect after the exact published repair candidate completed the full autonomous production certification with Atlas `healthy:100`, 22 running containers, and zero unhealthy containers.
+
+- Added Q.6A.7 bounded Runtime Bus terminal-convergence semantics after the completed 193/193 production run exposed a finalization race between the frozen final sample and Notifications cursor convergence.
+- Replaced the historical final Runtime Bus backlog-equals-zero terminal gate with a bounded observer anchored to the Runtime Bus journal tail captured by sample 193. Finalization now requires Notifications to consume through that frozen target within 180 seconds; post-target journal growth is allowed and does not move the certification target.
+- Added explicit terminal evidence to the sustained-use lifecycle and CLI. `pending` is not success, convergence is required before `completed`, and timeout is a hard certification failure.
+- Certified the eight-file Q.6A.7 repair candidate with 22 terminal-convergence tests, 19 historical evaluator tests, 31 finalization regression tests, 251 complete Sustained Use tests, and 71 generic Scheduler regressions.
+- Preserved the production Q.6 record `q6-20260819T233234Z` byte-identically as `failed` at 193/193 while retrospective evaluation proved history PASS, fixed cadence PASS, and bounded terminal convergence PASS against the frozen sample-193 Runtime Bus target.
+
+- Added Q.6A.5 fixed-cadence sustained-use certification semantics after the second production Q.6 attempt exposed cumulative Scheduler phase drift.
+- Separated the 900-second Q.6 certification interval from the 60-second Scheduler polling interval. The fixed certification clock is anchored to T0 rather than to previous callback completion time.
+- Added a 180-second maximum lateness window for each T0-derived sampling slot. Early polls are successful no-ops, bounded lateness captures exactly one real observation, and a missed slot returns a hard failure.
+- Explicitly forbid certification backfill. Atlas never manufactures multiple historical observations after a missed slot.
+- Added independent finalization-time fixed-slot validation through `history.cadence.fixed_slots`, providing defense in depth even if collection scheduling regresses.
+- Added regression coverage against archived production run `q6-20260817T232028Z`, which was retired at `176/193` after accumulating deterministic temporal drift despite zero Scheduler failures and otherwise healthy production.
+
+- Added explicit Q.6 sustained-use session retirement for incomplete certification attempts. Active sessions can now be transitioned to the distinct terminal `aborted` state and archived without misclassifying an infrastructure-invalid run as a completed certification failure.
+- Added immutable sustained-use run archives under `archive/<run-id>/`, preserving `history/`, `latest.json`, and terminal `session.json` evidence while reopening the active sustained-use root for a future certification run.
+- Added retry-safe retirement semantics: archive movement is ordered `history -> latest -> session`, the current session boundary moves last, partially completed archival can resume without changing the original completion timestamp, and archived run identities cannot be reused.
+- Added the guarded `atlas sustained-use abort --confirm-run-id <run-id>` operator command. The exact current run ID is required, no force bypass exists, and the shell adapter remains a thin argument/exit-code forwarding boundary while the Python CLI owns confirmation validation.
+- Certified the seven-file abort/archive candidate with 55 focused abort/archive tests, 189 complete Sustained Use tests, and 71 Scheduler/dispatcher regression tests while preserving the production Q.6 attempt at `1/193` and leaving `sustained-use.sample` absent during the maintenance boundary.
+
+- Added M-023 Q.6A.2 sustained-use release-certification instrumentation without
+  starting the certification clock. The new `atlas.sustained_use` domain
+  provides immutable contracts, live read-only collectors, atomic evidence
+  persistence, hard and temporal evaluation, lifecycle orchestration, an
+  executable `atlas sustained-use` CLI, and Scheduler integration.
+- Established the v1.0 sustained-use policy at 48 hours with 15-minute
+  intervals and 193 expected samples including T0, while freezing the expected
+  production runtime at 22 running containers.
+- Added the canonical core Scheduler task `sustained-use.sample` at a
+  900-second interval. Its idempotent callback is a successful no-op when no
+  Q.6 session exists, when the session is inactive, or when the next interval
+  is not yet due; only an active due session captures evidence.
+- Extended unqualified `atlas scheduler sync` to register
+  `sustained-use.sample` alongside `operations.collect` while preserving
+  targeted module-sync isolation.
+- Added the release-engineering guide `docs/releases/SUSTAINED_USE.md`.
+- Q.6 instrumentation certification passed 171 Sustained Use tests together
+  with Scheduler, Operations Scheduler, shell-boundary, and Operations
+  repository regressions. Production remained at 22 running containers and
+  zero unhealthy containers.
+- The M-023 ROADMAP item `Complete sustained-use test` remains open.
+  Live Scheduler synchronization, production session creation, T0, the
+  48-hour observation window, finalization, and the release-blocking-defect
+  decision have not yet occurred.
+
+- Completed the M-023 Q.5 v1.0 performance-baseline certification against the
+  exact committed release candidate. The certified reference inventory contains
+  thirteen API, HTTP, CLI, and browser metrics, including seven authenticated
+  exact-candidate Portal surfaces.
+- Certified 20 successful samples each for API health and Portal login HTTP,
+  10 successful samples for each of the four CLI measurements, and seven
+  exact-candidate browser samples for Login, Portal, Media, Favorites, Requests,
+  Services, and Sports.
+- Established the measured Q.5 results as the v1.0 reference performance
+  baseline for future equivalent regression comparison. No candidate
+  performance blocker was identified.
+- Kept older live Portal runtime drift separate from the exact-candidate
+  baseline and introduced no arbitrary universal latency threshold.
+- Closed only the M-023 ROADMAP item `Complete performance baseline`.
+  `Complete sustained-use test`, release-blocking-defect resolution, pilot,
+  stabilization, and final v1.0 release certification remain independent gates.
+  Q.5 makes no stress-load or sustained-use certification claim.
+
+
+- Completed the M-023 Q.4 full automated release-candidate test-suite
+  certification. The authoritative matrix passed the complete Core, API,
+  Sports, Portal, and critical-browser validation layers together with Portal
+  formatting, TypeScript, ESLint, and production-build validation.
+- Reconciled the five pre-existing Portal Prettier failures discovered by the
+  release-wide formatter gate as formatting-only changes to the Media and
+  Service Lifecycle surfaces. Focused validation passed 24 tests, the complete
+  Portal suite passed 247 tests across 34 files, and the production Portal
+  build remained green before the remediation was committed.
+- Certified the formatting remediation as an exact five-file commit and
+  re-certified the committed checkpoint with formatting, typecheck, and lint
+  green while preserving the Q.4 automated-matrix evidence chain.
+- Closed only the M-023 ROADMAP item `Run full automated test suite`. The
+  independent performance-baseline, sustained-use, release-blocking-defect,
+  human User Acceptance, pilot, stabilization, and final-release gates remain
+  separate requirements.
+
+
+- Added deterministic Administrator critical-browser coverage for the existing
+  read-only Service Lifecycle Administration Portal. The certified journey
+  authenticates through the real Portal session path, requires
+  `system.health.read`, navigates to `/portal/services`, exercises the five
+  authenticated overview GET sources plus the Jellyfin read-only detail GET,
+  renders aggregate service health, managed-service state, Update Availability,
+  and Maintenance History, and proves that Restart, Update service, and Rollback
+  lifecycle mutation controls remain absent.
+- Completed the M-023 critical-browser engineering set across Login, Media
+  Request, Favorites, Sports Request, and Administrator Service Lifecycle. The
+  final deterministic Playwright inventory is six tests across five critical
+  browser specs.
+- Certified the D.5 Administrator delta with 3,156 Core tests plus 104 subtests,
+  400 API tests plus 15 subtests, all five Sports integration suites, 247 Portal
+  tests, TypeScript, ESLint, a production Next.js build, the targeted
+  Administrator browser journey, and the complete six-test critical-browser
+  regression.
+- Kept D.5 bounded to E2E infrastructure only:
+  `apps/portal/e2e/administrator.spec.ts` and
+  `apps/portal/e2e/fixtures/atlas-api-server.mjs`. Production Atlas API and
+  Portal source were unchanged, and production remained at 22 running
+  containers with zero unhealthy.
+- Preserved the five independently established pre-existing Portal Prettier
+  warnings outside the D.5 delta; D.5 introduced no additional formatting debt.
+
+- Added the v1.0 Sports request surface through the authenticated Atlas API and
+  `/portal/sports`, using the existing TheSportsDB provider boundary while
+  preserving Atlas-owned user and subscription identity.
+- Added deterministic critical-browser coverage for login, Media Request,
+  Favorites, and Sports. The Sports journey proves authenticated event discovery,
+  an authenticated single event-request POST, provider/event identity preservation,
+  server-owned user/subscription identity, and duplicate UI submission prevention.
+- Certified the accumulated D.1-D.4 critical-E2E worktree with 3,156 Core tests
+  plus 104 subtests, 400 API tests plus 15 subtests, all five Sports integration
+  suites, 247 Portal tests, TypeScript, ESLint, a production Next.js build, and
+  five Playwright tests across four critical-browser specs.
+- Reconciled formatting only for the 25 D.1-D.4-owned Portal files. Five unrelated
+  pre-existing Portal Prettier warnings remain unchanged and are not attributed to
+  the critical-E2E work.
+
 - Added Seerr-backed Media discovery/search through the Atlas API and the
   authenticated `/portal/media` experience without exposing browser-to-provider
   access or rendering raw provider media identifiers.
@@ -57,6 +183,49 @@ All notable changes to Project Atlas are documented in this file.
   `init: true`, existing configuration path, and current dependency topology.
 
 ### Fixed
+
+- Added the repository-owned production Scheduler dispatcher contract discovered
+  as missing during the first Q.6 sustained-use attempt. The dispatcher uses
+  `atlas-scheduler.timer` to provide a one-minute systemd dispatch opportunity
+  and `atlas-scheduler.service` to invoke `/bin/atlas scheduler run` as a
+  one-shot process; `TaskScheduler` remains the sole authority for registered
+  task cadence, due-state calculation, locking, execution, history, and
+  success/failure state.
+- Added 26 dedicated Scheduler systemd/dispatcher contract tests covering unit
+  structure, one-minute dispatch cadence, separation from the existing health
+  timer, zero-work success, successful due work, failed due work, mixed due
+  work, live-lock contention, and direct propagation of Atlas CLI exit status
+  to systemd without failure masking.
+- Recorded the first Q.6 production attempt,
+  `q6-20260817T171504Z`, as incomplete release evidence. T0 was successfully
+  established at `2026-08-17T17:15:04.595315Z` against commit
+  `b3dc4a1877285b627386fb989e1a71b0b2acb0eb`, but the run remained at
+  `1/193` samples because no recurring production dispatcher existed to invoke
+  due Scheduler work automatically.
+- Preserved the failed first Q.6 attempt rather than fabricating or backfilling
+  the missed 15-minute observations. A new uninterrupted 48-hour / 193-sample
+  certification window remains required after the dispatcher repair is
+  committed, published, installed, and live-certified.
+
+- Repaired the Notifications Runtime Bus reader contract discovered during
+  release-quality preflight. The non-root Notifications worker remains
+  `1000:1000` while receiving only supplementary Runtime Bus reader group
+  `20000`; the shared event journal remains mounted read-only.
+- Hardened Notifications health reporting so a worker is healthy only when the
+  Runtime Bus event journal is actually readable in addition to the existing
+  heartbeat freshness requirement.
+- Hardened the canonical Notifications update preflight to test journal
+  readability with the same supplementary reader group used by the deployed
+  worker and to fail closed before recreation when that access is unavailable.
+- Pinned canonical Notifications Compose operations to project
+  `notifications`, preventing container-identity drift during controlled module
+  update.
+- Added regression coverage for the supplementary reader group, read-only
+  journal mount, journal-aware healthcheck, update-time reader-group
+  validation, and explicit Compose project boundary.
+- This repair does not by itself certify sustained-use completion or close the
+  independent release-blocking-defect gate.
+
 
 - Closed the initial final-v1.0 Security Acceptance baseline after protected
   PR #23 merged Docker socket hardening into `main` and protected PR #24
@@ -792,3 +961,55 @@ All notable changes to Project Atlas are documented in this file.
 - Added no restart, update, rollback, start, stop, or other lifecycle mutation control.
 - Closed the final v1.0 Maintenance History presentation gate.
 - Final representative v1.0 User Acceptance and release certification remain required.
+
+## Q.2 — Responsive UI Review Certification
+
+- Completed the v1.0 responsive UI review across the critical Portal
+  surfaces.
+- Certified a deterministic visual review matrix covering three
+  viewports (`390x844`, `768x1024`, and `1280x800`) across six critical
+  surfaces (Login, Dashboard, Media, Favorites, Sports, and Services),
+  for 18 screenshots total.
+- Confirmed the previously observed compact-navigation/sidebar artifact
+  was caused by screenshot capture timing during the drawer-closing
+  transition rather than a production Portal responsive defect.
+- Final review evidence showed the compact navigation fully off-screen
+  after close, with no residual sidebar exposure or material horizontal
+  clipping on the reviewed critical surfaces.
+- The responsive Playwright contract remains the only Q.2 source/test
+  candidate; the responsive certification did not require a production
+  Portal or API source change.
+- Closed the ROADMAP item `Complete responsive UI review`.
+- The broader v1.0 quality gates for the full automated test suite,
+  accessibility review, performance baseline, sustained-use testing, and
+  release-blocking defect closure remain open.
+
+## Q.3 — Accessibility Review Certification
+
+- Completed the v1.0 accessibility review across the six critical Portal
+  surfaces: Login, Dashboard, Media, Favorites, Sports, and Services.
+- Added deterministic semantic and keyboard accessibility coverage for the
+  critical Portal surfaces, including visible focus behavior and compact
+  navigation isolation.
+- Added `@axe-core/playwright` and a six-surface Axe scan with a release
+  threshold of zero serious or critical violations and no Axe rule
+  exclusions or suppressions.
+- Certified the human-review matrix across desktop (`1280x800`), phone
+  (`390x844`), and tablet (`768x1024`) with 18 baseline screenshots,
+  18 keyboard-focus screenshots, and 2 compact-navigation open-state
+  screenshots.
+- Verified compact-navigation close behavior, accessibility-tree isolation,
+  focus return to `Open navigation`, and exclusion of hidden navigation links
+  from the keyboard focus flow.
+- Classified development-only hydration/caret warnings and `NEXTJS-PORTAL`
+  focus artifacts as non-production artifacts: neither had an Atlas-owned
+  source anchor and neither reproduced in the isolated standalone production
+  runtime.
+- Final isolated production provenance recorded zero HTTP 404 responses,
+  zero console errors, zero failed requests, and zero page errors.
+- Closed only the M-023 ROADMAP item `Complete accessibility review`.
+  The older M-019 `Accessibility baseline` remains open as part of that
+  milestone's broader Shared User Experience work.
+- The remaining v1.0 Quality gates for the full automated test suite,
+  performance baseline, sustained-use testing, and release-blocking defect
+  closure remain open.

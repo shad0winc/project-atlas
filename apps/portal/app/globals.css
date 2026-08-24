@@ -820,11 +820,13 @@ a {
   border-right: 1px solid rgba(148, 163, 184, 0.16);
   background: rgba(7, 13, 26, 0.98);
   transform: translateX(-100%);
+  visibility: hidden;
   transition: transform 180ms ease;
 }
 
 .portal-sidebar[data-open="true"] {
   transform: translateX(0);
+  visibility: visible;
 }
 
 .portal-sidebar-backdrop {
@@ -1232,6 +1234,7 @@ a {
 
   .portal-sidebar {
     transform: translateX(0);
+    visibility: visible;
   }
 
   .portal-sidebar-close,

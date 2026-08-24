@@ -1,3 +1,18 @@
+export { loadMediaCatalog } from "./api/catalog";
+export type { LoadMediaCatalogOptions } from "./api/catalog";
+
+export { readMediaCatalog } from "./services/catalog";
+export type { ReadMediaCatalogOptions } from "./services/catalog";
+
+export { createMediaCatalogItem, createMediaCatalogPage } from "./types/catalog";
+
+export type {
+  CreateMediaCatalogItemInput,
+  CreateMediaCatalogPageInput,
+  MediaCatalogItem,
+  MediaCatalogPage
+} from "./types/catalog";
+
 export { loadMediaDiscovery, loadMediaSearch } from "./api/discovery";
 export type { ReadMediaDiscoveryOptions, SearchMediaDiscoveryOptions } from "./api/discovery";
 
@@ -5,6 +20,7 @@ export { loadMedia } from "./api/media";
 export type { LoadMediaOptions } from "./api/media";
 
 export { MediaDiscoveryContent, MediaDiscoveryView } from "./components/MediaDiscoveryView";
+export { MediaCatalogContent, MediaCatalogView } from "./components/MediaCatalogView";
 
 export type {
   MediaDiscoveryRequestAction,

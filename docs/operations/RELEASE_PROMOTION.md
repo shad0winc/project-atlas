@@ -1,5 +1,27 @@
 # Release Promotion and Production Source Gate
 
+This document owns the repository promotion and production-source gate. It does
+not own the complete production upgrade, rollback, or restore procedure.
+
+## Canonical v1 operator guides
+
+Project Atlas v1 operational procedures are owned by the guides under
+`docs/guides/`. Use the guide that matches the transaction you are performing:
+
+| Guide | Canonical responsibility |
+|---|---|
+| `docs/guides/ADMINISTRATOR_GUIDE.md` | Administrator workflows and operational navigation |
+| `docs/guides/USER_GUIDE.md` | End-user workflows and user-safe failure behavior |
+| `docs/guides/INSTALLATION_GUIDE.md` | New installation and initial production verification |
+| `docs/guides/UPGRADE_GUIDE.md` | Production upgrade transaction |
+| `docs/guides/ROLLBACK_GUIDE.md` | Deployment rollback transaction |
+| `docs/guides/BACKUP_RESTORE_GUIDE.md` | Atlas backup and state-restore transaction |
+| `docs/guides/TROUBLESHOOTING_GUIDE.md` | Diagnosis, incident handling, and failure recovery |
+
+Older documents may retain architecture, implementation history, command contracts,
+or service-specific reference material, but they do not override these procedure
+owners. When instructions conflict, stop and follow the applicable canonical guide.
+
 Project Atlas production deployment has two complementary safety boundaries:
 
 1. repository-hosting rules prevent untested source from being promoted into
@@ -70,8 +92,9 @@ deployment source.
 
 Passing CI does not itself deploy production.
 
-After an approved release is promoted to `main`, the production checkout must
-be synchronized deliberately. `atlas update` then independently requires:
+After an approved release is promoted to `main`, production deployment must
+follow `docs/guides/UPGRADE_GUIDE.md`. The `atlas update` source gate independently
+requires:
 
 - branch `main`;
 - a clean working tree;
@@ -83,6 +106,9 @@ be synchronized deliberately. `atlas update` then independently requires:
 ## Production Recovery Source
 
 Protected promotion is also part of the live-restore authorization boundary.
+The complete state-restore transaction is owned by
+`docs/guides/BACKUP_RESTORE_GUIDE.md`; deployment rollback is owned by
+`docs/guides/ROLLBACK_GUIDE.md`.
 `atlas restore apply` refuses production mutation unless the checkout is clean
 `main` exactly equal to `origin/main`; `--confirm-live` cannot override an
 uncertified feature or release checkout. M-023.25 explicitly exercised that
@@ -109,8 +135,24 @@ have release-specific compatibility, backup, validation, and recovery evidence
 before production automation may authorize it. Missing migration evidence
 blocks deployment.
 
-## Existing v1.0.0 Tag
+## Reconciled v1.0.0 Tag State
 
-The historical `v1.0.0` tag remains a separate release blocker. This workflow
-does not reinterpret, move, delete, or accept that tag as current certification
-evidence. Tag reconciliation remains an explicit project-owner release action.
+The historical premature `v1.0.0` tag was explicitly reconciled by the project
+owner during the v1.0 release-readiness process after independent forensic
+verification established that the annotated tag claimed a production v1.0.0
+release while pointing to an earlier commit whose repository `VERSION` was
+`0.9.0`.
+
+That invalid tag has been deleted locally and from `origin`. The underlying
+historical commit remains preserved in normal Git history.
+
+The absence of the old tag does not itself certify or publish Project Atlas
+v1.0.0. A future `v1.0.0` tag may be created only by the normal release process
+and must point to the exact certified final-release commit.
+
+Until that final release gate is reached:
+
+- do not treat the reclaimed `v1.0.0` namespace as release evidence;
+- do not create or move a final tag outside the certified release transaction;
+- keep release-candidate and final-release identities distinct; and
+- preserve the forensic and historical documentation describing the former tag.

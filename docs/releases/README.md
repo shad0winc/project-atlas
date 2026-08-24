@@ -78,6 +78,23 @@ The document validates:
 - performance, failure, and recovery behavior;
 - defect classification and release approval.
 
+### [`KNOWN_LIMITATIONS.md`](KNOWN_LIMITATIONS.md)
+
+Records the bounded limitations accepted for the Project Atlas v1.0 release
+boundary.
+
+The document distinguishes accepted limitations from:
+
+- release-blocking defects;
+- supported operating boundaries;
+- deferred post-v1 scope; and
+- unresolved release questions.
+
+Publication of the Known Limitations document does not itself mean Project Atlas
+v1.0 has been released. Release-candidate creation, controlled pilot,
+stabilization, release freeze, tagging, release notes, publication, and stable
+support remain separate release gates until completed and certified.
+
 ### [`RELEASE_TEMPLATE.md`](RELEASE_TEMPLATE.md)
 
 Provides the reusable planning and certification structure for future Atlas
@@ -157,13 +174,15 @@ reclassified solely to permit publication.
 
 ## Current Release Records
 
-Existing or planned release records may include:
+### [`RC_V1_0.md`](RC_V1_0.md)
 
-```text
-TEMPLATE.md
-RC_M018_SERVICE_LIFECYCLE.md
-RC_V1_0.md
-```
+Records the Project Atlas v1.0 release-candidate identity, certified source
+promotion, validation evidence, candidate limitations, approval boundary, and
+the remaining production RC gates.
+
+The record distinguishes creation of `1.0.0-rc.1` from production deployment,
+controlled pilot, stabilization, release freeze, final `v1.0.0` tagging,
+publication, and stable support.
 
 ## Relationship to Governance
 
@@ -171,3 +190,10 @@ The Release Library builds upon the Governance Library.
 
 Governance defines how Atlas is engineered. Release documentation defines how
 Atlas is delivered.
+
+## Sustained Use Certification
+
+The v1.0 Q.6 sustained-use release-certification operator contract is documented in
+[`SUSTAINED_USE.md`](SUSTAINED_USE.md). The guide defines the 48-hour / 193-sample
+lifecycle, Scheduler behavior, activation gate, evidence boundary, and finalization
+requirements.

@@ -8,10 +8,13 @@ import os
 from pathlib import Path
 from typing import Sequence
 
-from atlas.events import publish_event
+from atlas.events import publish_core_event
 from atlas.module_scheduler import sync_module_jobs
 from atlas.operations_scheduler import (
     register_operations_collection,
+)
+from atlas.sustained_use.scheduler import (
+    register_sustained_use_sampling,
 )
 from atlas.scheduler import SchedulerLockedError, TaskScheduler
 
@@ -30,9 +33,11 @@ def scheduler_lock_file() -> Path | None:
 
 
 def _publish_scheduler_event(event_name: str, payload: dict[str, object]) -> None:
-    module = payload.get("module")
-    if isinstance(module, str) and module.strip():
-        publish_event(module, event_name, payload)
+    publish_core_event(
+        event_name,
+        payload,
+        source="scheduler",
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -96,11 +101,19 @@ def _sync_scheduler_jobs(
         operations_task["name"],
     )
 
+    sustained_use_task = register_sustained_use_sampling(
+        scheduler,
+    )
+    sustained_use_name = str(
+        sustained_use_task["name"],
+    )
+
     return {
         "registered": sorted(
             {
                 *result["registered"],
                 operations_name,
+                sustained_use_name,
             }
         ),
         "removed": result["removed"],

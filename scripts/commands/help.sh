@@ -120,6 +120,7 @@ Intelligence
   atlas operations latest [--json]
   atlas operations history [--limit LIMIT] [--json]
   atlas operations compare [--json] [--include-unchanged]
+  atlas sustained-use [--help]
   atlas retention evaluate <provider> <item-id> [--json]
   atlas cleanup evaluate <provider> <item-id> [--json]
   atlas cleanup scan <provider> [--page-size N] [--json]

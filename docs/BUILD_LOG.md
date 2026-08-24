@@ -6840,3 +6840,1481 @@ audit-journal defect remediation. This does **not** certify the remaining
 independent Quality, broader representative User Acceptance,
 accessibility/performance/sustained-use, release-candidate, pilot,
 stabilization, tagging, publication, or final v1.0 approval gates.
+
+---
+
+# 2026-08-16
+
+## M-023 Critical E2E D.4 — Sports Request Journey Certification
+
+### Objective
+
+Complete the smallest v1.0 Sports request journey required by the release plan
+without expanding Sports into the unfinished post-v1 experience or weakening
+Atlas identity, authorization, provider, process, or production-safety
+boundaries.
+
+The certified browser journey is:
+
+`login -> Sports -> upcoming event -> request event -> Requested`
+
+### Contract and Source Freeze
+
+D.4 began with a strictly read-only contract/source freeze against the
+certified D.1-D.3 worktree.
+
+The freeze established that the smallest v1.0 Sports browser surface requires:
+
+- authenticated access to upcoming supported Sports events;
+- authenticated submission of one event request;
+- `sports.read` for the read surface;
+- `sports.events.request` for the mutation;
+- provider and provider-event identity in the browser request;
+- Atlas-owned user and subscription identity on the server; and
+- no browser ownership of recording/process identity.
+
+The existing Sports module remained authoritative for provider integration,
+subscriptions, scheduling, recording, recovery, and maintenance. D.4 did not
+replace or duplicate those boundaries.
+
+### API and Portal Implementation
+
+The bounded API slice added normalized Sports schema, service, and v1 route
+contracts for event discovery and event subscription.
+
+The Portal added:
+
+- normalized Sports transport/domain types;
+- authenticated Sports event loading and request services;
+- `SportsRequestView`;
+- the protected `/portal/sports` route;
+- `sports.read` and `sports.events.request` permission constants;
+- Workspace navigation integration; and
+- explicit success/error/loading behavior.
+
+The default API adapter consumes the configured existing Sports provider
+environment. No second provider framework was introduced.
+
+### Critical Browser Certification
+
+The deterministic Playwright fixture and `sports-request.spec.ts` prove:
+
+- authentication before Sports access;
+- authenticated `GET /api/v1/sports/events?provider=thesportsdb`;
+- the deterministic event is rendered through the real Portal;
+- authenticated `POST /api/v1/sports/subscriptions`;
+- the browser POST body contains only `provider` and `provider_event_id`;
+- the browser does not control `user_id`, `subscription_id`, subscription
+  `type`, or event `name`;
+- the server derives the authenticated Atlas user identity;
+- Atlas subscription identity remains distinct from provider-event identity;
+- HTTP 201 is returned for the first deterministic subscription; and
+- the resulting `Requested` state disables duplicate UI submission.
+
+The final critical-browser inventory is four specs containing five tests:
+Favorites, two Login tests, Media Request, and Sports Request.
+
+### Broader Certification
+
+D.4.4H.3 certified the complete accumulated D.1-D.4 worktree:
+
+- exact critical-E2E worktree: 47 files;
+- Core pytest: 3,156 passed plus 104 subtests;
+- API pytest: 400 passed plus 15 subtests;
+- Sports integration suite: five passed, zero failed;
+- Portal Vitest: 34 files / 247 tests passed;
+- Portal TypeScript typecheck: PASS;
+- Portal ESLint: PASS;
+- 25 D.1-D.4-owned Portal files: Prettier GREEN;
+- production Next.js build: PASS;
+- `/portal/sports` present in the production route build;
+- full Playwright suite: five passed;
+- generated Playwright `.last-run.json` reconciled; and
+- production runtime preserved at 22 running containers and zero unhealthy.
+
+### Formatting Provenance
+
+The repository-wide Prettier check still identifies exactly five files outside
+the D.1-D.4 47-file boundary:
+
+- `apps/portal/features/media/components/MediaDiscoveryView.test.tsx`;
+- `apps/portal/features/media/components/MediaDiscoveryView.tsx`;
+- `apps/portal/features/services/components/ServiceOverview.tsx`;
+- `apps/portal/features/services/components/ServiceView.test.tsx`; and
+- `apps/portal/features/services/types/services.ts`.
+
+Read-only provenance proved those five paths were clean tracked paths outside
+the critical-E2E worktree. They remain unchanged as pre-existing formatting
+debt and are not reinterpreted as D.4 defects.
+
+### Documentation Reconciliation
+
+The v1.0 ROADMAP now records as complete:
+
+- Browse upcoming events;
+- Request sporting events;
+- Login journey test;
+- Media Request journey test;
+- Favorite-protection journey test; and
+- Sports request journey test.
+
+The broader Quality item `Add critical end-to-end tests` remains open because
+the Administrator journey is not yet certified.
+
+`Run full automated test suite` also remains open as a final release gate. The
+current accumulated D.1-D.4 suite is fully green, but Administrator work will
+change the releasable candidate and must be included in the final suite.
+
+Responsive UI review, accessibility review, performance baseline, sustained-use
+testing, release-blocking-defect closure, representative human User Acceptance,
+controlled pilot, stabilization, and final release approval remain separate
+unfinished v1.0 gates.
+
+`docs/releases/USER_ACCEPTANCE.md` is intentionally unchanged. Its governing
+contract states that automated testing is necessary but does not replace human
+validation.
+
+### Result
+
+D.4 Sports critical-browser engineering certification is complete.
+
+Atlas now provides the smallest required v1.0 Sports request journey through its
+own authenticated API and Portal boundaries while preserving provider, user,
+subscription, and process identities.
+
+This documentation reconciliation does not deploy production source, certify
+representative human User Acceptance, close Administrator D.5, or declare
+v1.0.0 release readiness.
+
+---
+
+# 2026-08-16
+
+## M-023 Critical E2E D.5 — Administrator Service Lifecycle Journey Certification
+
+### Objective
+
+Complete the smallest defensible v1.0 Administrator critical-browser
+engineering journey without overstating completion of the broader
+Administration Portal product scope or representative human Administrator User
+Acceptance.
+
+The certified browser journey is:
+
+`login -> Services navigation -> /portal/services -> Service Lifecycle snapshot -> read-only service detail`
+
+### Contract and Source Freeze
+
+D.5 began from committed D.1-D.4 checkpoint
+`19dc08ee359dfbdc094cbc88488816fefe744b1f`.
+
+The read-only D.5 source freezes established that the strongest already-mature
+v1.0 Administrator browser surface is Service Lifecycle. Existing production
+Portal and API contracts already supported the journey; no production source
+correction was justified.
+
+The frozen Administrator contract requires:
+
+- authentication through the real Portal login/session path;
+- effective `system.health.read` authorization;
+- the real Services navigation item and `/portal/services` route;
+- authenticated `GET /api/v1/services`;
+- authenticated `GET /api/v1/services/health`;
+- authenticated `GET /api/v1/services/summary`;
+- authenticated `GET /api/v1/services/updates`;
+- authenticated `GET /api/v1/services/history`;
+- authenticated read-only `GET /api/v1/services/jellyfin`;
+- aggregate Service health visibility;
+- managed-service runtime and health visibility;
+- Update Availability visibility;
+- Maintenance History visibility;
+- read-only service-detail open/close behavior; and
+- explicit absence of Restart, Update service, and Rollback mutation controls.
+
+Lifecycle mutation, user management, invitation administration, request
+administration, Media/Sports administration, module administration, broader
+routine-operation acceptance, and representative human Administrator User
+Acceptance remain outside this automated D.5 contract.
+
+### Red Contract
+
+D.5.3A added only
+`apps/portal/e2e/administrator.spec.ts`.
+
+The deterministic fixture intentionally still lacked `system.health.read`.
+Playwright failed at the real Services navigation link because the authenticated
+fixture identity was not authorized to see `/portal/services`.
+
+That RED state certified the actual missing contract: deterministic E2E
+authorization/fixture coverage, not missing production API or Portal behavior.
+
+### Green Fixture
+
+D.5.3B changed only:
+
+- `apps/portal/e2e/administrator.spec.ts`; and
+- `apps/portal/e2e/fixtures/atlas-api-server.mjs`.
+
+The fixture now grants `system.health.read` and supplies deterministic responses
+for the five Service Lifecycle overview GETs plus the Jellyfin detail GET.
+
+No production Atlas API route, schema, service, Portal page, component,
+authorization registry, or navigation source was changed.
+
+### Browser Certification
+
+The Administrator Playwright journey proves:
+
+1. the user authenticates through the real Portal session path;
+2. `system.health.read` exposes the Services navigation entry;
+3. `/portal/services` loads through the real protected Portal;
+4. all five overview Service Lifecycle HTTP requests are authenticated GETs;
+5. Service health is rendered;
+6. Managed services are rendered;
+7. deterministic update availability is rendered;
+8. deterministic Maintenance History is rendered;
+9. Jellyfin managed-service runtime and health state are visible;
+10. View details issues the authenticated read-only Jellyfin detail GET;
+11. Read-only service detail is rendered;
+12. Restart is absent;
+13. Update service is absent;
+14. Rollback is absent;
+15. detail can be closed; and
+16. every observed Service Lifecycle browser request remains GET-only.
+
+### D.5.4 Broader Certification
+
+D.5.4 certified the committed D.1-D.4 base plus the exact two-file D.5 delta:
+
+- Core pytest: 3,156 passed plus 104 subtests;
+- API pytest: 400 passed plus 15 subtests;
+- Sports integration suite: five passed, zero failed;
+- Portal Vitest: 34 files / 247 tests passed;
+- Portal TypeScript typecheck: PASS;
+- Portal ESLint: PASS;
+- D.5 two-file Prettier gate: PASS;
+- repository-wide formatting provenance unchanged at the same five pre-existing
+  Portal warnings;
+- production Next.js build: PASS;
+- `/portal/services` present in the production route build;
+- `/portal/sports` remained present in the production route build;
+- targeted Administrator Playwright: one passed;
+- complete critical-browser suite: six passed;
+- critical-browser inventory: five specs / six tests;
+- read-only Administrator contract: PASS;
+- exact two-file D.5 worktree preserved;
+- production API / Portal source unchanged; and
+- production runtime preserved at 22 running containers and zero unhealthy.
+
+### Quality Reconciliation
+
+The ROADMAP Quality items now record as complete:
+
+- Login journey test;
+- Media Request journey test;
+- Favorite-protection journey test;
+- Sports request journey test;
+- Administrator journey test; and
+- aggregate critical end-to-end tests.
+
+`Run full automated test suite` remains open as the final release-candidate-wide
+automated certification gate rather than being inferred from this D.5 feature
+certification.
+
+Responsive UI review, accessibility review, performance baseline,
+sustained-use testing, release-blocking-defect closure, representative human
+User Acceptance, controlled pilot, stabilization, release-candidate freeze,
+tagging, publication, and final v1.0 approval remain separate unfinished gates.
+
+`docs/releases/USER_ACCEPTANCE.md` remains unchanged. Automated D.5
+Administrator certification does not replace the broader human Administrator
+acceptance contract.
+
+### Result
+
+D.5 Administrator critical-browser engineering certification is complete.
+
+The complete M-023 critical-browser engineering set now covers Login, Media
+Request, Favorites, Sports Request, and the read-only Administrator Service
+Lifecycle journey through six deterministic Playwright tests in five spec
+files.
+
+This certification does not declare the broader Administration Portal product
+scope complete, does not certify human Administrator User Acceptance, and does
+not declare v1.0.0 release readiness.
+
+## M-023 Release Quality Q.2 — Responsive UI Review Certification
+
+Q.2 responsive engineering review is complete.
+
+### Scope
+
+The deterministic browser review covered three viewport classes:
+
+- Phone: `390x844`
+- Tablet: `768x1024`
+- Desktop: `1280x800`
+
+Each viewport was reviewed across six critical Portal surfaces:
+
+- Login
+- Dashboard
+- Media
+- Favorites
+- Sports
+- Services
+
+This produced a complete `3 x 6` matrix of 18 responsive-review
+screenshots.
+
+### Certification result
+
+The final evidence confirms that the reviewed critical surfaces remain
+usable at the certified phone, tablet, and desktop viewport sizes. The
+compact Portal navigation closes fully off-screen before final capture,
+and the reviewed evidence does not show residual sidebar exposure or
+material horizontal clipping.
+
+An earlier apparent sidebar defect on compact Favorites and Sports
+captures was isolated to capture timing during the navigation drawer
+closing transition. After correcting the external `/tmp` capture harness
+to wait for the actual closed state, the resulting screenshots were
+clean. No production Portal shell or CSS correction was required for
+that observation.
+
+The responsive Playwright contract remains the Q.2 repository
+engineering candidate. Q.2 screenshot capture and review infrastructure
+remained external test evidence under `/tmp`; production Atlas
+API/Portal runtime behavior was not mutated by the review.
+
+### ROADMAP effect
+
+`Complete responsive UI review` is certified complete and may be closed.
+
+The following broader v1.0 release-quality gates remain open and are not
+satisfied by Q.2:
+
+- `Run full automated test suite`
+- `Complete accessibility review`
+- `Complete performance baseline`
+- `Complete sustained-use test`
+- `Resolve release-blocking defects`
+
+Q.2 responsive certification therefore closes only the responsive-review
+gate and does not constitute final v1.0 release certification.
+
+---
+
+## M-023 Release Quality Q.3 — Accessibility Review Certification
+
+Q.3 accessibility engineering review is complete.
+
+The release-quality accessibility gate was evaluated as a bounded extension of
+the existing critical-browser candidate. The final repository candidate adds
+semantic/keyboard accessibility coverage, automated Axe analysis, the required
+Axe Playwright dependency, and the bounded Portal focus presentation change
+without changing production API behavior or introducing an alternate Portal
+architecture.
+
+### Q.3B — Semantic and Keyboard Accessibility Contract
+
+The critical accessibility contract covers the six release-review surfaces:
+
+- Login;
+- Portal Dashboard;
+- Media;
+- Favorites;
+- Sports; and
+- Services.
+
+The deterministic browser contract verifies the critical semantic structure and
+keyboard interaction path, including visible keyboard focus and compact
+navigation behavior.
+
+The compact-navigation contract specifically verifies that closed navigation is
+excluded from the accessibility tree and keyboard focus flow.
+
+### Q.3C — Compact Navigation Accessibility Repair
+
+The bounded Portal presentation repair hardened compact-navigation focus
+behavior while preserving the existing responsive application shell.
+
+Certification proved:
+
+- compact navigation can be opened through its canonical control;
+- the navigation closes through its canonical interaction;
+- closed compact navigation leaves the accessibility tree;
+- focus returns to `Open navigation`; and
+- hidden compact-navigation links do not remain reachable by keyboard.
+
+No alternate mobile route, duplicate navigation architecture, or production API
+change was introduced.
+
+### Q.3D — Automated Axe Accessibility Scan
+
+`@axe-core/playwright` was added as the Portal E2E accessibility dependency.
+
+A dedicated six-surface Axe contract scans Login, Dashboard, Media, Favorites,
+Sports, and Services.
+
+The release threshold is:
+
+- zero `serious` Axe violations;
+- zero `critical` Axe violations; and
+- no Axe rule exclusions or suppressions.
+
+The final six-surface Axe execution passed all six tests.
+
+Axe violation typing is derived from the native `AxeBuilder.analyze()` result
+rather than a hand-maintained approximation, preserving native cross-tree and
+shadow-DOM target evidence.
+
+### Q.3E — Deterministic Human Accessibility Review
+
+Human review used a frozen three-viewport matrix:
+
+- desktop: `1280x800`;
+- phone: `390x844`; and
+- tablet: `768x1024`.
+
+Each viewport covered all six critical surfaces.
+
+The final evidence inventory contains:
+
+- 18 baseline screenshots;
+- 18 keyboard-focus screenshots; and
+- 2 compact-navigation open-state screenshots.
+
+Human review evaluated:
+
+- keyboard-only operation;
+- logical Tab and Shift+Tab progression;
+- Enter / Space activation where applicable;
+- absence of keyboard traps;
+- visible and understandable focus;
+- contrast and distinguishability;
+- semantic usability;
+- responsive accessibility; and
+- interaction behavior.
+
+### Development-Runtime Artifact Provenance
+
+Development capture recorded hydration/caret warnings and focus entries
+associated with `NEXTJS-PORTAL`.
+
+Read-only provenance found:
+
+- zero Atlas-owned `caret-color` source anchors;
+- zero Atlas-owned `NEXTJS-PORTAL` source anchors;
+- zero capture-harness injection of either artifact.
+
+The same candidate was then built and executed through an isolated standalone
+Next.js production runtime.
+
+The development artifacts did not reproduce:
+
+- production hydration mismatch errors: `0`;
+- production caret-color errors: `0`; and
+- production `NEXTJS-PORTAL` focus entries: `0`.
+
+They are therefore classified as development-runtime artifacts rather than
+Atlas production accessibility defects.
+
+### Final Production Network Provenance
+
+A final isolated standalone production run recorded the exact browser/network
+error set.
+
+Observed results:
+
+- HTTP 404 responses: `0`;
+- console errors: `0`;
+- failed requests: `0`; and
+- page errors: `0`.
+
+No accessibility remediation was required from that provenance run.
+
+### Q.3 Release Decision
+
+Q.3 accessibility certification is **PASS**.
+
+Certified evidence includes:
+
+- semantic accessibility baseline green;
+- keyboard accessibility baseline green;
+- compact-navigation keyboard isolation green;
+- six-surface Axe scan green;
+- zero serious or critical Axe violations;
+- complete critical Portal E2E regression preserved;
+- complete three-viewport / six-surface human review;
+- development-only browser artifacts not reproduced in standalone production;
+  and
+- zero-error final isolated production network provenance.
+
+The M-023 ROADMAP item `Complete accessibility review` is therefore certified
+complete.
+
+The older M-019 `Accessibility baseline` remains open because it belongs to the
+broader Shared User Experience milestone and is not reinterpreted by this
+release-quality certification.
+
+The following independent M-023 Quality gates remain open:
+
+- `Run full automated test suite`;
+- `Complete performance baseline`;
+- `Complete sustained-use test`; and
+- `Resolve release-blocking defects`.
+
+Q.3 accessibility certification does not constitute final v1.0 release
+certification.
+
+---
+
+## M-023 Release Quality Q.4 — Full Automated Test Suite Certification
+
+Q.4 release-candidate automated-suite certification is complete.
+
+### Scope
+
+Q.4 executed the authoritative release-candidate automated validation matrix
+against the committed M-023 critical-browser and accessibility candidate.
+
+The release-wide matrix covers the established Atlas validation layers,
+including:
+
+- Core Python tests;
+- API Python tests;
+- Sports integration tests;
+- Portal formatting;
+- Portal TypeScript validation;
+- Portal ESLint validation;
+- complete Portal Vitest regression;
+- Portal production build; and
+- complete critical-browser Playwright regression.
+
+This gate is intentionally broader than the focused validation performed by
+individual M-023 feature slices. Its purpose is to prove that the accumulated
+v1.0 release candidate remains coherent when the automated validation layers
+are executed as one release-quality boundary.
+
+### Formatter defect discovered by the release-wide gate
+
+The initial Q.4 execution correctly stopped when the repository-wide Portal
+Prettier gate identified five pre-existing formatting failures:
+
+- `features/media/components/MediaDiscoveryView.test.tsx`;
+- `features/media/components/MediaDiscoveryView.tsx`;
+- `features/services/components/ServiceOverview.tsx`;
+- `features/services/components/ServiceView.test.tsx`; and
+- `features/services/types/services.ts`.
+
+These files were already known outside the earlier bounded D.5 delta. Q.4 did
+not waive the failures merely because they were pre-existing.
+
+The formatter delta was frozen and inspected before mutation. The five files
+were then reconciled using canonical Prettier output only, preserving the
+existing Media Discovery and Service Lifecycle behavior.
+
+### Post-remediation validation
+
+The exact five-file formatting candidate passed:
+
+- repository-wide Portal `format:check`;
+- Portal TypeScript validation;
+- Portal ESLint validation;
+- 24 focused Media Discovery and Service Lifecycle tests;
+- the complete Portal Vitest suite with 247 tests across 34 files; and
+- the Portal production Next.js build.
+
+The remediation was committed as:
+
+`17337b23f66e560bd0dba241581687bd5f5708e3`
+`style(portal): reconcile release-gate formatting`
+
+Committed-checkpoint recertification confirmed that the feature branch and its
+remote were synchronized at that commit, the commit contained exactly the five
+formatter-remediation files, the working tree and index were clean, and the
+committed Portal formatting, typecheck, and lint gates remained green.
+
+### Production preservation
+
+Q.4 validation and formatting remediation did not deploy or mutate production
+Atlas runtime state.
+
+The certified runtime preservation boundary remained:
+
+- 22 running containers; and
+- zero unhealthy containers.
+
+### Q.4 Release Decision
+
+Q.4 full automated test-suite certification is **PASS**.
+
+The M-023 ROADMAP item `Run full automated test suite` is therefore certified
+complete.
+
+Q.4 closes only the release-candidate-wide automated-suite gate. It does not
+replace human User Acceptance Certification and does not close the independent
+release-quality requirements for:
+
+- performance baseline;
+- sustained-use testing;
+- release-blocking defect resolution;
+- controlled pilot;
+- stabilization; or
+- final v1.0 release approval.
+
+Q.4 certification therefore does not by itself constitute final v1.0 release
+certification.
+
+---
+
+## M-023 Release Quality Q.5 — Performance Baseline Certification
+
+Q.5 v1.0 performance-baseline certification is complete.
+
+### Scope
+
+Q.5 established a reproducible reference performance baseline for the exact
+committed v1.0 release candidate.
+
+The baseline is intended for future equivalent regression comparison. It is not
+a universal latency service-level objective, a stress benchmark, or a
+sustained-use certification.
+
+The certified candidate checkpoint was:
+
+`26a2455cf15c1978e9b1bfa5d46c7a9adc301350`
+
+### Certified Metric Inventory
+
+The Q.5 baseline contains exactly thirteen metrics:
+
+- API health;
+- Portal login HTTP;
+- CLI version;
+- CLI status;
+- CLI compact health;
+- CLI services;
+- browser Login;
+- browser Portal;
+- browser Media;
+- browser Favorites;
+- browser Requests;
+- browser Services; and
+- browser Sports.
+
+API health and Portal login HTTP each contain 20 successful samples.
+
+Each CLI metric contains 10 successful samples.
+
+Each exact-candidate browser metric contains seven samples.
+
+### Certified v1.0 Reference Baseline
+
+The certified measurements are:
+
+| Metric | Count | Min ms | Median ms | P95 ms | Max ms |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| API health | 20 | 1.141 | 1.474 | 1.696 | 1.703 |
+| Portal login HTTP | 20 | 1.213 | 1.539 | 1.672 | 1.741 |
+| CLI version | 10 | 44.637 | 47.030 | 48.744 | 48.744 |
+| CLI status | 10 | 111.071 | 116.395 | 134.926 | 134.926 |
+| CLI compact health | 10 | 425.473 | 432.506 | 443.114 | 443.114 |
+| CLI services | 10 | 182.503 | 186.621 | 188.744 | 188.744 |
+| Browser Login | 7 | 44.072 | 46.555 | 67.532 | 67.532 |
+| Browser Portal | 7 | 47.468 | 63.725 | 64.528 | 64.528 |
+| Browser Media | 7 | 51.686 | 52.819 | 53.496 | 53.496 |
+| Browser Favorites | 7 | 49.953 | 51.302 | 51.908 | 51.908 |
+| Browser Requests | 7 | 49.457 | 50.718 | 53.668 | 53.668 |
+| Browser Services | 7 | 56.528 | 58.564 | 69.694 | 69.694 |
+| Browser Sports | 7 | 50.290 | 50.909 | 52.402 | 52.402 |
+
+### Browser Measurement Boundary
+
+The seven Portal browser surfaces were measured against an isolated standalone
+production build of the exact candidate rather than against the older live
+Portal container.
+
+The authenticated browser measurement preserved Atlas's intentionally
+memory-backed authentication lifecycle by using canonical client-side protected
+navigation after login.
+
+This prevented hard document navigation from being misclassified as candidate
+performance behavior while preserving the real Portal authentication contract.
+
+### Runtime Drift Separation
+
+Read-only investigation identified older live Portal runtime drift during the
+performance work.
+
+That runtime was not used as evidence for the exact-candidate browser baseline.
+
+Q.5 therefore preserves a strict distinction between:
+
+- the exact committed candidate used for release-quality certification; and
+- independently managed live runtime state that may predate the candidate.
+
+No production deployment was performed as part of Q.5.
+
+### Performance Policy
+
+Q.5 deliberately does not introduce an arbitrary universal latency threshold.
+
+The certified values form a reference baseline against which future equivalent
+measurements can be compared.
+
+This certification also does not claim:
+
+- stress-test completion;
+- sustained-load validation;
+- sustained-use completion; or
+- final production-capacity certification.
+
+Those concerns remain separate release or operational gates.
+
+### Production Preservation
+
+The final Q.5 certification preserved:
+
+- 22 running production containers;
+- zero unhealthy production containers;
+- a clean repository working tree; and
+- a clean Git index.
+
+### Q.5 Release Decision
+
+Q.5 performance-baseline certification is **PASS**.
+
+The M-023 ROADMAP item `Complete performance baseline` is therefore certified
+complete.
+
+The following independent M-023 Quality gates remain open:
+
+- `Complete sustained-use test`; and
+- `Resolve release-blocking defects`.
+
+Controlled pilot, stabilization, release-candidate freeze, final v1.0 approval,
+tagging, and publication also remain independent later release gates.
+
+Q.5 does not constitute sustained-use certification or final v1.0 release
+certification.
+
+---
+
+## M-023 Release Quality Q.6 Preflight — Notifications Runtime Bus Reader Contract Repair
+
+### Objective
+
+Resolve the Notifications runtime defect discovered immediately before
+sustained-use certification without weakening the established non-root or
+Runtime Bus security boundaries.
+
+This work is a release-quality preflight repair. It does not itself constitute
+Q.6 sustained-use certification.
+
+### Defect
+
+The Notifications worker had already been hardened to run as the non-root Atlas
+runtime identity `1000:1000`, while the shared Runtime Bus event journal was
+protected independently from Notifications-owned writable state.
+
+Controlled deployment exposed a mismatch between those two valid boundaries:
+the worker runtime identity could not read the protected Runtime Bus journal
+under the deployed group contract.
+
+The deployment guards correctly failed closed rather than recreating a worker
+whose effective runtime identity could not consume its required input.
+
+### Narrow Runtime-State Repair
+
+The Notifications-owned runtime directory and subscriber cursor were reconciled
+to the non-root Notifications runtime identity without changing the ownership
+model of the shared Runtime Bus event journal.
+
+The repair preserved the separation between:
+
+- Notifications-owned writable state;
+- the Notifications subscriber cursor;
+- the read-only Notifications filter; and
+- the shared Runtime Bus event journal.
+
+The shared journal was not made Notifications-owned.
+
+### Permanent Runtime Contract
+
+The repository repair establishes the following permanent contract:
+
+- Notifications continues to run as UID:GID `1000:1000`;
+- supplementary group `20000` is added only for Runtime Bus journal reader
+  access;
+- the Runtime Bus event journal remains mounted read-only in Notifications;
+- Notifications-owned runtime state remains independently writable;
+- worker health now requires actual Runtime Bus journal readability in addition
+  to heartbeat freshness;
+- the canonical update preflight checks journal readability using supplementary
+  reader group `20000`;
+- update refuses recreation when the effective runtime identity cannot read the
+  required journal; and
+- Compose validation, build, and deployment use the explicit project identity
+  `notifications`.
+
+The repair therefore restores required read capability without granting
+Notifications write authority over the shared Runtime Bus journal.
+
+### Regression Contract
+
+`tests/core/test_security_module_runtime.py` now freezes:
+
+- supplementary Notifications reader group `20000`;
+- the read-only Runtime Bus journal mount;
+- journal readability as part of Notifications health;
+- update-time use of the same reader group; and
+- the explicit `notifications` Compose project boundary for configuration,
+  build, and deployment.
+
+These tests prevent a future security-hardening or deployment change from
+silently removing the worker's effective Runtime Bus read capability or
+changing its canonical Compose identity.
+
+### Release Boundary
+
+This repair closes the specific Notifications Runtime Bus reader-contract
+defect discovered during release-quality preflight.
+
+It does not close:
+
+- `Complete sustained-use test`;
+- the aggregate `Resolve release-blocking defects` gate;
+- controlled pilot;
+- stabilization;
+- release-candidate freeze;
+- final v1.0 approval;
+- tagging; or
+- publication.
+
+Q.6 sustained-use certification must execute against the repaired candidate.
+Only after the sustained-use evidence is complete can the remaining
+release-blocking-defect gate be evaluated truthfully.
+
+---
+
+# 2026-08-17
+
+## M-023 Release Quality Q.6A.2 — Sustained-Use Instrumentation Readiness
+
+### Objective
+
+Implement and certify the repository-owned instrumentation required to execute
+the v1.0 Q.6 sustained-use release-quality gate without starting the production
+certification window prematurely.
+
+Q.6A.2 establishes the measurement, persistence, evaluation, lifecycle, CLI,
+and Scheduler contracts. It does not itself complete the 48-hour sustained-use
+test.
+
+### Certification Contract
+
+The frozen Q.6 policy is:
+
+- duration: 48 hours;
+- interval: 15 minutes / 900 seconds;
+- total expected samples: 193, including T0;
+- expected production container inventory: 22 running containers;
+- canonical Scheduler task: `sustained-use.sample`; and
+- canonical scheduled callback: `python3 -m atlas.sustained_use.scheduled_sample --json`.
+
+### Implemented
+
+Q.6A.2 added the `atlas.sustained_use` domain with normalized immutable model
+contracts, live read-only collectors, atomic evidence and session persistence,
+hard and temporal evaluation, lifecycle orchestration, CLI integration,
+canonical Scheduler registration, and an idempotent scheduled-sample callback.
+
+Unqualified Scheduler synchronization now includes the new core task while
+targeted module synchronization remains isolated from core task registration.
+
+### Validation
+
+The final Q.6A.2 pre-documentation implementation certification froze exactly
+4 tracked modified paths plus 21 new paths, for 25 total candidate paths.
+
+Validation passed 171 Sustained Use tests, 42 core Scheduler tests, 17 Operations
+Scheduler tests, 25 shell-boundary tests, 28 Operations repository tests, Python
+compilation, shell syntax, executable CLI stderr/runpy validation, Scheduler sync
+structure validation, and a production read-only in-memory sample.
+
+The live read-only observation reported Atlas health `warning:99` solely because
+of the expected dirty development Git working tree, 22 running containers, zero
+unhealthy containers, Runtime Bus backlog `0`, Runtime Bus readable `true`,
+Runtime Bus writable `false`, and accepted ARI baseline `warning:80`.
+
+### Production Preservation
+
+Q.6A.2 did not run live Scheduler synchronization, register
+`sustained-use.sample`, create `/mnt/storage/configs/atlas/sustained-use`, create
+a production Q.6 session, persist production sample evidence, or start the Q.6
+clock. The live Scheduler state remained byte-identical during certification.
+
+### Activation Boundary
+
+The real Q.6 run may begin only after the instrumentation candidate is committed
+and pushed, Git returns clean, Atlas health returns to `healthy:100`, production
+remains at 22 running / zero unhealthy, controlled unqualified Scheduler sync
+registers and certifies `sustained-use.sample`, and `atlas sustained-use start`
+successfully establishes T0.
+
+T0 becomes sample 1 of 193 and starts the 48-hour certification clock.
+
+### Release Boundary
+
+Q.6A.2 instrumentation readiness is **PASS**.
+
+The ROADMAP item `Complete sustained-use test` remains **OPEN**. Publication of
+the instrumentation commit, clean-Git recertification, live Scheduler
+registration, T0, the 48-hour observation window, all 193 samples, final hard and
+temporal evaluation, Q.6 finalization, and the independent release-blocking-defect
+decision remain outstanding.
+
+---
+
+# 2026-08-17
+
+## M-023 Release Quality Q.6A.3 — First Production Sustained-Use Attempt
+
+### Activation
+
+The Q.6A.2 instrumentation candidate was committed and published as:
+
+`b3dc4a1877285b627386fb989e1a71b0b2acb0eb`
+
+After clean-Git recertification returned Atlas to `healthy:100`, controlled
+unqualified Scheduler synchronization registered the core
+`sustained-use.sample` task at a 900-second interval. A deliberate no-session
+execution completed successfully and proved that the scheduled callback is a
+safe dormant no-op before T0.
+
+The first production Q.6 session was then established as:
+
+- run ID: `q6-20260817T171504Z`;
+- T0: `2026-08-17T17:15:04.595315Z`;
+- scheduled end: `2026-08-19T17:15:04.595315Z`;
+- expected duration: 48 hours;
+- expected interval: 15 minutes;
+- expected samples: 193 including T0;
+- candidate commit: `b3dc4a1877285b627386fb989e1a71b0b2acb0eb`.
+
+The T0 sample passed the hard-invariant evaluation, production remained at
+22 running containers with zero unhealthy containers, and the immediate
+Scheduler alignment execution correctly returned a not-due no-op without
+creating sample 2.
+
+### Release-Blocking Defect Discovery
+
+Read-only observation later showed that the session remained at `1/193`
+samples after the first automatic collection boundary had passed.
+
+The registered `sustained-use.sample` task was healthy but overdue. Further
+read-only diagnosis showed the same pattern for the pre-existing
+`operations.collect` and `sports.maintenance` tasks.
+
+Repository and runtime inspection established the root cause:
+
+- `TaskScheduler.run_due_tasks()` already owned due-work execution;
+- Scheduler runtime locking and success/failure persistence were present;
+- `atlas scheduler run` correctly invoked due-task execution;
+- no long-running Scheduler process existed;
+- no Atlas Scheduler systemd service or timer existed;
+- no cron entry invoked the Scheduler; and
+- no container owned recurring Scheduler dispatch.
+
+The defect was therefore not the shared Scheduler engine or the Q.6 callback.
+The missing layer was the production mechanism that periodically invokes the
+existing Scheduler engine.
+
+The first Q.6 attempt is preserved as incomplete factual evidence. Missed
+15-minute samples are not backfilled or reconstructed, and the attempt is not
+eligible for sustained-use certification.
+
+## M-023 Release Quality Q.6A.4 — Production Scheduler Dispatcher Repair
+
+### Architecture Decision
+
+Atlas retains `TaskScheduler` as the sole scheduler and recovery authority.
+
+The production dispatcher uses the existing Atlas systemd precedent:
+
+```text
+atlas-scheduler.timer
+        |
+        | one-minute dispatch opportunity
+        v
+atlas-scheduler.service
+        |
+        | Type=oneshot
+        v
+/bin/atlas scheduler run
+        |
+        v
+TaskScheduler.run_due_tasks()
+```
+
+systemd owns only the recurring opportunity to ask Atlas for due work.
+`TaskScheduler` continues to own registered task intervals, due-state
+calculation, the runtime lock, callback subprocess execution, task health,
+success/failure counters, and bounded execution history.
+
+The one-minute dispatcher interval intentionally does not duplicate the
+15-minute sustained-use cadence or the hourly Operations/Sports cadence.
+Individual task cadence remains stored and evaluated by Atlas.
+
+### Repository Contract
+
+Q.6A.4.2 added exactly three repository candidate files:
+
+- `systemd/atlas-scheduler.service`;
+- `systemd/atlas-scheduler.timer`; and
+- `tests/core/test_scheduler_systemd.py`.
+
+The service contract is:
+
+- `Type=oneshot`;
+- `WorkingDirectory=/opt/project-atlas`;
+- `ExecStart=/bin/atlas scheduler run`;
+- ordered after and wanting `docker.service`;
+- no daemon loop, watchdog, restart loop, or second scheduler.
+
+The timer contract is:
+
+- `OnBootSec=1min`;
+- `OnUnitActiveSec=1min`;
+- `Persistent=true`;
+- `Unit=atlas-scheduler.service`;
+- installable through `timers.target`.
+
+Tracking the units in the repository does not itself install or enable them on
+the production host. Live installation remains a separately guarded deployment
+step after commit and publication.
+
+### Dispatcher Exit Contract
+
+Isolated tests certify the process contract seen by systemd:
+
+- no due tasks -> exit `0`;
+- all due callbacks successful -> exit `0`;
+- any due callback failed -> exit `1`;
+- live Scheduler runtime lock contention -> exit `3`;
+- mixed due tasks are all attempted even when one fails;
+- systemd does not mask Atlas nonzero exit status.
+
+A task that has never succeeded may omit `last_success`; absence and `None`
+both represent the same never-successful semantic state.
+
+### Validation
+
+Repository certification passed:
+
+- 26 Scheduler systemd/dispatcher tests;
+- 42 core Scheduler regression tests;
+- 17 Operations Scheduler regression tests;
+- 26 Sustained Use Scheduler regression tests; and
+- `systemd-analyze verify` for both proposed units.
+
+The production Scheduler state remained byte-identical throughout isolated
+execution testing. No live dispatcher unit was installed, no production task
+was executed by the candidate, the incomplete Q.6 attempt remained at `1/193`,
+and production remained at 22 running containers with zero unhealthy
+containers.
+
+### Architecture and ADR Boundary
+
+No ADR-0015 amendment is required.
+
+The production dispatcher does not create another scheduler, status store,
+watchdog, retry daemon, or recovery engine. It supplies the missing recurring
+host-level invocation to the existing `TaskScheduler`, preserving the accepted
+Scheduler Recovery decision and fail-closed runtime-lock boundary.
+
+### Remaining Release Boundary
+
+Before Q.6 can restart:
+
+1. reconcile and certify repository documentation;
+2. commit and publish the dispatcher repair;
+3. restore clean-Git health;
+4. install the tracked systemd units through a guarded production change;
+5. prove recurring automatic dispatch across multiple timer cycles;
+6. preserve/close the first incomplete attempt as historical release evidence;
+7. establish a new T0 against the repaired committed candidate; and
+8. collect a fresh uninterrupted 193-sample / 48-hour history.
+
+`Complete sustained-use test` and `Resolve release-blocking defects` remain
+open until those requirements are satisfied.
+
+## M-023 Release Quality Q.6A.4.6B — Incomplete Sustained-Use Attempt Retirement
+
+### Objective
+
+Provide a repository-owned, explicit, and auditable way to retire an incomplete Q.6 sustained-use certification attempt without rewriting it as a completed certification failure and without deleting its evidence.
+
+The first Q.6 run, `q6-20260817T171504Z`, remains an incomplete production attempt at `1/193`. Its certification window became invalid when release testing exposed the missing recurring production Scheduler dispatcher. That infrastructure defect and the subsequent Scheduler lifecycle core-event routing defect were repaired and live-certified separately. The original Q.6 evidence therefore must be preserved historically before a fresh T0 is established.
+
+### Repository Archive Contract
+
+`FileSustainedUseRepository` now owns an immutable archive namespace:
+
+```text
+/mnt/storage/configs/atlas/sustained-use/
+└── archive/
+    └── <run-id>/
+        ├── session.json
+        ├── latest.json
+        └── history/
+```
+
+A terminal run can be moved from the active root into `archive/<run-id>/`.
+
+Archival preserves the safety boundary by moving evidence in this order:
+
+1. `history/`;
+2. `latest.json`;
+3. `session.json`.
+
+`session.json` moves last. If an interruption occurs before the final move, the current terminal-session boundary remains visible and prevents a replacement run from silently starting. A retry can resume the archive operation. Existing archived run identities cannot be recreated.
+
+### Abort Lifecycle
+
+The lifecycle now exposes `abort_session()` and `SustainedUseAbortResult`.
+
+The retirement path is intentionally distinct from normal Q.6 finalization:
+
+- `completed` means the full sustained-use history passed final hard and temporal evaluation;
+- `failed` means the full completed sustained-use history was evaluated and did not pass;
+- `aborted` means an incomplete certification attempt was explicitly retired and preserved as historical evidence.
+
+Only `active` or partially archived `aborted` sessions may enter the abort path. `completed` and `failed` sessions cannot be reinterpreted through it.
+
+For an active session, Atlas records a UTC `completed_at`, persists the `active -> aborted` transition, and then archives the run. If archival is interrupted after the transition, retry preserves the original completion timestamp.
+
+### Guarded Operator CLI
+
+The public command is:
+
+```bash
+atlas sustained-use abort \
+  --confirm-run-id <exact-current-run-id>
+```
+
+The exact current run identity is mandatory. There is no `--force` bypass.
+
+The Python CLI owns destructive confirmation validation. The shell command remains intentionally thin and only forwards arguments and propagates the Python exit status.
+
+### Certification
+
+Final code certification passed 55 focused abort/archive tests, 189 complete Sustained Use tests, and 71 Scheduler/systemd-dispatcher regression tests.
+
+During certification the failed first Q.6 attempt remained byte-identical at `1/193`, the live Scheduler state remained unchanged, `sustained-use.sample` remained absent, `atlas-scheduler.timer` remained enabled but intentionally stopped, Atlas health was `warning:99` solely because of the expected dirty Git working tree, production remained at 22 running containers with zero unhealthy containers, no production abort was executed, and no commit or push was performed.
+
+### Release Boundary
+
+This implementation does not itself retire the production attempt or start a replacement Q.6 window.
+
+The next controlled sequence is to publish this retirement implementation, execute the guarded abort against `q6-20260817T171504Z`, verify the immutable archive, restore `sustained-use.sample`, resume and prove autonomous Scheduler dispatch, establish a fresh T0, and collect a new uninterrupted 193-sample / 48-hour history.
+
+`Complete sustained-use test` and the aggregate `Resolve release-blocking defects` gate remain open.
+
+## M-023 Release Quality Q.6A.5 — Fixed-Cadence Sustained-Use Repair
+
+### Production Defect Discovery
+
+The second production Q.6 run, `q6-20260817T232028Z`, established a valid T0 and proved autonomous Scheduler dispatch, but read-only observation later showed deterministic sampling drift even though Atlas and the Scheduler remained healthy.
+
+The run was retired and archived at `176/193` samples.
+
+Observed evidence included:
+
+- zero Scheduler failures;
+- zero consecutive Scheduler failures;
+- healthy production runtime;
+- 22 running containers and zero unhealthy containers;
+- one evidence file per persisted sample;
+- approximately 960-second median collection cadence instead of the required 900 seconds; and
+- cumulative phase drift that made 193 observations impossible within the exact 48-hour certification window.
+
+The defect was therefore temporal rather than availability-related.
+
+The generic `TaskScheduler` intentionally derives a task's next due boundary from the previous successful completion. That behavior remains appropriate for ordinary recurring maintenance jobs, but it cannot serve as the authoritative clock for a fixed-wall-clock release certification.
+
+### Fixed-Cadence Architecture
+
+Q.6A.5 separates two concepts that were previously conflated:
+
+```text
+certification clock
+    T0 + (sample ordinal - 1) × 900 seconds
+
+dispatch clock
+    one Scheduler polling opportunity every 60 seconds
+```
+
+The canonical Q.6 certification contract remains unchanged:
+
+- duration: 172800 seconds / 48 hours;
+- certification sample interval: 900 seconds / 15 minutes;
+- expected observations: 193;
+- sample 1: T0;
+- sample 193: exactly T0 + 172800 seconds.
+
+The `sustained-use.sample` Scheduler registration now uses a 60-second polling interval. The callback does not treat each invocation as a required observation. Instead, it evaluates the next immutable T0-derived certification slot.
+
+### Slot Decision Contract
+
+For each next required sample:
+
+- invocation before the fixed slot -> `not_due`, successful no-op;
+- invocation at or up to 180 seconds after the fixed slot -> capture exactly one real observation;
+- invocation more than 180 seconds late -> `missed`, hard failure;
+- completed history -> successful no-op;
+- inactive or absent session -> successful no-op.
+
+Actual callback completion time never shifts later certification slots.
+
+The allowed lateness is intentionally bounded below the 900-second certification interval so a missed temporal observation cannot be mistaken for ordinary dispatch jitter.
+
+### No Backfill
+
+A missed certification slot is evidence of a failed temporal contract.
+
+Atlas does not create multiple rapid observations to replace missed historical slots and does not advance to a later slot while pretending the required earlier observation exists.
+
+No-backfill behavior preserves the meaning of sustained-use evidence: every sample represents an observation actually collected near its required wall-clock boundary.
+
+### Finalization Defense in Depth
+
+Collection-side fixed-slot behavior is not the only certification authority.
+
+Q.6A.5 adds independent `evaluate_fixed_cadence()` final-history validation. Finalization combines the existing sustained temporal evaluation with a new finding:
+
+```text
+history.cadence.fixed_slots
+```
+
+Every persisted sample ordinal is compared directly with:
+
+```text
+T0 + ((sample_number - 1) * interval_seconds)
+```
+
+Early observations or observations outside the permitted lateness window fail certification even if the history is chronologically ordered and contains the expected number of samples.
+
+The existing `evaluate_history()` contract remains preserved for Scheduler progression, Runtime Bus monotonicity, ARI behavior, Git consistency, and other sustained temporal properties.
+
+### Production Regression Proof
+
+The new fixed-slot evaluator was executed retrospectively against the immutable archived production run:
+
+```text
+q6-20260817T232028Z
+samples: 176/193
+status: aborted
+```
+
+The evaluator correctly rejected the real production history through `history.cadence.fixed_slots`.
+
+This proves Q.6A.5 detects the defect actually observed in production rather than only synthetic test fixtures.
+
+### Candidate Certification
+
+The pre-documentation Q.6A.5 repair candidate certified:
+
+- 63 focused fixed-cadence tests;
+- 204 complete Sustained Use regression tests;
+- 71 generic Scheduler/systemd regression tests;
+- exact T0/sample-193 mathematical boundary;
+- 900-second certification cadence;
+- 60-second dispatch polling contract;
+- 180-second maximum lateness;
+- hard missed-slot failure;
+- forbidden backfill;
+- retrospective detection of the archived production defect; and
+- preservation of the generic Scheduler contract.
+
+During candidate certification:
+
+- the live `sustained-use.sample` task remained intentionally unsynchronized at 900 seconds;
+- the production Scheduler timer remained enabled but stopped;
+- no active Q.6 session existed;
+- no new T0 was established;
+- production remained at 22 running containers with zero unhealthy containers; and
+- Atlas health was `warning:99` solely because of the expected development working tree.
+
+### Release Boundary
+
+Q.6A.5 does not itself complete sustained-use certification.
+
+The next controlled sequence is:
+
+1. certify this documentation reconciliation;
+2. commit and publish the complete fixed-cadence repair;
+3. restore clean Git health;
+4. perform guarded unqualified Scheduler synchronization so `sustained-use.sample` uses 60-second polling;
+5. prove dormant callback safety with no active session;
+6. prove autonomous fixed-slot behavior across multiple polling boundaries;
+7. establish a new T0 against the exact published repair candidate;
+8. certify the first autonomous fixed-slot sample;
+9. collect a fresh uninterrupted 193-sample / 48-hour history; and
+10. finalize the complete fixed-slot certification evidence.
+
+`Complete sustained-use test` and `Resolve release-blocking defects` remain open until the replacement Q.6 run passes.
+
+## M-023 Release Quality Q.6A.7 — Runtime Bus Terminal Convergence Repair
+
+### Production Defect Discovery
+
+The final fixed-cadence production run, `q6-20260819T233234Z`, completed the full 48-hour observation window with exactly `193/193` samples. Independent fixed-slot evaluation reported zero violations, the Scheduler recorded zero failures, Atlas remained `healthy:100`, and production remained at 22 running containers with zero unhealthy containers.
+
+Finalization nevertheless closed the durable production session as `failed`. The failure was preserved as immutable production evidence and was not retried or rewritten.
+
+The defect was isolated to the historical terminal Runtime Bus requirement that the final observed journal backlog equal zero at the instant of finalization. Sample 193 had frozen a Runtime Bus journal target of `3917` while the Notifications cursor was at `3916`, leaving a one-event terminal backlog even though the subscriber remained healthy and continued consuming.
+
+### Correct Terminal Contract
+
+Q.6A.7 replaces the instantaneous final-backlog gate with bounded terminal convergence.
+
+The authoritative target is the Runtime Bus journal tail captured by sample 193. That target is immutable for the terminal decision. Finalization observes Notifications for at most 180 seconds and requires the subscriber cursor to reach or pass that frozen target.
+
+The contract is:
+
+- terminal target = frozen sample-193 Runtime Bus journal tail;
+- terminal timeout = 180 seconds;
+- `pending` is not success;
+- cursor convergence through the frozen target is required for `completed`;
+- timeout is a hard certification failure;
+- Runtime Bus events written after sample 193 are allowed and do not move the target; and
+- historical sample evidence is never rewritten.
+
+This distinguishes a healthy asynchronous subscriber that is briefly behind at the exact sampling boundary from a subscriber that cannot converge within the bounded release-certification window.
+
+### Implementation
+
+The repair candidate contains exactly eight files:
+
+- `atlas/sustained_use/__init__.py`;
+- `atlas/sustained_use/cli.py`;
+- `atlas/sustained_use/evaluator.py`;
+- `atlas/sustained_use/lifecycle.py`;
+- `atlas/sustained_use/terminal.py`;
+- `tests/core/test_sustained_use_evaluator.py`;
+- `tests/core/test_sustained_use_terminal.py`; and
+- `tests/core/test_sustained_use_terminal_finalization.py`.
+
+The obsolete historical `final Runtime Bus backlog of zero` gate was removed from temporal history evaluation. Terminal observation is now a bounded lifecycle concern, and the CLI exposes the resulting terminal evidence.
+
+### Candidate Certification
+
+Q.6A.7.6 certified:
+
+- 22 terminal-convergence tests;
+- 19 historical evaluator tests;
+- 31 finalization regression tests;
+- 251 complete Sustained Use regression tests; and
+- 71 generic Scheduler regression tests.
+
+Retrospective evaluation of the immutable production evidence reported:
+
+- history evaluation: PASS;
+- fixed-cadence evaluation: PASS;
+- frozen terminal target: `3917`;
+- initial Notifications cursor: `3916`;
+- initial terminal state: `pending`; and
+- live bounded terminal convergence: PASS.
+
+The current Runtime Bus journal and cursor were allowed to advance beyond the frozen target. This proves the terminal decision is anchored to the certification boundary rather than to unrelated post-target event growth.
+
+### Safety Boundary
+
+During Q.6A.7 implementation and certification:
+
+- `q6-20260819T233234Z` remained byte-identical in terminal `failed` state at `193/193`;
+- no production finalization retry occurred;
+- no historical sample was rewritten;
+- the Scheduler timer remained enabled but stopped;
+- no new Q.6 session was started;
+- production remained at 22 running containers with zero unhealthy containers; and
+- Atlas health was `warning:99` only because of the expected development working tree.
+
+### Release Boundary
+
+Q.6A.7 repairs the release-certification semantics but does not retroactively rewrite the failed production record and does not, by itself, close `Complete sustained-use test`.
+
+The next controlled sequence is to reconcile and certify documentation, commit and publish the complete terminal-convergence repair, restore clean Git health, and then perform the explicitly approved post-publication certification step while preserving all historical Q.6 evidence.
+
+## M-023 Release Quality Q.6A.7.14-Q.6A.7.15 — Final Sustained-Use Release Certification
+
+### Exact Published Candidate
+
+The fresh replacement certification ran against the exact published terminal-convergence candidate:
+
+```text
+branch: feature/v1-critical-e2e-contracts
+commit: 13a48a5ce1a6e4c5f335f4ae6cd19ba61149fefa
+run: q6-20260822T011449Z
+```
+
+Git remained frozen for the complete observation window.
+
+### Production Observation Result
+
+The run completed the full fixed-slot contract:
+
+```text
+samples:                 193/193
+history evaluation:      PASS
+fixed cadence:           PASS
+fixed-slot violations:   0
+Scheduler failures:      0
+Atlas health:            healthy:100
+running containers:      22
+unhealthy containers:    0
+```
+
+The 193 persisted history samples remained byte-identical through finalization.
+
+### Terminal Convergence Result
+
+At the 193/193 boundary, the finalization guard waited for any in-flight Scheduler dispatch to finish, stopped `atlas-scheduler.timer`, verified the one-shot service inactive, and froze the production boundary before finalization.
+
+The bounded Runtime Bus terminal observer then completed successfully:
+
+```text
+terminal target journal lines: 7053
+terminal final cursor value:    7068
+terminal final journal lines:   7070
+terminal probe count:           2
+terminal status:                passed
+hard failure count:             0
+```
+
+Notifications therefore consumed through the frozen sample-193 target within the 180-second terminal window. Journal growth after the target was permitted and did not move the certification target.
+
+### Durable Final Decision
+
+Finalization persisted:
+
+```text
+status: completed
+passed: true
+completed_at: 2026-08-24T01:30:00.736205Z
+```
+
+The Scheduler timer remained enabled but inactive after the frozen certification boundary.
+
+The earlier failed run `q6-20260819T233234Z` remained preserved as historical evidence, and no failed or aborted Q.6 record was rewritten.
+
+### Release-Gate Decision
+
+Q.6 sustained-use certification is complete for the exact published candidate `13a48a5ce1a6e4c5f335f4ae6cd19ba61149fefa`.
+
+The production Scheduler-dispatcher defect that invalidated the first Q.6 attempt is also closed as a release blocker: the committed and published dispatcher/fixed-cadence/terminal-convergence path completed a fresh autonomous 48-hour production certification with zero Scheduler failures.
+
+The ROADMAP gates `Complete sustained-use test` and `Resolve release-blocking defects` may therefore be marked complete. Pilot, stabilization, release-candidate freeze, tagging, and publication remain independent later release gates.

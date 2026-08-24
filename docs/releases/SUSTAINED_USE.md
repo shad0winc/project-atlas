@@ -1,0 +1,469 @@
+# Sustained Use Release Certification
+
+Project Atlas uses the M-023 Q.6 sustained-use certification to prove that the
+exact v1.0 release candidate remains operationally stable over an extended
+production observation window.
+
+This document defines the operator contract for Q.6. It does not itself certify
+that Q.6 has completed.
+
+---
+
+## Certification Contract
+
+The canonical Q.6 contract is:
+
+| Property | Contract |
+| --- | --- |
+| Duration | 48 hours |
+| Sample interval | 15 minutes / 900 seconds |
+| Total expected samples | 193 |
+| First sample | T0, captured by manual `start` |
+| Expected running containers | 22 |
+| Automated task | `sustained-use.sample` |
+| Automated callback | `python3 -m atlas.sustained_use.scheduled_sample --json` |
+| Start | Manual release-engineering action |
+| Sampling | Automatic while active and due |
+| Status | Manual, read-only |
+| Finalize | Manual release-engineering action |
+
+The 193 samples include T0 plus the 192 subsequent 15-minute intervals through
+T+48h.
+
+---
+
+## Evidence Location
+
+Production Q.6 evidence is stored under:
+
+```text
+/mnt/storage/configs/atlas/sustained-use
+```
+
+The repository layer maintains:
+
+- immutable historical sample evidence;
+- atomic latest-sample state; and
+- atomic `session.json` lifecycle state.
+
+No production evidence directory should exist before the real Q.6 session is
+started.
+
+---
+
+## Lifecycle
+
+The supported operator lifecycle is:
+
+```text
+clean committed candidate
+        |
+        v
+controlled Scheduler synchronization
+        |
+        v
+atlas sustained-use start
+        |
+        +----> T0 / sample 1 of 193
+        |
+        v
+sustained-use.sample polled every 60 seconds
+        |
+        | fixed T0-derived slot gate
+        | certification observations every 900 seconds
+        v
+atlas sustained-use status
+        |
+        v
+T+48 hours / 193 samples
+        |
+        v
+atlas sustained-use finalize
+```
+
+### Start
+
+```bash
+atlas sustained-use start
+```
+
+`start` is intentionally manual.
+
+Before durable session creation, Atlas:
+
+1. resolves the exact current Git commit;
+2. collects candidate T0 in memory;
+3. strictly evaluates T0;
+4. refuses to create the session if T0 fails;
+5. creates the immutable session boundary only after T0 passes; and
+6. persists T0 immediately as sample 1.
+
+The Q.6 clock starts only after this successful durable T0 boundary.
+
+### Sample
+
+```bash
+atlas sustained-use sample
+```
+
+The manual `sample` command requires an active session.
+
+A sample that violates a hard invariant is still persisted so the certification
+history cannot hide the failure.
+
+### Status
+
+```bash
+atlas sustained-use status
+```
+
+`status` is read-only and reports the durable session, current sample count,
+remaining sample count, and latest persisted observation.
+
+### Finalize
+
+```bash
+atlas sustained-use finalize
+```
+
+`finalize` is intentionally manual.
+
+Finalization refuses to proceed before the scheduled T+48h boundary or unless
+the exact expected sample count is present.
+
+The final decision re-evaluates:
+
+- every persisted sample against the hard invariants; and
+- the complete ordered sample history against temporal invariants.
+
+The session transitions to `completed` only when hard evaluation, temporal
+history evaluation, fixed-slot cadence validation, and bounded Runtime Bus
+terminal convergence all pass. Otherwise the session closes as `failed`.
+
+---
+
+## Automated Sampling
+
+The canonical core Scheduler task is:
+
+```text
+name:                   sustained-use.sample
+poll interval:          60 seconds
+certification interval: 900 seconds
+module:                 null
+callback:               python3 -m atlas.sustained_use.scheduled_sample --json
+```
+
+It is registered only through an **unqualified**:
+
+```bash
+atlas scheduler sync
+```
+
+Targeted module synchronization does not register or mutate this core task.
+
+The scheduled callback is deliberately idempotent:
+
+| State | Result |
+| --- | --- |
+| No Q.6 session | Successful no-op |
+| Inactive terminal session | Successful no-op |
+| Expected sample count already reached | Successful no-op |
+| Active before next fixed T0-derived slot | Successful `not_due` no-op |
+| Active at fixed slot or <=180 seconds late | Capture and persist exactly one sample |
+| Active >180 seconds after next required slot | `missed`; return nonzero and do not backfill |
+| Due sample fails hard evaluation | Persist evidence and return nonzero |
+| Collection/runtime failure | Return nonzero |
+
+This allows the Scheduler task to remain registered while Q.6 is inactive
+without manufacturing Scheduler failures or accidentally starting a
+certification session.
+
+The Scheduler never starts or finalizes Q.6.
+
+---
+
+## Observed Domains
+
+Each sustained-use sample aggregates the release-critical runtime observations
+required by the Q.6 contract:
+
+- Atlas aggregate health;
+- Docker container runtime state;
+- root filesystem usage;
+- Atlas storage usage;
+- canonical Scheduler task observations;
+- Runtime Bus journal/cursor state and Notifications heartbeat;
+- ARI status, score, warnings, and TV synchronization state; and
+- exact Git commit identity.
+
+The production Runtime Bus observation is read-only. The certification
+collector does not gain journal write authority.
+
+---
+
+## Hard Invariants
+
+A single sample must satisfy the release-critical hard contract, including:
+
+- exact committed Git identity;
+- clean/healthy Atlas release health at the real certification boundary;
+- expected running-container count;
+- zero unhealthy containers;
+- zero OOM kills and disallowed restart growth;
+- filesystem/storage safety thresholds;
+- readable but non-writable Runtime Bus journal access;
+- acceptable Notifications heartbeat freshness;
+- required Scheduler state; and
+- accepted ARI baseline.
+
+Hard failures are evidence. They are not discarded.
+
+---
+
+## Temporal Invariants
+
+Final history evaluation protects against failures that cannot be judged from a
+single snapshot.
+
+The temporal contract includes:
+
+- every sample ordinal belonging to its immutable T0-derived slot;
+- no sample occurring before its required slot;
+- no sample occurring more than 180 seconds after its required slot;
+- no backfilled replacement observations for missed slots;
+- Scheduler progress across the observation window;
+- no Scheduler failure-count growth;
+- no Runtime Bus journal or subscriber-cursor regression;
+- bounded Runtime Bus terminal convergence through the journal target frozen by sample 193;
+- no ARI score drop below the established T0 baseline;
+- no expansion of the ARI warning set; and
+- no worsening of the TV synchronization difference.
+
+Finalization evaluates fixed-slot cadence independently from the collection callback through `history.cadence.fixed_slots`. Chronological order and correct sample cardinality alone are not sufficient to certify Q.6.
+
+---
+
+## Activation Gate
+
+Instrumentation readiness and Q.6 execution are separate states.
+
+Do **not** start Q.6 from a dirty development worktree.
+
+Before the real production session begins:
+
+1. complete implementation and documentation certification;
+2. commit the exact Q.6 instrumentation candidate;
+3. push the exact commit;
+4. restore a clean Git working tree and index;
+5. prove Atlas health is `healthy:100`;
+6. confirm 22 running containers and zero unhealthy containers;
+7. perform controlled unqualified `atlas scheduler sync`;
+8. inspect `sustained-use.sample`;
+9. prove the dormant callback is safe while no session exists; and
+10. only then execute `atlas sustained-use start`.
+
+The commit recorded by T0 is part of the immutable certification contract.
+
+---
+
+## Before T0
+
+Expected state before activation:
+
+```text
+Q.6 implementation         present and committed
+Git working tree           clean
+Atlas health               healthy:100
+running containers         22
+unhealthy containers       0
+sustained-use.sample       registered and inspected
+Q.6 session.json           absent
+Q.6 sample history         absent
+Q.6 clock                  not started
+```
+
+A dormant Scheduler task does not mean Q.6 has started.
+
+---
+
+## During the Run
+
+Routine observation should use:
+
+```bash
+atlas sustained-use status
+atlas scheduler inspect sustained-use.sample
+atlas health --compact
+```
+
+Avoid manually invoking extra samples unless a controlled recovery procedure
+requires it. The persisted history is intended to represent the fixed
+15-minute observation contract.
+
+Do not change the certified Git candidate during the Q.6 run.
+
+A release-blocking defect discovered during the window must be treated as a
+candidate defect, not hidden by modifying the running certification candidate.
+
+---
+
+## Completion
+
+Q.6 is complete only when all of the following are true:
+
+- the full 48-hour interval has elapsed;
+- exactly 193 samples are present;
+- every sample has been hard-evaluated;
+- every sample satisfies the fixed T0-derived slot contract;
+- the complete temporal history has been evaluated;
+- finalization succeeds;
+- the durable session records the final decision; and
+- the resulting evidence is reconciled into release documentation.
+
+Only then may the ROADMAP item:
+
+```text
+Complete sustained-use test
+```
+
+be marked complete.
+
+Q.6 completion does not automatically close the independent
+`Resolve release-blocking defects` gate, controlled pilot, stabilization,
+release-candidate freeze, tagging, or final publication.
+
+---
+
+## Current Q.6A.2 State
+
+At the Q.6A.2 instrumentation documentation boundary:
+
+- the sustained-use implementation candidate is complete;
+- the pre-documentation implementation certification is passing;
+- the Q.6 Scheduler registration contract exists in the repository;
+- live `sustained-use.sample` registration has not yet occurred;
+- no production Q.6 session exists;
+- no production Q.6 evidence has been persisted; and
+- the 48-hour Q.6 clock has not started.
+
+This document therefore describes the certified instrumentation and the
+procedure for the later production certification run. It is not itself Q.6
+completion evidence.
+
+## Q.6A.5 Fixed-Cadence Repair
+
+The second production attempt, `q6-20260817T232028Z`, proved that Scheduler execution success is not by itself sufficient to guarantee the Q.6 temporal contract.
+
+The run reached `176/193` samples with zero Scheduler failures and otherwise healthy production, but its effective interval was approximately 16 minutes because each next Scheduler due time inherited the previous callback's execution/completion delay. The resulting cumulative phase drift made 193 observations impossible inside the exact 48-hour window.
+
+The attempt was explicitly retired as `aborted` and preserved under the immutable archive namespace.
+
+Q.6A.5 corrects the certification clock without changing generic `TaskScheduler` semantics.
+
+The certification schedule is fixed:
+
+```text
+required_time(sample_number)
+    = T0 + ((sample_number - 1) * 900 seconds)
+```
+
+The Scheduler polls `sustained-use.sample` every 60 seconds. The callback compares the current time with the next required T0-derived slot.
+
+The maximum accepted lateness is 180 seconds. Polls before the slot are no-ops, observations inside the lateness window may be captured, and observations outside that window are classified as missed. Missed observations are never backfilled.
+
+The complete history is independently rechecked during finalization through `history.cadence.fixed_slots`.
+
+The fixed-slot evaluator has been regression-tested against the archived `176/193` production history and correctly rejects that drifting run.
+
+A fresh Q.6 certification must not begin until this repair is committed, published, synchronized into the live Scheduler, and autonomously reverified.
+
+---
+
+## Aborted certification attempts
+
+`aborted` is the terminal state for an explicitly retired incomplete sustained-use certification attempt.
+
+| State | Meaning |
+|---|---|
+| `completed` | The complete scheduled history was finalized and passed release evaluation. |
+| `failed` | The complete scheduled history was finalized but did not pass release evaluation. |
+| `aborted` | The certification attempt was incomplete and was deliberately retired while preserving its evidence. |
+
+The supported operator boundary is:
+
+```bash
+atlas sustained-use abort \
+  --confirm-run-id <exact-current-run-id>
+```
+
+The confirmation is mandatory and must exactly equal the current session run ID. There is no force bypass.
+
+The abort lifecycle loads the current session, permits only `active` or partially archived `aborted` state, transitions an active session to `aborted`, records a UTC `completed_at`, persists the terminal session, archives the run, and returns the immutable archive path. If a previous archive attempt was interrupted after the status transition, retry preserves the original completion timestamp.
+
+Each retired run is stored at:
+
+```text
+archive/<run-id>/
+├── session.json
+├── latest.json
+└── history/
+```
+
+The move order is `history`, then `latest.json`, then `session.json`. Moving `session.json` last keeps the lifecycle closed until archival is complete. Archived run identities are not reusable.
+
+Before a replacement T0, the release candidate must be committed and published, Git health must be clean, `sustained-use.sample` must be registered at the canonical 60-second polling interval while preserving the 900-second certification interval, the production Scheduler dispatcher must be enabled and active, dormant callback behavior must be reverified, and every previous aborted run must remain intact.
+
+## Q.6A.7 Runtime Bus terminal convergence
+
+The completed 193-sample production run exposed a terminal race that cannot be represented correctly by an instantaneous `final Runtime Bus backlog of zero` history rule.
+
+The final certification target is now frozen from sample 193:
+
+```text
+terminal_target = sample_193.runtime_bus.journal_tail
+terminal_timeout = 180 seconds
+```
+
+After the complete hard, temporal, and fixed-slot history passes, finalization observes Notifications until its Runtime Bus cursor reaches or exceeds that frozen target.
+
+| Terminal state | Meaning |
+|---|---|
+| `pending` | The cursor has not yet reached the frozen target and the bounded observation window remains open. This is not success. |
+| `passed` | The cursor reached or exceeded the frozen sample-193 target within 180 seconds. |
+| timeout/failure | The cursor did not reach the frozen target within 180 seconds. Certification fails. |
+
+Runtime Bus events published after sample 193 are explicitly allowed. They do not move the terminal target and do not require the subscriber to catch an ever-advancing journal tail before certification can complete.
+
+This terminal observer replaces the obsolete temporal invariant requiring final Runtime Bus backlog to equal zero at the exact history boundary. Historical evaluation still requires Runtime Bus journal and subscriber-cursor monotonicity; terminal convergence is evaluated separately by the lifecycle.
+
+The production run `q6-20260819T233234Z` remains immutable historical evidence. It reached `193/193`, passed retrospective history and fixed-cadence evaluation, but its original finalization closed as `failed` under the obsolete instantaneous backlog gate. Q.6A.7 does not rewrite that session. Retrospective bounded observation demonstrated that Notifications consumed through the frozen sample-193 target.
+
+The repair must be documented, certified, committed, and published before any post-repair release-certification action is taken.
+
+## Final v1.0 Q.6 certification
+
+The final fresh production certification is complete.
+
+```text
+run_id:                    q6-20260822T011449Z
+candidate_commit:          13a48a5ce1a6e4c5f335f4ae6cd19ba61149fefa
+samples:                   193/193
+history_evaluation:        PASS
+fixed_cadence_evaluation:  PASS
+fixed_slot_violations:     0
+scheduler_failures:        0
+terminal_status:           passed
+session_status:            completed
+Q6_RELEASE_CERTIFICATION:  PASS
+```
+
+The observation window began at `2026-08-22T01:14:49.687123Z`. Sample 193 was captured at `2026-08-24T01:15:59.617495Z`.
+
+Finalization froze the Runtime Bus terminal target from sample 193 at journal line `7053`. Notifications reached cursor `7068` while the journal advanced to line `7070`; convergence completed in two probes inside the bounded 180-second window. Post-target Runtime Bus growth did not move the certification target.
+
+The complete 193-sample history remained byte-identical through finalization. The earlier failed run `q6-20260819T233234Z` and all aborted attempts remain preserved as immutable historical evidence.
+
+At the final certification boundary, the Scheduler timer was stopped but remained enabled, the Scheduler one-shot service was inactive, Atlas health was `healthy:100`, and production contained 22 running containers with zero unhealthy containers.
+
+This evidence closes the M-023 `Complete sustained-use test` gate for the exact published candidate. It also provides the live production proof required to close the Scheduler-dispatcher release-blocking defect. Controlled pilot, stabilization, release-candidate freeze, tagging, and publication remain separate release gates.

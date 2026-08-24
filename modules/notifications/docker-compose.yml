@@ -23,6 +23,9 @@ services:
       - /mnt/storage/configs/atlas/runtime/subscribers/module-notifications.filter:/mnt/storage/configs/atlas/runtime/subscribers/module-notifications.filter:ro
       - /mnt/storage/configs/atlas/notifications:/mnt/storage/configs/atlas/notifications
 
+    group_add:
+      - "20000"
+
     security_opt:
       - no-new-privileges:true
 
@@ -33,7 +36,8 @@ services:
       test:
         - CMD-SHELL
         - >-
-          test -f /mnt/storage/configs/atlas/notifications/worker-heartbeat
+          test -r /mnt/storage/configs/atlas/runtime/events.jsonl
+          && test -f /mnt/storage/configs/atlas/notifications/worker-heartbeat
           && test
           $(( $(date +%s) - $(stat -c %Y /mnt/storage/configs/atlas/notifications/worker-heartbeat) ))
           -lt 30

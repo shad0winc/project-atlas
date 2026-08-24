@@ -8,7 +8,7 @@ vi.mock("../../../lib/services/authenticated", () => ({
   authenticatedAtlasApiRequest: authenticatedAtlasApiRequestMock
 }));
 
-import { readFavorites, removeFavoriteRecord } from "./favorites";
+import { createFavoriteRecord, readFavorites, removeFavoriteRecord } from "./favorites";
 
 const FAVORITE_ID = "fav_0123456789abcdef0123456789abcdef";
 const USER_ID = "usr_0123456789abcdef0123456789abcdef";
@@ -112,5 +112,116 @@ describe("Favorites authenticated service boundary", () => {
         expectedUserId: USER_ID
       })
     ).rejects.toThrow("Favorites removal response crossed the authenticated-user boundary.");
+  });
+});
+
+describe("createFavoriteRecord", () => {
+  it("creates one authenticated-user favorite without retrying the mutation", async () => {
+    const userId = `usr_${"a".repeat(32)}`;
+    const favoriteId = `fav_${"b".repeat(32)}`;
+
+    authenticatedAtlasApiRequestMock.mockResolvedValueOnce({
+      schema_version: 1,
+      favorite_id: favoriteId,
+      user_id: userId,
+      provider: "jellyfin",
+      item_id: "jellyfin-item-123",
+      media_type: "movie",
+      title: "Interstellar",
+      metadata: {},
+      created_at: "2026-08-16T00:00:00Z",
+      updated_at: "2026-08-16T00:00:00Z"
+    });
+
+    const favorite = await createFavoriteRecord(
+      {
+        provider: " Jellyfin ",
+        itemId: " jellyfin-item-123 "
+      },
+      {
+        expectedUserId: userId
+      }
+    );
+
+    expect(authenticatedAtlasApiRequestMock).toHaveBeenCalledWith(
+      "/favorites",
+      expect.objectContaining({
+        method: "POST",
+        cache: "no-store",
+        retryPolicy: {
+          maxRetries: 0,
+          baseDelayMs: 250,
+          maxDelayMs: 5_000
+        },
+        body: {
+          provider: "jellyfin",
+          item_id: "jellyfin-item-123"
+        }
+      })
+    );
+
+    expect(favorite.favoriteId).toBe(favoriteId);
+    expect(favorite.userId).toBe(userId);
+    expect(favorite.provider).toBe("jellyfin");
+    expect(favorite.itemId).toBe("jellyfin-item-123");
+  });
+
+  it("rejects a favorite creation response that crosses the authenticated-user boundary", async () => {
+    const expectedUserId = `usr_${"a".repeat(32)}`;
+    const otherUserId = `usr_${"c".repeat(32)}`;
+
+    authenticatedAtlasApiRequestMock.mockResolvedValueOnce({
+      schema_version: 1,
+      favorite_id: `fav_${"b".repeat(32)}`,
+      user_id: otherUserId,
+      provider: "jellyfin",
+      item_id: "jellyfin-item-123",
+      media_type: "movie",
+      title: "Interstellar",
+      metadata: {},
+      created_at: "2026-08-16T00:00:00Z",
+      updated_at: "2026-08-16T00:00:00Z"
+    });
+
+    await expect(
+      createFavoriteRecord(
+        {
+          provider: "jellyfin",
+          itemId: "jellyfin-item-123"
+        },
+        {
+          expectedUserId
+        }
+      )
+    ).rejects.toThrow("Favorite creation response crossed the authenticated-user boundary.");
+  });
+
+  it("rejects a favorite creation response for a different media identity", async () => {
+    const userId = `usr_${"a".repeat(32)}`;
+
+    authenticatedAtlasApiRequestMock.mockResolvedValueOnce({
+      schema_version: 1,
+      favorite_id: `fav_${"b".repeat(32)}`,
+      user_id: userId,
+      provider: "jellyfin",
+      item_id: "different-item",
+      media_type: "movie",
+      title: "Different item",
+      metadata: {},
+      created_at: "2026-08-16T00:00:00Z",
+      updated_at: "2026-08-16T00:00:00Z"
+    });
+
+    await expect(
+      createFavoriteRecord(
+        {
+          provider: "jellyfin",
+          itemId: "jellyfin-item-123"
+        },
+        {
+          expectedUserId: userId
+        }
+      )
+    ).rejects.toThrow("Favorite creation response did not match the requested media identity.");
   });
 });

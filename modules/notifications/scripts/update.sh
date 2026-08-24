@@ -49,6 +49,7 @@ do
 done
 
 event_log='/mnt/storage/configs/atlas/runtime/events.jsonl'
+event_reader_gid='20000'
 cursor='/mnt/storage/configs/atlas/runtime/subscribers/module-notifications.cursor'
 filter='/mnt/storage/configs/atlas/runtime/subscribers/module-notifications.filter'
 
@@ -72,7 +73,7 @@ fi
 if ! setpriv \
     --reuid="$puid" \
     --regid="$pgid" \
-    --clear-groups \
+    --groups="$event_reader_gid" \
     test -r "$event_log"; then
   echo "ERROR: Notifications runtime identity cannot read the Runtime Bus event journal." >&2
   echo "Refusing to recreate the non-root Notifications worker." >&2
@@ -96,6 +97,7 @@ echo
 
 if ! docker compose \
     --env-file "$OPERATOR_ENV_FILE" \
+    --project-name notifications \
     -f "$MODULE_DIR/docker-compose.yml" \
     config >/dev/null; then
   echo "Module Compose configuration is invalid."
@@ -104,11 +106,13 @@ fi
 
 docker compose \
   --env-file "$OPERATOR_ENV_FILE" \
+  --project-name notifications \
   -f "$MODULE_DIR/docker-compose.yml" \
   build
 
 docker compose \
   --env-file "$OPERATOR_ENV_FILE" \
+  --project-name notifications \
   -f "$MODULE_DIR/docker-compose.yml" \
   up -d
 
