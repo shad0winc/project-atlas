@@ -14,8 +14,29 @@ separate from sprint history, release notes, and future planning.
 - `CHANGELOG.md` records user-visible and operator-visible changes.
 - `docs/BUILD_LOG.md` records implementation history and validation evidence.
 - `docs/architecture/*.md` describes stable subsystem design and contracts.
+- `docs/guides/*.md` owns canonical v1 operator and user procedures.
 - `docs/ADR/` records architectural decisions and their rationale.
 - `docs/EDR/` records engineering decisions and implementation constraints.
+
+## Relationship to Canonical v1 Guides
+
+Architecture documents define system structure, ownership boundaries, invariants,
+and failure semantics. They do not replace the canonical v1 procedures under
+`docs/guides/`.
+
+- [Administrator Guide](../guides/ADMINISTRATOR_GUIDE.md) — administrator workflows and operational navigation.
+- [User Guide](../guides/USER_GUIDE.md) — end-user workflows and user-safe failure behavior.
+- [Installation Guide](../guides/INSTALLATION_GUIDE.md) — installation and initial production verification.
+- [Upgrade Guide](../guides/UPGRADE_GUIDE.md) — controlled production upgrade transaction.
+- [Rollback Guide](../guides/ROLLBACK_GUIDE.md) — deployment rollback transaction.
+- [Backup/Restore Guide](../guides/BACKUP_RESTORE_GUIDE.md) — Atlas backup and state-restore transaction.
+- [Troubleshooting Guide](../guides/TROUBLESHOOTING_GUIDE.md) — diagnosis, incident handling, and failure recovery.
+
+When an architecture document explains why a boundary exists and a guide explains
+how to operate within that boundary, both are authoritative in their own scope.
+If procedural wording in an architecture document appears to conflict with a
+canonical guide, stop and follow the canonical guide for the operation while
+preserving the architecture contract.
 
 ## Atlas Structure
 
@@ -63,7 +84,10 @@ logic.
 - [Interrupted-Request Recovery](INTERRUPTED_REQUEST_RECOVERY.md)
 - [Sports Recovery](SPORTS_RECOVERY.md)
 - [Automatic Cleanup Safety](AUTOMATIC_CLEANUP_SAFETY.md)
+- [VPN Fail-Closed Verification](VPN_FAIL_CLOSED.md)
 - [Storage Exhaustion Recovery](STORAGE_EXHAUSTION.md)
+- [Unavailable-Provider Behavior](UNAVAILABLE_PROVIDER_BEHAVIOR.md)
+- [Production Deployment Safety](DEPLOYMENT_SAFETY.md)
 - [Portal](PORTAL.md)
 - [Backup and Recovery](BACKUP_RECOVERY.md)
 - [Security](SECURITY.md)
@@ -111,6 +135,13 @@ Project Atlas milestones use this sequence:
 - [Architecture](SERVICE_LIFECYCLE.md)
 - [CLI reference](../cli/SERVICE_LIFECYCLE.md)
 - [Python API reference](../api/SERVICE_LIFECYCLE.md)
+
+## Stale-State Recovery
+
+Stale-State Recovery defines deterministic handling for persisted or observed
+service state that can no longer be trusted as current.
+
+- [Architecture](STALE_STATE_RECOVERY.md)
 
 ## Startup Policy
 
@@ -225,6 +256,13 @@ controlled changes to the stable Atlas deployment.
 
 - [Architecture](DEPLOYMENT_SAFETY.md)
 - [ADR 0022 — Production Deployment Safety Boundaries](../ADR/0022-production-deployment-safety-boundaries.md)
+
+## Portal
+
+Portal defines the web-interface architecture and the boundary between browser
+presentation, Atlas API/service contracts, and provider-specific behavior.
+
+- [Architecture](PORTAL.md)
 
 ## Backup and Recovery
 
