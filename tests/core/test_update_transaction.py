@@ -32,6 +32,18 @@ def prepare_runtime(tmp_path: Path, *, branch: str = "main") -> dict[str, str]:
     (project / "docker-compose.yml").write_text("services: {}\n", encoding="utf-8")
     (project / "stack" / "ingress.yml").write_text("services: {}\n", encoding="utf-8")
 
+    tracked_build_files = (
+        project / "apps" / "api" / "pyproject.toml",
+        project / "apps" / "api" / "atlas_api" / "main.py",
+        project / "atlas" / "example.py",
+        project / "apps" / "portal" / "package.json",
+    )
+
+    for tracked in tracked_build_files:
+        tracked.parent.mkdir(parents=True, exist_ok=True)
+        tracked.write_text("fixture\n", encoding="utf-8")
+        tracked.chmod(0o644)
+
     write_executable(
         project / "scripts" / "verify-ingress.sh",
         """
@@ -66,6 +78,12 @@ def prepare_runtime(tmp_path: Path, *, branch: str = "main") -> dict[str, str]:
           printf '%s\\n' "${{ATLAS_TEST_ORIGIN_MAIN:-abc123}}"
         elif [[ "$args" == *" rev-parse HEAD "* ]]; then
           printf '%s\\n' "${{ATLAS_TEST_HEAD:-abc123}}"
+        elif [[ "$args" == *" ls-files -z "* ]]; then
+          printf '%s\\0' \
+            'apps/api/pyproject.toml' \
+            'apps/api/atlas_api/main.py' \
+            'atlas/example.py' \
+            'apps/portal/package.json'
         else
           exit 1
         fi
@@ -251,6 +269,82 @@ def test_diverged_main_is_rejected_before_runtime_mutation(tmp_path: Path) -> No
     assert result.returncode != 0
     assert event_lines(environment) == []
     assert not lock_path(environment).exists()
+
+
+def test_ingress_unreadable_tracked_file_fails_before_network_or_maintenance(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+
+    project = Path(environment["ATLAS_PROJECT_DIR"])
+    blocked = project / "atlas" / "example.py"
+    blocked.chmod(0o600)
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode != 0
+
+    events = event_lines(environment)
+
+    assert events == [
+        "preserve-rollback-images",
+        "doctor",
+    ]
+    assert "maintenance:enable" not in events
+    assert "backup" not in events
+    assert not any(
+        event.startswith("docker compose")
+        for event in events
+    )
+    assert not lock_path(environment).exists()
+
+    assert (
+        "tracked build-context file is not readable by "
+        "container runtime user: atlas/example.py (mode=600)"
+        in result.stderr
+    )
+    assert (
+        "ingress build-context permission validation failed"
+        in result.stderr
+    )
+
+
+def test_ingress_untraversable_tracked_directory_fails_before_network_or_maintenance(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+
+    project = Path(environment["ATLAS_PROJECT_DIR"])
+    blocked = project / "atlas"
+    blocked.chmod(0o700)
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode != 0
+
+    events = event_lines(environment)
+
+    assert events == [
+        "preserve-rollback-images",
+        "doctor",
+    ]
+    assert "maintenance:enable" not in events
+    assert "backup" not in events
+    assert not any(
+        event.startswith("docker compose")
+        for event in events
+    )
+    assert not lock_path(environment).exists()
+
+    assert (
+        "tracked build-context directory is not traversable by "
+        "container runtime user: atlas (mode=700)"
+        in result.stderr
+    )
+    assert (
+        "ingress build-context permission validation failed"
+        in result.stderr
+    )
 
 
 def test_core_update_preflights_artifacts_before_maintenance_and_reopens_on_success(

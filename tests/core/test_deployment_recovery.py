@@ -147,28 +147,429 @@ def test_rollback_requires_previous_verified_baseline_and_backup() -> None:
     assert "automatic rollback is blocked for state-changing migrations" in section
 
 
-def test_rollback_uses_immutable_images_without_pull_or_build() -> None:
+def test_rollback_uses_preserved_aliases_without_pull_or_build() -> None:
     content = DEPLOYMENT.read_text(encoding="utf-8")
     section = content.split("atlas_deployment_restore_surface() {", 1)[1].split(
         "atlas_deployment_rollback() {", 1
     )[0]
 
-    assert 'docker image inspect "$image_id"' in section
-    assert 'docker image tag "$image_id" "$image_reference"' in section
+    assert 'local rollback_images="$transaction/rollback-images.tsv"' in section
+    assert '"$rollback_images"' in section
+    assert 'recovery_tag="$(' in section
+    assert 'docker image inspect "$recovery_tag"' in section
+    assert "'{{.Id}}'" in section
+    assert '== "$image_id"' in section
+    assert "rollback-images.yml" in section
+    assert "image: %s" in section
+    assert '-f "$override"' in section
     assert "up -d --no-build --pull never" in section
     assert "docker pull" not in section
+    assert 'docker image tag "$image_id" "$image_reference"' not in section
 
 
-def test_rollback_source_is_extracted_outside_live_git_worktree() -> None:
+def test_restore_surface_uses_alias_for_digest_shaped_reference(
+    tmp_path: Path,
+) -> None:
+    runtime = tmp_path / "runtime"
+    records = runtime / "deployments" / "records"
+    baseline = tmp_path / "baseline"
+    transaction = records / "update-test"
+    recovery_source = tmp_path / "source"
+    bin_dir = tmp_path / "bin"
+    tags = tmp_path / "tags"
+    compose_events = tmp_path / "compose-events"
+
+    baseline.mkdir()
+    transaction.mkdir(parents=True)
+    recovery_source.mkdir()
+    bin_dir.mkdir()
+
+    (recovery_source / "stack").mkdir()
+    (recovery_source / "stack" / "ingress.yml").write_text(
+        "services: {}\n",
+        encoding="utf-8",
+    )
+
+    subprocess.run(
+        [
+            "tar",
+            "-czf",
+            str(baseline / "ingress-source.tar.gz"),
+            "-C",
+            str(recovery_source),
+            ".",
+        ],
+        check=True,
+    )
+
+    digest_reference = (
+        "registry.example/atlas/caddy@"
+        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    )
+
+    (baseline / "images.tsv").write_text(
+        "ingress|stack/ingress.yml|atlas-ingress|caddy|"
+        f"atlas-caddy|{digest_reference}|sha256:caddy\n",
+        encoding="utf-8",
+    )
+
+    (transaction / "rollback-images.tsv").write_text(
+        "sha256:caddy|atlas-rollback:update-test-1\n",
+        encoding="utf-8",
+    )
+
+    tags.write_text(
+        "atlas-rollback:update-test-1|sha256:caddy\n",
+        encoding="utf-8",
+    )
+
+    docker = bin_dir / "docker"
+
+    docker.write_text(
+        textwrap.dedent(
+            r'''
+            #!/usr/bin/env bash
+            set -euo pipefail
+
+            if [[ "$1 $2" == "image inspect" && "${3:-}" != "--format" ]]; then
+              awk -F'|' -v tag="$3" \
+                '$1 == tag {found=1} END {exit !found}' \
+                "$ATLAS_TEST_TAGS"
+              exit $?
+            fi
+
+            if [[ "$1 $2 $3" == "image inspect --format" ]]; then
+              awk -F'|' -v tag="$5" \
+                '$1 == tag {print $2; exit}' \
+                "$ATLAS_TEST_TAGS"
+              exit 0
+            fi
+
+            if [[ "$1 $2" == "image tag" ]]; then
+              echo "UNEXPECTED_IMAGE_TAG|$*" \
+                >> "$ATLAS_TEST_COMPOSE_EVENTS"
+              exit 90
+            fi
+
+            if [[ "$1" == "compose" ]]; then
+              printf '%s\n' "$*" \
+                >> "$ATLAS_TEST_COMPOSE_EVENTS"
+              exit 0
+            fi
+
+            exit 1
+            '''
+        ).lstrip(),
+        encoding="utf-8",
+    )
+
+    docker.chmod(0o755)
+
+    live = tmp_path / "live"
+    live.mkdir()
+    (live / ".env").write_text(
+        "ATLAS_TEST=1\n",
+        encoding="utf-8",
+    )
+
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "PATH": f"{bin_dir}:{environment['PATH']}",
+            "ATLAS_PROJECT_DIR": str(live),
+            "ATLAS_RUNTIME_CONFIG_DIR": str(runtime),
+            "ATLAS_TEST_DEPLOYMENT": str(DEPLOYMENT),
+            "ATLAS_TEST_TAGS": str(tags),
+            "ATLAS_TEST_COMPOSE_EVENTS": str(compose_events),
+        }
+    )
+
+    harness = r'''
+    set -euo pipefail
+    source "$ATLAS_TEST_DEPLOYMENT"
+    atlas_deployment_restore_surface "$1" "$2" ingress
+    '''
+
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            textwrap.dedent(harness),
+            "test",
+            str(baseline),
+            str(transaction),
+        ],
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+
+    events = compose_events.read_text(
+        encoding="utf-8"
+    ).splitlines()
+
+    assert not any(
+        event.startswith("UNEXPECTED_IMAGE_TAG")
+        for event in events
+    )
+
+    compose = next(
+        event
+        for event in events
+        if not event.startswith("UNEXPECTED_IMAGE_TAG")
+    )
+
+    assert "--no-build" in compose
+    assert "--pull never" in compose
+    assert "rollback-images.yml" in compose
+
+    recovery_dirs = list(
+        transaction.glob("recovery-ingress.*")
+    )
+
+    assert len(recovery_dirs) == 1
+
+    override = (
+        recovery_dirs[0] / "rollback-images.yml"
+    ).read_text(encoding="utf-8")
+
+    assert override == (
+        "services:\n"
+        "  caddy:\n"
+        "    image: atlas-rollback:update-test-1\n"
+    )
+
+    assert digest_reference not in override
+
+
+def test_restore_surface_fails_when_rollback_alias_is_missing(
+    tmp_path: Path,
+) -> None:
+    runtime = tmp_path / "runtime"
+    records = runtime / "deployments" / "records"
+    baseline = tmp_path / "baseline"
+    transaction = records / "update-test"
+    source = tmp_path / "source"
+
+    baseline.mkdir()
+    transaction.mkdir(parents=True)
+    source.mkdir()
+
+    (source / "docker-compose.yml").write_text(
+        "services: {}\n",
+        encoding="utf-8",
+    )
+
+    subprocess.run(
+        [
+            "tar",
+            "-czf",
+            str(baseline / "core-source.tar.gz"),
+            "-C",
+            str(source),
+            ".",
+        ],
+        check=True,
+    )
+
+    (baseline / "images.tsv").write_text(
+        "core|docker-compose.yml|atlas|core|"
+        "core-container|core:test|sha256:core\n",
+        encoding="utf-8",
+    )
+
+    (transaction / "rollback-images.tsv").write_text(
+        "sha256:other|atlas-rollback:update-test-1\n",
+        encoding="utf-8",
+    )
+
+    live = tmp_path / "live"
+    live.mkdir()
+
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "ATLAS_PROJECT_DIR": str(live),
+            "ATLAS_RUNTIME_CONFIG_DIR": str(runtime),
+            "ATLAS_TEST_DEPLOYMENT": str(DEPLOYMENT),
+        }
+    )
+
+    harness = r'''
+    set -euo pipefail
+    source "$ATLAS_TEST_DEPLOYMENT"
+    atlas_deployment_restore_surface "$1" "$2" core
+    '''
+
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            textwrap.dedent(harness),
+            "test",
+            str(baseline),
+            str(transaction),
+        ],
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert (
+        "rollback alias missing for image sha256:core (core)"
+        in result.stderr
+    )
+
+
+def test_rollback_source_uses_persistent_deployment_record_namespace() -> None:
     content = DEPLOYMENT.read_text(encoding="utf-8")
-    section = content.split("atlas_deployment_restore_surface() {", 1)[1].split(
-        "atlas_deployment_rollback() {", 1
+
+    helper = content.split(
+        "atlas_deployment_create_recovery_dir() {",
+        1,
+    )[1].split(
+        "atlas_deployment_record_value() {",
+        1,
     )[0]
 
-    assert 'mktemp -d "$transaction/recovery-${surface}.XXXXXX"' in section
-    assert 'tar -xzf "$archive" -C "$recovery"' in section
-    assert "git checkout" not in section
-    assert "git reset" not in section
+    restore = content.split(
+        "atlas_deployment_restore_surface() {",
+        1,
+    )[1].split(
+        "atlas_deployment_rollback() {",
+        1,
+    )[0]
+
+    assert 'records="$(atlas_deployment_records_dir)"' in helper
+    assert 'records_real="$(realpath -e "$records")"' in helper
+    assert 'transaction_real="$(realpath -e "$transaction")"' in helper
+    assert 'dirname "$transaction_real"' in helper
+    assert '== "$records_real"' in helper
+    assert 'atlas_deployment_valid_id "$transaction_id"' in helper
+    assert (
+        '"$transaction_real/recovery-${surface}.XXXXXX"'
+        in helper
+    )
+
+    assert "atlas_deployment_create_recovery_dir" in restore
+    assert 'tar -xzf "$archive" -C "$recovery"' in restore
+    assert 'mktemp -d "$transaction/recovery-${surface}.XXXXXX"' not in restore
+    assert "git checkout" not in restore
+    assert "git reset" not in restore
+
+
+def test_recovery_directory_is_created_under_transaction_record_and_persists(
+    tmp_path: Path,
+) -> None:
+    runtime = tmp_path / "runtime"
+    records = runtime / "deployments" / "records"
+    transaction = records / "update-test"
+
+    transaction.mkdir(parents=True)
+
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "ATLAS_RUNTIME_CONFIG_DIR": str(runtime),
+            "ATLAS_TEST_DEPLOYMENT": str(DEPLOYMENT),
+        }
+    )
+
+    harness = r"""
+    set -euo pipefail
+
+    source "$ATLAS_TEST_DEPLOYMENT"
+
+    atlas_deployment_create_recovery_dir \
+      "$1" \
+      ingress
+    """
+
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            textwrap.dedent(harness),
+            "test",
+            str(transaction),
+        ],
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+
+    recovery = Path(result.stdout.strip())
+
+    assert recovery.parent == transaction.resolve()
+    assert recovery.name.startswith("recovery-ingress.")
+    assert recovery.is_dir()
+
+    # The helper returns without deleting the directory because
+    # containers may retain bind mounts into this source tree.
+    assert recovery.exists()
+
+
+def test_recovery_directory_rejects_transaction_outside_records_namespace(
+    tmp_path: Path,
+) -> None:
+    runtime = tmp_path / "runtime"
+    records = runtime / "deployments" / "records"
+    outsider = tmp_path / "outside" / "update-test"
+
+    records.mkdir(parents=True)
+    outsider.mkdir(parents=True)
+
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "ATLAS_RUNTIME_CONFIG_DIR": str(runtime),
+            "ATLAS_TEST_DEPLOYMENT": str(DEPLOYMENT),
+        }
+    )
+
+    harness = r"""
+    set -euo pipefail
+
+    source "$ATLAS_TEST_DEPLOYMENT"
+
+    atlas_deployment_create_recovery_dir \
+      "$1" \
+      ingress
+    """
+
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            textwrap.dedent(harness),
+            "test",
+            str(outsider),
+        ],
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+
+    assert (
+        "rollback transaction is outside the deployment records namespace"
+        in result.stderr
+    )
+
+    assert not list(
+        outsider.glob("recovery-ingress.*")
+    )
 
 
 def test_rollback_reopens_traffic_only_after_verification() -> None:

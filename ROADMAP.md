@@ -763,6 +763,11 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
   - [x] Complete the second controlled Jellyseerr-to-Seerr migration with the verified deployment transaction retained through runtime acceptance
   - [x] Certify standard-TV and Anime-TV server-owned routing, monitoring policy, and production E2E isolation under E2.5
   - [x] Harden target-artifact, isolation, lifecycle-ordering, and recovery contracts from E2.5 attempt #1
+  - [x] Fail closed before first-party ingress pull/build when tracked build-context permissions are incompatible
+  - [x] Restore captured image identities through verified transaction-scoped rollback aliases
+  - [x] Require rollback recovery sources beneath the persistent Atlas deployment-record namespace
+  - [x] Reconcile the exact 17-file checkout permission drift from `0600` to repository-authoritative `0644`
+  - [x] Certify the combined RC deployment-safety remediation while preserving failed deployment evidence and the recovered production baseline
 
 ### Backup and Recovery
 

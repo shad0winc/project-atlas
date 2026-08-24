@@ -18,6 +18,93 @@ atlas_update_validate_migration() {
   }
 }
 
+atlas_update_validate_build_context_permissions() {
+  local path
+  local absolute
+  local mode
+  local other_digit
+  local directory
+  local directory_absolute
+  local directory_mode
+  local directory_other_digit
+  local count=0
+
+  while IFS= read -r -d '' path; do
+    [[ -n "$path" ]] || continue
+
+    absolute="$ATLAS_PROJECT_DIR/$path"
+
+    [[ -e "$absolute" || -L "$absolute" ]] || {
+      printf 'ERROR: tracked build-context path is missing: %s\n' \
+        "$path" >&2
+      return 1
+    }
+
+    # Symlink access is governed by the target and parent-directory
+    # traversal contract rather than symlink mode bits.
+    [[ -L "$absolute" ]] && continue
+
+    [[ -f "$absolute" ]] || continue
+
+    count=$((count + 1))
+
+    mode="$(stat -c '%a' "$absolute")" || return 1
+    other_digit="${mode: -1}"
+
+    if (( (10#$other_digit & 4) == 0 )); then
+      printf \
+        'ERROR: tracked build-context file is not readable by container runtime user: %s (mode=%s)\n' \
+        "$path" \
+        "$mode" >&2
+      return 1
+    fi
+
+    directory="$(dirname "$path")"
+
+    while [[ "$directory" != '.' ]]; do
+      directory_absolute="$ATLAS_PROJECT_DIR/$directory"
+
+      [[ -d "$directory_absolute" ]] || {
+        printf \
+          'ERROR: tracked build-context parent directory is missing: %s\n' \
+          "$directory" >&2
+        return 1
+      }
+
+      directory_mode="$(stat -c '%a' "$directory_absolute")" ||
+        return 1
+
+      directory_other_digit="${directory_mode: -1}"
+
+      if (( (10#$directory_other_digit & 1) == 0 )); then
+        printf \
+          'ERROR: tracked build-context directory is not traversable by container runtime user: %s (mode=%s)\n' \
+          "$directory" \
+          "$directory_mode" >&2
+        return 1
+      fi
+
+      directory="$(dirname "$directory")"
+    done
+  done < <(
+    git -C "$ATLAS_PROJECT_DIR" \
+      ls-files -z -- "$@"
+  )
+
+  [[ "$count" -gt 0 ]] || {
+    echo 'ERROR: tracked build-context validation selected no regular files.' >&2
+    return 1
+  }
+}
+
+atlas_update_validate_ingress_build_permissions() {
+  atlas_update_validate_build_context_permissions \
+    apps/api/pyproject.toml \
+    apps/api/atlas_api \
+    atlas \
+    apps/portal
+}
+
 atlas_update_core_prepare() {
   docker compose \
     --env-file "$ATLAS_PROJECT_DIR/.env" \
@@ -28,6 +115,11 @@ atlas_update_core_prepare() {
 
 atlas_update_ingress_prepare() {
   local compose_file="$ATLAS_PROJECT_DIR/stack/ingress.yml"
+
+  atlas_update_validate_ingress_build_permissions || {
+    echo 'ERROR: ingress build-context permission validation failed.' >&2
+    return 1
+  }
 
   docker compose \
     --env-file "$ATLAS_PROJECT_DIR/.env" \
