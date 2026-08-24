@@ -871,7 +871,7 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 
 ### Release
 
-- [ ] Create v1.0 release candidate
+- [x] Create v1.0 release candidate
 - [ ] Deploy release candidate to production
 - [ ] Complete controlled user pilot
 - [ ] Complete stabilization period
