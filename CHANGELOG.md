@@ -19,6 +19,11 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Added
 
+- Completed Q.6 sustained-use release certification against exact published candidate `13a48a5ce1a6e4c5f335f4ae6cd19ba61149fefa` with run `q6-20260822T011449Z`: 193/193 immutable samples across the full 48-hour fixed-slot window, zero fixed-slot violations, zero Scheduler failures, bounded Runtime Bus terminal convergence PASS, and durable terminal status `completed`.
+- Final terminal evidence froze the sample-193 Runtime Bus target at journal line `7053`; Notifications converged through that target within two bounded probes, with final cursor `7068` and journal line `7070`. Post-target event growth remained allowed and did not move the certification target.
+- Preserved all prior failed/aborted Q.6 evidence without rewrite, kept the 193 history samples byte-identical through finalization, and stopped the Scheduler timer at the certification boundary while leaving it enabled for controlled future operation.
+- Closed the M-023 `Complete sustained-use test` release gate and the production Scheduler-dispatcher release-blocking defect after the exact published repair candidate completed the full autonomous production certification with Atlas `healthy:100`, 22 running containers, and zero unhealthy containers.
+
 - Added Q.6A.7 bounded Runtime Bus terminal-convergence semantics after the completed 193/193 production run exposed a finalization race between the frozen final sample and Notifications cursor convergence.
 - Replaced the historical final Runtime Bus backlog-equals-zero terminal gate with a bounded observer anchored to the Runtime Bus journal tail captured by sample 193. Finalization now requires Notifications to consume through that frozen target within 180 seconds; post-target journal growth is allowed and does not move the certification target.
 - Added explicit terminal evidence to the sustained-use lifecycle and CLI. `pending` is not success, convergence is required before `completed`, and timeout is a hard certification failure.

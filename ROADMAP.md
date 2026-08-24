@@ -817,7 +817,7 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 - [x] Complete responsive UI review
 - [x] Complete accessibility review
 - [x] Complete performance baseline
-- [ ] Complete sustained-use test
+- [x] Complete sustained-use test
   - [x] Implement Q.6 sustained-use domain contracts and immutable evidence persistence
   - [x] Implement `atlas sustained-use start|sample|status|finalize`
   - [x] Implement idempotent `sustained-use.sample` Scheduler callback
@@ -838,19 +838,21 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
   - [x] Add independent finalization-time fixed-slot validation
   - [x] Prove the fixed-slot evaluator retrospectively rejects the archived drifting production history
   - [x] Publish the Q.6A.5 fixed-cadence repair and synchronize the live `sustained-use.sample` task to 60-second polling
-  - [ ] Reverify dormant and accelerated autonomous fixed-slot behavior against the published repair
+  - [x] Reverify dormant and accelerated autonomous fixed-slot behavior against the published repair
   - [x] Establish the final fresh Q.6 T0 against the repaired published candidate
-  - [ ] Collect 193 samples across a fresh uninterrupted 48-hour / 15-minute fixed-slot observation window
-  - [ ] Finalize and certify the complete sustained-use history
+  - [x] Collect 193 samples across a fresh uninterrupted 48-hour / 15-minute fixed-slot observation window
+  - [x] Finalize and certify the complete sustained-use history
     - [x] Collect the complete uninterrupted 193/193 fixed-slot production history
     - [x] Preserve the original production finalization result as immutable failed evidence
     - [x] Diagnose the final Runtime Bus backlog race as a terminal-convergence defect
     - [x] Implement bounded Runtime Bus terminal convergence against the frozen sample-193 journal tail
     - [x] Certify the Q.6A.7 eight-file terminal-convergence repair candidate
-    - [ ] Reconcile, certify, commit, and publish the Q.6A.7 repair
-    - [ ] Perform the controlled post-publication release-certification step without rewriting historical Q.6 evidence
-- [ ] Resolve release-blocking defects
-  - [ ] Close the missing production Scheduler dispatcher defect through committed, published, installed, and live-certified remediation
+    - [x] Reconcile, certify, commit, and publish the Q.6A.7 repair
+    - [x] Perform the controlled post-publication release-certification step without rewriting historical Q.6 evidence
+    - [x] Certify fresh exact-candidate run `q6-20260822T011449Z` at 193/193 with zero fixed-slot violations, zero Scheduler failures, bounded terminal convergence PASS, and durable `completed` status
+    - [x] Preserve the complete sample history byte-identically and retain prior failed/aborted Q.6 evidence unchanged
+- [x] Resolve release-blocking defects
+  - [x] Close the missing production Scheduler dispatcher defect through committed, published, installed, and live-certified remediation
 
 ### Documentation
 

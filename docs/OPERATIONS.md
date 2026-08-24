@@ -1005,3 +1005,34 @@ Operators must not edit the final sample, advance the cursor manually, rewrite t
 When investigating terminal convergence, inspect the sustained-use finalization output together with current Runtime Bus journal/cursor and Notifications heartbeat evidence. A healthy current subscriber that has consumed through the frozen target demonstrates convergence; it does not alter the historical sample evidence.
 
 A production run may transition to `completed` only after hard evaluation, temporal history evaluation, fixed-slot evaluation, and bounded terminal convergence all pass. `pending` is never equivalent to success, and terminal timeout remains release-blocking.
+
+## Q.6 completed-certification boundary
+
+A successful Q.6 certification ends with a durable `completed` session and a frozen Scheduler boundary.
+
+The certified production sequence is:
+
+1. verify exactly `193/193` persisted samples and zero fixed-slot violations;
+2. wait for any in-flight `atlas-scheduler.service` invocation to finish;
+3. stop `atlas-scheduler.timer` without disabling it;
+4. verify the one-shot Scheduler service is inactive;
+5. finalize once through the bounded Runtime Bus terminal observer;
+6. require terminal status `passed`;
+7. verify the persisted session is `completed`;
+8. verify the 193 history samples were not rewritten; and
+9. reconcile the result into release documentation before changing release gates.
+
+The final successful v1.0 Q.6 run is `q6-20260822T011449Z` against commit `13a48a5ce1a6e4c5f335f4ae6cd19ba61149fefa`.
+
+Its terminal target was frozen at Runtime Bus journal line `7053`. Notifications converged through that target with final cursor `7068` in two probes. The live journal reached `7070`; that post-target growth is valid and does not change the frozen certification target.
+
+After successful certification, `atlas-scheduler.timer` is expected to be:
+
+```text
+enabled: yes
+active:  no
+```
+
+Do not restart the timer merely to make the post-certification state look active. Any later Scheduler activation belongs to the next explicitly controlled operational or release step.
+
+Historical failed and aborted Q.6 runs remain immutable evidence and must not be rewritten to match the successful run.

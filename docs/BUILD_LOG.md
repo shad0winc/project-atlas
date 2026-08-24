@@ -8248,3 +8248,73 @@ During Q.6A.7 implementation and certification:
 Q.6A.7 repairs the release-certification semantics but does not retroactively rewrite the failed production record and does not, by itself, close `Complete sustained-use test`.
 
 The next controlled sequence is to reconcile and certify documentation, commit and publish the complete terminal-convergence repair, restore clean Git health, and then perform the explicitly approved post-publication certification step while preserving all historical Q.6 evidence.
+
+## M-023 Release Quality Q.6A.7.14-Q.6A.7.15 — Final Sustained-Use Release Certification
+
+### Exact Published Candidate
+
+The fresh replacement certification ran against the exact published terminal-convergence candidate:
+
+```text
+branch: feature/v1-critical-e2e-contracts
+commit: 13a48a5ce1a6e4c5f335f4ae6cd19ba61149fefa
+run: q6-20260822T011449Z
+```
+
+Git remained frozen for the complete observation window.
+
+### Production Observation Result
+
+The run completed the full fixed-slot contract:
+
+```text
+samples:                 193/193
+history evaluation:      PASS
+fixed cadence:           PASS
+fixed-slot violations:   0
+Scheduler failures:      0
+Atlas health:            healthy:100
+running containers:      22
+unhealthy containers:    0
+```
+
+The 193 persisted history samples remained byte-identical through finalization.
+
+### Terminal Convergence Result
+
+At the 193/193 boundary, the finalization guard waited for any in-flight Scheduler dispatch to finish, stopped `atlas-scheduler.timer`, verified the one-shot service inactive, and froze the production boundary before finalization.
+
+The bounded Runtime Bus terminal observer then completed successfully:
+
+```text
+terminal target journal lines: 7053
+terminal final cursor value:    7068
+terminal final journal lines:   7070
+terminal probe count:           2
+terminal status:                passed
+hard failure count:             0
+```
+
+Notifications therefore consumed through the frozen sample-193 target within the 180-second terminal window. Journal growth after the target was permitted and did not move the certification target.
+
+### Durable Final Decision
+
+Finalization persisted:
+
+```text
+status: completed
+passed: true
+completed_at: 2026-08-24T01:30:00.736205Z
+```
+
+The Scheduler timer remained enabled but inactive after the frozen certification boundary.
+
+The earlier failed run `q6-20260819T233234Z` remained preserved as historical evidence, and no failed or aborted Q.6 record was rewritten.
+
+### Release-Gate Decision
+
+Q.6 sustained-use certification is complete for the exact published candidate `13a48a5ce1a6e4c5f335f4ae6cd19ba61149fefa`.
+
+The production Scheduler-dispatcher defect that invalidated the first Q.6 attempt is also closed as a release blocker: the committed and published dispatcher/fixed-cadence/terminal-convergence path completed a fresh autonomous 48-hour production certification with zero Scheduler failures.
+
+The ROADMAP gates `Complete sustained-use test` and `Resolve release-blocking defects` may therefore be marked complete. Pilot, stabilization, release-candidate freeze, tagging, and publication remain independent later release gates.

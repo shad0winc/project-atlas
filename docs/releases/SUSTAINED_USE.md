@@ -440,3 +440,30 @@ This terminal observer replaces the obsolete temporal invariant requiring final 
 The production run `q6-20260819T233234Z` remains immutable historical evidence. It reached `193/193`, passed retrospective history and fixed-cadence evaluation, but its original finalization closed as `failed` under the obsolete instantaneous backlog gate. Q.6A.7 does not rewrite that session. Retrospective bounded observation demonstrated that Notifications consumed through the frozen sample-193 target.
 
 The repair must be documented, certified, committed, and published before any post-repair release-certification action is taken.
+
+## Final v1.0 Q.6 certification
+
+The final fresh production certification is complete.
+
+```text
+run_id:                    q6-20260822T011449Z
+candidate_commit:          13a48a5ce1a6e4c5f335f4ae6cd19ba61149fefa
+samples:                   193/193
+history_evaluation:        PASS
+fixed_cadence_evaluation:  PASS
+fixed_slot_violations:     0
+scheduler_failures:        0
+terminal_status:           passed
+session_status:            completed
+Q6_RELEASE_CERTIFICATION:  PASS
+```
+
+The observation window began at `2026-08-22T01:14:49.687123Z`. Sample 193 was captured at `2026-08-24T01:15:59.617495Z`.
+
+Finalization froze the Runtime Bus terminal target from sample 193 at journal line `7053`. Notifications reached cursor `7068` while the journal advanced to line `7070`; convergence completed in two probes inside the bounded 180-second window. Post-target Runtime Bus growth did not move the certification target.
+
+The complete 193-sample history remained byte-identical through finalization. The earlier failed run `q6-20260819T233234Z` and all aborted attempts remain preserved as immutable historical evidence.
+
+At the final certification boundary, the Scheduler timer was stopped but remained enabled, the Scheduler one-shot service was inactive, Atlas health was `healthy:100`, and production contained 22 running containers with zero unhealthy containers.
+
+This evidence closes the M-023 `Complete sustained-use test` gate for the exact published candidate. It also provides the live production proof required to close the Scheduler-dispatcher release-blocking defect. Controlled pilot, stabilization, release-candidate freeze, tagging, and publication remain separate release gates.
