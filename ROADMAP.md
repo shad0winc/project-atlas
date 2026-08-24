@@ -866,7 +866,7 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 - [x] Complete backup and restore guide
 - [x] Complete troubleshooting guide
 - [x] Document maintenance windows
-- [ ] Document known limitations
+- [x] Document known limitations
 - [ ] Publish v1.0 release notes
 
 ### Release
