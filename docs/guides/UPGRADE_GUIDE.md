@@ -111,17 +111,22 @@ commit.
 
 ---
 
-## 5. Historical v1.0 Tag Warning
+## 5. Reconciled Historical v1.0 Tag
 
-The repository contains a historical premature `v1.0.0` tag that predates the
-final v1.0 release-certification process.
+A premature historical `v1.0.0` tag previously existed and predated the final
+v1.0 release-certification process. Release forensics confirmed that the tag
+was not valid release evidence because it claimed v1.0.0 while its tagged
+commit contained repository `VERSION` `0.9.0`.
 
-Do not use the existence of that tag as proof that a source commit is the final
-certified v1.0 release.
+The project owner explicitly reconciled and removed that invalid tag from the
+local and remote tag namespaces while preserving the underlying commit in Git
+history.
 
-Do not silently move or delete the tag as part of an ordinary upgrade.
-
-Tag reconciliation belongs to the final release procedure.
+Do not infer final-release status merely because the `v1.0.0` namespace is now
+available. Upgrade authorization continues to depend on the approved release
+source, exact certified commit, required validation, and the normal protected
+promotion and deployment gates. The genuine final `v1.0.0` tag must be created
+only by the certified final-release transaction.
 
 ---
 

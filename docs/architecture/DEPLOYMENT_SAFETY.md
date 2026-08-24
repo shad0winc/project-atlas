@@ -63,20 +63,23 @@ certified tag      -- immutable release identity
 A production runtime change still requires an explicit maintenance/deployment
 operation after source promotion.
 
-## Legacy Release-Tag Blocker
+## Legacy Release-Tag Reconciliation
 
-The existing `v1.0.0` tag cannot certify the eventual v1.0 release because it
-points to an earlier development commit.
+A historical annotated `v1.0.0` tag previously pointed to an earlier
+development commit and could not certify the eventual v1.0 release. Independent
+forensics established that the tag claimed `v1.0.0` while the tagged commit
+contained repository `VERSION` `0.9.0`.
 
-Until explicitly reconciled:
+The project owner explicitly reconciled the mismatch during release
+preparation. The invalid tag is now absent locally and from `origin`; its
+underlying commit remains preserved in normal Git history.
 
-- automation must not use it as proof that v1.0 is certified;
-- release documentation must identify the mismatch;
-- it must not be silently moved or deleted; and
-- final v1.0 publication remains blocked.
-
-Reconciliation requires explicit project-owner approval because changing a tag
-may affect external consumers.
+This reconciliation removes the legacy tag mismatch as a release blocker, but
+it does not satisfy the later release gates. Automation and operators must
+still require the normal release-candidate, promotion, production-validation,
+pilot, stabilization, freeze, final-certification, and publication evidence.
+The eventual final `v1.0.0` tag must point to the exact certified final-release
+commit.
 
 ## Maintenance Mode
 
@@ -361,9 +364,16 @@ durable rollback references. Validation then established:
   failed-transaction audit record, repository, maintenance state, and lock
   invariants clean.
 
-The historical premature `v1.0.0` tag remains intentionally untouched and is
-still an explicit release-certification blocker. Its reconciliation belongs to
-final v1.0 release work, not Deployment Safety.
+The historical premature `v1.0.0` tag has now been explicitly reconciled by the
+project owner as part of final v1.0 release preparation. Independent forensics
+confirmed that the tag claimed a production v1.0.0 release while its tagged
+commit contained repository `VERSION` `0.9.0`; the invalid tag was then removed
+locally and from `origin` while preserving the underlying commit in Git history.
+
+That legacy mismatch is no longer a release-certification blocker. Release
+candidate creation, protected promotion, production deployment, controlled
+pilot, stabilization, candidate freeze, final certification, tagging, and
+publication remain separate later release gates.
 
 ## E2.5 Migration Recovery Lessons
 

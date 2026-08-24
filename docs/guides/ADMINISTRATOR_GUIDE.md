@@ -152,14 +152,21 @@ merge does not by itself authorize a production runtime change.
 
 Atlas v1.0 does not require a permanent `develop` branch.
 
-### 4.1 Existing historical `v1.0.0` tag
+### 4.1 Reconciled historical `v1.0.0` tag
 
-The repository contains an older annotated `v1.0.0` tag that predates the
-current v1.0 release-readiness program. It is not valid final v1.0 certification
-evidence.
+An older annotated `v1.0.0` tag previously existed in the repository and
+predated the current v1.0 release-readiness program. Independent release
+forensics confirmed that it was not valid final v1.0 certification evidence:
+the tag claimed a production v1.0.0 release while the tagged commit contained
+repository `VERSION` `0.9.0`.
 
-Do not silently move, delete, or treat that tag as the final release identity.
-Its reconciliation is a deliberate final-release action.
+The project owner explicitly reconciled that historical tag during final
+release preparation. It is now absent locally and from `origin`; the underlying
+historical commit remains preserved in Git history.
+
+This reconciliation does not mean Project Atlas v1.0.0 has been released. The
+final `v1.0.0` tag must still be created through the certified release process
+and must point to the exact approved final-release commit.
 
 ---
 

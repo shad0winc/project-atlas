@@ -135,8 +135,24 @@ have release-specific compatibility, backup, validation, and recovery evidence
 before production automation may authorize it. Missing migration evidence
 blocks deployment.
 
-## Existing v1.0.0 Tag
+## Reconciled v1.0.0 Tag State
 
-The historical `v1.0.0` tag remains a separate release blocker. This workflow
-does not reinterpret, move, delete, or accept that tag as current certification
-evidence. Tag reconciliation remains an explicit project-owner release action.
+The historical premature `v1.0.0` tag was explicitly reconciled by the project
+owner during the v1.0 release-readiness process after independent forensic
+verification established that the annotated tag claimed a production v1.0.0
+release while pointing to an earlier commit whose repository `VERSION` was
+`0.9.0`.
+
+That invalid tag has been deleted locally and from `origin`. The underlying
+historical commit remains preserved in normal Git history.
+
+The absence of the old tag does not itself certify or publish Project Atlas
+v1.0.0. A future `v1.0.0` tag may be created only by the normal release process
+and must point to the exact certified final-release commit.
+
+Until that final release gate is reached:
+
+- do not treat the reclaimed `v1.0.0` namespace as release evidence;
+- do not create or move a final tag outside the certified release transaction;
+- keep release-candidate and final-release identities distinct; and
+- preserve the forensic and historical documentation describing the former tag.
