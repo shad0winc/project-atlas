@@ -78,6 +78,23 @@ The document validates:
 - performance, failure, and recovery behavior;
 - defect classification and release approval.
 
+### [`KNOWN_LIMITATIONS.md`](KNOWN_LIMITATIONS.md)
+
+Records the bounded limitations accepted for the Project Atlas v1.0 release
+boundary.
+
+The document distinguishes accepted limitations from:
+
+- release-blocking defects;
+- supported operating boundaries;
+- deferred post-v1 scope; and
+- unresolved release questions.
+
+Publication of the Known Limitations document does not itself mean Project Atlas
+v1.0 has been released. Release-candidate creation, controlled pilot,
+stabilization, release freeze, tagging, release notes, publication, and stable
+support remain separate release gates until completed and certified.
+
 ### [`RELEASE_TEMPLATE.md`](RELEASE_TEMPLATE.md)
 
 Provides the reusable planning and certification structure for future Atlas

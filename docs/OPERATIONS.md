@@ -503,7 +503,7 @@ human renderer.
 
 ## Shared API Contract Foundation
 
-Operations now shares a transport-neutral contract layer located under
+Operations shares a transport-neutral contract layer located under
 `atlas/api`.
 
 The shared package provides:
@@ -519,9 +519,17 @@ These contracts remain framework-independent and intentionally avoid
 FastAPI, Pydantic, Starlette, routing objects, HTTP request objects,
 and status codes.
 
-Future Operations HTTP routes will construct shared Atlas API contracts
-first and adapt them into FastAPI schemas only at the outer HTTP
-boundary.
+The v1 Atlas HTTP API adapts the shared Operations contracts at the outer
+FastAPI boundary. The authenticated, permission-gated read-only Operations
+surface is registered under `/api/v1/operations` and currently provides:
+
+- `GET /api/v1/operations/report` — collect one fresh, non-persisted Operations report;
+- `GET /api/v1/operations/latest` — return the latest validated persisted report;
+- `GET /api/v1/operations/history` — return validated persisted report history;
+- `GET /api/v1/operations/compare` — compare the two newest persisted reports.
+
+The HTTP routes require the `system.health.read` permission and preserve the
+shared Atlas success/failure envelope contract.
 
 This preserves one canonical transport contract for:
 
@@ -529,16 +537,18 @@ This preserves one canonical transport contract for:
 - HTTP endpoints;
 - automation;
 - integration tests;
-- future Portal communication.
+- Portal communication.
 
-Existing CLI behavior is unchanged.
-
-Operations HTTP routes remain planned work and are not yet implemented.
+Existing CLI behavior remains unchanged.
 
 ## Current boundaries
 
-API routes, notifications, Portal visualization, comparison retention,
-and automatic remediation remain planned extensions.
+Operations reporting, persisted history, comparison, authenticated HTTP access,
+and Portal summary integration are implemented.
+
+Notifications, comparison-retention policy beyond the current persisted report
+history, and automatic remediation remain planned extensions. Operations remains
+an evidence and visibility surface; it does not silently mutate production state.
 
 # Production Ingress Operations
 
