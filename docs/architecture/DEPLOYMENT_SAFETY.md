@@ -298,6 +298,37 @@ The standalone `scripts/update.sh` delegates to the canonical Atlas CLI and no
 longer provides a weaker alternate deployment path. Update paths do not prune
 rollback images.
 
+## v1.0 RC Deployment Remediation Contract
+
+The first exact `1.0.0-rc.1` production deployment attempt on 2026-08-24
+failed closed and preserved the previous verified production baseline.
+
+The incident established three permanent deployment-safety requirements:
+
+1. **Build-context permission preflight.** Before any first-party ingress pull
+   or build, Atlas validates tracked file readability and required parent
+   directory traversal for the container-runtime boundary.
+2. **Digest-safe rollback aliases.** Rollback restores from transaction-scoped
+   `atlas-rollback:` aliases recorded in `rollback-images.tsv` and verifies
+   every alias against the exact captured image ID. It does not retag a
+   digest-shaped captured reference.
+3. **Persistent rollback source lifetime.** Recovery extraction used by
+   recreated services must live beneath the persistent deployment transaction
+   record at `<deployment-root>/records/<transaction-id>/` and remain available
+   after restore returns.
+
+Exactly 17 tracked files whose Git mode was already `100644` but whose checkout
+mode had drifted to `0600` were normalized to filesystem `0644` without a Git
+content or executable-mode delta.
+
+The failed transaction `update-20260824T165151Z-3258027` remains historical
+evidence. Production was recovered to verified baseline
+`baseline-reconciliation-20260824T164541Z-927002`.
+
+This remediation certifies the machinery required for a controlled retry. It
+does not claim successful exact-RC production deployment and does not close
+that Roadmap gate.
+
 ## Validation Strategy
 
 Implementation proceeds in bounded stages:

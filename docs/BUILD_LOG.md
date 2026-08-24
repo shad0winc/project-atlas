@@ -8318,3 +8318,43 @@ Q.6 sustained-use certification is complete for the exact published candidate `1
 The production Scheduler-dispatcher defect that invalidated the first Q.6 attempt is also closed as a release blocker: the committed and published dispatcher/fixed-cadence/terminal-convergence path completed a fresh autonomous 48-hour production certification with zero Scheduler failures.
 
 The ROADMAP gates `Complete sustained-use test` and `Resolve release-blocking defects` may therefore be marked complete. Pilot, stabilization, release-candidate freeze, tagging, and publication remain independent later release gates.
+---
+
+# 2026-08-24
+
+## R.10B RC Production Deployment Attempt and Deployment-Safety Remediation
+
+The first exact `1.0.0-rc.1` production deployment transaction
+`update-20260824T165151Z-3258027` failed closed while starting the newly built
+Atlas API. Maintenance and deployment-lock ownership were preserved and the
+previous verified baseline remained authoritative.
+
+Forensics proved a build-context permission mismatch: Git recorded affected
+first-party source as `100644` while the production checkout exposed 17 tracked
+files as filesystem `0600`, unreadable to the non-root API runtime. D.2 added a
+pre-pull/pre-build permission guard and the 17 files were normalized to
+repository-authoritative `0644` without adding a Git content delta.
+
+Rollback then exposed a second defect: digest-shaped captured image references
+cannot be used as Docker tag destinations. D.3 changed restoration to consume
+the transaction-scoped `atlas-rollback:` aliases preserved in
+`rollback-images.tsv`, verifying exact image identity and restoring with
+`--no-build --pull never`.
+
+Emergency Caddy recovery exposed the third blocker: bind-mounted recovery source
+must outlive the restoring shell. D.4 requires canonical recovery extraction
+beneath the persistent Atlas deployment-record transaction namespace.
+
+Production was recovered to verified baseline
+`baseline-reconciliation-20260824T164541Z-927002`. The failed transaction
+remains historical evidence with terminal `rolled_back` state.
+
+Final remediation certification preserved exactly four engineering files and
+passed 3,446 Core tests plus 104 subtests, all five canonical Sports integration
+suites, 52 focused release-safety tests, zero tracked permission defects,
+18/18 exact rollback alias checks, and 22 running production containers with
+zero unhealthy or restarting containers.
+
+All three discovered deployment-safety blockers are certified. The Roadmap gate
+`Deploy release candidate to production` remains open; a separately authorized
+controlled retry is still required.

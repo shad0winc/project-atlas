@@ -204,6 +204,30 @@ Portal and API paths again before publishing the candidate as the current
 verified baseline or releasing the deployment lock. A failure after reopening
 re-enables maintenance and leaves the previous verified baseline authoritative.
 
+## v1.0 RC Deployment Evidence and Clarification
+
+The first exact `1.0.0-rc.1` production deployment attempt on 2026-08-24
+added three clarifications to this accepted decision.
+
+> Production build paths must validate effective readability and traversal of
+> tracked first-party build inputs before pull or build mutation begins.
+
+> Rollback must restore from transaction-scoped aliases created and
+> identity-verified before mutation; it must not recreate prior availability by
+> retagging a captured digest-shaped image reference.
+
+> Recovery source used by recreated services must live beneath the persistent
+> Atlas deployment-record transaction namespace and remain present after the
+> restore command returns.
+
+These clarifications harden the existing fail-closed transaction and recovery
+model rather than creating a new lifecycle abstraction.
+
+The failed transaction `update-20260824T165151Z-3258027` remains immutable
+audit evidence. Production recovery restored verified baseline
+`baseline-reconciliation-20260824T164541Z-927002`. The exact RC production
+deployment gate remains open until a controlled retry succeeds.
+
 ## Consequences
 
 Positive consequences:

@@ -28,11 +28,16 @@
 | Candidate Tag | `v1.0.0-rc.1` |
 | Release Manager | Project Atlas project owner |
 
-The immutable RC tag is intentionally not created by this document mutation.
+The original release-record mutation intentionally did not create the immutable
+RC tag.
 
-The eventual `v1.0.0-rc.1` tag must point to the exact certified RC commit
-after the release-only candidate transaction has passed repository validation
-and the required protected promotion path.
+The annotated `v1.0.0-rc.1` tag was subsequently created and verified against
+certified `main` commit `0691a2827ade3c2256fd6f57e969c54a3ef1120e`.
+Its annotated tag object is
+`83e65bd194d3382d848e3ad706596e87fb5a0d3f`.
+
+The later Roadmap-closure merge does not move or redefine that immutable RC
+identity.
 
 ---
 
@@ -161,13 +166,41 @@ version or tag.
 
 ---
 
+# RC Production Deployment Attempt and Safety Remediation
+
+The first exact-RC production deployment attempt failed closed and did not
+complete the production-deployment release gate.
+
+Failed transaction:
+
+`update-20260824T165151Z-3258027`
+
+Recovered authoritative baseline:
+
+`baseline-reconciliation-20260824T164541Z-927002`
+
+The remediation certifies build-context permission preflight, digest-safe
+transaction-scoped rollback aliases, and persistent transaction-owned recovery
+source. Exactly 17 permission-drift files were normalized from `0600` to
+repository-authoritative `0644`.
+
+Final remediation certification passed 3,446 Core tests plus 104 subtests, all
+five canonical Sports integration suites, 52 focused release-safety tests,
+18/18 rollback alias identity checks, and production remained at 22 running
+containers with zero unhealthy or restarting containers.
+
+This is remediation certification, not successful exact-RC production
+deployment. A controlled retry remains required.
+
+---
+
 # 10. Validation Summary
 
 | Validation | Result | Evidence |
 | --- | --- | --- |
 | Engineering | PASS | Protected Atlas Release Gate passed on the promoted candidate |
 | Repository | PASS | Feature source `8b7a5876...` promoted through merge commit `1545133b...`; release tree matched certified feature tree |
-| Runtime | PENDING EXACT RC DEPLOYMENT | Prior production release-readiness and sustained-use evidence exists; exact `1.0.0-rc.1` deployment remains a later gate |
+| Runtime | PENDING CONTROLLED RC RETRY | First exact-RC deployment failed closed; production was recovered and deployment-safety remediation is certified, but successful exact `1.0.0-rc.1` deployment remains required |
 | Operations | READY FOR RC VALIDATION | Canonical operations, upgrade, rollback, backup/restore, and troubleshooting contracts are documented |
 | User Acceptance | PENDING RC PILOT | Controlled user pilot remains a Roadmap release gate |
 | Administrator Acceptance | ENGINEERING JOURNEY PASS | Administrator critical-browser journey certified before RC identity creation; production RC validation remains pending |
@@ -206,7 +239,11 @@ the release policy.
 | Release Contracts | PASS |
 | Aggregate Release Gate | PASS |
 | Sustained-use Certification | 193 / 193 samples across certified 48-hour window |
-| Exact RC Production Deployment | Pending |
+| Exact RC Production Deployment | Pending controlled retry; first attempt failed closed and remediation is certified |
+| RC Deployment-Safety Remediation | PASS |
+| Remediation Core Validation | 3446 passed + 104 subtests |
+| Remediation Sports Integration | 5 suites passed |
+| Focused Release-Safety Validation | 52 passed |
 | Controlled User Pilot | Pending |
 | Stabilization | Pending |
 
@@ -286,8 +323,13 @@ It does not claim completion of:
 - final publication; or
 - stable support.
 
-The `Create v1.0 release candidate` Roadmap gate remains open until the
-candidate's release commit has completed the required protected promotion and
-the immutable annotated `v1.0.0-rc.1` tag has been created and verified.
+The `Create v1.0 release candidate` Roadmap gate is closed. The candidate was
+promoted through the protected release path and immutable annotated
+`v1.0.0-rc.1` identity was created and verified.
+
+The separate `Deploy release candidate to production` gate remains open. The
+first exact-RC attempt failed closed, production recovery completed, and the
+resulting deployment-safety remediation has been certified. A controlled retry
+is still required.
 
 The final `v1.0.0` release remains a separate later certification transaction.

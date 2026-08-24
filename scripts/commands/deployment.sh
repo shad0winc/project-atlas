@@ -26,6 +26,64 @@ atlas_deployment_record_dir() {
   printf '%s/%s\n' "$(atlas_deployment_records_dir)" "$identifier"
 }
 
+atlas_deployment_create_recovery_dir() {
+  local transaction="$1"
+  local surface="$2"
+  local records
+  local records_real
+  local transaction_real
+  local transaction_id
+
+  case "$surface" in
+    core|ingress)
+      ;;
+    *)
+      printf \
+        'ERROR: unsupported rollback recovery surface: %s\n' \
+        "$surface" >&2
+      return 1
+      ;;
+  esac
+
+  [[ -d "$transaction" ]] || {
+    printf \
+      'ERROR: rollback transaction directory is missing: %s\n' \
+      "$transaction" >&2
+    return 1
+  }
+
+  records="$(atlas_deployment_records_dir)"
+
+  [[ -d "$records" ]] || {
+    printf \
+      'ERROR: deployment records directory is missing: %s\n' \
+      "$records" >&2
+    return 1
+  }
+
+  records_real="$(realpath -e "$records")" || return 1
+  transaction_real="$(realpath -e "$transaction")" || return 1
+
+  [[ "$(dirname "$transaction_real")" == "$records_real" ]] || {
+    printf \
+      'ERROR: rollback transaction is outside the deployment records namespace: %s\n' \
+      "$transaction_real" >&2
+    return 1
+  }
+
+  transaction_id="$(basename "$transaction_real")"
+
+  atlas_deployment_valid_id "$transaction_id" || {
+    printf \
+      'ERROR: invalid rollback transaction identity: %s\n' \
+      "$transaction_id" >&2
+    return 1
+  }
+
+  mktemp -d \
+    "$transaction_real/recovery-${surface}.XXXXXX"
+}
+
 atlas_deployment_record_value() {
   local record="$1"
   local key="$2"
@@ -408,6 +466,8 @@ atlas_deployment_restore_surface() {
   local surface="$3"
   local recovery
   local archive="$baseline/${surface}-source.tar.gz"
+  local rollback_images="$transaction/rollback-images.tsv"
+  local override
   local row
   local compose_relative
   local project
@@ -415,33 +475,104 @@ atlas_deployment_restore_surface() {
   local container_name
   local image_reference
   local image_id
+  local recovery_tag
+  local restored=0
 
   [[ -s "$archive" ]] || return 1
-  recovery="$(mktemp -d "$transaction/recovery-${surface}.XXXXXX")"
+  [[ -s "$rollback_images" ]] || {
+    echo 'ERROR: rollback image alias evidence is missing.' >&2
+    return 1
+  }
+
+  recovery="$(
+    atlas_deployment_create_recovery_dir       "$transaction"       "$surface"
+  )" || return 1
+
   tar -xzf "$archive" -C "$recovery" || return 1
 
   if [[ -f "$ATLAS_PROJECT_DIR/.env" && ! -e "$recovery/.env" ]]; then
     ln -s -- "$ATLAS_PROJECT_DIR/.env" "$recovery/.env"
   fi
 
+  override="$recovery/rollback-images.yml"
+
+  printf 'services:\n' > "$override"
+
   while IFS='|' read -r \
     row compose_relative project service container_name image_reference image_id
   do
     [[ "$row" == "$surface" ]] || continue
-    docker image inspect "$image_id" >/dev/null 2>&1 || return 1
-    docker image tag "$image_id" "$image_reference" || return 1
+    [[ -n "$service" && -n "$image_id" ]] || return 1
+
+    recovery_tag="$(
+      awk -F'|' -v expected="$image_id" \
+        '$1 == expected {print $2; exit}' \
+        "$rollback_images"
+    )"
+
+    [[ -n "$recovery_tag" ]] || {
+      printf \
+        'ERROR: rollback alias missing for image %s (%s).\n' \
+        "$image_id" \
+        "$service" >&2
+      return 1
+    }
+
+    docker image inspect "$recovery_tag" >/dev/null 2>&1 || {
+      printf \
+        'ERROR: rollback alias unavailable: %s\n' \
+        "$recovery_tag" >&2
+      return 1
+    }
+
+    [[ "$(
+      docker image inspect \
+        --format '{{.Id}}' \
+        "$recovery_tag"
+    )" == "$image_id" ]] || {
+      printf \
+        'ERROR: rollback alias identity mismatch: %s\n' \
+        "$recovery_tag" >&2
+      return 1
+    }
+
+    printf '  %s:\n' "$service" >> "$override"
+    printf '    image: %s\n' "$recovery_tag" >> "$override"
+
+    restored=$((restored + 1))
   done < "$baseline/images.tsv"
 
-  compose_relative="$(awk -F'|' -v surface="$surface" '$1 == surface {print $2; exit}' "$baseline/images.tsv")"
-  project="$(awk -F'|' -v surface="$surface" '$1 == surface {print $3; exit}' "$baseline/images.tsv")"
+  [[ "$restored" -gt 0 ]] || {
+    printf \
+      'ERROR: no rollback services found for surface: %s\n' \
+      "$surface" >&2
+    return 1
+  }
+
+  compose_relative="$(
+    awk -F'|' \
+      -v surface="$surface" \
+      '$1 == surface {print $2; exit}' \
+      "$baseline/images.tsv"
+  )"
+
+  project="$(
+    awk -F'|' \
+      -v surface="$surface" \
+      '$1 == surface {print $3; exit}' \
+      "$baseline/images.tsv"
+  )"
+
   [[ -n "$compose_relative" && -n "$project" ]] || return 1
 
   (
     cd "$recovery"
+
     docker compose \
       --env-file "$recovery/.env" \
       --project-name "$project" \
       -f "$recovery/$compose_relative" \
+      -f "$override" \
       up -d --no-build --pull never
   )
 }

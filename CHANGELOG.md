@@ -184,6 +184,20 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Fixed
 
+- Hardened the v1.0 RC production deployment path after the first exact
+  `1.0.0-rc.1` deployment attempt failed closed.
+- Added pre-pull/pre-build validation for tracked first-party ingress build
+  inputs so unreadable files or untraversable parent directories fail closed.
+- Hardened rollback to consume exact-ID-verified transaction-scoped
+  `atlas-rollback:` aliases instead of retagging digest-shaped references.
+- Required rollback recovery source to remain beneath the persistent Atlas
+  deployment-record namespace for long-lived bind-mount safety.
+- Reconciled exactly 17 tracked checkout files from filesystem `0600` to
+  repository-authoritative `0644` without a Git content-mode delta.
+- Preserved failed transaction `update-20260824T165151Z-3258027` and recovered
+  baseline `baseline-reconciliation-20260824T164541Z-927002`; the exact RC
+  production-deployment gate remains open pending a controlled retry.
+
 - Added the repository-owned production Scheduler dispatcher contract discovered
   as missing during the first Q.6 sustained-use attempt. The dispatcher uses
   `atlas-scheduler.timer` to provide a one-minute systemd dispatch opportunity
