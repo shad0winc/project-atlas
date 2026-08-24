@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from atlas.media import MediaItem
+from atlas_api.dependencies import clear_dependency_caches
 from atlas_api.main import app
 from atlas_api.routes.v1.media_catalog import (
     get_media_catalog_service,
@@ -55,16 +56,30 @@ class TestMediaCatalogAPI:
     def test_media_catalog_requires_authentication(
         self,
         monkeypatch,
+        tmp_path,
     ) -> None:
+        audit_path = tmp_path / "events.jsonl"
+        audit_path.write_text("", encoding="utf-8")
+        audit_path.chmod(0o660)
+
         monkeypatch.setenv(
             "ATLAS_JWT_SECRET",
             "atlas-media-catalog-test-secret-0123456789abcdef",
         )
-
-        client = TestClient(app)
-
-        response = client.get(
-            "/api/v1/media/catalog"
+        monkeypatch.setenv(
+            "ATLAS_SECURITY_AUDIT_PATH",
+            str(audit_path),
         )
 
-        assert response.status_code == 401
+        clear_dependency_caches()
+
+        try:
+            client = TestClient(app)
+
+            response = client.get(
+                "/api/v1/media/catalog"
+            )
+
+            assert response.status_code == 401
+        finally:
+            clear_dependency_caches()
