@@ -28,10 +28,12 @@ At discovery commit `7f82bc8d`:
 - Caddy data, config, and logs use writable Atlas-managed storage; and
 - the current Caddy Docker healthcheck reaches the public API health route.
 
-The local repository also contains an annotated `v1.0.0` tag resolving to
-`a67bb8a5` (`feat: add ARI recommendation engine`, 2026-07-09). That tag predates
-the current release-readiness work and is not current v1.0 certification
-evidence.
+A historical annotated `v1.0.0` tag previously resolved to `a67bb8a5`
+(`feat: add ARI recommendation engine`, 2026-07-09). Release forensics confirmed
+that the tag predated the current release-readiness work and was not valid v1.0
+certification evidence. The project owner has since reconciled and removed that
+invalid tag locally and from `origin` while preserving the underlying commit in
+Git history.
 
 ## Branch and Release Model
 
