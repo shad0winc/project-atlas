@@ -17,6 +17,7 @@ export type PortalRouteId =
   | "media"
   | "favorites"
   | "requests"
+  | "sports"
   | "downloads"
   | "users"
   | "services"
@@ -87,6 +88,16 @@ export const portalRoutes: readonly PortalRoute[] = [
     section: PORTAL_ROUTE_SECTIONS.workspace
   },
   {
+    id: "sports",
+    path: "/portal/sports",
+    label: "Sports",
+    navigationDescription: "Upcoming sporting events",
+    abbreviation: "SP",
+    permission: ATLAS_PERMISSIONS.sportsRead,
+    section: PORTAL_ROUTE_SECTIONS.workspace,
+    pageDescription: "Browse upcoming supported sporting events and request one through Atlas."
+  },
+  {
     id: "downloads",
     path: "/portal/downloads",
     label: "Downloads",
@@ -149,6 +160,7 @@ export const PORTAL_ROUTES = {
   media: routeById("media"),
   favorites: routeById("favorites"),
   requests: routeById("requests"),
+  sports: routeById("sports"),
   downloads: routeById("downloads"),
   users: routeById("users"),
   services: routeById("services"),

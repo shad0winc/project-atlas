@@ -136,6 +136,55 @@ idempotency boundary when external side effects require it.
 This milestone does not add automatic compensating actions for interrupted
 callbacks.
 
+## Production Dispatch Boundary
+
+Scheduler Recovery and production dispatch are separate responsibilities.
+
+`TaskScheduler` remains the sole scheduler and recovery authority. It owns
+persistent task state, task cadence, due-state calculation, the runtime lock,
+callback execution, success/failure state, and bounded history.
+
+The production host supplies only a recurring dispatch opportunity through:
+
+```text
+atlas-scheduler.timer
+        |
+        | one-minute host cadence
+        v
+atlas-scheduler.service
+        |
+        | /bin/atlas scheduler run
+        v
+TaskScheduler.run_due_tasks()
+```
+
+This systemd layer does not create a second scheduler. It does not decide that
+a specific task is due, encode task-specific intervals, maintain Scheduler
+state, reclaim locks, retry callbacks independently, or manufacture task
+outcomes.
+
+A one-minute timer cadence bounds normal dispatch jitter while leaving each
+task's `interval_seconds` and `last_success` semantics entirely inside Atlas.
+For example, the 900-second `sustained-use.sample` interval remains an Atlas
+task contract; it is not a 15-minute systemd timer.
+
+The existing fail-closed runtime lock remains authoritative when two dispatch
+opportunities overlap or an operator starts Scheduler execution manually. A
+live owner blocks the new execution, and the Atlas CLI returns its Scheduler
+lock-contention status to systemd rather than bypassing or masking the lock.
+
+Dispatcher exit semantics preserve Scheduler facts:
+
+- no due work is successful dispatcher execution;
+- all successful due callbacks produce dispatcher exit `0`;
+- any failed due callback produces dispatcher exit `1`;
+- lock contention produces dispatcher exit `3`;
+- mixed due tasks are attempted under the normal shared Scheduler contract.
+
+The dispatcher therefore supplies availability of invocation, not recovery
+policy. All lock-recovery and interrupted-task rules defined by this document
+and ADR 0015 remain unchanged.
+
 ## Verification Requirements
 
 M-023.17 must prove the existing and hardened behavior with focused tests:

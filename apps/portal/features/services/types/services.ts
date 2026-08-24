@@ -40,11 +40,7 @@ export type ServiceLifecycleSummary = Readonly<{
 }>;
 
 export type ServiceUpdateStatus =
-  | "current"
-  | "update-available"
-  | "mutable-tag"
-  | "unknown"
-  | "unsupported";
+  "current" | "update-available" | "mutable-tag" | "unknown" | "unsupported";
 
 export type ServiceUpdate = Readonly<{
   serviceIdentifier: string;
@@ -67,12 +63,7 @@ export type ServiceUpdateReport = Readonly<{
   evaluatedAt?: string;
 }>;
 
-export type ServiceMaintenanceResult =
-  | "success"
-  | "partial"
-  | "failed"
-  | "skipped"
-  | "unknown";
+export type ServiceMaintenanceResult = "success" | "partial" | "failed" | "skipped" | "unknown";
 
 export type ServiceMaintenanceRecord = Readonly<{
   serviceIdentifier: string;
@@ -361,9 +352,7 @@ export function createServiceUpdateReport(value: unknown): ServiceUpdateReport {
   };
 }
 
-export function createServiceMaintenanceHistory(
-  value: unknown
-): ServiceMaintenanceHistory {
+export function createServiceMaintenanceHistory(value: unknown): ServiceMaintenanceHistory {
   const report = recordValue(value);
   const counts = recordValue(report.counts);
 

@@ -15,6 +15,8 @@ export const ATLAS_PERMISSIONS = {
   requestsCancel: "requests.cancel",
   requestsCreate: "requests.create",
   requestsRead: "requests.read",
+  sportsEventsRequest: "sports.events.request",
+  sportsRead: "sports.read",
   systemHealthRead: "system.health.read",
   usersRead: "users.read",
   usersSelfRead: "users.self.read",

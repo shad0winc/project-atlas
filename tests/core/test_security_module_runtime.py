@@ -191,3 +191,66 @@ def test_sports_health_alias_uses_directory_backed_state_mount() -> None:
 
     assert "alias /etc/nginx/sports-state/health.json;" in nginx
     assert "alias /etc/nginx/sports-health.json;" not in nginx
+
+
+def test_notifications_runtime_has_event_journal_reader_group() -> None:
+    content = NOTIFICATIONS_COMPOSE.read_text(encoding="utf-8")
+
+    assert '    group_add:\n      - "20000"\n' in content
+    assert (
+        "/mnt/storage/configs/atlas/runtime/events.jsonl:"
+        "/mnt/storage/configs/atlas/runtime/events.jsonl:ro"
+    ) in content
+
+
+def test_notifications_health_requires_readable_event_journal() -> None:
+    content = NOTIFICATIONS_COMPOSE.read_text(encoding="utf-8")
+
+    assert (
+        "test -r "
+        "/mnt/storage/configs/atlas/runtime/events.jsonl"
+    ) in content
+    assert (
+        "test -f "
+        "/mnt/storage/configs/atlas/notifications/worker-heartbeat"
+    ) in content
+
+
+def test_notifications_update_uses_event_journal_reader_group() -> None:
+    content = NOTIFICATIONS_UPDATE.read_text(encoding="utf-8")
+
+    assert "event_reader_gid='20000'" in content
+    assert '--groups="$event_reader_gid"' in content
+
+    journal_guard = content.index(
+        "Notifications runtime identity cannot read "
+        "the Runtime Bus event journal"
+    )
+
+    prefix = content[:journal_guard]
+
+    assert '--groups="$event_reader_gid"' in prefix
+
+
+def test_notifications_update_has_explicit_compose_project_boundary() -> None:
+    content = NOTIFICATIONS_UPDATE.read_text(encoding="utf-8")
+
+    assert content.count("--project-name notifications") == 3
+
+    assert (
+        '--project-name notifications \\\n'
+        '    -f "$MODULE_DIR/docker-compose.yml" \\\n'
+        '    config >/dev/null'
+    ) in content
+
+    assert (
+        '--project-name notifications \\\n'
+        '  -f "$MODULE_DIR/docker-compose.yml" \\\n'
+        '  build'
+    ) in content
+
+    assert (
+        '--project-name notifications \\\n'
+        '  -f "$MODULE_DIR/docker-compose.yml" \\\n'
+        '  up -d'
+    ) in content

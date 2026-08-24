@@ -332,39 +332,33 @@ Portal development additionally requires a supported Node.js release and npm.
 
 ## Installation
 
-Atlas installation is environment-sensitive. Review the installation and configuration documentation before applying production changes.
+Installation is a controlled production procedure. Do not use README snippets as
+a substitute for the complete installation transaction.
 
-Typical repository setup:
-
-```bash
-cd /opt
-git clone <atlas-repository-url> project-atlas
-cd project-atlas
-
-cp .env.example .env
-nano .env
-
-./scripts/install.sh
-```
+Start with `docs/guides/INSTALLATION_GUIDE.md`. After installation, use
+`docs/guides/ADMINISTRATOR_GUIDE.md` for routine administration and
+`docs/guides/TROUBLESHOOTING_GUIDE.md` when verification does not pass.
 
 Never commit `.env` files or production secrets.
 
-After installation, verify the platform:
+## Canonical v1 operator guides
 
-```bash
-atlas verify
-atlas doctor
-atlas status
-```
+Project Atlas v1 operational procedures are owned by the guides under
+`docs/guides/`. Use the guide that matches the transaction you are performing:
 
-Primary references:
+| Guide | Canonical responsibility |
+|---|---|
+| `docs/guides/ADMINISTRATOR_GUIDE.md` | Administrator workflows and operational navigation |
+| `docs/guides/USER_GUIDE.md` | End-user workflows and user-safe failure behavior |
+| `docs/guides/INSTALLATION_GUIDE.md` | New installation and initial production verification |
+| `docs/guides/UPGRADE_GUIDE.md` | Production upgrade transaction |
+| `docs/guides/ROLLBACK_GUIDE.md` | Deployment rollback transaction |
+| `docs/guides/BACKUP_RESTORE_GUIDE.md` | Atlas backup and state-restore transaction |
+| `docs/guides/TROUBLESHOOTING_GUIDE.md` | Diagnosis, incident handling, and failure recovery |
 
-```text
-docs/01-install.md
-docs/CONFIGURATION.md
-docs/OPERATIONS.md
-docs/guides/ADMINISTRATOR_GUIDE.md
-```
+Older documents may retain architecture, implementation history, command contracts,
+or service-specific reference material, but they do not override these procedure
+owners. When instructions conflict, stop and follow the applicable canonical guide.
 
 ---
 
@@ -624,9 +618,15 @@ See `docs/OPERATIONS.md` for the complete command and persistence contract.
 | `CHANGELOG.md` | Notable changes |
 | `BUILD_LOG.md` | Engineering implementation history |
 | `docs/MATURITY.md` | Capability and production maturity |
-| `docs/OPERATIONS.md` | Operational procedures |
+| `docs/OPERATIONS.md` | Operational command contracts, runtime details, and historical certification evidence |
 | `docs/CONFIGURATION.md` | Configuration reference |
-| `docs/guides/ADMINISTRATOR_GUIDE.md` | Administrator workflows |
+| `docs/guides/ADMINISTRATOR_GUIDE.md` | Administrator workflows and operational navigation |
+| `docs/guides/USER_GUIDE.md` | End-user workflows and user-safe failure behavior |
+| `docs/guides/INSTALLATION_GUIDE.md` | Canonical installation procedure |
+| `docs/guides/UPGRADE_GUIDE.md` | Canonical production upgrade procedure |
+| `docs/guides/ROLLBACK_GUIDE.md` | Canonical deployment rollback procedure |
+| `docs/guides/BACKUP_RESTORE_GUIDE.md` | Canonical Atlas backup and state-restore procedure |
+| `docs/guides/TROUBLESHOOTING_GUIDE.md` | Canonical troubleshooting and incident procedure |
 | `docs/ADR/` | Architecture Decision Records |
 | `docs/EDR/` | Engineering Decision Records |
 

@@ -59,6 +59,7 @@ source "$ATLAS_CLI_ROOT/commands/retention.sh"
 source "$ATLAS_CLI_ROOT/commands/cleanup.sh"
 source "$ATLAS_CLI_ROOT/commands/discovery.sh"
 source "$ATLAS_CLI_ROOT/commands/operations.sh"
+source "$ATLAS_CLI_ROOT/commands/sustained-use.sh"
 
 atlas_initialize
 
@@ -135,6 +136,10 @@ case "$command" in
 
   operations)
     atlas_command_operations "${@:2}"
+    ;;
+
+  sustained-use)
+    atlas_command_sustained_use "${@:2}"
     ;;
 
   module)

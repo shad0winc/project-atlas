@@ -90,11 +90,15 @@ def test_branch_protection_procedure_records_verified_external_state() -> None:
     assert "Atlas Release Gate / release-gate" in content
 
 
-def test_procedure_preserves_legacy_v1_tag_blocker() -> None:
+def test_procedure_records_reconciled_v1_tag_state() -> None:
     content = PROCEDURE.read_text(encoding="utf-8")
 
-    assert "historical `v1.0.0` tag remains a separate release blocker" in content
-    assert "does not reinterpret, move, delete" in content
+    assert "## Reconciled v1.0.0 Tag State" in content
+    assert "historical premature `v1.0.0` tag was explicitly reconciled" in content
+    assert "deleted locally and from `origin`" in content
+    assert "historical commit remains preserved in normal Git history" in content
+    assert "does not itself certify or publish Project Atlas" in content
+    assert "must point to the exact certified final-release commit" in content
 
 
 # M-023.24.5 clean-runner portability contracts

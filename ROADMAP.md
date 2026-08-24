@@ -499,9 +499,9 @@ with backend services.
 - [x] Sports health integration
 - [x] Sports scheduling foundation
 - [x] Sports recording foundation
-- [ ] Browse upcoming events
+- [x] Browse upcoming events
 - [ ] Search teams and leagues
-- [ ] Request sporting events
+- [x] Request sporting events
 - [ ] View sports request status
 - [ ] View scheduled recordings
 - [ ] View completed recordings
@@ -807,32 +807,66 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 
 ### Quality
 
-- [ ] Run full automated test suite
-- [ ] Add critical end-to-end tests
-- [ ] Add login journey test
-- [ ] Add media request journey test
-- [ ] Add favorite-protection journey test
-- [ ] Add Sports request journey test
-- [ ] Add administrator journey test
-- [ ] Complete responsive UI review
-- [ ] Complete accessibility review
-- [ ] Complete performance baseline
-- [ ] Complete sustained-use test
-- [ ] Resolve release-blocking defects
+- [x] Run full automated test suite
+- [x] Add critical end-to-end tests
+- [x] Add login journey test
+- [x] Add media request journey test
+- [x] Add favorite-protection journey test
+- [x] Add Sports request journey test
+- [x] Add administrator journey test
+- [x] Complete responsive UI review
+- [x] Complete accessibility review
+- [x] Complete performance baseline
+- [x] Complete sustained-use test
+  - [x] Implement Q.6 sustained-use domain contracts and immutable evidence persistence
+  - [x] Implement `atlas sustained-use start|sample|status|finalize`
+  - [x] Implement idempotent `sustained-use.sample` Scheduler callback
+  - [x] Integrate `sustained-use.sample` into unqualified Scheduler sync
+  - [x] Certify the pre-activation implementation candidate without live Scheduler mutation or Q.6 persistence
+  - [x] Publish the Q.6 instrumentation commit and restore clean Git health
+  - [x] Register and certify the dormant live `sustained-use.sample` task
+  - [x] Preserve and retire `q6-20260817T171504Z` as immutable `aborted` historical evidence after detecting missing recurring production Scheduler dispatch
+  - [x] Implement, publish, install, and live-certify the repository-owned one-minute Scheduler dispatcher
+  - [x] Implement and certify guarded retirement/archive support for incomplete Q.6 attempts
+  - [x] Restore `sustained-use.sample` and prove autonomous Scheduler dispatch
+  - [x] Establish fresh run `q6-20260817T232028Z` and certify its first autonomous production sample
+  - [x] Detect deterministic cumulative cadence drift during the second production attempt despite zero Scheduler failures
+  - [x] Retire `q6-20260817T232028Z` at `176/193` as immutable `aborted` temporal-cadence failure evidence
+  - [x] Implement and certify T0-anchored fixed sampling slots
+  - [x] Separate 900-second certification cadence from 60-second dispatch polling
+  - [x] Enforce bounded 180-second lateness, hard missed-slot failure, and no backfill
+  - [x] Add independent finalization-time fixed-slot validation
+  - [x] Prove the fixed-slot evaluator retrospectively rejects the archived drifting production history
+  - [x] Publish the Q.6A.5 fixed-cadence repair and synchronize the live `sustained-use.sample` task to 60-second polling
+  - [x] Reverify dormant and accelerated autonomous fixed-slot behavior against the published repair
+  - [x] Establish the final fresh Q.6 T0 against the repaired published candidate
+  - [x] Collect 193 samples across a fresh uninterrupted 48-hour / 15-minute fixed-slot observation window
+  - [x] Finalize and certify the complete sustained-use history
+    - [x] Collect the complete uninterrupted 193/193 fixed-slot production history
+    - [x] Preserve the original production finalization result as immutable failed evidence
+    - [x] Diagnose the final Runtime Bus backlog race as a terminal-convergence defect
+    - [x] Implement bounded Runtime Bus terminal convergence against the frozen sample-193 journal tail
+    - [x] Certify the Q.6A.7 eight-file terminal-convergence repair candidate
+    - [x] Reconcile, certify, commit, and publish the Q.6A.7 repair
+    - [x] Perform the controlled post-publication release-certification step without rewriting historical Q.6 evidence
+    - [x] Certify fresh exact-candidate run `q6-20260822T011449Z` at 193/193 with zero fixed-slot violations, zero Scheduler failures, bounded terminal convergence PASS, and durable `completed` status
+    - [x] Preserve the complete sample history byte-identically and retain prior failed/aborted Q.6 evidence unchanged
+- [x] Resolve release-blocking defects
+  - [x] Close the missing production Scheduler dispatcher defect through committed, published, installed, and live-certified remediation
 
 ### Documentation
 
 - [x] Reconcile Media discovery and Request architecture through E2.5 production acceptance
-- [ ] Update architecture documentation for remaining v1.0 surfaces
-- [ ] Complete administrator guide
-- [ ] Complete user guide
-- [ ] Complete installation guide
-- [ ] Complete upgrade guide
-- [ ] Complete rollback guide
-- [ ] Complete backup and restore guide
-- [ ] Complete troubleshooting guide
-- [ ] Document maintenance windows
-- [ ] Document known limitations
+- [x] Update architecture documentation for remaining v1.0 surfaces
+- [x] Complete administrator guide
+- [x] Complete user guide
+- [x] Complete installation guide
+- [x] Complete upgrade guide
+- [x] Complete rollback guide
+- [x] Complete backup and restore guide
+- [x] Complete troubleshooting guide
+- [x] Document maintenance windows
+- [x] Document known limitations
 - [ ] Publish v1.0 release notes
 
 ### Release

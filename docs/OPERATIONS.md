@@ -1,8 +1,31 @@
 # Project Atlas Operations Guide
 
-> **Operational Runbook for Project Atlas**
+> **Operational command, runtime, and certification reference for Project Atlas**
 
-This document describes the standard operating procedures for administering, maintaining, troubleshooting, and updating Project Atlas.
+This document preserves detailed Operations subsystem contracts, runtime behavior,
+service verification details, and historical certification evidence. It is not the
+canonical owner of installation, upgrade, rollback, backup/restore, or
+troubleshooting transactions.
+
+## Canonical v1 operator guides
+
+Project Atlas v1 operational procedures are owned by the guides under
+`docs/guides/`. Use the guide that matches the transaction you are performing:
+
+| Guide | Canonical responsibility |
+|---|---|
+| `docs/guides/ADMINISTRATOR_GUIDE.md` | Administrator workflows and operational navigation |
+| `docs/guides/USER_GUIDE.md` | End-user workflows and user-safe failure behavior |
+| `docs/guides/INSTALLATION_GUIDE.md` | New installation and initial production verification |
+| `docs/guides/UPGRADE_GUIDE.md` | Production upgrade transaction |
+| `docs/guides/ROLLBACK_GUIDE.md` | Deployment rollback transaction |
+| `docs/guides/BACKUP_RESTORE_GUIDE.md` | Atlas backup and state-restore transaction |
+| `docs/guides/TROUBLESHOOTING_GUIDE.md` | Diagnosis, incident handling, and failure recovery |
+
+Older documents may retain architecture, implementation history, command contracts,
+or service-specific reference material, but they do not override these procedure
+owners. When instructions conflict, stop and follow the applicable canonical guide.
+
 
 ---
 
@@ -288,6 +311,70 @@ directory. A successful run updates task health, counters, success time,
 duration, and scheduler history. Callback failures are normalized through
 the existing scheduler execution contract.
 
+## Production Scheduler dispatcher
+
+The shared `TaskScheduler` owns task definitions, individual
+`interval_seconds`, due-state calculation, runtime locking, callback execution,
+health/counters, and execution history. It remains the sole Atlas scheduler.
+
+Production uses a repository-owned systemd dispatcher to provide recurring
+opportunities for the existing scheduler to evaluate due work:
+
+```text
+atlas-scheduler.timer
+        |
+        | every 1 minute
+        v
+atlas-scheduler.service
+        |
+        | Type=oneshot
+        v
+/bin/atlas scheduler run
+        |
+        v
+TaskScheduler.run_due_tasks()
+```
+
+The tracked units are:
+
+- `systemd/atlas-scheduler.service`;
+- `systemd/atlas-scheduler.timer`.
+
+The service runs from `/opt/project-atlas` and invokes the public Atlas CLI.
+It does not run a daemon loop, implement task-specific cadence, maintain a
+second scheduler state file, or bypass the Scheduler runtime lock.
+
+The timer uses a one-minute dispatch opportunity:
+
+- `OnBootSec=1min`;
+- `OnUnitActiveSec=1min`;
+- `Persistent=true`.
+
+The one-minute systemd cadence is intentionally shorter than the shortest
+registered Atlas task interval. It bounds dispatch delay without encoding
+`operations.collect`, `sports.maintenance`, `sustained-use.sample`, module, or
+other task intervals in systemd. Atlas still decides whether each task is due.
+
+The dispatcher process exit contract is:
+
+- exit `0` when no work is due;
+- exit `0` when all due callbacks succeed;
+- exit `1` when any due callback fails;
+- exit `3` when the Scheduler runtime lock prevents execution.
+
+The systemd service does not mask these nonzero Atlas exit statuses. Operators
+should therefore treat a failed `atlas-scheduler.service` invocation as a
+Scheduler execution signal that requires inspection rather than silently
+restarting a second scheduler.
+
+Repository tracking alone does not install or enable these units. Host
+installation, `daemon-reload`, enablement, start, and live recurring-dispatch
+verification are controlled production deployment steps.
+
+Manual commands such as `atlas scheduler run <task>` remain supported for
+explicit operator actions, but they are not the production recurrence
+mechanism.
+
 ## Scheduled collection repository root
 
 The callback uses `/mnt/storage/configs/atlas/operations` by default.
@@ -416,7 +503,7 @@ human renderer.
 
 ## Shared API Contract Foundation
 
-Operations now shares a transport-neutral contract layer located under
+Operations shares a transport-neutral contract layer located under
 `atlas/api`.
 
 The shared package provides:
@@ -432,9 +519,17 @@ These contracts remain framework-independent and intentionally avoid
 FastAPI, Pydantic, Starlette, routing objects, HTTP request objects,
 and status codes.
 
-Future Operations HTTP routes will construct shared Atlas API contracts
-first and adapt them into FastAPI schemas only at the outer HTTP
-boundary.
+The v1 Atlas HTTP API adapts the shared Operations contracts at the outer
+FastAPI boundary. The authenticated, permission-gated read-only Operations
+surface is registered under `/api/v1/operations` and currently provides:
+
+- `GET /api/v1/operations/report` — collect one fresh, non-persisted Operations report;
+- `GET /api/v1/operations/latest` — return the latest validated persisted report;
+- `GET /api/v1/operations/history` — return validated persisted report history;
+- `GET /api/v1/operations/compare` — compare the two newest persisted reports.
+
+The HTTP routes require the `system.health.read` permission and preserve the
+shared Atlas success/failure envelope contract.
 
 This preserves one canonical transport contract for:
 
@@ -442,16 +537,18 @@ This preserves one canonical transport contract for:
 - HTTP endpoints;
 - automation;
 - integration tests;
-- future Portal communication.
+- Portal communication.
 
-Existing CLI behavior is unchanged.
-
-Operations HTTP routes remain planned work and are not yet implemented.
+Existing CLI behavior remains unchanged.
 
 ## Current boundaries
 
-API routes, notifications, Portal visualization, comparison retention,
-and automatic remediation remain planned extensions.
+Operations reporting, persisted history, comparison, authenticated HTTP access,
+and Portal summary integration are implemented.
+
+Notifications, comparison-retention policy beyond the current persisted report
+history, and automatic remediation remain planned extensions. Operations remains
+an evidence and visibility surface; it does not silently mutate production state.
 
 # Production Ingress Operations
 
@@ -489,256 +586,21 @@ and before production release validation.
 
 ---
 
-# Weekly Maintenance
-
-Recommended tasks:
-
-- Review ARI report
-- Review storage growth
-- Verify backup completion
-- Review container logs
-- Update containers if appropriate
-
-Suggested commands:
-
-```bash
-atlas doctor
-atlas verify
-atlas ari collect
-atlas ari report
-docker compose pull
-docker compose up -d
-```
-
----
-
-# Monthly Maintenance
-
-Recommended tasks:
-
-- Review storage forecasts
-- Verify disaster recovery procedures
-- Validate backups
-- Review media quality profiles
-- Update documentation if architecture changes
-
----
-
-# Backup Procedure
-
-Create a backup:
-
-```bash
-atlas backup
-```
-
-Recommended before:
-
-- Docker updates
-- Configuration changes
-- Adding services
-- System upgrades
-
-After backup:
-
-```bash
-atlas verify
-```
-
-Confirm the platform remains healthy.
-
----
-
-# Update Procedure
-
-## Step 1
-
-Verify platform health.
-
-```bash
-atlas doctor
-atlas verify
-```
-
----
-
-## Step 2
-
-Create backup.
-
-```bash
-atlas backup
-```
-
----
-
-## Step 3
-
-Update Atlas.
-
-```bash
-atlas update
-```
-
----
-
-## Step 4
-
-Verify platform.
-
-```bash
-atlas verify
-```
-
----
-
-## Step 5
-
-Collect a new ARI snapshot.
-
-```bash
-atlas ari collect
-atlas ari report
-```
-
----
-
-# Recovery Procedure
-
-If an update fails:
-
-1. Stop changes immediately.
-2. Review logs.
-3. Restore backup.
-4. Run:
-
-```bash
-atlas verify
-atlas doctor
-```
-
-5. Confirm ARI health.
-
----
-
-# Standard Operational Workflow
-
-Routine maintenance:
-
-```text
-atlas doctor
-        │
-        ▼
-atlas verify
-        │
-        ▼
-atlas ari collect
-        │
-        ▼
-atlas ari report
-        │
-        ▼
-atlas backup
-        │
-        ▼
-atlas update
-        │
-        ▼
-atlas verify
-```
-
----
-
-# Health Monitoring
-
-ARI evaluates:
-
-## Platform
-
-- Docker
-- VPN
-- Storage
-- Snapshot freshness
-
-## Media
-
-- Jellyfin libraries
-- Library paths
-- Library synchronization
-
-## Intelligence
-
-- Historical analysis
-- Capacity forecasting
-- Operational recommendations
-
----
-
-# Troubleshooting
-
-## Docker Issues
-
-```bash
-atlas doctor
-docker ps
-docker compose logs
-```
-
----
-
-## VPN Issues
-
-Verify:
-
-```bash
-docker logs gluetun
-```
-
-Confirm VPN IP:
-
-```bash
-atlas doctor
-```
-
----
-
-## Jellyfin Issues
-
-Verify:
-
-- Libraries exist
-- Paths are correct
-- Synchronization passes
-
-Run:
-
-```bash
-atlas ari report
-```
-
----
-
-## Storage Issues
-
-Check:
-
-```bash
-df -h
-```
-
-Then:
-
-```bash
-atlas verify
-```
-
-Review forecast:
-
-```bash
-atlas ari report
-```
-
----
+# Routine Maintenance and Recovery Navigation
+
+Routine observation commands and subsystem references in this document remain
+useful, but production-changing procedures are owned by the canonical guides.
+
+- For routine administration, use `docs/guides/ADMINISTRATOR_GUIDE.md`.
+- For upgrades, use `docs/guides/UPGRADE_GUIDE.md`.
+- For deployment rollback, use `docs/guides/ROLLBACK_GUIDE.md`.
+- For backup or state restore, use `docs/guides/BACKUP_RESTORE_GUIDE.md`.
+- For diagnosis or failed verification, use `docs/guides/TROUBLESHOOTING_GUIDE.md`.
+
+Do not assemble a production transaction from older command snippets in this
+reference. In particular, direct `docker compose pull`, `docker compose up -d`,
+ad-hoc restore steps, or abbreviated update sequences are not substitutes for the
+applicable canonical guide.
 
 # Operational Philosophy
 
@@ -776,20 +638,11 @@ Monthly
 
 ---
 
-# Incident Response Checklist
+# Incident Response Navigation
 
-When unexpected behavior occurs:
-
-- [ ] Run `atlas doctor`
-- [ ] Run `atlas verify`
-- [ ] Review `atlas ari report`
-- [ ] Review Docker logs
-- [ ] Verify storage
-- [ ] Verify VPN
-- [ ] Restore backup if necessary
-- [ ] Document findings
-
----
+Use `docs/guides/TROUBLESHOOTING_GUIDE.md` for the canonical incident and
+diagnostic procedure. Preserve evidence before mutation and do not convert an
+unknown or failed state into an assumed healthy state.
 
 # Administrator Checklist
 
@@ -824,3 +677,151 @@ Project Atlas is considered operational only when these checks are complete.
                   │
                   ▼
                COMMIT
+
+## Retiring an incomplete sustained-use certification attempt
+
+An incomplete Q.6 certification attempt must not be deleted, manually rewritten as `failed`, or cleared by moving `session.json` by hand.
+
+Use the explicit retirement path:
+
+```bash
+atlas sustained-use status --json
+
+atlas sustained-use abort \
+  --confirm-run-id <exact-current-run-id>
+```
+
+The confirmation must exactly match the current session run ID. No force bypass exists.
+
+A successful abort transitions the session to `aborted`, records its UTC completion time, and archives the run under:
+
+```text
+/mnt/storage/configs/atlas/sustained-use/archive/<run-id>/
+```
+
+The archive preserves `session.json`, `latest.json`, and the complete `history/` directory. Atlas moves `session.json` last so an interrupted archive retains the terminal lifecycle boundary and can be retried safely.
+
+After archival, verify the historical run before starting another certification:
+
+```bash
+find /mnt/storage/configs/atlas/sustained-use/archive/<run-id> \
+  -maxdepth 2 \
+  -type f \
+  -print
+
+cat /mnt/storage/configs/atlas/sustained-use/archive/<run-id>/session.json
+```
+
+The archived session must report `status` as `aborted`. Keep the archive as historical release evidence.
+
+Start a new T0 only after the repaired candidate is clean and published, `sustained-use.sample` is restored at its canonical cadence, and autonomous Scheduler dispatch has been reverified.
+
+## Q.6 fixed-cadence sustained-use operation
+
+Q.6 uses two distinct timing contracts.
+
+The **certification cadence** is fixed at 15 minutes / 900 seconds. Required observation times are derived from T0:
+
+```text
+sample 1   = T0
+sample 2   = T0 + 900 seconds
+sample 3   = T0 + 1800 seconds
+...
+sample 193 = T0 + 172800 seconds
+```
+
+The **Scheduler polling cadence** is 60 seconds. The shorter polling interval does not change the Q.6 observation frequency. It only gives Atlas repeated opportunities to recognize the next fixed certification slot without accumulating Scheduler completion-time drift.
+
+The scheduled callback behavior is:
+
+```text
+before fixed slot        -> successful not_due no-op
+0..180 seconds late      -> capture one real sample
+more than 180 seconds    -> missed-slot hard failure
+no active session        -> successful no-op
+terminal session         -> successful no-op
+history complete         -> successful no-op
+```
+
+A missed slot must never be repaired by backfilling multiple observations. Historical samples must represent real observations collected near their required temporal boundaries.
+
+During a real Q.6 run, inspect:
+
+```bash
+atlas sustained-use status --json
+atlas scheduler inspect sustained-use.sample
+atlas health --compact
+```
+
+The live Scheduler task should report:
+
+```text
+name:              sustained-use.sample
+interval_seconds:  60
+enabled:           true
+status:            healthy
+failure_count:     0
+```
+
+The `60` second value is the polling interval, **not** the Q.6 certification sample interval.
+
+If a scheduled callback reports a missed-slot failure, preserve the active evidence and treat the certification attempt as release-blocking. Do not manually create replacement samples and do not restart the Q.6 clock until the failure is investigated and the incomplete run is explicitly retired.
+
+Finalization independently validates every persisted observation against its T0-derived slot. Therefore a history with 193 chronologically ordered samples can still fail Q.6 if those observations violate the fixed cadence.
+
+The archived run `q6-20260817T232028Z` is the canonical production example of this distinction: Atlas and the Scheduler remained operationally healthy, but cumulative temporal drift made the run invalid for the exact 48-hour / 193-sample certification contract.
+
+## Q.6 Runtime Bus terminal convergence
+
+The final sustained-use decision must not require the Notifications subscriber cursor to equal the live Runtime Bus journal tail at one instantaneous read. Runtime Bus publication and subscriber consumption are asynchronous, so a healthy subscriber can be briefly behind at the exact sample-193 boundary.
+
+Q.6 freezes the terminal target from the Runtime Bus journal tail recorded by sample 193. Finalization then observes subscriber progress for a bounded 180-second window.
+
+The terminal contract is:
+
+```text
+target = sample_193.runtime_bus.journal_tail
+
+cursor >= target within 180 seconds -> terminal PASS
+cursor < target while time remains  -> pending, not success
+cursor < target after timeout       -> hard failure
+```
+
+Events published after sample 193 do not move the frozen target. The live journal may therefore continue to grow while Notifications converges through the certification target.
+
+Operators must not edit the final sample, advance the cursor manually, rewrite the failed session, or retry historical finalization merely to manufacture a pass. Preserve the original terminal record as evidence.
+
+When investigating terminal convergence, inspect the sustained-use finalization output together with current Runtime Bus journal/cursor and Notifications heartbeat evidence. A healthy current subscriber that has consumed through the frozen target demonstrates convergence; it does not alter the historical sample evidence.
+
+A production run may transition to `completed` only after hard evaluation, temporal history evaluation, fixed-slot evaluation, and bounded terminal convergence all pass. `pending` is never equivalent to success, and terminal timeout remains release-blocking.
+
+## Q.6 completed-certification boundary
+
+A successful Q.6 certification ends with a durable `completed` session and a frozen Scheduler boundary.
+
+The certified production sequence is:
+
+1. verify exactly `193/193` persisted samples and zero fixed-slot violations;
+2. wait for any in-flight `atlas-scheduler.service` invocation to finish;
+3. stop `atlas-scheduler.timer` without disabling it;
+4. verify the one-shot Scheduler service is inactive;
+5. finalize once through the bounded Runtime Bus terminal observer;
+6. require terminal status `passed`;
+7. verify the persisted session is `completed`;
+8. verify the 193 history samples were not rewritten; and
+9. reconcile the result into release documentation before changing release gates.
+
+The final successful v1.0 Q.6 run is `q6-20260822T011449Z` against commit `13a48a5ce1a6e4c5f335f4ae6cd19ba61149fefa`.
+
+Its terminal target was frozen at Runtime Bus journal line `7053`. Notifications converged through that target with final cursor `7068` in two probes. The live journal reached `7070`; that post-target growth is valid and does not change the frozen certification target.
+
+After successful certification, `atlas-scheduler.timer` is expected to be:
+
+```text
+enabled: yes
+active:  no
+```
+
+Do not restart the timer merely to make the post-certification state look active. Any later Scheduler activation belongs to the next explicitly controlled operational or release step.
+
+Historical failed and aborted Q.6 runs remain immutable evidence and must not be rewritten to match the successful run.
