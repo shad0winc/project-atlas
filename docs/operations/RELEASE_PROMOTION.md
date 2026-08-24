@@ -1,5 +1,27 @@
 # Release Promotion and Production Source Gate
 
+This document owns the repository promotion and production-source gate. It does
+not own the complete production upgrade, rollback, or restore procedure.
+
+## Canonical v1 operator guides
+
+Project Atlas v1 operational procedures are owned by the guides under
+`docs/guides/`. Use the guide that matches the transaction you are performing:
+
+| Guide | Canonical responsibility |
+|---|---|
+| `docs/guides/ADMINISTRATOR_GUIDE.md` | Administrator workflows and operational navigation |
+| `docs/guides/USER_GUIDE.md` | End-user workflows and user-safe failure behavior |
+| `docs/guides/INSTALLATION_GUIDE.md` | New installation and initial production verification |
+| `docs/guides/UPGRADE_GUIDE.md` | Production upgrade transaction |
+| `docs/guides/ROLLBACK_GUIDE.md` | Deployment rollback transaction |
+| `docs/guides/BACKUP_RESTORE_GUIDE.md` | Atlas backup and state-restore transaction |
+| `docs/guides/TROUBLESHOOTING_GUIDE.md` | Diagnosis, incident handling, and failure recovery |
+
+Older documents may retain architecture, implementation history, command contracts,
+or service-specific reference material, but they do not override these procedure
+owners. When instructions conflict, stop and follow the applicable canonical guide.
+
 Project Atlas production deployment has two complementary safety boundaries:
 
 1. repository-hosting rules prevent untested source from being promoted into
@@ -70,8 +92,9 @@ deployment source.
 
 Passing CI does not itself deploy production.
 
-After an approved release is promoted to `main`, the production checkout must
-be synchronized deliberately. `atlas update` then independently requires:
+After an approved release is promoted to `main`, production deployment must
+follow `docs/guides/UPGRADE_GUIDE.md`. The `atlas update` source gate independently
+requires:
 
 - branch `main`;
 - a clean working tree;
@@ -83,6 +106,9 @@ be synchronized deliberately. `atlas update` then independently requires:
 ## Production Recovery Source
 
 Protected promotion is also part of the live-restore authorization boundary.
+The complete state-restore transaction is owned by
+`docs/guides/BACKUP_RESTORE_GUIDE.md`; deployment rollback is owned by
+`docs/guides/ROLLBACK_GUIDE.md`.
 `atlas restore apply` refuses production mutation unless the checkout is clean
 `main` exactly equal to `origin/main`; `--confirm-live` cannot override an
 uncertified feature or release checkout. M-023.25 explicitly exercised that

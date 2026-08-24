@@ -1,4 +1,20 @@
-# Service Wiring
+# Service Wiring — Supplemental Reference
+
+This document preserves service-specific wiring values for the current media
+stack. It is a supplemental configuration reference, not a complete installation,
+upgrade, rollback, restore, or troubleshooting procedure.
+
+For production procedures, use:
+
+- `docs/guides/INSTALLATION_GUIDE.md`
+- `docs/guides/UPGRADE_GUIDE.md`
+- `docs/guides/ROLLBACK_GUIDE.md`
+- `docs/guides/BACKUP_RESTORE_GUIDE.md`
+- `docs/guides/TROUBLESHOOTING_GUIDE.md`
+
+Validate these service values against the deployed environment and
+`docs/CONFIGURATION.md` before applying changes. If this reference conflicts with
+a canonical v1 guide, stop and follow the canonical guide.
 
 ## qBittorrent
 

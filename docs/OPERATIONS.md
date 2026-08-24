@@ -1,8 +1,31 @@
 # Project Atlas Operations Guide
 
-> **Operational Runbook for Project Atlas**
+> **Operational command, runtime, and certification reference for Project Atlas**
 
-This document describes the standard operating procedures for administering, maintaining, troubleshooting, and updating Project Atlas.
+This document preserves detailed Operations subsystem contracts, runtime behavior,
+service verification details, and historical certification evidence. It is not the
+canonical owner of installation, upgrade, rollback, backup/restore, or
+troubleshooting transactions.
+
+## Canonical v1 operator guides
+
+Project Atlas v1 operational procedures are owned by the guides under
+`docs/guides/`. Use the guide that matches the transaction you are performing:
+
+| Guide | Canonical responsibility |
+|---|---|
+| `docs/guides/ADMINISTRATOR_GUIDE.md` | Administrator workflows and operational navigation |
+| `docs/guides/USER_GUIDE.md` | End-user workflows and user-safe failure behavior |
+| `docs/guides/INSTALLATION_GUIDE.md` | New installation and initial production verification |
+| `docs/guides/UPGRADE_GUIDE.md` | Production upgrade transaction |
+| `docs/guides/ROLLBACK_GUIDE.md` | Deployment rollback transaction |
+| `docs/guides/BACKUP_RESTORE_GUIDE.md` | Atlas backup and state-restore transaction |
+| `docs/guides/TROUBLESHOOTING_GUIDE.md` | Diagnosis, incident handling, and failure recovery |
+
+Older documents may retain architecture, implementation history, command contracts,
+or service-specific reference material, but they do not override these procedure
+owners. When instructions conflict, stop and follow the applicable canonical guide.
+
 
 ---
 
@@ -553,256 +576,21 @@ and before production release validation.
 
 ---
 
-# Weekly Maintenance
-
-Recommended tasks:
-
-- Review ARI report
-- Review storage growth
-- Verify backup completion
-- Review container logs
-- Update containers if appropriate
-
-Suggested commands:
-
-```bash
-atlas doctor
-atlas verify
-atlas ari collect
-atlas ari report
-docker compose pull
-docker compose up -d
-```
-
----
-
-# Monthly Maintenance
-
-Recommended tasks:
-
-- Review storage forecasts
-- Verify disaster recovery procedures
-- Validate backups
-- Review media quality profiles
-- Update documentation if architecture changes
-
----
-
-# Backup Procedure
-
-Create a backup:
-
-```bash
-atlas backup
-```
-
-Recommended before:
-
-- Docker updates
-- Configuration changes
-- Adding services
-- System upgrades
-
-After backup:
-
-```bash
-atlas verify
-```
-
-Confirm the platform remains healthy.
-
----
-
-# Update Procedure
-
-## Step 1
-
-Verify platform health.
-
-```bash
-atlas doctor
-atlas verify
-```
-
----
-
-## Step 2
-
-Create backup.
-
-```bash
-atlas backup
-```
-
----
-
-## Step 3
-
-Update Atlas.
-
-```bash
-atlas update
-```
-
----
-
-## Step 4
-
-Verify platform.
-
-```bash
-atlas verify
-```
-
----
-
-## Step 5
-
-Collect a new ARI snapshot.
-
-```bash
-atlas ari collect
-atlas ari report
-```
-
----
-
-# Recovery Procedure
-
-If an update fails:
-
-1. Stop changes immediately.
-2. Review logs.
-3. Restore backup.
-4. Run:
-
-```bash
-atlas verify
-atlas doctor
-```
-
-5. Confirm ARI health.
-
----
-
-# Standard Operational Workflow
-
-Routine maintenance:
-
-```text
-atlas doctor
-        │
-        ▼
-atlas verify
-        │
-        ▼
-atlas ari collect
-        │
-        ▼
-atlas ari report
-        │
-        ▼
-atlas backup
-        │
-        ▼
-atlas update
-        │
-        ▼
-atlas verify
-```
-
----
-
-# Health Monitoring
-
-ARI evaluates:
-
-## Platform
-
-- Docker
-- VPN
-- Storage
-- Snapshot freshness
-
-## Media
-
-- Jellyfin libraries
-- Library paths
-- Library synchronization
-
-## Intelligence
-
-- Historical analysis
-- Capacity forecasting
-- Operational recommendations
-
----
-
-# Troubleshooting
-
-## Docker Issues
-
-```bash
-atlas doctor
-docker ps
-docker compose logs
-```
-
----
-
-## VPN Issues
-
-Verify:
-
-```bash
-docker logs gluetun
-```
-
-Confirm VPN IP:
-
-```bash
-atlas doctor
-```
-
----
-
-## Jellyfin Issues
-
-Verify:
-
-- Libraries exist
-- Paths are correct
-- Synchronization passes
-
-Run:
-
-```bash
-atlas ari report
-```
-
----
-
-## Storage Issues
-
-Check:
-
-```bash
-df -h
-```
-
-Then:
-
-```bash
-atlas verify
-```
-
-Review forecast:
-
-```bash
-atlas ari report
-```
-
----
+# Routine Maintenance and Recovery Navigation
+
+Routine observation commands and subsystem references in this document remain
+useful, but production-changing procedures are owned by the canonical guides.
+
+- For routine administration, use `docs/guides/ADMINISTRATOR_GUIDE.md`.
+- For upgrades, use `docs/guides/UPGRADE_GUIDE.md`.
+- For deployment rollback, use `docs/guides/ROLLBACK_GUIDE.md`.
+- For backup or state restore, use `docs/guides/BACKUP_RESTORE_GUIDE.md`.
+- For diagnosis or failed verification, use `docs/guides/TROUBLESHOOTING_GUIDE.md`.
+
+Do not assemble a production transaction from older command snippets in this
+reference. In particular, direct `docker compose pull`, `docker compose up -d`,
+ad-hoc restore steps, or abbreviated update sequences are not substitutes for the
+applicable canonical guide.
 
 # Operational Philosophy
 
@@ -840,20 +628,11 @@ Monthly
 
 ---
 
-# Incident Response Checklist
+# Incident Response Navigation
 
-When unexpected behavior occurs:
-
-- [ ] Run `atlas doctor`
-- [ ] Run `atlas verify`
-- [ ] Review `atlas ari report`
-- [ ] Review Docker logs
-- [ ] Verify storage
-- [ ] Verify VPN
-- [ ] Restore backup if necessary
-- [ ] Document findings
-
----
+Use `docs/guides/TROUBLESHOOTING_GUIDE.md` for the canonical incident and
+diagnostic procedure. Preserve evidence before mutation and do not convert an
+unknown or failed state into an assumed healthy state.
 
 # Administrator Checklist
 
