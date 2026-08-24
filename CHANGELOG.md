@@ -184,6 +184,20 @@ All notable changes to Project Atlas are documented in this file.
 
 ### Fixed
 
+- Reconciled the second controlled exact `1.0.0-rc.1` production attempt,
+  `update-20260824T222351Z-3794932`, which failed closed at the immediate post-Compose ingress
+  verification boundary while the ingress health state was still legitimately
+  `starting`.
+- Added a bounded, read-only ingress readiness phase for `ingress` and `all`
+  update scopes between deterministic Compose apply and authoritative
+  post-update verification. The readiness phase accepts only `running +
+  starting` as transient, requires `running + healthy` for success, and fails
+  closed on missing, unhealthy, non-running, uninspectable, or unexpected
+  states.
+- Preserved the strict authoritative ingress verifier, maintenance ownership,
+  deployment-lock ownership, previous verified production baseline, and both
+  failed exact-RC transactions as immutable deployment evidence.
+
 - Hardened the v1.0 RC production deployment path after the first exact
   `1.0.0-rc.1` deployment attempt failed closed.
 - Added pre-pull/pre-build validation for tracked first-party ingress build

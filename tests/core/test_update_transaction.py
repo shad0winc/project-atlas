@@ -193,6 +193,43 @@ def run_update(
       return "${ATLAS_TEST_BACKUP_STATUS:-0}"
     }
 
+    atlas_update_ingress_container_state() {
+      local container="$1"
+      local status="running"
+      local health="healthy"
+
+      if [[ -n "${ATLAS_TEST_READINESS_FAIL_CONTAINER:-}" ]] &&
+         [[ "$container" == "$ATLAS_TEST_READINESS_FAIL_CONTAINER" ]]
+      then
+        status="${ATLAS_TEST_READINESS_FAIL_STATUS:-running}"
+        health="${ATLAS_TEST_READINESS_FAIL_HEALTH:-healthy}"
+      fi
+
+      if [[ "$container" == "atlas-caddy" ]] &&
+         [[ "${ATLAS_TEST_CADDY_STARTING_ONCE:-0}" == "1" ]]
+      then
+        if [[ ! -e "$ATLAS_TEST_CADDY_READY_MARKER" ]]; then
+          touch "$ATLAS_TEST_CADDY_READY_MARKER"
+          health="starting"
+        fi
+      fi
+
+      if [[ "$container" == "atlas-caddy" ]] &&
+         [[ "${ATLAS_TEST_CADDY_ALWAYS_STARTING:-0}" == "1" ]]
+      then
+        health="starting"
+      fi
+
+      echo "readiness-probe:$container:$status:$health" \
+        >> "$ATLAS_TEST_EVENTS"
+
+      printf '%s|%s\n' "$status" "$health"
+    }
+
+    atlas_update_readiness_sleep() {
+      echo "readiness-sleep:${1:-}" >> "$ATLAS_TEST_EVENTS"
+    }
+
     atlas_deployment_archive_source() {
       cp "$ATLAS_TEST_ARCHIVE" "$2"
     }
@@ -566,3 +603,281 @@ def test_missing_target_image_aborts_before_maintenance_or_apply(
         "target image completeness verification failed before maintenance"
         in result.stderr
     )
+
+
+def readiness_events(environment: dict[str, str]) -> list[str]:
+    return [
+        event
+        for event in event_lines(environment)
+        if event.startswith("readiness-")
+    ]
+
+
+def test_readiness_already_healthy_succeeds_immediately(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_CADDY_READY_MARKER"] = str(
+        tmp_path / "caddy-ready"
+    )
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode == 0, result.stderr
+
+    events = readiness_events(environment)
+
+    assert events == [
+        "readiness-probe:atlas-api:running:healthy",
+        "readiness-probe:atlas-portal:running:healthy",
+        "readiness-probe:atlas-caddy:running:healthy",
+        "readiness-probe:atlas-api:running:healthy",
+        "readiness-probe:atlas-portal:running:healthy",
+        "readiness-probe:atlas-caddy:running:healthy",
+    ]
+
+    assert not any(
+        event.startswith("readiness-sleep:")
+        for event in events
+    )
+
+
+def test_readiness_starting_then_healthy_retries_and_succeeds(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_CADDY_STARTING_ONCE"] = "1"
+    environment["ATLAS_TEST_CADDY_READY_MARKER"] = str(
+        tmp_path / "caddy-ready"
+    )
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode == 0, result.stderr
+
+    events = readiness_events(environment)
+
+    first_caddy = events.index(
+        "readiness-probe:atlas-caddy:running:starting"
+    )
+    sleep = next(
+        index
+        for index, event in enumerate(events)
+        if event.startswith("readiness-sleep:")
+    )
+    healthy_caddy = events.index(
+        "readiness-probe:atlas-caddy:running:healthy",
+        sleep + 1,
+    )
+
+    assert first_caddy < sleep < healthy_caddy
+
+
+def test_readiness_unhealthy_fails_immediately(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_CADDY_READY_MARKER"] = str(
+        tmp_path / "caddy-ready"
+    )
+    environment["ATLAS_TEST_READINESS_FAIL_CONTAINER"] = "atlas-caddy"
+    environment["ATLAS_TEST_READINESS_FAIL_HEALTH"] = "unhealthy"
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode != 0
+
+    events = readiness_events(environment)
+
+    assert (
+        "readiness-probe:atlas-caddy:running:unhealthy"
+        in events
+    )
+
+    assert not any(
+        event.startswith("readiness-sleep:")
+        for event in events
+    )
+
+    assert "maintenance:enable" in event_lines(environment)
+    assert "maintenance:disable" not in event_lines(environment)
+    assert lock_path(environment).is_dir()
+
+    assert "ingress readiness failed" in result.stderr.lower()
+
+
+def test_readiness_non_running_container_fails_immediately(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_CADDY_READY_MARKER"] = str(
+        tmp_path / "caddy-ready"
+    )
+    environment["ATLAS_TEST_READINESS_FAIL_CONTAINER"] = "atlas-portal"
+    environment["ATLAS_TEST_READINESS_FAIL_STATUS"] = "exited"
+    environment["ATLAS_TEST_READINESS_FAIL_HEALTH"] = "healthy"
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode != 0
+
+    assert (
+        "readiness-probe:atlas-portal:exited:healthy"
+        in readiness_events(environment)
+    )
+
+    assert "maintenance:disable" not in event_lines(environment)
+    assert lock_path(environment).is_dir()
+
+
+def test_readiness_missing_health_contract_fails_immediately(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_CADDY_READY_MARKER"] = str(
+        tmp_path / "caddy-ready"
+    )
+    environment["ATLAS_TEST_READINESS_FAIL_CONTAINER"] = "atlas-api"
+    environment["ATLAS_TEST_READINESS_FAIL_HEALTH"] = "missing"
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode != 0
+
+    assert (
+        "readiness-probe:atlas-api:running:missing"
+        in readiness_events(environment)
+    )
+
+    assert "maintenance:disable" not in event_lines(environment)
+    assert lock_path(environment).is_dir()
+
+
+def test_readiness_starting_timeout_fails_closed(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_CADDY_ALWAYS_STARTING"] = "1"
+    environment["ATLAS_TEST_CADDY_READY_MARKER"] = str(
+        tmp_path / "caddy-ready"
+    )
+    environment["ATLAS_UPDATE_READINESS_ATTEMPTS"] = "3"
+    environment["ATLAS_UPDATE_READINESS_INTERVAL_SECONDS"] = "0"
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode != 0
+
+    events = readiness_events(environment)
+
+    caddy_starting = [
+        event
+        for event in events
+        if event == "readiness-probe:atlas-caddy:running:starting"
+    ]
+
+    assert len(caddy_starting) == 3
+    assert "maintenance:disable" not in event_lines(environment)
+    assert lock_path(environment).is_dir()
+
+    assert "readiness timed out" in result.stderr.lower()
+
+
+def test_core_scope_does_not_invoke_ingress_readiness(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_CADDY_READY_MARKER"] = str(
+        tmp_path / "caddy-ready"
+    )
+
+    result = run_update(environment, "core")
+
+    assert result.returncode == 0, result.stderr
+    assert readiness_events(environment) == []
+
+
+def test_ingress_readiness_occurs_after_apply_before_verification(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_CADDY_READY_MARKER"] = str(
+        tmp_path / "caddy-ready"
+    )
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode == 0, result.stderr
+
+    events = event_lines(environment)
+
+    apply = next(
+        index
+        for index, event in enumerate(events)
+        if event.startswith("docker compose")
+        and "up -d" in event
+        and "--no-build" in event
+        and "--pull never" in event
+    )
+
+    readiness = events.index(
+        "readiness-probe:atlas-api:running:healthy"
+    )
+
+    doctor_after_apply = events.index("doctor", apply + 1)
+
+    assert apply < readiness < doctor_after_apply
+
+
+def test_readiness_failure_preserves_maintenance_and_lock(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_CADDY_READY_MARKER"] = str(
+        tmp_path / "caddy-ready"
+    )
+    environment["ATLAS_TEST_READINESS_FAIL_CONTAINER"] = "atlas-caddy"
+    environment["ATLAS_TEST_READINESS_FAIL_HEALTH"] = "unhealthy"
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode != 0
+
+    events = event_lines(environment)
+
+    assert "maintenance:enable" in events
+    assert "maintenance:disable" not in events
+    assert lock_path(environment).is_dir()
+    assert "Recovery command: atlas deployment rollback" in result.stderr
+
+
+def test_readiness_waiter_is_inspection_only() -> None:
+    content = UPDATE.read_text(encoding="utf-8")
+
+    assert "atlas_update_wait_for_ingress_readiness() {" in content
+
+    section = content.split(
+        "atlas_update_wait_for_ingress_readiness() {",
+        1,
+    )[1].split(
+        "atlas_update_core_apply() {",
+        1,
+    )[0]
+
+    assert "docker inspect" in section
+
+    forbidden = (
+        "docker restart",
+        "docker stop",
+        "docker start",
+        "docker compose",
+        " up -d",
+        "docker pull",
+        "docker build",
+        "maintenance",
+        "deployment_set_status",
+        "release_lock",
+    )
+
+    for item in forbidden:
+        assert item not in section

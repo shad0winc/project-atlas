@@ -196,6 +196,38 @@ change requires them.
 Application builds must come from the approved source commit. Untracked or
 dirty source fails the deployment gate.
 
+## Post-Apply Ingress Readiness
+
+A successful deterministic Compose apply is not equivalent to verified ingress
+readiness.
+
+For update scopes that recreate ingress services, Atlas performs a bounded,
+read-only readiness observation after Compose apply and before authoritative
+post-update verification.
+
+The readiness boundary observes `atlas-api`, `atlas-portal`, and `atlas-caddy`.
+
+Success requires both:
+
+- container state `running`; and
+- health state `healthy`.
+
+The only transient retry state is `running + starting`.
+
+Atlas fails closed immediately for a missing container, Docker inspection
+failure, non-running container, `unhealthy` health state, missing health
+contract, or any unexpected health state. Remaining in `running + starting`
+beyond the bounded readiness deadline also fails closed.
+
+The readiness phase performs inspection only. It does not restart, stop, start,
+recreate, pull, build, invoke Compose, change maintenance state, release the
+deployment lock, or modify deployment records.
+
+Readiness does not replace or weaken authoritative verification. Its purpose is
+only to distinguish a legitimate bounded health-startup interval from a
+terminal verification failure before the existing strict verification gates
+run.
+
 ## Post-Update Verification
 
 Required validation is selected by the affected surface and includes the

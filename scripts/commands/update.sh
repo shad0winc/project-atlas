@@ -203,6 +203,112 @@ atlas_update_verify_target_images() {
   esac
 }
 
+atlas_update_wait_for_ingress_readiness() {
+  local attempts="${ATLAS_UPDATE_READINESS_ATTEMPTS:-18}"
+  local interval="${ATLAS_UPDATE_READINESS_INTERVAL_SECONDS:-5}"
+  local attempt
+  local container
+  local state
+  local status
+  local health
+  local pending
+
+  [[ "$attempts" =~ ^[1-9][0-9]*$ ]] || {
+    printf \
+      'ERROR: ATLAS_UPDATE_READINESS_ATTEMPTS must be a positive integer: %s\n' \
+      "$attempts" >&2
+    return 1
+  }
+
+  [[ "$interval" =~ ^[0-9]+$ ]] || {
+    printf \
+      'ERROR: ATLAS_UPDATE_READINESS_INTERVAL_SECONDS must be a non-negative integer: %s\n' \
+      "$interval" >&2
+    return 1
+  }
+
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
+    pending=0
+
+    for container in \
+      atlas-api \
+      atlas-portal \
+      atlas-caddy
+    do
+      state="$(
+        atlas_update_ingress_container_state "$container"
+      )" || {
+        printf \
+          'ERROR: ingress readiness failed: unable to inspect %s\n' \
+          "$container" >&2
+        return 1
+      }
+
+      IFS='|' read -r status health <<<"$state"
+
+      if [[ "$status" != 'running' ]]; then
+        printf \
+          'ERROR: ingress readiness failed: %s is not running (status=%s health=%s)\n' \
+          "$container" \
+          "${status:-missing}" \
+          "${health:-missing}" >&2
+        return 1
+      fi
+
+      case "$health" in
+        healthy)
+          ;;
+        starting)
+          pending=1
+          ;;
+        unhealthy|missing|'')
+          printf \
+            'ERROR: ingress readiness failed: %s health=%s\n' \
+            "$container" \
+            "${health:-missing}" >&2
+          return 1
+          ;;
+        *)
+          printf \
+            'ERROR: ingress readiness failed: %s has unexpected health state=%s\n' \
+            "$container" \
+            "$health" >&2
+          return 1
+          ;;
+      esac
+    done
+
+    if [[ "$pending" -eq 0 ]]; then
+      return 0
+    fi
+
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      printf \
+        'ERROR: ingress readiness timed out after %s attempts.\n' \
+        "$attempts" >&2
+      return 1
+    fi
+
+    atlas_update_readiness_sleep "$interval"
+  done
+
+  return 1
+}
+
+atlas_update_ingress_container_state() {
+  local container="$1"
+
+  docker inspect \
+    --format \
+    '{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' \
+    "$container" \
+    2>/dev/null
+}
+
+atlas_update_readiness_sleep() {
+  sleep "$1"
+}
+
 atlas_update_core_apply() {
   docker compose \
     --env-file "$ATLAS_PROJECT_DIR/.env" \
@@ -242,6 +348,15 @@ atlas_update_apply_scope() {
 
 atlas_update_post_verify() {
   local scope="$1"
+
+  if [[ "$scope" == 'ingress' || "$scope" == 'all' ]]; then
+    echo 'Post-update ingress readiness:'
+
+    atlas_update_wait_for_ingress_readiness || {
+      echo 'ERROR: ingress readiness failed.' >&2
+      return 1
+    }
+  fi
 
   echo 'Post-update doctor:'
   atlas_command_doctor || return 1
