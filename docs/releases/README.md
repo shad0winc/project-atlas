@@ -174,13 +174,15 @@ reclassified solely to permit publication.
 
 ## Current Release Records
 
-Existing or planned release records may include:
+### [`RC_V1_0.md`](RC_V1_0.md)
 
-```text
-TEMPLATE.md
-RC_M018_SERVICE_LIFECYCLE.md
-RC_V1_0.md
-```
+Records the Project Atlas v1.0 release-candidate identity, certified source
+promotion, validation evidence, candidate limitations, approval boundary, and
+the remaining production RC gates.
+
+The record distinguishes creation of `1.0.0-rc.1` from production deployment,
+controlled pilot, stabilization, release freeze, final `v1.0.0` tagging,
+publication, and stable support.
 
 ## Relationship to Governance
 
