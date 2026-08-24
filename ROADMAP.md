@@ -857,7 +857,7 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 ### Documentation
 
 - [x] Reconcile Media discovery and Request architecture through E2.5 production acceptance
-- [ ] Update architecture documentation for remaining v1.0 surfaces
+- [x] Update architecture documentation for remaining v1.0 surfaces
 - [x] Complete administrator guide
 - [x] Complete user guide
 - [x] Complete installation guide
