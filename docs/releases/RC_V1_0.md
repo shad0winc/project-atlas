@@ -168,6 +168,74 @@ version or tag.
 
 # RC Production Deployment Attempt and Safety Remediation
 
+## Current Runtime Status — PENDING CONTROLLED RC RETRY
+
+The immutable release-candidate identity remains `1.0.0-rc.1`.
+
+Two controlled production attempts are now preserved as release evidence.
+
+### First controlled attempt
+
+Transaction:
+
+`update-20260824T165151Z-3258027`
+
+Result:
+
+- failed closed;
+- production recovery completed;
+- transaction remains immutable historical evidence; and
+- deployment-safety remediation for build-context permission safety,
+  digest-safe rollback aliases, and persistent recovery-source lifetime was
+  certified.
+
+### Second controlled attempt
+
+Transaction:
+
+`update-20260824T222351Z-3794932`
+
+Result:
+
+- deterministic Compose apply completed;
+- immediate strict ingress verification encountered the legitimate transitional
+  health state `running + starting`;
+- the transaction failed closed;
+- maintenance remained enabled;
+- deployment-lock ownership remained preserved; and
+- the previous verified baseline remained authoritative.
+
+Root cause:
+
+`POST_APPLY_READINESS_RACE`
+
+The authoritative verifier was not weakened.
+
+A bounded, read-only ingress readiness phase has now been implemented and
+certified between deterministic Compose apply and strict post-update
+verification for `ingress` and `all` update scopes.
+
+Readiness requires `running + healthy` for success and permits only
+`running + starting` as a bounded transient state.
+
+Engineering certification:
+
+- Full Core: 3,456 tests passed
+- Core subtests: 104 passed
+- Canonical Sports: PASS
+- Legacy Sports: PASS
+- readiness remediation: CERTIFIED
+
+The authoritative production baseline remains:
+
+`baseline-reconciliation-20260824T164541Z-927002`
+
+A further controlled exact `1.0.0-rc.1` production retry is still required.
+
+This record does **not** claim successful RC production deployment, does not
+close the production deployment gate, and does not authorize the next retry.
+
+
 The first exact-RC production deployment attempt failed closed and did not
 complete the production-deployment release gate.
 

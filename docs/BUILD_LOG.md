@@ -8358,3 +8358,65 @@ zero unhealthy or restarting containers.
 All three discovered deployment-safety blockers are certified. The Roadmap gate
 `Deploy release candidate to production` remains open; a separately authorized
 controlled retry is still required.
+
+## R.10B.5H — RC Ingress Readiness Remediation
+
+The second controlled exact `1.0.0-rc.1` production deployment attempt was
+recorded as `update-20260824T222351Z-3794932`.
+
+The transaction failed closed after deterministic Compose apply because strict
+authoritative ingress verification ran while the recreated ingress containers
+were still in the legitimate transitional state `running + starting`.
+
+This was diagnosed as:
+
+`POST_APPLY_READINESS_RACE`
+
+The authoritative ingress verifier remains correct and strict. It was not
+weakened to accept `starting`.
+
+The remediation adds a bounded, read-only ingress readiness phase for `ingress`
+and `all` update scopes between deterministic Compose apply and authoritative
+post-update verification.
+
+The readiness contract observes:
+
+- `atlas-api`
+- `atlas-portal`
+- `atlas-caddy`
+
+Terminal success requires `running + healthy`.
+
+Only `running + starting` is retryable. Missing containers, Docker inspection
+failure, non-running state, `unhealthy`, missing health metadata, unexpected
+health state, and bounded timeout all fail closed.
+
+The waiter performs Docker inspection only and does not restart, stop, start,
+recreate, pull, build, run Compose, alter maintenance state, alter the
+deployment lock, or alter deployment records.
+
+R.10B.5H.5 engineering certification completed with:
+
+- Full Core: 3,456 tests passed and 104 subtests passed
+- Canonical Sports: PASS
+- Legacy Sports: PASS
+- engineering payload: CERTIFIED
+
+The failed transaction remains immutable evidence:
+
+`update-20260824T222351Z-3794932`
+
+The previous verified production baseline remains authoritative:
+
+`baseline-reconciliation-20260824T164541Z-927002`
+
+Maintenance mode and deployment-lock ownership remain preserved. Production
+runtime health remains stable.
+
+The first failed exact-RC transaction,
+`update-20260824T165151Z-3258027`, remains historical audit evidence and is not rewritten by this
+second remediation.
+
+A further controlled exact `1.0.0-rc.1` production retry remains required.
+This documentation reconciliation does not authorize that retry and does not
+close the production deployment release gate.

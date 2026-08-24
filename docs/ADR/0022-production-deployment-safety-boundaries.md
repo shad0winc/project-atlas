@@ -228,6 +228,40 @@ audit evidence. Production recovery restored verified baseline
 `baseline-reconciliation-20260824T164541Z-927002`. The exact RC production
 deployment gate remains open until a controlled retry succeeds.
 
+## Second Exact-RC Attempt: Post-Apply Readiness Invariant
+
+The second controlled exact `1.0.0-rc.1` production attempt,
+`update-20260824T222351Z-3794932`, established an additional deployment-safety invariant.
+
+A successful Compose apply is not equivalent to verified readiness.
+
+Ingress services recreated by an approved update may legitimately report
+`running + starting` for a bounded interval after Compose returns. Atlas may
+observe and retry that transitional state before authoritative verification.
+
+The readiness observation is bounded and read-only:
+
+- `running + healthy` is terminal success;
+- `running + starting` is the only retryable state;
+- missing containers, inspection failure, non-running state, `unhealthy`,
+  missing health metadata, unexpected health state, and timeout fail closed.
+
+The readiness phase does not replace authoritative verification. Strict ingress
+verification continues to require `running + healthy`.
+
+A readiness failure after maintenance begins enters the existing failed
+transaction path. Maintenance remains enabled, deployment-lock ownership
+remains held, and the previous verified baseline remains authoritative until
+explicit recovery or a separately authorized safe continuation.
+
+The failed transaction `update-20260824T222351Z-3794932` remains immutable audit evidence.
+The authoritative production baseline remains
+`baseline-reconciliation-20260824T164541Z-927002`.
+
+This clarification extends the existing deployment transaction and verification
+boundary; it does not create a new lifecycle abstraction and does not authorize
+another production retry.
+
 ## Consequences
 
 Positive consequences:
