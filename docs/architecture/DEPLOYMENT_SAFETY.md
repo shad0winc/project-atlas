@@ -253,6 +253,35 @@ If apply or post-update validation fails:
 
 Failure is not converted into success because containers happen to be running.
 
+## Post-Restore Rollback Readiness
+
+A successful rollback restore command is not equivalent to verified rollback
+readiness.
+
+For rollback scopes that restore ingress services, Atlas performs a bounded,
+inspection-only readiness observation after ingress restoration and before
+authoritative rollback verification.
+
+The readiness boundary observes `atlas-api`, `atlas-portal`, and `atlas-caddy`.
+
+Success requires container state `running` and health state `healthy`.
+The only bounded retry state is `running + starting`.
+
+Missing containers, Docker inspection failure, non-running state, `unhealthy`,
+missing health metadata, unexpected health state, and timeout fail closed.
+
+The readiness phase performs inspection only. It does not restart, stop, start,
+recreate, pull, build, invoke Compose, change maintenance state, release the
+deployment lock, change the current verified baseline, change deployment
+status, or modify deployment records.
+
+Authoritative rollback verification remains unchanged and strict.
+
+Readiness occurs before maintenance disable, current-baseline finalization,
+`rolled_back` transaction finalization, and final lock release. Failure
+therefore preserves the failed transaction, maintenance isolation, lock
+ownership, and the previous verified baseline for explicit recovery.
+
 ## Rollback
 
 Rollback uses the captured deployment manifest.

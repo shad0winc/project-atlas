@@ -577,6 +577,122 @@ atlas_deployment_restore_surface() {
   )
 }
 
+atlas_deployment_ingress_container_state() {
+  local container="$1"
+  local status
+  local health
+
+  status="$(
+    docker inspect \
+      --format '{{.State.Status}}' \
+      "$container"
+  )" || return 1
+
+  health="$(
+    docker inspect \
+      --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' \
+      "$container"
+  )" || return 1
+
+  printf '%s|%s\n' "$status" "$health"
+}
+
+atlas_deployment_readiness_sleep() {
+  sleep "$1"
+}
+
+atlas_deployment_wait_for_ingress_readiness() {
+  local attempts="${ATLAS_ROLLBACK_READINESS_ATTEMPTS:-18}"
+  local interval="${ATLAS_ROLLBACK_READINESS_INTERVAL_SECONDS:-5}"
+  local attempt
+  local container
+  local state
+  local status
+  local health
+  local pending
+
+  [[ "$attempts" =~ ^[1-9][0-9]*$ ]] || {
+    printf \
+      'ERROR: ATLAS_ROLLBACK_READINESS_ATTEMPTS must be a positive integer: %s\n' \
+      "$attempts" >&2
+    return 1
+  }
+
+  [[ "$interval" =~ ^[0-9]+$ ]] || {
+    printf \
+      'ERROR: ATLAS_ROLLBACK_READINESS_INTERVAL_SECONDS must be a non-negative integer: %s\n' \
+      "$interval" >&2
+    return 1
+  }
+
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
+    pending=0
+
+    for container in \
+      atlas-api \
+      atlas-portal \
+      atlas-caddy
+    do
+      state="$(
+        atlas_deployment_ingress_container_state "$container"
+      )" || {
+        printf \
+          'ERROR: rollback ingress readiness failed: unable to inspect %s\n' \
+          "$container" >&2
+        return 1
+      }
+
+      IFS='|' read -r status health <<<"$state"
+
+      if [[ "$status" != 'running' ]]; then
+        printf \
+          'ERROR: rollback ingress readiness failed: %s is not running (status=%s health=%s)\n' \
+          "$container" \
+          "${status:-missing}" \
+          "${health:-missing}" >&2
+        return 1
+      fi
+
+      case "$health" in
+        healthy)
+          ;;
+        starting)
+          pending=1
+          ;;
+        unhealthy|missing|'')
+          printf \
+            'ERROR: rollback ingress readiness failed: %s health=%s\n' \
+            "$container" \
+            "${health:-missing}" >&2
+          return 1
+          ;;
+        *)
+          printf \
+            'ERROR: rollback ingress readiness failed: %s has unexpected health state=%s\n' \
+            "$container" \
+            "$health" >&2
+          return 1
+          ;;
+      esac
+    done
+
+    if [[ "$pending" -eq 0 ]]; then
+      return 0
+    fi
+
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      printf \
+        'ERROR: rollback ingress readiness timed out after %s attempts.\n' \
+        "$attempts" >&2
+      return 1
+    fi
+
+    atlas_deployment_readiness_sleep "$interval"
+  done
+
+  return 1
+}
+
 atlas_deployment_rollback() {
   local identifier="$1"
   local transaction
@@ -671,6 +787,14 @@ atlas_deployment_rollback() {
       return 1
       ;;
   esac
+
+  if [[ "$scope" == 'ingress' || "$scope" == 'all' ]]; then
+    echo 'Post-restore ingress readiness:'
+    atlas_deployment_wait_for_ingress_readiness || {
+      echo 'ERROR: rollback ingress readiness failed.' >&2
+      return 1
+    }
+  fi
 
   atlas_command_doctor || return 1
   atlas_command_verify || return 1

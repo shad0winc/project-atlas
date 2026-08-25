@@ -885,6 +885,9 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
   - [x] Second exact `1.0.0-rc.1` production attempt failed closed at the
     post-apply ingress-readiness boundary (`update-20260824T222351Z-3794932`).
   - [x] Bounded read-only ingress-readiness remediation certified.
+  - [x] Certify bounded inspection-only post-restore rollback-readiness
+    remediation for failed transaction `update-20260824T222351Z-3794932` while preserving
+    maintenance, deployment-lock ownership, and the previous verified baseline.
   - [ ] Complete a successful controlled exact-RC production retry.
 - [ ] Complete controlled user pilot
 - [ ] Complete stabilization period
