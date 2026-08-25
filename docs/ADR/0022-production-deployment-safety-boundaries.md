@@ -228,6 +228,39 @@ audit evidence. Production recovery restored verified baseline
 `baseline-reconciliation-20260824T164541Z-927002`. The exact RC production
 deployment gate remains open until a controlled retry succeeds.
 
+## Post-Restore Rollback Readiness Invariant
+
+Recovery of failed exact-RC transaction `update-20260824T222351Z-3794932` established a separate
+rollback-side invariant from the previously documented
+`POST_APPLY_READINESS_RACE`.
+
+The restored runtime could legitimately remain `running + starting` briefly
+after restore. Immediate authoritative verification therefore exposed the
+distinct:
+
+`POST_RESTORE_ROLLBACK_READINESS_RACE`
+
+A restore command returning successfully is not equivalent to rollback
+readiness.
+
+For rollback scopes that restore ingress, Atlas requires bounded,
+inspection-only readiness before authoritative rollback verification and before
+state finalization.
+
+`running + healthy` is success. `running + starting` is the only retryable
+state. Missing containers, inspection failure, non-running state, `unhealthy`,
+missing health metadata, unexpected health state, and timeout fail closed.
+
+This readiness boundary is not a second health authority and does not weaken
+strict ingress verification.
+
+Failure preserves the failed transaction, maintenance mode, deployment-lock
+ownership, and previous verified baseline `baseline-reconciliation-20260824T164541Z-927002` until explicit recovery
+completes.
+
+This decision does not authorize manual finalization, lock deletion, automatic
+recovery, rollback replay, or another production deployment attempt.
+
 ## Second Exact-RC Attempt: Post-Apply Readiness Invariant
 
 The second controlled exact `1.0.0-rc.1` production attempt,

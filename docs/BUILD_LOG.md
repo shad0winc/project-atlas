@@ -8420,3 +8420,58 @@ second remediation.
 A further controlled exact `1.0.0-rc.1` production retry remains required.
 This documentation reconciliation does not authorize that retry and does not
 close the production deployment release gate.
+
+## R.10B.5I — Rollback Readiness Remediation
+
+The second controlled exact `1.0.0-rc.1` deployment transaction,
+`update-20260824T222351Z-3794932`, originally failed closed because immediate post-apply strict
+ingress verification encountered the legitimate transitional state
+`running + starting`. That update-side defect remains recorded as
+`POST_APPLY_READINESS_RACE`.
+
+During explicit recovery of the same failed transaction, canonical rollback
+restored the previous verified runtime and recreated ingress. Immediate
+authoritative verification then encountered `atlas-caddy` in
+`running + starting`, correctly failed closed, and returned before rollback
+transaction finalization.
+
+The restored runtime subsequently settled to healthy state:
+
+- `atlas-api`: running + healthy;
+- `atlas-portal`: running + healthy;
+- `atlas-caddy`: running + healthy;
+- strict live ingress: 29/29 PASS;
+- production runtime: 22 running, zero unhealthy, zero restarting.
+
+The distinct rollback-side root cause is:
+
+`POST_RESTORE_ROLLBACK_READINESS_RACE`
+
+A successful restore command is not equivalent to verified rollback readiness.
+Atlas now performs bounded, inspection-only rollback readiness after ingress
+restore and before authoritative rollback verification.
+
+Success requires `running + healthy`; only `running + starting` is transient.
+Missing containers, inspect failure, non-running state, `unhealthy`, missing
+health metadata, unexpected health states, and timeout fail closed.
+
+The waiter does not mutate runtime, maintenance, deployment records, baseline
+selection, transaction status, or deployment-lock ownership.
+
+Engineering certification:
+
+- focused rollback readiness: 6 passed;
+- deployment recovery: 30 passed;
+- update transaction: 25 passed;
+- release gate: 18 passed;
+- full Core: 3,467 passed plus 104 subtests;
+- Canonical Sports: PASS;
+- `atlas test sports`: PASS;
+- strict live ingress: 29/29 PASS.
+
+Production remains at verified baseline
+`baseline-reconciliation-20260824T164541Z-927002`. Transaction `update-20260824T222351Z-3794932` remains `failed`, maintenance
+remains enabled, and the deployment lock remains owned by that transaction.
+
+Rollback rerun and controlled exact-RC retry #3 remain unauthorized. The
+production RC deployment gate remains open.

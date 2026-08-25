@@ -236,6 +236,44 @@ This record does **not** claim successful RC production deployment, does not
 close the production deployment gate, and does not authorize the next retry.
 
 
+### Subsequent rollback-readiness remediation
+
+Recovery of failed transaction `update-20260824T222351Z-3794932` exposed the distinct
+`POST_RESTORE_ROLLBACK_READINESS_RACE` after the update-side
+`POST_APPLY_READINESS_RACE` had already been remediated.
+
+The restored production runtime subsequently settled to healthy state, but
+rollback finalization did not complete. Therefore:
+
+- transaction `update-20260824T222351Z-3794932` remains `failed`;
+- authoritative baseline `baseline-reconciliation-20260824T164541Z-927002` remains verified and current;
+- maintenance remains enabled;
+- deployment-lock ownership remains with the failed transaction;
+- runtime remains 22 running, zero unhealthy, zero restarting; and
+- strict live ingress is 29/29 PASS.
+
+A bounded, inspection-only post-restore rollback-readiness phase has now been
+implemented and engineering-certified. The strict ingress verifier remains
+unchanged.
+
+Current engineering certification:
+
+- focused rollback readiness: 6 passed;
+- deployment recovery: 30 passed;
+- update transaction: 25 passed;
+- release gate: 18 passed;
+- Full Core: 3,467 tests passed;
+- Core subtests: 104 passed;
+- Canonical Sports: PASS;
+- `atlas test sports`: PASS;
+- strict live ingress: 29/29 PASS.
+
+The earlier Full Core: 3,456 tests passed certification remains valid historical
+evidence for the separate update-side post-apply remediation.
+
+This record does **not** authorize rollback rerun or controlled exact-RC retry
+#3 and does not close the `Deploy release candidate to production` gate.
+
 The first exact-RC production deployment attempt failed closed and did not
 complete the production-deployment release gate.
 

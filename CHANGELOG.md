@@ -188,6 +188,21 @@ All notable changes to Project Atlas are documented in this file.
   `update-20260824T222351Z-3794932`, which failed closed at the immediate post-Compose ingress
   verification boundary while the ingress health state was still legitimately
   `starting`.
+- Certified rollback-side post-restore ingress readiness after recovery of
+  failed exact-RC transaction `update-20260824T222351Z-3794932` exposed the distinct
+  `POST_RESTORE_ROLLBACK_READINESS_RACE`.
+- Added a bounded, inspection-only rollback readiness boundary after ingress
+  restore and before authoritative rollback verification/finalization.
+- Rollback readiness requires `running + healthy`, permits only
+  `running + starting` as a bounded transient state, and otherwise fails closed.
+- Certified the rollback-readiness remediation with 6 focused readiness tests,
+  30 deployment-recovery tests, 25 update-transaction tests, 18 release-gate
+  tests, 3,467 Core tests plus 104 subtests, Canonical Sports PASS,
+  `atlas test sports` PASS, and strict live ingress at 29/29.
+- Preserved authoritative production baseline `baseline-reconciliation-20260824T164541Z-927002` while transaction
+  `update-20260824T222351Z-3794932` remains `failed`, maintenance remains enabled, and its
+  deployment lock remains held. Rollback rerun and controlled retry #3 remain
+  unauthorized.
 - Added a bounded, read-only ingress readiness phase for `ingress` and `all`
   update scopes between deterministic Compose apply and authoritative
   post-update verification. The readiness phase accepts only `running +
