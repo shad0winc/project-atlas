@@ -176,13 +176,11 @@ reclassified solely to permit publication.
 
 ### [`RC_V1_0.md`](RC_V1_0.md)
 
-Records the Project Atlas v1.0 release-candidate identity, certified source
-promotion, validation evidence, candidate limitations, approval boundary, and
-the remaining production RC gates.
-
-The record distinguishes creation of `1.0.0-rc.1` from production deployment,
-controlled pilot, stabilization, release freeze, final `v1.0.0` tagging,
-publication, and stable support.
+Records the v1.0 release-candidate identity, production deployment evidence,
+deployment-safety/recovery history, and later production-state reconciliation.
+Exact-RC production deployment is complete. Controlled pilot, final User and
+Administrator Experience Certification, stabilization, release freeze, final
+tagging, publication, and stable support remain separate release gates.
 
 ## Relationship to Governance
 

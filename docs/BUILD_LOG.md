@@ -8485,3 +8485,30 @@ remains enabled, and the deployment lock remains owned by that transaction.
 
 Rollback rerun and controlled exact-RC retry #3 remain unauthorized. The
 production RC deployment gate remains open.
+
+
+---
+
+# 2026-08-26
+
+## R.10B.5I.25T.25 — Final v1 Release-State Reconciliation
+
+The controlled exact-RC production retry completed successfully as
+`update-20260825T232236Z-1274121`, with verified baseline
+`baseline-20260825T232627Z-1296276`.
+
+Administrator identity remediation at certified `main`
+`a52d6a24c936f0f99ddbcd5dce452b6a70197edf` was subsequently deployed through
+`update-20260826T035129Z-1615937` and production-accepted.
+
+Historical failed RC attempts and remediation evidence remain immutable.
+`Deploy release candidate to production` is now complete. Broad M-022
+Administration, Observability, and Notification scope is not bulk-closed.
+
+Controlled pilot, final representative User and Administrator Experience
+Certification, stabilization, pilot-defect disposition, release freeze, final
+release notes/certification, version promotion, `v1.0.0` tagging, publication,
+and stable-support activation remain open.
+
+No VERSION, tag, deployment, or production mutation belongs to this
+reconciliation.
