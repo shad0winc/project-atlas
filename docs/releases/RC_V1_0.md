@@ -448,3 +448,28 @@ resulting deployment-safety remediation has been certified. A controlled retry
 is still required.
 
 The final `v1.0.0` release remains a separate later certification transaction.
+
+
+---
+
+# Post-RC Production State Reconciliation — 2026-08-26
+
+The exact `1.0.0-rc.1` production retry completed successfully as transaction
+`update-20260825T232236Z-1274121`; verified post-deployment baseline:
+`baseline-20260825T232627Z-1296276`.
+
+The subsequent Administrator identity remediation was merged to certified
+`main` commit `a52d6a24c936f0f99ddbcd5dce452b6a70197edf` and deployed through bounded
+ingress transaction `update-20260826T035129Z-1615937`.
+
+Earlier failed-attempt and authorization statements remain immutable historical
+evidence. Current production evidence supersedes only stale current-state
+claims that exact-RC production deployment remains pending.
+
+Still open: controlled user pilot; final representative User and Administrator
+Experience Certification; stabilization; pilot-defect disposition; release
+freeze; final release notes; final release authorization; `VERSION=1.0.0`;
+`v1.0.0` tag; publication; and stable-support activation.
+
+No additional RC production deployment is required by currently accepted
+production evidence. Final `v1.0.0` authorization remains a separate transaction.
