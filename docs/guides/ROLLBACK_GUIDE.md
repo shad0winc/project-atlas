@@ -140,19 +140,27 @@ Do not substitute memory or mutable tags for missing evidence.
 The previous verified baseline remains authoritative when a new deployment
 fails before successful baseline publication.
 
-Use:
+Use the read-only status command to inspect the current deployment identity:
 
 ```bash
 atlas deployment status
-atlas deployment baseline
 ```
 
-to inspect the current deployment transaction and verified baseline where
-applicable.
+Do not run `atlas deployment baseline` merely to inspect deployment state.
+`atlas deployment baseline` is a mutating checkpoint-creation operation. It
+runs the required verification surfaces, creates and verifies a fresh baseline
+record, captures the production source archives and exact running image
+identities, and publishes that new verified baseline as the authoritative
+`current` deployment pointer.
 
-The baseline is evidence of the last known-good production deployment identity.
+Creating a new baseline therefore changes which verified deployment is current.
+A previously verified update transaction is no longer directly rollback-eligible
+after another verified baseline becomes current. Run baseline creation only when
+you intentionally want to publish a new verified production checkpoint.
 
-Do not overwrite it simply because a newer deployment reached the apply phase.
+The current verified baseline is evidence of the last known-good production
+deployment identity. Do not replace it simply because a newer deployment reached
+the apply phase.
 
 ---
 
