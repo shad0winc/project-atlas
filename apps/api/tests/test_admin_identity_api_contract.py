@@ -26,9 +26,21 @@ from atlas.user_profiles import UserProfileStore
 from atlas_api.auth.models import AuthenticatedUser
 from atlas_api.dependencies import (
     get_current_user,
+    get_security_audit_writer,
     get_user_profile_store,
 )
 from atlas_api.main import create_app
+
+
+class _NoopSecurityAuditWriter:
+    """Test-only audit sink for authorization-denial events."""
+
+    def publish(
+        self,
+        event_name: str,
+        payload=None,
+    ) -> None:
+        return None
 
 
 class AdminIdentityAPIContractTests(unittest.TestCase):
@@ -71,6 +83,9 @@ class AdminIdentityAPIContractTests(unittest.TestCase):
         self.app = create_app()
         self.app.dependency_overrides[get_user_profile_store] = (
             lambda: self.profiles
+        )
+        self.app.dependency_overrides[get_security_audit_writer] = (
+            lambda: _NoopSecurityAuditWriter()
         )
 
     def tearDown(self) -> None:

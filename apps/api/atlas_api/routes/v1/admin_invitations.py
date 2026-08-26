@@ -22,6 +22,17 @@ router = APIRouter(
 )
 
 
+require_invitations_read = require_permission(
+    "users.read"
+)
+require_invitations_create = require_permission(
+    "users.create"
+)
+require_invitations_update = require_permission(
+    "users.update"
+)
+
+
 InvitationStatus = Literal[
     "pending",
     "completed",
@@ -112,9 +123,7 @@ def list_admin_invitations(
         InvitationStatus | None,
         Query(alias="status"),
     ] = None,
-    _user: AuthenticatedUser = Depends(
-        require_permission("users.read")
-    ),
+    _user: AuthenticatedUser = Depends(require_invitations_read),
     invitations: InvitationStore = Depends(
         get_invitation_store
     ),
@@ -142,9 +151,7 @@ def list_admin_invitations(
 )
 def create_admin_invitation(
     payload: InvitationCreateRequest,
-    user: AuthenticatedUser = Depends(
-        require_permission("users.create")
-    ),
+    user: AuthenticatedUser = Depends(require_invitations_create),
     invitations: InvitationStore = Depends(
         get_invitation_store
     ),
@@ -175,9 +182,7 @@ def create_admin_invitation(
 @router.get("/{invite_id}")
 def get_admin_invitation(
     invite_id: str,
-    _user: AuthenticatedUser = Depends(
-        require_permission("users.read")
-    ),
+    _user: AuthenticatedUser = Depends(require_invitations_read),
     invitations: InvitationStore = Depends(
         get_invitation_store
     ),
@@ -195,9 +200,7 @@ def get_admin_invitation(
 @router.post("/{invite_id}/revoke")
 def revoke_admin_invitation(
     invite_id: str,
-    user: AuthenticatedUser = Depends(
-        require_permission("users.update")
-    ),
+    user: AuthenticatedUser = Depends(require_invitations_update),
     invitations: InvitationStore = Depends(
         get_invitation_store
     ),
