@@ -168,7 +168,7 @@ version or tag.
 
 # RC Production Deployment Attempt and Safety Remediation
 
-## Current Runtime Status — PENDING CONTROLLED RC RETRY
+## Current Runtime Status — EXACT RC PRODUCTION DEPLOYMENT VERIFIED
 
 The immutable release-candidate identity remains `1.0.0-rc.1`.
 
@@ -230,10 +230,19 @@ The authoritative production baseline remains:
 
 `baseline-reconciliation-20260824T164541Z-927002`
 
-A further controlled exact `1.0.0-rc.1` production retry is still required.
+The controlled exact `1.0.0-rc.1` production retry subsequently completed
+successfully as transaction `update-20260825T232236Z-1274121` with status
+`verified`.
 
-This record does **not** claim successful RC production deployment, does not
-close the production deployment gate, and does not authorize the next retry.
+The authoritative post-deployment baseline is
+`baseline-20260825T232627Z-1296276` with status `verified`. The production
+runtime is stable at 22 running containers, zero unhealthy, and zero
+restarting. Strict ingress verification passes, the deployment lock is absent,
+and maintenance mode is disabled.
+
+The ingress-readiness and rollback-readiness remediations are production-proven.
+No further RC redeployment is required. Final `v1.0.0` release authorization
+remains a separate release gate.
 
 
 ### Subsequent rollback-readiness remediation
@@ -306,7 +315,7 @@ deployment. A controlled retry remains required.
 | --- | --- | --- |
 | Engineering | PASS | Protected Atlas Release Gate passed on the promoted candidate |
 | Repository | PASS | Feature source `8b7a5876...` promoted through merge commit `1545133b...`; release tree matched certified feature tree |
-| Runtime | PENDING CONTROLLED RC RETRY | First exact-RC deployment failed closed; production was recovered and deployment-safety remediation is certified, but successful exact `1.0.0-rc.1` deployment remains required |
+| Runtime | PASS — EXACT RC DEPLOYMENT VERIFIED | Exact `1.0.0-rc.1` production transaction `update-20260825T232236Z-1274121` is verified; authoritative baseline `baseline-20260825T232627Z-1296276` is verified; runtime is 22 running / 0 unhealthy / 0 restarting; strict ingress passes; lock absent; maintenance disabled |
 | Operations | READY FOR RC VALIDATION | Canonical operations, upgrade, rollback, backup/restore, and troubleshooting contracts are documented |
 | User Acceptance | PENDING RC PILOT | Controlled user pilot remains a Roadmap release gate |
 | Administrator Acceptance | ENGINEERING JOURNEY PASS | Administrator critical-browser journey certified before RC identity creation; production RC validation remains pending |

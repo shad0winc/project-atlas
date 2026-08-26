@@ -8417,9 +8417,19 @@ The first failed exact-RC transaction,
 `update-20260824T165151Z-3258027`, remains historical audit evidence and is not rewritten by this
 second remediation.
 
-A further controlled exact `1.0.0-rc.1` production retry remains required.
-This documentation reconciliation does not authorize that retry and does not
-close the production deployment release gate.
+The controlled exact `1.0.0-rc.1` production retry subsequently completed
+successfully as transaction `update-20260825T232236Z-1274121` with status
+`verified`.
+
+The authoritative post-deployment production baseline is
+`baseline-20260825T232627Z-1296276`, also with status `verified`. Production
+stabilized at 22 running containers with zero unhealthy and zero restarting
+containers, strict ingress verification passed, the deployment lock is absent,
+and maintenance mode is disabled.
+
+The ingress-readiness and rollback-readiness remediations are therefore
+production-proven. No further RC redeployment is required. Final `v1.0.0`
+release authorization remains a separate release gate.
 
 ## R.10B.5I — Rollback Readiness Remediation
 
