@@ -2,6 +2,8 @@
 
 from fastapi import APIRouter
 
+from .admin_invitations import router as admin_invitations_router
+from .admin_users import router as admin_users_router
 from .auth import router as auth_router
 from .dashboard import router as dashboard_router
 from .dashboard_media import router as dashboard_media_router
@@ -23,6 +25,8 @@ router = APIRouter(
 
 router.include_router(health_router)
 router.include_router(auth_router)
+router.include_router(admin_users_router)
+router.include_router(admin_invitations_router)
 router.include_router(dashboard_router)
 router.include_router(dashboard_media_router)
 router.include_router(favorites_router)
