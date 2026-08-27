@@ -113,7 +113,8 @@ export const portalRoutes: readonly PortalRoute[] = [
     navigationDescription: "Accounts and access",
     abbreviation: "US",
     permission: ATLAS_PERMISSIONS.usersRead,
-    section: PORTAL_ROUTE_SECTIONS.management
+    section: PORTAL_ROUTE_SECTIONS.management,
+    pageDescription: "Manage Atlas user access and invitations through the supported Administrator workflow."
   },
   {
     id: "services",

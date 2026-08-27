@@ -9,6 +9,8 @@ const USER_ID = `usr_${"a".repeat(32)}`;
 const REQUEST_ID = `req_${"c".repeat(32)}`;
 const JELLYFIN_ITEM_ID = "jf-interstellar";
 const FAVORITE_ID = `fav_${"d".repeat(32)}`;
+const ADMIN_MEMBER_ID = `usr_${"b".repeat(32)}`;
+const ADMIN_INVITE_ID = `inv_${"f".repeat(32)}`;
 
 const SPORTS_PROVIDER = "thesportsdb";
 const SPORTS_EVENT_ID = "atlas-sports-event-001";
@@ -16,6 +18,9 @@ const SPORTS_SUBSCRIPTION_ID = `sub_${"e".repeat(32)}`;
 
 let favoriteCreated = false;
 let sportsRequested = false;
+let adminMemberStatus = "active";
+let adminMemberRoles = ["member"];
+let adminInvitation = null;
 
 function sendJson(response, status, payload) {
   const body = JSON.stringify(payload);
@@ -94,7 +99,7 @@ const server = http.createServer(async (request, response) => {
         user_id: USER_ID,
         username: "atlas-e2e-user",
         display_name: "Atlas E2E User",
-        roles: ["member"],
+        roles: ["global_admin"],
         provider: "e2e",
         granted_permission_patterns: [
           "media.*",
@@ -102,7 +107,9 @@ const server = http.createServer(async (request, response) => {
           "favorites.*",
           "sports.read",
           "sports.events.request",
-          "system.health.read"
+          "system.health.read",
+          "users.*",
+          "roles.assign"
         ],
         denied_permission_patterns: []
       });
@@ -371,6 +378,46 @@ const server = http.createServer(async (request, response) => {
         created_at: "2026-08-16T20:00:00Z"
       });
       return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/v1/admin/users") {
+      if (!authorized(request)) { sendJson(response, 401, { detail: "Authentication credentials were not provided." }); return; }
+      sendJson(response, 200, { users: [
+        { user_id: USER_ID, username: "atlas-e2e-user", display_name: "Atlas E2E User", roles: ["global_admin"], status: "active" },
+        { user_id: ADMIN_MEMBER_ID, username: "atlas-test", display_name: "Atlas Test", roles: adminMemberRoles, status: adminMemberStatus }
+      ]}); return;
+    }
+
+    if (request.method === "GET" && url.pathname === `/api/v1/admin/users/${ADMIN_MEMBER_ID}`) {
+      if (!authorized(request)) { sendJson(response, 401, { detail: "Authentication credentials were not provided." }); return; }
+      sendJson(response, 200, { user_id: ADMIN_MEMBER_ID, username: "atlas-test", display_name: "Atlas Test", roles: adminMemberRoles, status: adminMemberStatus }); return;
+    }
+
+    if (request.method === "PATCH" && url.pathname === `/api/v1/admin/users/${ADMIN_MEMBER_ID}`) {
+      if (!authorized(request)) { sendJson(response, 401, { detail: "Authentication credentials were not provided." }); return; }
+      const payload = await readRequestJsonBody(request);
+      if (typeof payload.status === "string") adminMemberStatus = payload.status;
+      if (Array.isArray(payload.roles)) adminMemberRoles = payload.roles;
+      sendJson(response, 200, { user_id: ADMIN_MEMBER_ID, username: "atlas-test", display_name: "Atlas Test", roles: adminMemberRoles, status: adminMemberStatus }); return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/v1/admin/invitations") {
+      if (!authorized(request)) { sendJson(response, 401, { detail: "Authentication credentials were not provided." }); return; }
+      sendJson(response, 200, { items: adminInvitation === null ? [] : [adminInvitation] }); return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/v1/admin/invitations") {
+      if (!authorized(request)) { sendJson(response, 401, { detail: "Authentication credentials were not provided." }); return; }
+      const payload = await readRequestJsonBody(request);
+      adminInvitation = { invite_id: ADMIN_INVITE_ID, email: payload.email ?? null, role: payload.role ?? "user", status: "pending", created_at: "2026-08-26T20:00:00Z", expires_at: "2026-09-02T20:00:00Z" };
+      sendJson(response, 201, { ...adminInvitation, token: "atlas-e2e-invitation-token" }); return;
+    }
+
+    if (request.method === "POST" && url.pathname === `/api/v1/admin/invitations/${ADMIN_INVITE_ID}/revoke`) {
+      if (!authorized(request)) { sendJson(response, 401, { detail: "Authentication credentials were not provided." }); return; }
+      if (adminInvitation === null) { sendJson(response, 404, { detail: "Invitation not found." }); return; }
+      adminInvitation = { ...adminInvitation, status: "revoked" };
+      sendJson(response, 200, adminInvitation); return;
     }
 
     if (request.method === "GET" && url.pathname === "/api/v1/services") {
