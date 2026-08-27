@@ -4,6 +4,21 @@ All notable changes to Project Atlas are documented in this file.
 
 ## [Unreleased]
 
+## T42-F02 — Administrator Identity Mutation Boundary
+
+- Added private least-privilege `identity-writer` runtime for administrator
+  user and invitation mutations.
+- Kept public API user state RO and canonicalized invitations at
+  `ATLAS_IDENTITY_DIR/invitations`.
+- Preserved API authentication, RBAC, validation, response/error semantics
+  while delegating bounded mutations with dedicated service authentication.
+- Added isolation, bounded RW mounts, writer health, and direct-write contracts.
+- Reconciled administrator API fixtures with the new boundary.
+- Certified 37 focused contracts, 3,495 Core + 104 subtests, and 423 API + 15
+  subtests.
+- Still uncommitted/undeployed; T.42S remains blocked pending merge, deployment,
+  and live acceptance.
+
 - Added M-018.29 guarded lifecycle planning contracts: immutable
   `ServiceUpdatePlan`, `ServiceUpdateResult`, and `ServiceUpdateOutcome`
   contracts now normalize managed-service identity, image state, dependency

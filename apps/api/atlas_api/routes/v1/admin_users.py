@@ -9,7 +9,14 @@ from pydantic import BaseModel, ConfigDict
 
 from atlas.user_profiles import UserProfileError, UserProfileStore
 from atlas_api.auth.models import AuthenticatedUser
-from atlas_api.dependencies import get_user_profile_store
+from atlas_api.dependencies import (
+    get_identity_writer_client,
+    get_user_profile_store,
+)
+from atlas_api.services.identity_writer import (
+    IdentityWriterClient,
+    IdentityWriterError,
+)
 from atlas_api.security.dependencies import (
     get_authorization_service,
     require_permission,
@@ -87,6 +94,9 @@ def update_admin_user(
     request: AdminUserUpdateRequest,
     current_user: AuthenticatedUser = Depends(require_users_update),
     profiles: UserProfileStore = Depends(get_user_profile_store),
+    writer: IdentityWriterClient = Depends(
+        get_identity_writer_client
+    ),
     authorization=Depends(get_authorization_service),
 ) -> dict[str, Any]:
     """Update only supported administrator-managed user fields."""
@@ -133,13 +143,13 @@ def update_admin_user(
             )
 
     try:
-        updated = profiles.update_user(
+        updated = writer.update_user(
             identifier,
             updates,
         )
-    except UserProfileError as error:
+    except IdentityWriterError as error:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=error.status_code,
             detail=str(error),
         ) from error
 

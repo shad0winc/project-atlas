@@ -45,6 +45,7 @@ from atlas_api.services import (
     PortalDashboardService,
     SchedulerDashboardService,
 )
+from atlas_api.services.identity_writer import IdentityWriterClient
 
 
 _bearer_scheme = HTTPBearer(auto_error=False)
@@ -76,6 +77,36 @@ def get_user_profile_store() -> UserProfileStore:
     ).expanduser().resolve()
 
     return UserProfileStore(root)
+
+
+@lru_cache(maxsize=1)
+def get_identity_writer_client() -> IdentityWriterClient:
+    """Return the private identity-mutation client."""
+
+    url = os.getenv(
+        "ATLAS_IDENTITY_WRITER_URL",
+        "",
+    ).strip()
+
+    token = os.getenv(
+        "ATLAS_IDENTITY_WRITER_TOKEN",
+        "",
+    ).strip()
+
+    if not url:
+        raise RuntimeError(
+            "ATLAS_IDENTITY_WRITER_URL is required."
+        )
+
+    if not token:
+        raise RuntimeError(
+            "ATLAS_IDENTITY_WRITER_TOKEN is required."
+        )
+
+    return IdentityWriterClient(
+        url,
+        token,
+    )
 
 
 @lru_cache(maxsize=1)

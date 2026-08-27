@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from datetime import timedelta
 from pathlib import Path
 
 from fastapi import HTTPException, status
@@ -13,10 +14,55 @@ from atlas.user_profiles import UserProfileStore
 from atlas_api.auth.models import AuthenticatedUser
 from atlas_api.dependencies import (
     get_current_user,
+    get_identity_writer_client,
     get_security_audit_writer,
     get_user_profile_store,
 )
 from atlas_api.main import create_app
+from atlas_api.routes.v1.admin_invitations import (
+    get_invitation_store,
+)
+
+
+class _InvitationStoreBackedIdentityWriter:
+    """Test adapter preserving invitation-domain mutations."""
+
+    def __init__(
+        self,
+        invitations: InvitationStore,
+    ) -> None:
+        self.invitations = invitations
+
+    def create_invitation(
+        self,
+        *,
+        email: str | None,
+        role: str,
+        days: int,
+        created_by: str,
+    ) -> dict:
+        issue = self.invitations.create(
+            email=email,
+            role=role,
+            created_by=created_by,
+            expires_in=timedelta(days=days),
+        )
+
+        return {
+            "invitation": issue.invitation,
+            "token": issue.token,
+        }
+
+    def revoke_invitation(
+        self,
+        invite_id: str,
+        *,
+        revoked_by: str,
+    ) -> dict:
+        return self.invitations.revoke(
+            invite_id,
+            revoked_by=revoked_by,
+        )
 
 
 class _NoopSecurityAuditWriter:
@@ -59,6 +105,14 @@ class AdminInvitationAPIContractTests(unittest.TestCase):
         self.app = create_app()
         self.app.dependency_overrides[get_user_profile_store] = (
             lambda: self.profiles
+        )
+        self.app.dependency_overrides[get_invitation_store] = (
+            lambda: self.invitations
+        )
+        self.app.dependency_overrides[get_identity_writer_client] = (
+            lambda: _InvitationStoreBackedIdentityWriter(
+                self.invitations
+            )
         )
         self.app.dependency_overrides[get_security_audit_writer] = (
             lambda: _NoopSecurityAuditWriter()

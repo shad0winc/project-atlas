@@ -8512,3 +8512,26 @@ and stable-support activation remain open.
 
 No VERSION, tag, deployment, or production mutation belongs to this
 reconciliation.
+
+# 2026-08-27
+
+## T42-F02 — Identity Mutation Boundary Remediation
+
+Administrator acceptance exposed invitation initialization beneath the public
+API's intentionally RO users mount. The remediation preserves that boundary:
+a private `identity-writer` now owns bounded user/invitation mutations while
+the API retains authentication, RBAC, validation, canonical reads, and public
+semantics.
+
+Hardening: private `atlas-identity` network, no public port, bounded users and
+canonical-invitations RW mounts, read-only root, `no-new-privileges`, dedicated
+required token, and writer health verification.
+
+Certified before documentation reconciliation: 37 focused T42-F02 tests;
+3,495 Core + 104 subtests; 423 API + 15 subtests; compile, Compose, diff check,
+and direct-write guard PASS. Pre-commit security review passed; final v1.0.0
+tag remains absent.
+
+No commit, deployment, VERSION promotion, tag creation, or production mutation
+occurred at this checkpoint. T.42S remains blocked pending merge and controlled
+deployment.
