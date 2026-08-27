@@ -18,7 +18,10 @@ export const ATLAS_PERMISSIONS = {
   sportsEventsRequest: "sports.events.request",
   sportsRead: "sports.read",
   systemHealthRead: "system.health.read",
+  usersCreate: "users.create",
   usersRead: "users.read",
+  usersUpdate: "users.update",
+  rolesAssign: "roles.assign",
   usersSelfRead: "users.self.read",
   usersSelfUpdate: "users.self.update"
 } as const;
