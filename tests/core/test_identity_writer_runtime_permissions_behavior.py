@@ -24,6 +24,13 @@ def _run(
     environment["ATLAS_USERS_DIR"] = str(users)
     environment["ATLAS_IDENTITY_DIR"] = str(identity)
 
+    # Exercise the real provisioning path without requiring CAP_CHOWN in CI.
+    # Source-contract tests separately pin the production defaults.
+    environment["ATLAS_IDENTITY_WRITER_USERS_UID"] = str(os.geteuid())
+    environment["ATLAS_IDENTITY_WRITER_USERS_GID"] = str(os.getegid())
+    environment["ATLAS_IDENTITY_WRITER_INVITATIONS_UID"] = str(os.geteuid())
+    environment["ATLAS_IDENTITY_WRITER_INVITATIONS_GID"] = str(os.getegid())
+
     return subprocess.run(
         [
             "bash",
@@ -59,12 +66,12 @@ def test_provision_creates_exact_runtime_contract(
     assert users.is_dir()
     assert invitations.is_dir()
 
-    assert users.stat().st_uid == 0
-    assert users.stat().st_gid == 20000
+    assert users.stat().st_uid == os.geteuid()
+    assert users.stat().st_gid == os.getegid()
     assert _mode(users) == 0o2770
 
-    assert invitations.stat().st_uid == 0
-    assert invitations.stat().st_gid == 20001
+    assert invitations.stat().st_uid == os.geteuid()
+    assert invitations.stat().st_gid == os.getegid()
     assert _mode(invitations) == 0o2770
 
 
@@ -90,12 +97,12 @@ def test_provision_is_idempotent(
 
     invitations = identity / "invitations"
 
-    assert users.stat().st_uid == 0
-    assert users.stat().st_gid == 20000
+    assert users.stat().st_uid == os.geteuid()
+    assert users.stat().st_gid == os.getegid()
     assert _mode(users) == 0o2770
 
-    assert invitations.stat().st_uid == 0
-    assert invitations.stat().st_gid == 20001
+    assert invitations.stat().st_uid == os.geteuid()
+    assert invitations.stat().st_gid == os.getegid()
     assert _mode(invitations) == 0o2770
 
 
