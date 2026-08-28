@@ -84,3 +84,29 @@ regression protection. Certified state: 37 focused tests; 3,495 Core plus 104
 subtests; 423 API plus 15 subtests.
 
 See [ADR 0025 — Identity Mutation Boundary](../ADR/0025-identity-mutation-boundary.md).
+
+## T42S runtime-permission reconciliation
+
+The private identity-writer boundary also depends on explicit host filesystem
+authority. A read-write bind mount does not grant write permission when the
+host directory ownership or mode denies the writer's effective identity.
+
+The deployment contract therefore provisions and verifies only these writable
+directory roots before ingress Compose apply:
+
+- `ATLAS_USERS_DIR` (default `/mnt/storage/configs/atlas/users`) is owned by
+  UID `0`, GID `20000`, with mode `2770`.
+- `${ATLAS_IDENTITY_DIR}/invitations` (default
+  `/mnt/storage/configs/atlas/identity/invitations`) is owned by UID `0`,
+  GID `20001`, with mode `2770`.
+
+The setgid bit preserves the directory group for newly created children. The
+provisioner is deliberately non-recursive: it must not rewrite ownership or
+modes of existing user profiles, invitation records, or unrelated identity
+state. The public API keeps its `/users` mount read-only; only the private
+identity-writer receives the bounded writable mounts and supplemental groups
+required by this contract.
+
+Ingress deployment owns this prerequisite. If identity-writer runtime
+provisioning or verification fails, deployment fails closed before ingress
+Compose apply rather than starting a writer that cannot persist mutations.

@@ -65,6 +65,17 @@ def prepare_runtime(tmp_path: Path, *, branch: str = "main") -> dict[str, str]:
     )
 
     write_executable(
+        project / "scripts" / "lib" / "identity-writer-runtime.sh",
+        """
+        #!/usr/bin/env bash
+        atlas_identity_writer_runtime_provision() {
+          echo identity-writer-runtime:provision >> "$ATLAS_TEST_EVENTS"
+          return "${ATLAS_TEST_IDENTITY_WRITER_RUNTIME_STATUS:-0}"
+        }
+        """,
+    )
+
+    write_executable(
         bin_dir / "git",
         f"""
         #!/usr/bin/env bash
@@ -881,3 +892,37 @@ def test_readiness_waiter_is_inspection_only() -> None:
 
     for item in forbidden:
         assert item not in section
+
+
+def test_identity_writer_runtime_provisioning_failure_aborts_before_ingress_apply(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_IDENTITY_WRITER_RUNTIME_STATUS"] = "1"
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode != 0
+    assert "identity writer runtime provisioning failed" in result.stderr
+
+    events = event_lines(environment)
+
+    assert "audit-runtime:provision" in events
+    assert "identity-writer-runtime:provision" in events
+
+    identity_provision = events.index(
+        "identity-writer-runtime:provision"
+    )
+
+    compose_up_events = [
+        event
+        for event in events
+        if event.startswith("docker compose ")
+        and " up " in f" {event} "
+    ]
+
+    assert compose_up_events == []
+    assert "maintenance:disable" not in events
+
+    audit_provision = events.index("audit-runtime:provision")
+    assert audit_provision < identity_provision

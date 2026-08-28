@@ -63,3 +63,20 @@ Certified before documentation reconciliation:
 - [Security Architecture](../architecture/SECURITY.md)
 - [ADR 0024 — Security Trust Boundaries](0024-security-trust-boundaries.md)
 - [Backup and Recovery](../architecture/BACKUP_RECOVERY.md)
+
+## T42S runtime-permission clarification
+
+ADR-0025's bounded mutation authority includes the host filesystem authority
+needed to make the two approved writer mounts actually writable. Compose
+`rw` flags alone are insufficient.
+
+Deployment must establish and verify the following directory-root contract
+before ingress services are applied:
+
+- users: UID `0`, GID `20000`, mode `2770`;
+- canonical invitations: UID `0`, GID `20001`, mode `2770`.
+
+This is a deployment prerequisite, not an expansion of the writer's mutation
+surface. Provisioning is limited to those directory roots, is non-recursive,
+and preserves existing child ownership and modes. Failure to establish the
+contract aborts ingress deployment before Compose apply.

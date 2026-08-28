@@ -8535,3 +8535,45 @@ tag remains absent.
 No commit, deployment, VERSION promotion, tag creation, or production mutation
 occurred at this checkpoint. T.42S remains blocked pending merge and controlled
 deployment.
+
+## T42S — Identity Writer Runtime Permission Remediation
+
+Post-deployment T42S verification found that the T42-F02 private
+identity-writer topology was healthy and correctly isolated, but host
+filesystem authority was incomplete. The writer's `/users` and canonical
+invitation mounts were declared read-write in Compose while the backing
+directories remained unwritable to its effective supplemental groups.
+
+The corrective implementation adds a deployment-owned runtime permission
+provisioner and integrates it into ingress apply after audit-runtime
+provisioning and before Compose apply. The bounded directory-root contract is:
+
+- users: UID `0`, GID `20000`, mode `2770`;
+- canonical invitations: UID `0`, GID `20001`, mode `2770`.
+
+The provisioner is idempotent and non-recursive. Behavioral tests verify exact
+ownership/modes, environment path overrides, rejection of invalid path
+targets, drift detection, and preservation of existing child ownership and
+modes. Update-transaction coverage uses an isolated test double and verifies
+that provisioning failure aborts before ingress Compose apply and does not
+disable maintenance.
+
+Certification completed on the corrective branch:
+
+- focused identity-writer permission suite: 14 passed;
+- update transaction suite after fail-closed coverage: 26 passed;
+- full Core regression: 3493 passed plus 104 subtests;
+- canonical API regression: 439 passed plus 15 subtests;
+- API compile: PASS;
+- ingress Compose configuration: PASS;
+- recursive permission mutation guard: ABSENT.
+
+Production remained unchanged throughout corrective development:
+`/users` remained `2750:0:20000`, canonical invitations remained
+`755:0:0`, effective writer access remained `NO/NO`, all four ingress
+services remained healthy, and maintenance remained disabled.
+
+No live identity mutation was performed during this corrective phase. T.42S
+Administrator acceptance remains blocked until this corrective branch is
+reviewed, merged, deployed through the canonical ingress update transaction,
+and the resulting live writer authority is verified.
