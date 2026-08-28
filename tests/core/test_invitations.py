@@ -40,6 +40,70 @@ class InvitationStoreTests(unittest.TestCase):
         )
         self.assertEqual(registry, {"schema_version": 1, "invitations": {}})
 
+    def test_list_treats_unused_store_as_empty_without_initializing(self) -> None:
+        invitations_root = self.root / "invitations"
+        invitations_root.mkdir(parents=True)
+
+        with patch.object(
+            InvitationStore,
+            "initialize",
+            side_effect=AssertionError(
+                "list() must not initialize unused storage"
+            ),
+        ):
+            records = self.store.list()
+
+        self.assertEqual(records, [])
+        self.assertFalse(
+            (invitations_root / "invitations.json").exists()
+        )
+        self.assertFalse(
+            (invitations_root / "active").exists()
+        )
+        self.assertFalse(
+            (invitations_root / "completed").exists()
+        )
+        self.assertFalse(
+            (invitations_root / "revoked").exists()
+        )
+
+    def test_get_from_unused_store_reports_not_found_without_initializing(self) -> None:
+        invitations_root = self.root / "invitations"
+        invitations_root.mkdir(parents=True)
+
+        with patch.object(
+            InvitationStore,
+            "initialize",
+            side_effect=AssertionError(
+                "get() must not initialize unused storage"
+            ),
+        ):
+            with self.assertRaisesRegex(
+                InvitationError,
+                "invitation not found: inv_missing",
+            ):
+                self.store.get("inv_missing")
+
+        self.assertFalse(
+            (invitations_root / "invitations.json").exists()
+        )
+
+    def test_missing_registry_with_existing_record_fails_closed(self) -> None:
+        invitations_root = self.root / "invitations"
+        active = invitations_root / "active"
+        active.mkdir(parents=True)
+
+        (active / "inv_orphan.json").write_text(
+            "{}",
+            encoding="utf-8",
+        )
+
+        with self.assertRaisesRegex(
+            InvitationError,
+            "missing invitation data file",
+        ):
+            self.store.list()
+
     def test_get_is_read_only_after_provisioning(self) -> None:
         issue = self.store.create(
             email="reader@example.com",

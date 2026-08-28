@@ -240,6 +240,22 @@ class InvitationStore:
         return record
 
     def _load_registry(self) -> dict[str, Any]:
+        if not self.paths.invitation_registry.exists():
+            lifecycle_directories = (
+                self.paths.active_invitations,
+                self.paths.completed_invitations,
+                self.paths.revoked_invitations,
+            )
+            has_records = any(
+                directory.exists()
+                and any(directory.iterdir())
+                for directory in lifecycle_directories
+            )
+            if not has_records:
+                return {
+                    "schema_version": REGISTRY_SCHEMA_VERSION,
+                    "invitations": {},
+                }
         data = _read_json(self.paths.invitation_registry)
         if data.get("schema_version") != REGISTRY_SCHEMA_VERSION:
             raise InvitationError("unsupported invitation registry schema")
