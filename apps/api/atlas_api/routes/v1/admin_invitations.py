@@ -66,13 +66,9 @@ class InvitationCreateRequest(BaseModel):
 def get_invitation_store() -> InvitationStore:
     """Return the canonical read-only invitation store."""
 
-    store = InvitationStore(
+    return InvitationStore(
         default_identity_paths()
     )
-
-    store.initialize()
-
-    return store
 
 
 def _public_invitation(

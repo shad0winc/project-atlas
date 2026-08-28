@@ -4,6 +4,7 @@ import hashlib
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -38,6 +39,48 @@ class InvitationStoreTests(unittest.TestCase):
             (self.root / "invitations" / "invitations.json").read_text()
         )
         self.assertEqual(registry, {"schema_version": 1, "invitations": {}})
+
+    def test_get_is_read_only_after_provisioning(self) -> None:
+        issue = self.store.create(
+            email="reader@example.com",
+            created_by="usr_admin",
+        )
+
+        with patch.object(
+            InvitationStore,
+            "initialize",
+            side_effect=AssertionError(
+                "get() must not initialize storage"
+            ),
+        ):
+            record = self.store.get(
+                issue.invitation["invite_id"]
+            )
+
+        self.assertEqual(
+            record["invite_id"],
+            issue.invitation["invite_id"],
+        )
+
+    def test_list_is_read_only_after_provisioning(self) -> None:
+        issue = self.store.create(
+            email="reader@example.com",
+            created_by="usr_admin",
+        )
+
+        with patch.object(
+            InvitationStore,
+            "initialize",
+            side_effect=AssertionError(
+                "list() must not initialize storage"
+            ),
+        ):
+            records = self.store.list()
+
+        self.assertEqual(
+            [record["invite_id"] for record in records],
+            [issue.invitation["invite_id"]],
+        )
 
     def test_create_returns_plaintext_once_and_persists_only_hash(self) -> None:
         issue = self.store.create(email="FRIEND@EXAMPLE.COM", created_by="usr_admin")
