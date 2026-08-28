@@ -51,6 +51,7 @@ services:
 
     volumes:
       - /mnt/storage/configs/atlas/users:/mnt/storage/configs/atlas/users:ro
+      - /mnt/storage/configs/atlas/identity/invitations:/mnt/storage/configs/atlas/identity/invitations:ro
       - /mnt/storage/configs/atlas/identity/favorites:/mnt/storage/configs/atlas/identity/favorites:rw
       - /mnt/storage/configs/atlas/runtime/requests:/mnt/storage/configs/atlas/runtime/requests:rw
       - /mnt/storage/configs/atlas/runtime/events.jsonl:/mnt/storage/configs/atlas/runtime/events.jsonl:rw
