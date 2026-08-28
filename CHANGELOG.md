@@ -2,6 +2,27 @@
 
 All notable changes to Project Atlas are documented in this file.
 
+## T42S — Identity Writer Runtime Permission Remediation
+
+- Reconciles the post-deployment filesystem-authority gap discovered after
+  T42-F02: the private writer topology was healthy, but its two writable bind
+  mounts were not writable by the writer's effective supplemental groups.
+- Adds deployment-time provisioning and verification for only the required
+  directory roots:
+  - users: `root:20000`, mode `2770`;
+  - canonical invitations: `root:20001`, mode `2770`.
+- Keeps permission mutation non-recursive and preserves existing child
+  ownership and modes.
+- Fails ingress deployment closed before Compose apply when the runtime
+  permission prerequisite cannot be established.
+- Corrective branch certification includes focused permission contracts,
+  behavioral provisioning contracts, transaction fail-closed coverage, full
+  Core regression, canonical API regression, API compile, and Compose config.
+- Production has not yet received this corrective permission change. Live
+  Administrator mutation acceptance remains blocked until the corrective
+  branch is reviewed, merged, and deployed through the canonical ingress
+  transaction.
+
 ## [Unreleased]
 
 ## T42-F02 — Administrator Identity Mutation Boundary

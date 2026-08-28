@@ -323,9 +323,15 @@ atlas_update_ingress_apply() {
   local compose_file="$ATLAS_PROJECT_DIR/stack/ingress.yml"
 
   source "$ATLAS_PROJECT_DIR/scripts/lib/audit-runtime.sh"
+  source "$ATLAS_PROJECT_DIR/scripts/lib/identity-writer-runtime.sh"
 
   atlas_audit_runtime_provision || {
     echo 'ERROR: security audit runtime provisioning failed.' >&2
+    return 1
+  }
+
+  atlas_identity_writer_runtime_provision || {
+    echo 'ERROR: identity writer runtime provisioning failed.' >&2
     return 1
   }
 

@@ -515,3 +515,20 @@ The incident establishes the following permanent deployment rules:
 
 These rules extend the existing rollback and forward-recovery architecture; they
 do not create a second deployment or lifecycle system.
+
+## Identity-writer runtime permission prerequisite
+
+The identity-writer applies the existing non-root runtime ownership rule to
+two bounded persistent directory roots. Before ingress Compose apply,
+deployment provisions and verifies:
+
+- `ATLAS_USERS_DIR`: UID `0`, GID `20000`, mode `2770`;
+- `${ATLAS_IDENTITY_DIR}/invitations`: UID `0`, GID `20001`, mode `2770`.
+
+Provisioning is intentionally non-recursive. Existing child files and
+directories are not mass-chowned or mass-chmodded, and unrelated identity
+state is outside this operation. The setgid directory mode preserves group
+inheritance for newly created children.
+
+If this prerequisite cannot be established or verified, the ingress update
+must fail before Compose apply and remain in the transaction's failure state.
