@@ -90,6 +90,16 @@ def test_ingress_api_limits_writable_identity_state_to_favorites() -> None:
     ) in api
 
     assert (
+        "      - /mnt/storage/configs/atlas/identity/invitations:"
+        "/mnt/storage/configs/atlas/identity/invitations:ro\n"
+    ) in api
+
+    assert (
+        "/mnt/storage/configs/atlas/identity/invitations:"
+        "/mnt/storage/configs/atlas/identity/invitations:rw"
+    ) not in api
+
+    assert (
         "      - /mnt/storage/configs/atlas/identity/favorites:"
         "/mnt/storage/configs/atlas/identity/favorites:rw\n"
     ) in api
