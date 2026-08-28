@@ -100,7 +100,6 @@ class InvitationStore:
         return InvitationIssue(record, token)
 
     def get(self, invite_id: str) -> dict[str, Any]:
-        self.initialize()
         registry = self._load_registry()
         entry = registry["invitations"].get(invite_id)
         if not isinstance(entry, dict):
@@ -141,7 +140,6 @@ class InvitationStore:
         return self._archive(invite_id, "completed", actor=completed_by)
 
     def list(self, *, status: str | None = None) -> list[dict[str, Any]]:
-        self.initialize()
         if status is not None and status not in VALID_STATUSES:
             raise InvitationError("invalid invitation status")
         registry = self._load_registry()
@@ -154,6 +152,7 @@ class InvitationStore:
 
     def cleanup_expired(self) -> list[str]:
         """Archive all expired pending invitations and return their IDs."""
+        self.initialize()
         now = _require_aware(self.clock())
         expired = [
             record["invite_id"]
