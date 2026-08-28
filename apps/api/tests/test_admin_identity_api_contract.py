@@ -22,14 +22,49 @@ import unittest
 from fastapi import HTTPException, status
 from fastapi.testclient import TestClient
 
-from atlas.user_profiles import UserProfileStore
+from atlas.user_profiles import UserProfileError, UserProfileStore
 from atlas_api.auth.models import AuthenticatedUser
 from atlas_api.dependencies import (
     get_current_user,
+    get_identity_writer_client,
     get_security_audit_writer,
     get_user_profile_store,
 )
+from atlas_api.services.identity_writer import IdentityWriterError
 from atlas_api.main import create_app
+
+
+class _ProfileBackedIdentityWriter:
+    """Test adapter preserving user-domain mutation behavior."""
+
+    def __init__(
+        self,
+        profiles: UserProfileStore,
+    ) -> None:
+        self.profiles = profiles
+
+    def update_user(
+        self,
+        identifier: str,
+        updates: dict[str, object],
+    ) -> dict[str, object]:
+        try:
+            return self.profiles.update_user(
+                identifier,
+                updates,
+            )
+        except UserProfileError as error:
+            message = str(error)
+
+            if "not found" in message.lower():
+                code = 404
+            else:
+                code = 400
+
+            raise IdentityWriterError(
+                message,
+                status_code=code,
+            ) from error
 
 
 class _NoopSecurityAuditWriter:
@@ -83,6 +118,11 @@ class AdminIdentityAPIContractTests(unittest.TestCase):
         self.app = create_app()
         self.app.dependency_overrides[get_user_profile_store] = (
             lambda: self.profiles
+        )
+        self.app.dependency_overrides[get_identity_writer_client] = (
+            lambda: _ProfileBackedIdentityWriter(
+                self.profiles
+            )
         )
         self.app.dependency_overrides[get_security_audit_writer] = (
             lambda: _NoopSecurityAuditWriter()

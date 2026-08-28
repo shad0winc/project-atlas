@@ -2,17 +2,21 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field
 
-from atlas.identity import IdentityPaths
+from atlas.identity import default_identity_paths
 from atlas.invitations import InvitationError, InvitationStore
-from atlas.user_profiles import UserProfileStore
 from atlas_api.auth.models import AuthenticatedUser
-from atlas_api.dependencies import get_user_profile_store
+from atlas_api.dependencies import (
+    get_identity_writer_client,
+)
+from atlas_api.services.identity_writer import (
+    IdentityWriterClient,
+    IdentityWriterError,
+)
 from atlas_api.security.dependencies import require_permission
 
 
@@ -59,15 +63,11 @@ class InvitationCreateRequest(BaseModel):
     )
 
 
-def get_invitation_store(
-    profiles: UserProfileStore = Depends(
-        get_user_profile_store
-    ),
-) -> InvitationStore:
-    """Return the invitation store sharing Atlas identity state."""
+def get_invitation_store() -> InvitationStore:
+    """Return the canonical read-only invitation store."""
 
     store = InvitationStore(
-        IdentityPaths(profiles.root)
+        default_identity_paths()
     )
 
     store.initialize()
@@ -152,29 +152,30 @@ def list_admin_invitations(
 def create_admin_invitation(
     payload: InvitationCreateRequest,
     user: AuthenticatedUser = Depends(require_invitations_create),
-    invitations: InvitationStore = Depends(
-        get_invitation_store
+    writer: IdentityWriterClient = Depends(
+        get_identity_writer_client
     ),
 ) -> dict[str, Any]:
     """Create an invitation and disclose its token exactly once."""
 
     try:
-        issue = invitations.create(
+        issue = writer.create_invitation(
             email=payload.email,
             role=payload.role,
+            days=payload.days,
             created_by=_actor_id(user),
-            expires_in=timedelta(
-                days=payload.days
-            ),
         )
-    except InvitationError as error:
-        raise _translate_domain_error(error) from error
+    except IdentityWriterError as error:
+        raise HTTPException(
+            status_code=error.status_code,
+            detail=str(error),
+        ) from error
 
     result = _public_invitation(
-        issue.invitation
+        issue["invitation"]
     )
 
-    result["token"] = issue.token
+    result["token"] = issue["token"]
 
     return result
 
@@ -201,18 +202,21 @@ def get_admin_invitation(
 def revoke_admin_invitation(
     invite_id: str,
     user: AuthenticatedUser = Depends(require_invitations_update),
-    invitations: InvitationStore = Depends(
-        get_invitation_store
+    writer: IdentityWriterClient = Depends(
+        get_identity_writer_client
     ),
 ) -> dict[str, Any]:
     """Revoke one pending invitation."""
 
     try:
-        record = invitations.revoke(
+        record = writer.revoke_invitation(
             invite_id,
             revoked_by=_actor_id(user),
         )
-    except InvitationError as error:
-        raise _translate_domain_error(error) from error
+    except IdentityWriterError as error:
+        raise HTTPException(
+            status_code=error.status_code,
+            detail=str(error),
+        ) from error
 
     return _public_invitation(record)

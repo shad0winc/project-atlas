@@ -82,7 +82,7 @@ def test_ingress_api_has_read_only_identity_access() -> None:
 
 def test_ingress_api_limits_writable_identity_state_to_favorites() -> None:
     content = INGRESS_COMPOSE.read_text(encoding="utf-8")
-    api = _service_block(content, "api", "caddy")
+    api = _service_block(content, "api", "identity-writer")
 
     assert (
         "      - /mnt/storage/configs/atlas/users:"
@@ -114,4 +114,18 @@ def test_identity_network_is_not_shared_with_public_ingress_services() -> None:
 
     assert "atlas-identity" not in portal
     assert "atlas-identity" not in caddy
-    assert content.count("      - atlas-identity\n") == 1
+
+    api = _service_block(
+        content,
+        "api",
+        "identity-writer",
+    )
+    writer = _service_block(
+        content,
+        "identity-writer",
+        "caddy",
+    )
+
+    assert "      - atlas-identity\n" in api
+    assert "      - atlas-identity\n" in writer
+    assert content.count("      - atlas-identity\n") == 2
