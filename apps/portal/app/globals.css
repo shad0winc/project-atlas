@@ -2467,3 +2467,49 @@ section[aria-labelledby="service-detail-title"] dd {
     flex: 1;
   }
 }
+
+/* PR63: Administration Portal composition surface */
+.administration-surface {
+  display: grid;
+  gap: 1rem;
+}
+
+.administration-surface-heading {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.administration-surface-heading h3,
+.administration-surface-heading p,
+.administration-card h4,
+.administration-card p {
+  margin: 0;
+}
+
+.administration-surface-heading p,
+.administration-card p {
+  color: var(--muted);
+}
+
+.administration-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 1rem;
+}
+
+.administration-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 1.15rem;
+}
+
+.administration-card-content {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.administration-card .button {
+  align-self: flex-start;
+}
