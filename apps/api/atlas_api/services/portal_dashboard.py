@@ -10,6 +10,7 @@ from atlas.operations import (
     OperationsReport,
     OperationsReportNotFoundError,
     OperationsRepository,
+    OperationsRepositoryError,
     OperationsSectionId,
 )
 from atlas_api.schemas.dashboard import DashboardSummaryResponse
@@ -137,7 +138,7 @@ class PortalDashboardService:
     ) -> PortalOperationsSummaryResponse:
         try:
             report = self._operations_repository.latest()
-        except OperationsReportNotFoundError:
+        except (OperationsReportNotFoundError, OperationsRepositoryError):
             return PortalOperationsSummaryResponse(
                 status="unavailable",
                 report=None,

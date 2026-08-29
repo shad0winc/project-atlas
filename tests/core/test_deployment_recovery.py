@@ -601,6 +601,65 @@ def test_update_prepares_and_verifies_target_artifacts_before_maintenance() -> N
     assert doctor < prepare < verify < maintenance < backup < apply
 
 
+def test_update_publishes_dashboard_runtime_before_reopening_traffic() -> None:
+    content = UPDATE.read_text(encoding="utf-8")
+    section = content.split("atlas_command_update() {", 1)[1]
+
+    first_verify = section.index(
+        'atlas_update_post_verify "$scope"'
+    )
+    publish = section.index(
+        'atlas_update_publish_dashboard_runtime "$scope"'
+    )
+    disable = section.index(
+        "atlas_command_maintenance disable"
+    )
+    public_verify = section.index(
+        'atlas_update_post_verify "$scope"',
+        disable,
+    )
+    complete = section.index(
+        'atlas_deployment_complete_update "$identifier"'
+    )
+
+    assert first_verify < publish < disable < public_verify < complete
+
+
+def test_dashboard_runtime_update_hook_is_bounded_to_ingress_surface() -> None:
+    content = UPDATE.read_text(encoding="utf-8")
+    section = content.split(
+        "atlas_update_publish_dashboard_runtime() {",
+        1,
+    )[1].split(
+        "atlas_update_latest_backup() {",
+        1,
+    )[0]
+
+    assert 'core)' in section
+    assert 'return 0' in section
+    assert 'ingress|all)' in section
+    assert 'scripts/atlas-dashboard-runtime.sh' in section
+    assert 'publish-all' in section
+
+
+def test_dashboard_runtime_publication_failure_uses_maintenance_failure_path() -> None:
+    content = UPDATE.read_text(encoding="utf-8")
+    section = content.split("atlas_command_update() {", 1)[1]
+
+    publish = section.index(
+        'if ! atlas_update_publish_dashboard_runtime "$scope"; then'
+    )
+    disable = section.index(
+        "atlas_command_maintenance disable"
+    )
+
+    failure_window = section[publish:disable]
+
+    assert "atlas_update_fail_after_maintenance" in failure_window
+    assert "Dashboard runtime publication failed." in failure_window
+    assert "return 1" in failure_window
+
+
 def test_update_verifies_every_rendered_target_image_is_local() -> None:
     content = UPDATE.read_text(encoding="utf-8")
     section = content.split(

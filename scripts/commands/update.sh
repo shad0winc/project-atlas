@@ -376,6 +376,29 @@ atlas_update_post_verify() {
   fi
 }
 
+atlas_update_publish_dashboard_runtime() {
+  local scope="$1"
+
+  case "$scope" in
+    core)
+      return 0
+      ;;
+    ingress|all)
+      ;;
+    *)
+      printf 'ERROR: unsupported Dashboard runtime publication scope: %s\n' \
+        "$scope" >&2
+      return 2
+      ;;
+  esac
+
+  echo 'Post-update Dashboard runtime publication:'
+
+  "$ATLAS_PROJECT_DIR/scripts/atlas-dashboard-runtime.sh" \
+    publish-all ||
+    return 1
+}
+
 atlas_update_latest_backup() {
   ls -1t "$ATLAS_BACKUP_DIR"/atlas-*.tar.gz 2>/dev/null |
     head -n 1
@@ -528,6 +551,14 @@ atlas_command_update() {
     atlas_update_fail_after_maintenance \
       "$identifier" \
       'post-update verification failed.'
+
+    return 1
+  fi
+
+  if ! atlas_update_publish_dashboard_runtime "$scope"; then
+    atlas_update_fail_after_maintenance \
+      "$identifier" \
+      'Dashboard runtime publication failed.'
 
     return 1
   fi
