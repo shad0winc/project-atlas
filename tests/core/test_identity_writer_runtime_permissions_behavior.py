@@ -74,6 +74,13 @@ def test_provision_creates_exact_runtime_contract(
     assert invitations.stat().st_gid == os.getegid()
     assert _mode(invitations) == 0o2770
 
+    for name in ("active", "completed", "revoked"):
+        lifecycle = invitations / name
+        assert lifecycle.is_dir()
+        assert lifecycle.stat().st_uid == os.geteuid()
+        assert lifecycle.stat().st_gid == os.getegid()
+        assert _mode(lifecycle) == 0o2770
+
 
 def test_provision_is_idempotent(
     tmp_path: Path,
@@ -104,6 +111,72 @@ def test_provision_is_idempotent(
     assert invitations.stat().st_uid == os.geteuid()
     assert invitations.stat().st_gid == os.getegid()
     assert _mode(invitations) == 0o2770
+
+    for name in ("active", "completed", "revoked"):
+        lifecycle = invitations / name
+        assert lifecycle.stat().st_uid == os.geteuid()
+        assert lifecycle.stat().st_gid == os.getegid()
+        assert _mode(lifecycle) == 0o2770
+
+
+def test_provision_repairs_existing_lifecycle_directory_permissions(
+    tmp_path: Path,
+) -> None:
+    users = tmp_path / "users"
+    identity = tmp_path / "identity"
+    invitations = identity / "invitations"
+
+    users.mkdir(parents=True)
+    invitations.mkdir(parents=True)
+
+    lifecycle_dirs = [
+        invitations / name
+        for name in ("active", "completed", "revoked")
+    ]
+
+    for lifecycle in lifecycle_dirs:
+        lifecycle.mkdir()
+        os.chmod(lifecycle, 0o755)
+
+    result = _run(
+        "atlas_identity_writer_runtime_provision",
+        users=users,
+        identity=identity,
+    )
+
+    assert result.returncode == 0, result.stderr
+
+    for lifecycle in lifecycle_dirs:
+        assert lifecycle.stat().st_uid == os.geteuid()
+        assert lifecycle.stat().st_gid == os.getegid()
+        assert _mode(lifecycle) == 0o2770
+
+
+def test_verify_detects_lifecycle_directory_mode_drift(
+    tmp_path: Path,
+) -> None:
+    users = tmp_path / "users"
+    identity = tmp_path / "identity"
+
+    provision = _run(
+        "atlas_identity_writer_runtime_provision",
+        users=users,
+        identity=identity,
+    )
+    assert provision.returncode == 0, provision.stderr
+
+    active = identity / "invitations" / "active"
+    os.chmod(active, 0o2750)
+
+    verify = _run(
+        "atlas_identity_writer_runtime_verify",
+        users=users,
+        identity=identity,
+    )
+
+    assert verify.returncode != 0
+    assert "mode mismatch" in verify.stderr
+    assert str(active) in verify.stderr
 
 
 def test_provision_preserves_existing_children(
