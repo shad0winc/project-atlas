@@ -102,6 +102,7 @@ atlas_identity_writer_runtime_verify_directory() {
 atlas_identity_writer_runtime_verify() {
   local users_dir
   local invitations_dir
+  local lifecycle_dir
 
   users_dir="$(atlas_identity_writer_runtime_users_dir)" || return 1
   invitations_dir="$(
@@ -118,12 +119,21 @@ atlas_identity_writer_runtime_verify() {
     "$invitations_dir" \
     "$ATLAS_IDENTITY_WRITER_INVITATIONS_UID" \
     "$ATLAS_IDENTITY_WRITER_INVITATIONS_GID" \
-    "$ATLAS_IDENTITY_WRITER_INVITATIONS_MODE"
+    "$ATLAS_IDENTITY_WRITER_INVITATIONS_MODE" || return 1
+
+  for lifecycle_dir in active completed revoked; do
+    atlas_identity_writer_runtime_verify_directory \
+      "$invitations_dir/$lifecycle_dir" \
+      "$ATLAS_IDENTITY_WRITER_INVITATIONS_UID" \
+      "$ATLAS_IDENTITY_WRITER_INVITATIONS_GID" \
+      "$ATLAS_IDENTITY_WRITER_INVITATIONS_MODE" || return 1
+  done
 }
 
 atlas_identity_writer_runtime_provision() {
   local users_dir
   local invitations_dir
+  local lifecycle_dir
 
   users_dir="$(atlas_identity_writer_runtime_users_dir)" || return 1
   invitations_dir="$(
@@ -141,6 +151,14 @@ atlas_identity_writer_runtime_provision() {
     "$ATLAS_IDENTITY_WRITER_INVITATIONS_UID" \
     "$ATLAS_IDENTITY_WRITER_INVITATIONS_GID" \
     "$ATLAS_IDENTITY_WRITER_INVITATIONS_MODE" || return 1
+
+  for lifecycle_dir in active completed revoked; do
+    atlas_identity_writer_runtime_normalize_directory \
+      "$invitations_dir/$lifecycle_dir" \
+      "$ATLAS_IDENTITY_WRITER_INVITATIONS_UID" \
+      "$ATLAS_IDENTITY_WRITER_INVITATIONS_GID" \
+      "$ATLAS_IDENTITY_WRITER_INVITATIONS_MODE" || return 1
+  done
 
   atlas_identity_writer_runtime_verify
 }
