@@ -128,7 +128,7 @@ export interface AtlasPortalSchedulerSummaryResponse {
   readonly recent_failures: readonly AtlasPortalSchedulerFailureResponse[];
 }
 
-export interface AtlasPortalDashboardResponse {
+export interface AtlasPortalDashboardData {
   readonly dashboard: {
     readonly health: AtlasHealthResponse;
     readonly operational: AtlasDashboardSummaryResponse;
@@ -136,6 +136,14 @@ export interface AtlasPortalDashboardResponse {
     readonly operations: AtlasPortalOperationsSummaryResponse;
     readonly scheduler: AtlasPortalSchedulerSummaryResponse;
   };
+}
+
+export interface AtlasPortalDashboardResponse {
+  readonly schema_version: number;
+  readonly api_version: string;
+  readonly success: boolean;
+  readonly generated_at: string;
+  readonly data: AtlasPortalDashboardData;
 }
 
 export interface AtlasErrorResponse {
