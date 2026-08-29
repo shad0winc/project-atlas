@@ -57,7 +57,27 @@ def populate_source(root: Path, count: int) -> FileOperationsRepository:
     return repository
 
 
-def test_projection_publishes_latest_and_two_history_reports(tmp_path: Path) -> None:
+def stub_runtime_ownership(
+    monkeypatch: pytest.MonkeyPatch,
+) -> list[tuple[str, object, int, int]]:
+    calls: list[tuple[str, object, int, int]] = []
+
+    def record_chown(path: object, uid: int, gid: int) -> None:
+        calls.append(("chown", path, uid, gid))
+
+    def record_fchown(fd: int, uid: int, gid: int) -> None:
+        calls.append(("fchown", fd, uid, gid))
+
+    monkeypatch.setattr("atlas.dashboard_runtime.os.chown", record_chown)
+    monkeypatch.setattr("atlas.dashboard_runtime.os.fchown", record_fchown)
+    return calls
+
+
+def test_projection_publishes_latest_and_two_history_reports(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stub_runtime_ownership(monkeypatch)
     source = populate_source(tmp_path / "source", 3)
     destination = tmp_path / "runtime" / "operations"
     current = publish_operations_projection(source.root, destination, history_limit=2)
@@ -72,7 +92,11 @@ def test_projection_publishes_latest_and_two_history_reports(tmp_path: Path) -> 
     assert len(tuple(projected.history_directory.glob("*.json"))) == 2
 
 
-def test_projection_refresh_selects_new_generation(tmp_path: Path) -> None:
+def test_projection_refresh_selects_new_generation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stub_runtime_ownership(monkeypatch)
     source = populate_source(tmp_path / "source", 3)
     destination = tmp_path / "runtime" / "operations"
     current = publish_operations_projection(source.root, destination)
@@ -95,7 +119,11 @@ def test_projection_refresh_selects_new_generation(tmp_path: Path) -> None:
     assert len(generations) <= 2
 
 
-def test_projection_preserves_runtime_permissions(tmp_path: Path) -> None:
+def test_projection_preserves_runtime_permissions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ownership_calls = stub_runtime_ownership(monkeypatch)
     source = populate_source(tmp_path / "source", 2)
     destination = tmp_path / "runtime" / "operations"
     current = publish_operations_projection(source.root, destination)
@@ -105,9 +133,13 @@ def test_projection_preserves_runtime_permissions(tmp_path: Path) -> None:
     assert os.stat(target).st_mode & 0o777 == 0o750
     assert os.stat(target / "history").st_mode & 0o777 == 0o750
     assert os.stat(target / "latest.json").st_mode & 0o777 == 0o640
-    assert os.stat(destination).st_gid == 20000
-    assert os.stat(target).st_gid == 20000
-    assert os.stat(target / "latest.json").st_gid == 20000
+    assert ownership_calls
+    assert all(
+        uid == 0 and gid == 20000
+        for _operation, _target, uid, gid in ownership_calls
+    )
+    assert any(operation == "chown" for operation, *_rest in ownership_calls)
+    assert any(operation == "fchown" for operation, *_rest in ownership_calls)
 
 
 def test_projection_rejects_missing_canonical_latest(tmp_path: Path) -> None:
