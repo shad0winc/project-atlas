@@ -316,3 +316,61 @@ printf 'invitations=%s\n' "$(atlas_identity_writer_runtime_invitations_dir)"
     assert result.returncode == 0, result.stderr
     assert f"users={users}" in result.stdout
     assert f"invitations={identity / 'invitations'}" in result.stdout
+
+
+def test_provision_repairs_existing_profile_directory_permissions(
+    tmp_path: Path,
+) -> None:
+    users = tmp_path / "users"
+    profiles = users / "profiles"
+    profile = profiles / "usr_example"
+    identity = tmp_path / "identity"
+
+    profile.mkdir(parents=True)
+    profile_file = profile / "profile.json"
+    profile_file.write_text('{"user_id":"usr_example"}\n', encoding="utf-8")
+
+    os.chmod(users, 0o2770)
+    os.chmod(profiles, 0o2750)
+    os.chmod(profile, 0o2750)
+    os.chmod(profile_file, 0o640)
+
+    result = _run(
+        "atlas_identity_writer_runtime_provision",
+        users=users,
+        identity=identity,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert _mode(users) == 0o2770
+    assert _mode(profiles) == 0o2770
+    assert _mode(profile) == 0o2770
+    assert _mode(profile_file) == 0o640
+
+
+def test_verify_detects_profile_directory_mode_drift(
+    tmp_path: Path,
+) -> None:
+    users = tmp_path / "users"
+    identity = tmp_path / "identity"
+
+    provision = _run(
+        "atlas_identity_writer_runtime_provision",
+        users=users,
+        identity=identity,
+    )
+    assert provision.returncode == 0, provision.stderr
+
+    profile = users / "profiles" / "usr_example"
+    profile.mkdir()
+    os.chmod(profile, 0o2750)
+
+    verify = _run(
+        "atlas_identity_writer_runtime_verify",
+        users=users,
+        identity=identity,
+    )
+
+    assert verify.returncode != 0
+    assert "mode mismatch" in verify.stderr
+    assert str(profile) in verify.stderr
