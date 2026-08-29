@@ -37,6 +37,7 @@ source "$ATLAS_CLI_ROOT/commands/git.sh"
 source "$ATLAS_CLI_ROOT/commands/restart.sh"
 source "$ATLAS_CLI_ROOT/commands/logs.sh"
 source "$ATLAS_CLI_ROOT/commands/ari.sh"
+source "$ATLAS_CLI_ROOT/commands/service-runtime.sh"
 source "$ATLAS_CLI_ROOT/commands/module.sh"
 
 # shellcheck disable=SC1091
@@ -184,6 +185,10 @@ case "$command" in
 
   ari)
     atlas_command_ari "${@:2}"
+    ;;
+
+  service-runtime)
+    atlas_command_service_runtime "${@:2}"
     ;;
 
   event)
