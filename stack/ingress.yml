@@ -55,6 +55,7 @@ services:
       - /mnt/storage/configs/atlas/identity/favorites:/mnt/storage/configs/atlas/identity/favorites:rw
       - /mnt/storage/configs/atlas/runtime/requests:/mnt/storage/configs/atlas/runtime/requests:rw
       - /mnt/storage/configs/atlas/runtime/events.jsonl:/mnt/storage/configs/atlas/runtime/events.jsonl:rw
+      - /mnt/storage/configs/atlas/runtime/ari:/mnt/storage/configs/atlas/runtime/ari:ro
 
     expose:
       - "8000"
@@ -71,6 +72,8 @@ services:
       ATLAS_IDENTITY_WRITER_URL: "http://identity-writer:8001"
       ATLAS_IDENTITY_WRITER_TOKEN: "${ATLAS_IDENTITY_WRITER_TOKEN:?ATLAS_IDENTITY_WRITER_TOKEN is required}"
       ATLAS_SECURITY_AUDIT_PATH: "/mnt/storage/configs/atlas/runtime/events.jsonl"
+      ATLAS_ARI_LATEST_FILE: "/mnt/storage/configs/atlas/runtime/ari/latest.json"
+      ATLAS_ARI_LATEST_PATH: "/mnt/storage/configs/atlas/runtime/ari/latest.json"
       ATLAS_JWT_SECRET: "${ATLAS_JWT_SECRET:?ATLAS_JWT_SECRET is required}"
       ATLAS_JWT_ISSUER: "${ATLAS_JWT_ISSUER:-project-atlas}"
       ATLAS_JWT_AUDIENCE: "${ATLAS_JWT_AUDIENCE:-atlas-portal}"
