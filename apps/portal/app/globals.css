@@ -1533,6 +1533,10 @@ a {
 
 /* M-018.32 — Responsive & Mobile Service Lifecycle Acceptance */
 
+.service-lifecycle-card {
+  padding: 1.25rem;
+}
+
 section[aria-labelledby="managed-services-title"] .card,
 section[aria-labelledby="service-detail-title"] .card,
 section[aria-labelledby="service-detail-title"] dl > div {
