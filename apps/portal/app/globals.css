@@ -1255,6 +1255,10 @@ a {
 
 /* AEB-0002.4.1 dashboard primitives */
 
+.dashboard-runtime .card {
+  padding: 1.15rem;
+}
+
 .dashboard-metric-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
