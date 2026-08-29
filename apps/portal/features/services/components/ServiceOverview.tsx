@@ -158,7 +158,7 @@ export function ServiceOverview({
         ) : (
           <div className="dashboard-metric-grid">
             {snapshot.services.map((service) => (
-              <Card key={service.identifier}>
+              <Card className="service-lifecycle-card" key={service.identifier}>
                 <p>{service.provider}</p>
                 <h3>{service.name}</h3>
                 <p>Identifier: {service.identifier}</p>
@@ -197,7 +197,10 @@ export function ServiceOverview({
         ) : (
           <div className="dashboard-metric-grid">
             {snapshot.history.records.map((record, index) => (
-              <Card key={`${record.serviceIdentifier}-${record.startedAt ?? "unknown"}-${index}`}>
+              <Card
+                className="service-lifecycle-card"
+                key={`${record.serviceIdentifier}-${record.startedAt ?? "unknown"}-${index}`}
+              >
                 <p>{record.provider}</p>
                 <h3>{record.serviceName}</h3>
                 <p>Action: {record.action}</p>
