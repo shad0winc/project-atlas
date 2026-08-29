@@ -69,6 +69,7 @@ class UserProfileStore:
     """Durable Atlas user-profile store."""
 
     root: Path
+    profile_directory_mode: int = 0o2750
 
     @property
     def registry_file(self) -> Path:
@@ -170,10 +171,11 @@ class UserProfileStore:
         profile_file.parent.mkdir(
             parents=True,
             exist_ok=False,
-            mode=0o2750,
+            mode=self.profile_directory_mode,
         )
 
         try:
+            profile_file.parent.chmod(self.profile_directory_mode)
             _atomic_write_json(profile_file, profile)
 
             registry["users"][user_id] = {
@@ -946,7 +948,10 @@ def default_store() -> UserProfileStore:
         )
     ).expanduser()
 
-    return UserProfileStore(root.resolve())
+    return UserProfileStore(
+        root.resolve(),
+        profile_directory_mode=0o2770,
+    )
 
 
 def _roles_from_create_arguments(
