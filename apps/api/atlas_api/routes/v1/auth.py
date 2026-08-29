@@ -17,16 +17,19 @@ from atlas_api.auth.schemas import (
     LoginRequest,
     RefreshRequest,
     TokenResponse,
+    UpdateCurrentUserRequest,
 )
 from atlas_api.auth.service import AuthenticationService
 from atlas_api.dependencies import (
     get_authentication_service,
     get_jwt_service,
+    get_identity_writer_client,
     get_security_audit_writer,
     get_user_profile_store,
     resolve_refresh_user,
 )
 from atlas_api.security import require_permission
+from atlas_api.services.identity_writer import IdentityWriterClient, IdentityWriterError
 from atlas_api.security.dependencies import get_authorization_service
 from atlas_api.security.permissions import build_authorization_subject
 
@@ -37,6 +40,7 @@ router = APIRouter(
 )
 
 require_current_user_read = require_permission("users.self.read")
+require_current_user_update = require_permission("users.self.update")
 
 
 @router.post(
@@ -184,8 +188,66 @@ def read_current_user(
 
     return CurrentUserResponse(
         user_id=user.user_id,
-        username=user.username,
-        display_name=user.display_name,
+        username=str(profile["username"]),
+        display_name=str(profile["display_name"]),
+        roles=list(effective.roles),
+        provider=user.provider,
+        granted_permission_patterns=sorted(
+            effective.granted_permissions
+        ),
+        denied_permission_patterns=sorted(
+            effective.denied_permissions
+        ),
+    )
+
+
+@router.patch(
+    "/me",
+    response_model=CurrentUserResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Update supported authenticated Atlas user settings",
+)
+def update_current_user(
+    request: UpdateCurrentUserRequest,
+    user: AuthenticatedUser = Depends(require_current_user_update),
+    writer: IdentityWriterClient = Depends(get_identity_writer_client),
+    authorization=Depends(get_authorization_service),
+) -> CurrentUserResponse:
+    """Update only the authenticated user's supported self-service fields."""
+
+    if request.display_name is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one supported account setting is required.",
+        )
+
+    display_name = request.display_name.strip()
+
+    if not display_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Display name cannot be empty.",
+        )
+
+    try:
+        profile = writer.update_user(
+            user.user_id,
+            {"display_name": display_name},
+        )
+    except IdentityWriterError as error:
+        raise HTTPException(
+            status_code=error.status_code,
+            detail=str(error),
+        ) from error
+
+    effective = authorization.resolve(
+        build_authorization_subject(profile)
+    )
+
+    return CurrentUserResponse(
+        user_id=user.user_id,
+        username=str(profile["username"]),
+        display_name=str(profile["display_name"]),
         roles=list(effective.roles),
         provider=user.provider,
         granted_permission_patterns=sorted(

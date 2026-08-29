@@ -28,6 +28,14 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class UpdateCurrentUserRequest(BaseModel):
+    """Supported self-service Atlas profile fields."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    display_name: str | None = Field(default=None, max_length=100)
+
+
 class CurrentUserResponse(BaseModel):
     """Authenticated user and effective authorization state."""
 
