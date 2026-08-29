@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Final
+
+from atlas.dashboard_runtime import read_scheduler_snapshot
 
 from atlas_api.schemas.portal_dashboard import (
     PortalSchedulerFailureResponse,
@@ -12,6 +15,16 @@ from atlas_api.schemas.portal_dashboard import (
 
 
 PORTAL_RECENT_FAILURE_LIMIT: Final = 5
+
+
+class RuntimeSchedulerProvider:
+    """Read Scheduler observations from an API-safe runtime snapshot."""
+
+    def __init__(self, snapshot_path: str | Path) -> None:
+        self._snapshot_path = Path(snapshot_path).expanduser()
+
+    def list_tasks(self) -> list[dict[str, Any]]:
+        return [dict(task) for task in read_scheduler_snapshot(self._snapshot_path)]
 
 
 class SchedulerDashboardService:

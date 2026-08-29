@@ -45,6 +45,16 @@ def prepare_runtime(tmp_path: Path, *, branch: str = "main") -> dict[str, str]:
         tracked.chmod(0o644)
 
     write_executable(
+        project / "scripts" / "atlas-dashboard-runtime.sh",
+        """
+        #!/usr/bin/env bash
+        set -euo pipefail
+        echo "dashboard-runtime:${1:-}" >> "$ATLAS_TEST_EVENTS"
+        exit "${ATLAS_TEST_DASHBOARD_RUNTIME_STATUS:-0}"
+        """,
+    )
+
+    write_executable(
         project / "scripts" / "verify-ingress.sh",
         """
         #!/usr/bin/env bash
@@ -532,6 +542,23 @@ def test_update_preserves_rollback_images_before_runtime_mutation(tmp_path: Path
         index for index, event in enumerate(events) if event.startswith("docker compose")
     )
     assert preserve < first_compose
+
+
+def test_dashboard_runtime_publication_failure_keeps_maintenance_and_lock(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_DASHBOARD_RUNTIME_STATUS"] = "1"
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode != 0
+    events = event_lines(environment)
+
+    assert "dashboard-runtime:publish-all" in events
+    assert "maintenance:enable" in events
+    assert "maintenance:disable" not in events
+    assert "Dashboard runtime publication failed." in result.stderr
 
 
 def test_failed_public_reopen_reenables_maintenance_and_keeps_lock(tmp_path: Path) -> None:

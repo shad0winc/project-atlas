@@ -176,7 +176,19 @@ def get_authentication_service() -> AuthenticationService:
 def get_dashboard_summary_service() -> DashboardSummaryService:
     """Return the process-wide operational dashboard service."""
 
-    return DashboardSummaryService()
+    snapshot_path = os.getenv(
+        "ATLAS_DASHBOARD_HEALTH_SNAPSHOT_PATH",
+        "/mnt/storage/configs/atlas/runtime/dashboard/health.json",
+    ).strip()
+
+    if not snapshot_path:
+        raise ValueError(
+            "ATLAS_DASHBOARD_HEALTH_SNAPSHOT_PATH cannot be empty"
+        )
+
+    return DashboardSummaryService(
+        snapshot_path=Path(snapshot_path),
+    )
 
 
 @lru_cache(maxsize=1)
@@ -202,22 +214,9 @@ def get_dashboard_media_summary_service(
 
 
 @lru_cache(maxsize=1)
-def get_scheduler_dashboard_service() -> SchedulerDashboardService:
-    """Return the process-wide scheduler dashboard adapter."""
-
-    from atlas.scheduler import TaskScheduler
-
-    return SchedulerDashboardService(
-        TaskScheduler(),
-    )
-
-
-@lru_cache(maxsize=1)
 def get_task_scheduler():
     """Return the Atlas scheduler runtime reader."""
-
     from atlas.scheduler import TaskScheduler
-
     return TaskScheduler(
         Path(
             os.getenv(
@@ -231,10 +230,33 @@ def get_task_scheduler():
 @lru_cache(maxsize=1)
 def get_scheduler_dashboard_service() -> SchedulerDashboardService:
     """Return the Portal scheduler widget adapter."""
-
+    from atlas_api.services.scheduler_dashboard import RuntimeSchedulerProvider
+    snapshot_path = os.getenv(
+        "ATLAS_DASHBOARD_SCHEDULER_SNAPSHOT_PATH",
+        "/mnt/storage/configs/atlas/runtime/dashboard/scheduler.json",
+    ).strip()
+    if not snapshot_path:
+        raise ValueError("ATLAS_DASHBOARD_SCHEDULER_SNAPSHOT_PATH cannot be empty")
     return SchedulerDashboardService(
-        get_task_scheduler(),
+        RuntimeSchedulerProvider(Path(snapshot_path))
     )
+
+
+@lru_cache(maxsize=1)
+def get_portal_operations_repository() -> FileOperationsRepository:
+    """Return the bounded Operations repository used by the Portal dashboard."""
+
+    configured_root = os.getenv(
+        "ATLAS_DASHBOARD_OPERATIONS_DIRECTORY",
+        "/mnt/storage/configs/atlas/runtime/dashboard/operations/current",
+    ).strip()
+
+    if not configured_root:
+        raise ValueError(
+            "ATLAS_DASHBOARD_OPERATIONS_DIRECTORY cannot be empty"
+        )
+
+    return FileOperationsRepository(Path(configured_root))
 
 
 @lru_cache(maxsize=1)
@@ -244,7 +266,7 @@ def get_portal_dashboard_service() -> PortalDashboardService:
     return PortalDashboardService(
         get_dashboard_summary_service(),
         get_dashboard_media_summary_service(),
-        get_operations_repository(),
+        get_portal_operations_repository(),
         get_scheduler_dashboard_service(),
         get_operations_comparison_service(),
     )

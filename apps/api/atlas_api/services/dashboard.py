@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
+from pathlib import Path
 
+from atlas.dashboard_runtime import read_health_snapshot
 from atlas.health import (
     HealthCheck,
     HealthReport,
     HealthStatus,
-    collect_operational_health,
 )
 from atlas_api.schemas.dashboard import (
     DashboardMetricResponse,
@@ -18,6 +19,14 @@ from atlas_api.schemas.dashboard import (
 
 
 HealthReportFactory = Callable[[], HealthReport]
+
+
+def _unset_report_factory() -> HealthReport:
+    """Internal sentinel used to distinguish omitted factory from explicit None."""
+    raise RuntimeError("unset Dashboard report factory must not be called")
+
+
+_UNSET_REPORT_FACTORY: HealthReportFactory = _unset_report_factory
 
 
 _STATUS_SEVERITY = {
@@ -33,15 +42,26 @@ class DashboardSummaryService:
 
     def __init__(
         self,
-        report_factory: HealthReportFactory = collect_operational_health,
+        report_factory: HealthReportFactory | None = _UNSET_REPORT_FACTORY,
+        *,
+        snapshot_path: str | Path | None = None,
     ) -> None:
-        if not callable(report_factory):
-            raise TypeError("report_factory must be callable")
+        if report_factory is not _UNSET_REPORT_FACTORY:
+            if not callable(report_factory):
+                raise TypeError("report_factory must be callable")
+            if snapshot_path is not None:
+                raise ValueError("report_factory and snapshot_path are mutually exclusive")
+            self._report_factory = report_factory
+            return
 
-        self._report_factory = report_factory
+        if snapshot_path is None:
+            raise ValueError("snapshot_path is required")
+
+        normalized_path = Path(snapshot_path).expanduser()
+        self._report_factory = lambda: read_health_snapshot(normalized_path)
 
     def read_summary(self) -> DashboardSummaryResponse:
-        """Collect live operational health and return the dashboard summary."""
+        """Read operational health and return the dashboard summary."""
 
         report = self._report_factory()
 
