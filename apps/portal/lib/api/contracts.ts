@@ -72,6 +72,7 @@ export interface AtlasPortalOperationsReportSummaryResponse {
   readonly score: number;
   readonly attention_count: number;
   readonly generated_at: string;
+  readonly currentness: "historical";
 }
 
 export interface AtlasPortalOperationsComparisonResponse {

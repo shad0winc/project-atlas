@@ -33,7 +33,7 @@ export function OperationsAttentionPanel({
 
         <Badge variant="success">Clear</Badge>
 
-        <p>Atlas has no current Operations findings requiring attention.</p>
+        <p>No findings required attention in this Operations snapshot.</p>
       </Card>
     );
   }

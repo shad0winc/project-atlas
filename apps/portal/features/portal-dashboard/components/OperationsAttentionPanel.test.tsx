@@ -13,7 +13,8 @@ function operations(overrides: Partial<PortalOperationsSnapshot> = {}): PortalOp
       status: "warning",
       score: 82,
       attentionCount: 2,
-      generatedAt: "2026-08-04T14:00:00.000Z"
+      generatedAt: "2026-08-04T14:00:00.000Z",
+      currentness: "historical"
     },
     comparison: {
       status: "available",
@@ -37,7 +38,8 @@ describe("OperationsAttentionPanel", () => {
 
     expect(markup).toContain("Recent attention");
     expect(markup).toContain("Clear");
-    expect(markup).toContain("Atlas has no current Operations findings requiring attention.");
+    expect(markup).toContain("No findings required attention in this Operations snapshot.");
+    expect(markup).not.toContain("current Operations findings");
   });
 
   it("renders findings, severity, messages, and recommendations", () => {

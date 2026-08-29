@@ -42,7 +42,11 @@ export function OperationsSummaryCard({
     <Card>
       <h3>Operations</h3>
 
-      <Badge variant={statusVariant(summary.status)}>{summary.status}</Badge>
+      <Badge>Historical snapshot</Badge>
+
+      <p>Report status: <Badge variant={statusVariant(summary.status)}>{summary.status}</Badge></p>
+
+      <p>This is the latest persisted Operations snapshot and does not represent current system health.</p>
 
       <p>Score: {summary.score}</p>
 

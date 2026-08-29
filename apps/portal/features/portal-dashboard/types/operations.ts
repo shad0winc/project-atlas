@@ -36,6 +36,7 @@ export type PortalOperationsSnapshot = Readonly<{
     score: number;
     attentionCount: number;
     generatedAt: string;
+    currentness: "historical";
   }> | null;
   comparison: PortalOperationsComparison;
   recentAttention: readonly PortalOperationsAttention[];
@@ -89,7 +90,8 @@ export function createPortalOperationsSnapshot(
           status: value.summary.status,
           score: value.summary.score,
           attentionCount: value.summary.attention_count,
-          generatedAt: normalizeTimestamp(value.summary.generated_at)
+          generatedAt: normalizeTimestamp(value.summary.generated_at),
+          currentness: value.summary.currentness
         }
       : null,
 
