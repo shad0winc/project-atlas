@@ -12,7 +12,7 @@ function scoreLabel(score: number | null): string {
 
 export function ServiceHealthCard({ health }: ServiceHealthCardProps): React.ReactElement {
   return (
-    <Card>
+    <Card className="service-lifecycle-card">
       <p>Service health</p>
       <h3>{health.status}</h3>
       <p>Health score: {scoreLabel(health.score)}</p>
