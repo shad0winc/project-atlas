@@ -126,6 +126,7 @@ class PortalOperationsReportSummaryResponse(BaseModel):
     score: int
     attention_count: int
     generated_at: str
+    currentness: Literal["historical"]
 
 
 class PortalOperationsComparisonResponse(BaseModel):

@@ -166,6 +166,7 @@ class PortalDashboardService:
                     report.attention_findings
                 ),
                 generated_at=report.generated_at,
+                currentness="historical",
             ),
             comparison=self._read_comparison(),
             recent_attention=tuple(

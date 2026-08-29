@@ -212,6 +212,7 @@ def test_one_report_provides_summary_without_comparison() -> None:
     assert operations.summary.score == 100
     assert operations.summary.attention_count == 0
     assert operations.summary.generated_at == GENERATED_AT
+    assert operations.summary.currentness == "historical"
     assert operations.comparison.status == "unavailable"
     assert operations.recent_attention == ()
     assert repository.history_limits == [
