@@ -113,6 +113,8 @@ Intelligence
   atlas ari history [--json]
   atlas ari growth [--json]
   atlas ari forecast [--json]
+
+  atlas service-runtime publish
   atlas discovery [help|indexers|categories|applications|health|report]
   atlas operations [help|report|save|latest|history|compare]
   atlas operations report [--json] [--report-id REPORT_ID]

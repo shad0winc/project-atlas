@@ -56,6 +56,7 @@ services:
       - /mnt/storage/configs/atlas/runtime/requests:/mnt/storage/configs/atlas/runtime/requests:rw
       - /mnt/storage/configs/atlas/runtime/events.jsonl:/mnt/storage/configs/atlas/runtime/events.jsonl:rw
       - /mnt/storage/configs/atlas/runtime/ari:/mnt/storage/configs/atlas/runtime/ari:ro
+      - /mnt/storage/configs/atlas/runtime/services:/mnt/storage/configs/atlas/runtime/services:ro
 
     expose:
       - "8000"
@@ -74,6 +75,7 @@ services:
       ATLAS_SECURITY_AUDIT_PATH: "/mnt/storage/configs/atlas/runtime/events.jsonl"
       ATLAS_ARI_LATEST_FILE: "/mnt/storage/configs/atlas/runtime/ari/latest.json"
       ATLAS_ARI_LATEST_PATH: "/mnt/storage/configs/atlas/runtime/ari/latest.json"
+      ATLAS_SERVICE_LIFECYCLE_SNAPSHOT_PATH: "/mnt/storage/configs/atlas/runtime/services/latest.json"
       ATLAS_JWT_SECRET: "${ATLAS_JWT_SECRET:?ATLAS_JWT_SECRET is required}"
       ATLAS_JWT_ISSUER: "${ATLAS_JWT_ISSUER:-project-atlas}"
       ATLAS_JWT_AUDIENCE: "${ATLAS_JWT_AUDIENCE:-atlas-portal}"

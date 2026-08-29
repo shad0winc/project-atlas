@@ -7,10 +7,12 @@ import os
 from pathlib import Path
 
 from atlas.service_lifecycle import (
-    DockerComposeProvider,
     ServiceLifecycleService,
     ServiceMaintenanceHistoryService,
     ServiceUpdateService,
+)
+from atlas.service_lifecycle.providers import (
+    RuntimeSnapshotProvider,
 )
 
 from fastapi import Depends, HTTPException, status
@@ -296,34 +298,18 @@ def get_operations_repository() -> OperationsRepository:
 def get_service_lifecycle_service() -> ServiceLifecycleService:
     """Return the process-wide read-only Service Lifecycle service."""
 
-    project_root = Path(
+    snapshot_path = Path(
         os.environ.get(
-            "ATLAS_PROJECT_ROOT",
-            "/opt/project-atlas",
+            "ATLAS_SERVICE_LIFECYCLE_SNAPSHOT_PATH",
+            (
+                "/mnt/storage/configs/atlas/runtime/"
+                "services/latest.json"
+            ),
         )
     )
 
-    compose_file = Path(
-        os.environ.get(
-            "ATLAS_SERVICE_LIFECYCLE_COMPOSE_FILE",
-            str(project_root / "docker-compose.yml"),
-        )
-    )
-
-    project_directory_value = os.environ.get(
-        "ATLAS_SERVICE_LIFECYCLE_PROJECT_DIRECTORY"
-    )
-
-    project_directory = (
-        Path(project_directory_value)
-        if project_directory_value
-        else compose_file.parent
-    )
-
-    provider = DockerComposeProvider(
-        compose_file=compose_file,
-        project_directory=project_directory,
-        environment=os.environ,
+    provider = RuntimeSnapshotProvider(
+        snapshot_path
     )
 
     return ServiceLifecycleService(provider)
