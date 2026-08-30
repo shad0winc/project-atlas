@@ -164,7 +164,7 @@ def test_pr66_stage1c_upload_state_contract() -> None:
         "uploading": DownloadState.SEEDING,
         "forcedUP": DownloadState.SEEDING,
         "stalledUP": DownloadState.SEEDING,
-        "queuedUP": DownloadState.COMPLETED,
+        "queuedUP": DownloadState.QUEUED,
         "pausedUP": DownloadState.COMPLETED,
         "stoppedUP": DownloadState.COMPLETED,
         "checkingUP": DownloadState.CHECKING,

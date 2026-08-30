@@ -20,9 +20,13 @@ function DownloadJobControls({ item, busy, onAction }: Readonly<{
   onAction: (item: DownloadItem, action: DownloadManagementAction) => void;
 }>): React.ReactElement {
   const normalizedState = item.state.toLowerCase();
-  const canStop = normalizedState === "seeding";
+  const canStop = normalizedState === "seeding" || normalizedState === "queued";
   const canResume = normalizedState === "paused" || normalizedState === "completed";
-  const canRemove = normalizedState === "completed" || normalizedState === "seeding" || normalizedState === "paused";
+  const canRemove =
+    normalizedState === "completed" ||
+    normalizedState === "seeding" ||
+    normalizedState === "queued" ||
+    normalizedState === "paused";
   return (
     <div className="request-card-actions">
       <button className="button button--secondary" disabled={busy || !canStop} onClick={() => onAction(item, "stop_seeding")} type="button">Stop seeding</button>

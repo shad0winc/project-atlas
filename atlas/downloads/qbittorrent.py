@@ -22,7 +22,7 @@ _STATE_MAP: dict[str, DownloadState] = {
     "forcedDL": DownloadState.DOWNLOADING,
     "metaDL": DownloadState.DOWNLOADING,
     "queuedDL": DownloadState.QUEUED,
-    "queuedUP": DownloadState.COMPLETED,
+    "queuedUP": DownloadState.QUEUED,
     "stalledDL": DownloadState.STALLED,
     "stalledUP": DownloadState.SEEDING,
     "pausedDL": DownloadState.PAUSED,
