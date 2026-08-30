@@ -138,7 +138,13 @@ export function AdminIdentityView(): React.ReactElement {
     loadAssignableRoleCatalog(controller.signal)
       .then((roles) => {
         setAssignableRoles(roles);
-        if (roles.length && !roles.some((item) => item.name === role)) setRole(roles[0].name);
+        if (roles.length) {
+          setRole((currentRole) =>
+            roles.some((item) => item.name === currentRole)
+              ? currentRole
+              : roles[0].name
+          );
+        }
       })
       .catch(() => setAssignableRoles([]));
     return () => controller.abort();

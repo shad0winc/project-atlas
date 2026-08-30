@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ATLAS_PERMISSIONS, usePermission } from "../../../lib/authorization";
+import { usePermission } from "../../../lib/authorization";
 import type { AdminRole } from "../api/roles";
 import { useAdminRoles } from "../hooks/use-admin-roles";
 
