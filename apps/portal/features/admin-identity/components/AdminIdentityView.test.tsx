@@ -86,4 +86,21 @@ describe("AdminIdentityView surface spacing", () => {
     expect(source).toContain("assignableRoles.map");
   });
 
+  it("does not make the assignable-role effect depend on the unstable can callback", () => {
+    const source = readFileSync(
+      join(
+        process.cwd(),
+        "features/admin-identity/components/AdminIdentityView.tsx"
+      ),
+      "utf8"
+    );
+
+    expect(source).toContain(
+      "const canAssignRoles = can(ATLAS_PERMISSIONS.rolesAssign);"
+    );
+    expect(source).toContain("if (!canAssignRoles) return;");
+    expect(source).toContain("}, [canAssignRoles]);");
+    expect(source).not.toContain("}, [can]);");
+  });
+
 });
