@@ -17,7 +17,8 @@ function PermissionChoices({ permissions, selected, onChange, disabled }: Readon
       <legend>Permissions</legend>
       <div className="role-permission-grid">
         {permissions.map((permission) => (
-          <label key={permission}>
+          <label className="role-permission-row" key={permission}>
+            <span className="role-permission-name">{permission}</span>
             <input
               checked={selectedSet.has(permission)}
               onChange={(event) => onChange(event.target.checked
@@ -25,7 +26,6 @@ function PermissionChoices({ permissions, selected, onChange, disabled }: Readon
                 : selected.filter((item) => item !== permission))}
               type="checkbox"
             />
-            {permission}
           </label>
         ))}
       </div>
@@ -63,7 +63,7 @@ function RoleEditor({ role, permissions, canUpdate, canDelete, busy, onUpdate, o
         <>
           <label>Display name<input disabled={!editable || busy} onChange={(e) => setDisplayName(e.target.value)} value={displayName} /></label>
           <label>Description<textarea disabled={!editable || busy} onChange={(e) => setDescription(e.target.value)} value={description} /></label>
-          <label><input checked={assignable} disabled={!editable || busy} onChange={(e) => setAssignable(e.target.checked)} type="checkbox" /> Assignable to users</label>
+          <label className="role-assignable-row"><span>Assignable to users</span><input checked={assignable} disabled={!editable || busy} onChange={(e) => setAssignable(e.target.checked)} type="checkbox" /></label>
           <PermissionChoices disabled={!editable || busy} onChange={setSelectedPermissions} permissions={permissions} selected={selectedPermissions} />
           {editable ? <button disabled={busy} onClick={() => void onUpdate({ displayName, description, permissions: selectedPermissions, assignable })} type="button">Save role</button> : null}
           {canDelete ? <button disabled={busy} onClick={() => void onDelete()} type="button">Delete role</button> : null}
@@ -111,7 +111,7 @@ export function RoleManagement(): React.ReactElement | null {
           <label>Role name<input onChange={(e) => setName(e.target.value)} required value={name} /></label>
           <label>Display name<input onChange={(e) => setDisplayName(e.target.value)} required value={displayName} /></label>
           <label>Description<textarea onChange={(e) => setDescription(e.target.value)} value={description} /></label>
-          <label><input checked={assignable} onChange={(e) => setAssignable(e.target.checked)} type="checkbox" /> Assignable to users</label>
+          <label className="role-assignable-row"><span>Assignable to users</span><input checked={assignable} onChange={(e) => setAssignable(e.target.checked)} type="checkbox" /></label>
           <PermissionChoices disabled={busyKey === "role:create"} onChange={setSelectedPermissions} permissions={state.catalog.permissions} selected={selectedPermissions} />
           <button disabled={busyKey === "role:create"} type="submit">{busyKey === "role:create" ? "Creating…" : "Create role"}</button>
         </form>

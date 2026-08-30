@@ -2608,8 +2608,35 @@ section[aria-labelledby="service-detail-title"] dd {
   margin-top: 0.75rem;
 }
 
+.role-assignable-row,
+.role-permission-grid .role-permission-row {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.role-assignable-row {
+  margin-top: 1rem;
+}
+
 .role-permission-grid {
   display: grid;
-  gap: 0.35rem;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.role-permission-grid .role-permission-row {
+  margin-top: 0;
+  min-width: 0;
+  padding: 0.65rem 0.75rem;
+}
+
+.role-permission-grid .role-permission-row + .role-permission-row {
+  border-top: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.role-permission-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
