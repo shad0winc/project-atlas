@@ -22,7 +22,7 @@ function InvitationRow({
   onRevoke: () => void;
 }>): React.ReactElement {
   return (
-    <article className="card">
+    <article className="card admin-identity-card">
       <p className="portal-page-eyebrow">{invitation.status}</p>
       <h4>{invitation.email ?? "Invitation without email"}</h4>
       <p>Role: {invitation.role}</p>
@@ -59,7 +59,7 @@ function UserDetail({
   const nextStatus = user.status === "active" ? "disabled" : "active";
 
   return (
-    <section aria-label={`User detail for ${user.displayName}`} className="card">
+    <section aria-label={`User detail for ${user.displayName}`} className="card admin-identity-card">
       <p className="portal-page-eyebrow">User detail</p>
       <h3>{user.displayName}</h3>
       <p>Username: {user.username}</p>
@@ -161,7 +161,7 @@ export function AdminIdentityView(): React.ReactElement {
         {state.users.length ? (
           <div>
             {state.users.map((user) => (
-              <article className="card" key={user.userId}>
+              <article className="card admin-identity-card" key={user.userId}>
                 <h4>{user.displayName}</h4>
                 <p>{user.username}</p>
                 <p>Status: {user.status}</p>

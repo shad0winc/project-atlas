@@ -68,14 +68,14 @@ export function DownloadManagementView(): React.ReactElement {
 
   return (
     <section aria-labelledby="download-management-title">
-      <Card>
+      <Card className="download-management-card">
         <h3 id="download-management-title">Download job controls</h3>
         <p>These controls change qBittorrent job state only. Remove job keeps downloaded media. Atlas media-retention rules remain separate.</p>
         {message ? <p aria-live="polite">{message}</p> : null}
       </Card>
       <div className="request-card-list" style={{ marginTop: "1rem" }}>
         {state.data.downloads.length === 0 ? <Card><h4>No download jobs</h4><p>The runtime snapshot contains no jobs to manage.</p></Card> : state.data.downloads.map((item) => (
-          <Card key={item.jobId}>
+          <Card className="download-management-card" key={item.jobId}>
             <div className="administration-card-content">
               <p className="portal-page-eyebrow">{item.category ?? "Uncategorized"}</p>
               <h4>{item.name}</h4>
