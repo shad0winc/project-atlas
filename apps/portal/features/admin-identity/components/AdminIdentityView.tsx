@@ -132,8 +132,12 @@ export function AdminIdentityView(): React.ReactElement {
   const [invitationCreated, setInvitationCreated] = useState(false);
   const [assignableRoles, setAssignableRoles] = useState<readonly AssignableRole[]>([]);
 
+  const canCreate = can(ATLAS_PERMISSIONS.usersCreate);
+  const canUpdate = can(ATLAS_PERMISSIONS.usersUpdate);
+  const canAssignRoles = can(ATLAS_PERMISSIONS.rolesAssign);
+
   useEffect(() => {
-    if (!can(ATLAS_PERMISSIONS.rolesAssign)) return;
+    if (!canAssignRoles) return;
     const controller = new AbortController();
     loadAssignableRoleCatalog(controller.signal)
       .then((roles) => {
@@ -148,11 +152,7 @@ export function AdminIdentityView(): React.ReactElement {
       })
       .catch(() => setAssignableRoles([]));
     return () => controller.abort();
-  }, [can]);
-
-  const canCreate = can(ATLAS_PERMISSIONS.usersCreate);
-  const canUpdate = can(ATLAS_PERMISSIONS.usersUpdate);
-  const canAssignRoles = can(ATLAS_PERMISSIONS.rolesAssign);
+  }, [canAssignRoles]);
 
   if (state.status === "loading") {
     return <section aria-busy="true"><p>Loading users and invitations…</p></section>;
