@@ -18,6 +18,10 @@ vi.mock("../../../lib/authorization", async (importOriginal) => {
   };
 });
 
+vi.mock("./RoleManagement", () => ({
+  RoleManagement: () => <section data-testid="role-management">Role management</section>
+}));
+
 import { AdministrationView } from "./AdministrationView";
 
 describe("AdministrationView", () => {

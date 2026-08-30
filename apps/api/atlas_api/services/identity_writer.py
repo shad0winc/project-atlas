@@ -128,6 +128,21 @@ class IdentityWriterClient:
             updates,
         )
 
+    def create_custom_role(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._request("POST", "/internal/v1/roles", payload)
+
+    def update_custom_role(
+        self,
+        role_name: str,
+        updates: dict[str, Any],
+    ) -> dict[str, Any]:
+        role_name = quote(role_name, safe="")
+        return self._request("PATCH", f"/internal/v1/roles/{role_name}", updates)
+
+    def delete_custom_role(self, role_name: str) -> dict[str, Any]:
+        role_name = quote(role_name, safe="")
+        return self._request("DELETE", f"/internal/v1/roles/{role_name}", {})
+
     def create_invitation(
         self,
         *,

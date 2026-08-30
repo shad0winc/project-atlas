@@ -72,4 +72,13 @@ describe("AdminIdentityView surface spacing", () => {
     );
     expect(markup).toContain("Example User");
   });
+  it("does not expose a free-text role editor", () => {
+    const source = require("node:fs").readFileSync(
+      require("node:path").join(process.cwd(), "features/admin-identity/components/AdminIdentityView.tsx"),
+      "utf8"
+    );
+    expect(source).not.toContain('.split(",")');
+    expect(source).toContain("assignableRoles.map");
+  });
+
 });
