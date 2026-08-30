@@ -61,7 +61,7 @@ function UserDetail({
   const nextStatus = user.status === "active" ? "disabled" : "active";
 
   return (
-    <section aria-label={`User detail for ${user.displayName}`} className="card admin-identity-card">
+    <section aria-label={`User detail for ${user.displayName}`} className="admin-identity-inline-detail">
       <p className="portal-page-eyebrow">User detail</p>
       <h3>{user.displayName}</h3>
       <p>Username: {user.username}</p>
@@ -181,37 +181,45 @@ export function AdminIdentityView(): React.ReactElement {
         <h3 id="user-accounts-title">User accounts</h3>
         {state.users.length ? (
           <div>
-            {state.users.map((user) => (
-              <article className="card admin-identity-card" key={user.userId}>
-                <h4>{user.displayName}</h4>
-                <p>{user.username}</p>
-                <p>Status: {user.status}</p>
-                <p>Roles: {rolesLabel(user)}</p>
-                <button
-                  disabled={detailLoading}
-                  onClick={() => void inspectUser(user.userId)}
-                  type="button"
-                >
-                  View {user.displayName}
-                </button>
-              </article>
-            ))}
+            {state.users.map((user) => {
+              const isSelected = selectedUser?.userId === user.userId;
+
+              return (
+                <article className="card admin-identity-card" key={user.userId}>
+                  <h4>{user.displayName}</h4>
+                  <p>{user.username}</p>
+                  <p>Status: {user.status}</p>
+                  <p>Roles: {rolesLabel(user)}</p>
+
+                  {isSelected && selectedUser ? (
+                    <UserDetail
+                      assignableRoles={assignableRoles}
+                      busy={busyKey === `user:${selectedUser.userId}`}
+                      canAssignRoles={canAssignRoles}
+                      canUpdate={canUpdate}
+                      onClose={clearSelectedUser}
+                      onUpdate={(updates) => mutateUser(selectedUser.userId, updates)}
+                      user={selectedUser}
+                    />
+                  ) : (
+                    <button
+                      disabled={detailLoading}
+                      onClick={() => void inspectUser(user.userId)}
+                      type="button"
+                    >
+                      Manage {user.displayName}
+                    </button>
+                  )}
+                </article>
+              );
+            })}
           </div>
         ) : <p>No Atlas users were returned.</p>}
       </section>
 
-      {selectedUser ? (
-        <UserDetail
-          key={selectedUser.userId}
-          assignableRoles={assignableRoles}
-          busy={busyKey === `user:${selectedUser.userId}`}
-          canAssignRoles={canAssignRoles}
-          canUpdate={canUpdate}
-          onClose={clearSelectedUser}
-          onUpdate={(updates) => mutateUser(selectedUser.userId, updates)}
-          user={selectedUser}
-        />
-      ) : detailLoading ? <p aria-busy="true">Loading user detail…</p> : null}
+      {detailLoading && !selectedUser ? (
+        <p aria-busy="true">Loading user detail…</p>
+      ) : null}
 
       <section aria-labelledby="invitations-title">
         <div>
