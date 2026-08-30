@@ -9,7 +9,7 @@ export type DownloadManagementResult = Readonly<{
 }>;
 
 type DownloadManagementTransport = Readonly<{
-  accepted: boolean;
+  status: "accepted";
   action: DownloadManagementAction;
   job_id: string;
 }>;
@@ -37,7 +37,11 @@ export async function runDownloadManagementAction(
     }
   );
 
-  if (!response.accepted || response.action !== action || response.job_id !== normalizedJobId) {
+  if (
+    response.status !== "accepted" ||
+    response.action !== action ||
+    response.job_id !== normalizedJobId
+  ) {
     throw new Error("Download management response did not match the requested action. Refresh before retrying.");
   }
 
