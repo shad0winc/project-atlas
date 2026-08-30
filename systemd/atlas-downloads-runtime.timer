@@ -1,0 +1,11 @@
+[Unit]
+Description=Publish Project Atlas Downloads Runtime Snapshot
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+Persistent=true
+Unit=atlas-downloads-runtime.service
+
+[Install]
+WantedBy=timers.target
