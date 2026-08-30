@@ -16,8 +16,15 @@ describe("download management actions", () => {
   beforeEach(() => authenticatedAtlasApiRequestMock.mockReset());
 
   it("sends a bounded authenticated mutation with automatic retries disabled", async () => {
-    authenticatedAtlasApiRequestMock.mockResolvedValue({ accepted: true, action: "stop_seeding", job_id: JOB_ID });
-    await runDownloadManagementAction(JOB_ID, "stop_seeding");
+    authenticatedAtlasApiRequestMock.mockResolvedValue({ status: "accepted", action: "stop_seeding", job_id: JOB_ID });
+    await expect(
+      runDownloadManagementAction(JOB_ID, "stop_seeding")
+    ).resolves.toEqual({
+      accepted: true,
+      action: "stop_seeding",
+      jobId: JOB_ID
+    });
+
     expect(authenticatedAtlasApiRequestMock).toHaveBeenCalledWith(
       "/admin/downloads/action",
       expect.objectContaining({
@@ -35,7 +42,7 @@ describe("download management actions", () => {
   });
 
   it("fails closed when the response does not match the requested job", async () => {
-    authenticatedAtlasApiRequestMock.mockResolvedValue({ accepted: true, action: "resume", job_id: "dl_abcdefabcdefabcdefabcdefabcdefab" });
+    authenticatedAtlasApiRequestMock.mockResolvedValue({ status: "accepted", action: "resume", job_id: "dl_abcdefabcdefabcdefabcdefabcdefab" });
     await expect(runDownloadManagementAction(JOB_ID, "resume")).rejects.toThrow("did not match");
   });
 });
