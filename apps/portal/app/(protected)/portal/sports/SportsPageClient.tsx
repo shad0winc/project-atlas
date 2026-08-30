@@ -53,8 +53,37 @@ export function SportsPageClient(): React.ReactElement {
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    const controller = new AbortController();
+
+    void Promise.all([
+      loadSportsEvents({ signal: controller.signal }),
+      loadSportsFollows({ signal: controller.signal })
+    ])
+      .then(([loadedEvents, loadedFollows]) => {
+        if (!controller.signal.aborted) {
+          setEvents(loadedEvents);
+          setFollows(loadedFollows);
+        }
+      })
+      .catch((loadError) => {
+        if (!controller.signal.aborted) {
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Atlas could not load Sports."
+          );
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, []);
 
   async function handleSearch(
     type: "team" | "league",
