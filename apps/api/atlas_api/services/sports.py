@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-import importlib
+import http.client
+import json
 import os
-import sys
-from contextlib import contextmanager
+import urllib.error
+import urllib.parse
+import urllib.request
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
@@ -207,60 +209,166 @@ def _load_sports_module_env(
         key = key.strip()
         value = value.strip().strip('"').strip("'")
 
-        if key:
-            os.environ.setdefault(
-                key,
-                value,
+        if not key:
+            continue
+
+        os.environ.setdefault(
+            key,
+            value,
+        )
+
+
+class SportsWriterTransportError(SportsError):
+    """Private Sports service could not satisfy an API request."""
+
+
+class SportsWriterBackedAPIService:
+    """Authenticated API adapter backed by the private Sports service."""
+
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        token: str,
+        timeout_seconds: float = 15.0,
+    ) -> None:
+        normalized_url = base_url.strip().rstrip("/")
+        normalized_token = token.strip()
+        if not normalized_url:
+            raise RuntimeError("ATLAS_SPORTS_WRITER_URL is required")
+        if not normalized_token:
+            raise RuntimeError("ATLAS_SPORTS_WRITER_TOKEN is required")
+        self._base_url = normalized_url
+        self._token = normalized_token
+        self._timeout_seconds = timeout_seconds
+
+    def list_events_for_user(
+        self,
+        *,
+        user_id: str,
+        provider_name: str,
+        provider_event_ids: Sequence[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        query_items: list[tuple[str, str]] = [
+            ("user_id", user_id),
+            ("provider", provider_name),
+        ]
+        for event_id in provider_event_ids or ():
+            normalized = str(event_id).strip()
+            if normalized:
+                query_items.append(("event_id", normalized))
+        payload = self._request(
+            "GET",
+            "/internal/v1/events?" + urllib.parse.urlencode(query_items),
+        )
+        events = payload.get("events", [])
+        if not isinstance(events, list):
+            raise SportsWriterTransportError(
+                "Private Sports service returned an invalid events payload."
             )
+        return [dict(event) for event in events if isinstance(event, dict)]
 
-
-@contextmanager
-def _sports_import_path():
-    sports_src = Path(
-        "/opt/project-atlas/modules/sports/src"
-    ).resolve()
-
-    if not sports_src.is_dir():
-        raise RuntimeError(
-            f"Sports source directory is unavailable: {sports_src}"
+    def create_event_subscription(
+        self,
+        *,
+        user_id: str,
+        provider_name: str,
+        provider_event_id: str,
+    ) -> tuple[dict[str, Any], bool]:
+        payload = self._request(
+            "POST",
+            "/internal/v1/events/request",
+            {
+                "user_id": user_id,
+                "provider": provider_name,
+                "provider_event_id": provider_event_id,
+            },
         )
+        subscription = payload.get("subscription")
+        created = payload.get("created")
+        if not isinstance(subscription, dict) or not isinstance(created, bool):
+            raise SportsWriterTransportError(
+                "Private Sports service returned an invalid subscription payload."
+            )
+        return dict(subscription), created
 
-    path_text = str(sports_src)
-    inserted = path_text not in sys.path
-
-    if inserted:
-        sys.path.insert(0, path_text)
-
-    try:
-        yield
-    finally:
-        if inserted:
-            try:
-                sys.path.remove(path_text)
-            except ValueError:
-                pass
-
-
-def build_default_sports_api_service(
-) -> SportsAPIService:
-    _load_sports_module_env()
-
-    with _sports_import_path():
-        subscriptions = importlib.import_module(
-            "subscriptions"
-        )
-
-        provider_registry = importlib.import_module(
-            "providers.registry"
-        )
-
-        providers = {
-            provider.name: provider
-            for provider in provider_registry.enabled_providers()
+    def _request(
+        self,
+        method: str,
+        path: str,
+        payload: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        body: bytes | None = None
+        headers = {
+            "Accept": "application/json",
+            "Authorization": f"Bearer {self._token}",
         }
+        if payload is not None:
+            body = json.dumps(dict(payload), separators=(",", ":")).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+        request = urllib.request.Request(
+            f"{self._base_url}{path}",
+            data=body,
+            headers=headers,
+            method=method,
+        )
+        try:
+            with urllib.request.urlopen(
+                request,
+                timeout=self._timeout_seconds,
+            ) as response:
+                raw = response.read()
+        except urllib.error.HTTPError as exc:
+            error_payload: dict[str, Any] = {}
+            try:
+                decoded = json.loads(exc.read().decode("utf-8"))
+                if isinstance(decoded, dict):
+                    error_payload = decoded
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                pass
+            code = str(error_payload.get("code", "")).strip()
+            message = str(
+                error_payload.get(
+                    "error",
+                    "Private Sports service request failed.",
+                )
+            ).strip()
+            if code == "provider_not_found":
+                raise SportsProviderNotFoundError(message) from exc
+            if code == "event_not_found":
+                raise SportsEventNotFoundError(message) from exc
+            raise SportsWriterTransportError(message) from exc
+        except (
+            urllib.error.URLError,
+            TimeoutError,
+            ConnectionError,
+            http.client.HTTPException,
+        ) as exc:
+            raise SportsWriterTransportError(
+                "Private Sports service is unavailable."
+            ) from exc
 
-    return SportsAPIService(
-        providers=providers,
-        create_subscription=subscriptions.create_subscription,
-        load_subscriptions=subscriptions.load_subscriptions,
+        try:
+            decoded = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise SportsWriterTransportError(
+                "Private Sports service returned invalid JSON."
+            ) from exc
+        if not isinstance(decoded, dict):
+            raise SportsWriterTransportError(
+                "Private Sports service returned an invalid response."
+            )
+        return decoded
+
+
+def build_default_sports_api_service() -> SportsWriterBackedAPIService:
+    return SportsWriterBackedAPIService(
+        base_url=os.getenv(
+            "ATLAS_SPORTS_WRITER_URL",
+            "http://sports-writer:8003",
+        ),
+        token=os.getenv(
+            "ATLAS_SPORTS_WRITER_TOKEN",
+            "",
+        ),
     )
