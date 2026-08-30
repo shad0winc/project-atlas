@@ -38,6 +38,8 @@ class FakeSportsService:
         user_id: str,
         provider_name: str,
         provider_event_ids: tuple[str, ...] | None = None,
+        team_ids: tuple[str, ...] | None = None,
+        league_ids: tuple[str, ...] | None = None,
     ) -> list[dict[str, Any]]:
         assert user_id == USER.user_id
         assert provider_name == "thesportsdb"
@@ -234,6 +236,8 @@ def test_list_sports_events_maps_private_transport_failure_to_503() -> None:
         user_id: str,
         provider_name: str,
         provider_event_ids: tuple[str, ...] | None = None,
+        team_ids: tuple[str, ...] | None = None,
+        league_ids: tuple[str, ...] | None = None,
     ) -> list[dict[str, Any]]:
         raise SportsWriterTransportError(
             "Private Sports service is unavailable."

@@ -190,6 +190,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(HTTPStatus.NOT_FOUND, {"error": "Not found."})
             return
         event_ids = [str(value).strip() for value in params.get("event_id", []) if str(value).strip()]
+        team_ids = [str(value).strip() for value in params.get("team_id", []) if str(value).strip()]
+        league_ids = [str(value).strip() for value in params.get("league_id", []) if str(value).strip()]
         if not user_id or not provider_name:
             self._json(HTTPStatus.BAD_REQUEST, {"error": "user_id and provider are required."})
             return
@@ -202,12 +204,15 @@ class Handler(BaseHTTPRequestHandler):
                 and str(subscription.get("provider", "")).strip().lower() == provider.name
                 and bool(subscription.get("enabled", True))
             }
-            if event_ids:
-                provider_events = []
-                for event_id in event_ids:
-                    raw_event = provider.fetch_event(event_id)
-                    if raw_event is not None:
-                        provider_events.append(dict(provider.normalize_event(raw_event)))
+            if event_ids or team_ids or league_ids:
+                provider_events = [
+                    dict(event)
+                    for event in provider.fetch_games(
+                        event_ids=event_ids or None,
+                        team_ids=team_ids or None,
+                        league_ids=league_ids or None,
+                    )
+                ]
             else:
                 provider_events = [dict(event) for event in provider.fetch_games()]
         except LookupError:

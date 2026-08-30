@@ -59,6 +59,8 @@ class SportsAPIService:
         user_id: str,
         provider_name: str,
         provider_event_ids: Sequence[str] | None = None,
+        team_ids: Sequence[str] | None = None,
+        league_ids: Sequence[str] | None = None,
     ) -> list[dict[str, Any]]:
         provider = self._provider(provider_name)
 
@@ -248,6 +250,8 @@ class SportsWriterBackedAPIService:
         user_id: str,
         provider_name: str,
         provider_event_ids: Sequence[str] | None = None,
+        team_ids: Sequence[str] | None = None,
+        league_ids: Sequence[str] | None = None,
     ) -> list[dict[str, Any]]:
         query_items: list[tuple[str, str]] = [
             ("user_id", user_id),
@@ -257,6 +261,14 @@ class SportsWriterBackedAPIService:
             normalized = str(event_id).strip()
             if normalized:
                 query_items.append(("event_id", normalized))
+        for team_id in team_ids or ():
+            normalized = str(team_id).strip()
+            if normalized:
+                query_items.append(("team_id", normalized))
+        for league_id in league_ids or ():
+            normalized = str(league_id).strip()
+            if normalized:
+                query_items.append(("league_id", normalized))
         payload = self._request(
             "GET",
             "/internal/v1/events?" + urllib.parse.urlencode(query_items),

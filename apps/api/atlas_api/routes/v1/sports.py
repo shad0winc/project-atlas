@@ -85,6 +85,14 @@ def list_sports_events(
         list[str] | None,
         Query(),
     ] = None,
+    team_id: Annotated[
+        list[str] | None,
+        Query(),
+    ] = None,
+    league_id: Annotated[
+        list[str] | None,
+        Query(),
+    ] = None,
 ) -> SportsEventListResponse:
     try:
         events = service.list_events_for_user(
@@ -93,6 +101,16 @@ def list_sports_events(
             provider_event_ids=(
                 tuple(provider_event_id)
                 if provider_event_id
+                else None
+            ),
+            team_ids=(
+                tuple(team_id)
+                if team_id
+                else None
+            ),
+            league_ids=(
+                tuple(league_id)
+                if league_id
                 else None
             ),
         )
