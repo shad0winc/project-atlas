@@ -133,6 +133,11 @@ def test_identity_network_is_not_shared_with_public_ingress_services() -> None:
     downloads_writer = _service_block(
         content,
         "downloads-writer",
+        "sports-writer",
+    )
+    sports_writer = _service_block(
+        content,
+        "sports-writer",
         "identity-writer",
     )
     identity_writer = _service_block(
@@ -145,9 +150,12 @@ def test_identity_network_is_not_shared_with_public_ingress_services() -> None:
 
     assert identity_network in api
     assert identity_network in downloads_writer
+    assert identity_network in sports_writer
     assert identity_network in identity_writer
 
     assert "      - atlas-ingress\n" not in downloads_writer
     assert "      - atlas-backend\n" not in downloads_writer
+    assert "      - atlas-ingress\n" not in sports_writer
+    assert "      - atlas-backend\n" not in sports_writer
 
-    assert content.count(identity_network) == 3
+    assert content.count(identity_network) == 4

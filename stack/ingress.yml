@@ -78,6 +78,8 @@ services:
       ATLAS_IDENTITY_WRITER_TOKEN: "${ATLAS_IDENTITY_WRITER_TOKEN:?ATLAS_IDENTITY_WRITER_TOKEN is required}"
       ATLAS_DOWNLOADS_WRITER_URL: "http://downloads-writer:8002"
       ATLAS_DOWNLOADS_WRITER_TOKEN: "${ATLAS_DOWNLOADS_WRITER_TOKEN:?ATLAS_DOWNLOADS_WRITER_TOKEN is required}"
+      ATLAS_SPORTS_WRITER_URL: "http://sports-writer:8003"
+      ATLAS_SPORTS_WRITER_TOKEN: "${ATLAS_SPORTS_WRITER_TOKEN:?ATLAS_SPORTS_WRITER_TOKEN is required}"
       ATLAS_SECURITY_AUDIT_PATH: "/mnt/storage/configs/atlas/runtime/events.jsonl"
       ATLAS_ARI_LATEST_FILE: "/mnt/storage/configs/atlas/runtime/ari/latest.json"
       ATLAS_ARI_LATEST_PATH: "/mnt/storage/configs/atlas/runtime/ari/latest.json"
@@ -155,6 +157,59 @@ services:
       start_period: 10s
       retries: 3
 
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+
+  sports-writer:
+    build:
+      context: ..
+      dockerfile: modules/sports/Dockerfile.private-api
+      args:
+        PUID: "${PUID:?PUID is required}"
+        PGID: "${PGID:?PGID is required}"
+    image: atlas-sports-writer:local
+    container_name: atlas-sports-writer
+    restart: unless-stopped
+    read_only: true
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 256
+    networks:
+      - atlas-identity
+    volumes:
+      - /mnt/storage/configs/sportyfin/state:/mnt/storage/configs/sportyfin/state:rw
+    expose:
+      - "8003"
+    environment:
+      ATLAS_SPORTS_WRITER_TOKEN: "${ATLAS_SPORTS_WRITER_TOKEN:?ATLAS_SPORTS_WRITER_TOKEN is required}"
+      SPORTS_SUBSCRIPTIONS_FILE: "${SPORTS_SUBSCRIPTIONS_FILE:-/mnt/storage/configs/sportyfin/state/subscriptions.json}"
+      SPORTS_THESPORTSDB_API_KEY: "${SPORTS_THESPORTSDB_API_KEY:?SPORTS_THESPORTSDB_API_KEY is required}"
+      SPORTS_DISCOVERY_DAYS_AHEAD: "${SPORTS_DISCOVERY_DAYS_AHEAD:?SPORTS_DISCOVERY_DAYS_AHEAD is required}"
+      SPORTS_THESPORTSDB_LEAGUE_IDS: "${SPORTS_THESPORTSDB_LEAGUE_IDS:?SPORTS_THESPORTSDB_LEAGUE_IDS is required}"
+      SPORTS_PROVIDER_TIMEOUT_SECONDS: "${SPORTS_PROVIDER_TIMEOUT_SECONDS:?SPORTS_PROVIDER_TIMEOUT_SECONDS is required}"
+    command:
+      - python3
+      - /srv/sports/private_api.py
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8003"
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8003/health', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
     logging:
       driver: json-file
       options:

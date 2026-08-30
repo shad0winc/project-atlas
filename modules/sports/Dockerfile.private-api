@@ -1,0 +1,27 @@
+FROM python:3.13-slim
+
+ARG PUID
+ARG PGID
+
+RUN test -n "${PUID}" \
+    && test -n "${PGID}" \
+    && groupadd --gid "${PGID}" atlas \
+    && useradd \
+        --uid "${PUID}" \
+        --gid atlas \
+        --no-create-home \
+        --shell /usr/sbin/nologin \
+        atlas
+
+WORKDIR /srv/sports
+
+COPY modules/sports/src/private_api.py /srv/sports/private_api.py
+COPY modules/sports/src/subscriptions.py /srv/sports/subscriptions.py
+COPY modules/sports/src/providers /srv/sports/providers
+
+ENV PYTHONDONTWRITEBYTECODE="1" \
+    PYTHONPATH="/srv/sports"
+
+USER atlas
+
+CMD ["python3", "/srv/sports/private_api.py"]

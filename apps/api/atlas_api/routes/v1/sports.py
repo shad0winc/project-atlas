@@ -26,6 +26,7 @@ from atlas_api.services.sports import (
     SportsAPIService,
     SportsEventNotFoundError,
     SportsProviderNotFoundError,
+    SportsWriterTransportError,
     build_default_sports_api_service,
 )
 
@@ -95,6 +96,11 @@ def list_sports_events(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(error),
         ) from error
+    except SportsWriterTransportError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(error),
+        ) from error
 
     return SportsEventListResponse(
         events=[
@@ -136,6 +142,11 @@ def create_sports_subscription(
             detail=str(error),
         ) from error
     except SportsProviderNotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(error),
+        ) from error
+    except SportsWriterTransportError as error:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(error),
