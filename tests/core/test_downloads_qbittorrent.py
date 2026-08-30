@@ -84,6 +84,78 @@ def test_authentication_error_never_contains_password(
     assert password not in str(exc.value)
 
 
+
+
+def test_qbittorrent_login_accepts_204_no_content(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Response:
+        status = 204
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self, limit: int = -1) -> bytes:
+            return b""
+
+    client = QBittorrentReadOnlyClient(
+        "http://127.0.0.1:8080",
+        "user",
+        "password",
+    )
+    monkeypatch.setattr(client._opener, "open", lambda *args, **kwargs: Response())
+
+    client._login()
+
+
+def test_qbittorrent_login_accepts_legacy_200_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Response:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self, limit: int = -1) -> bytes:
+            return b"Ok."
+
+    client = QBittorrentReadOnlyClient(
+        "http://127.0.0.1:8080",
+        "user",
+        "password",
+    )
+    monkeypatch.setattr(client._opener, "open", lambda *args, **kwargs: Response())
+
+    client._login()
+
+
+def test_qbittorrent_login_rejects_legacy_200_non_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Response:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self, limit: int = -1) -> bytes:
+            return b"Fails."
+
+    client = QBittorrentReadOnlyClient(
+        "http://127.0.0.1:8080",
+        "user",
+        "password",
+    )
+    monkeypatch.setattr(client._opener, "open", lambda *args, **kwargs: Response())
+
+    with pytest.raises(DownloadsError):
+        client._login()
+
+
 def test_pr66_stage1c_upload_state_contract() -> None:
     """Upload-side qBittorrent states must not inflate active downloads."""
     expected = {
