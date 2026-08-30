@@ -102,6 +102,7 @@ def create_subscription(
             "name": name,
             "user": user,
             "enabled": True,
+            "record": False,
         }
     )
 
@@ -236,6 +237,15 @@ def normalize_subscription(
             subscription.get(
                 "enabled",
                 True,
+            )
+        ),
+        # Recording is explicit opt-in. Legacy subscriptions that predate
+        # this field normalize to False so following/requesting content can
+        # never silently become recording intent after an upgrade.
+        "record": bool(
+            subscription.get(
+                "record",
+                False,
             )
         ),
         "created_at": subscription.get(

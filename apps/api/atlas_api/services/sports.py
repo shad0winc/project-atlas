@@ -292,6 +292,42 @@ class SportsWriterBackedAPIService:
             )
         return dict(subscription), created
 
+    def search_teams(self, *, provider_name: str, query: str) -> list[dict[str, Any]]:
+        payload = self._request("GET", "/internal/v1/search/teams?" + urllib.parse.urlencode({"provider": provider_name, "query": query}))
+        items = payload.get("teams", [])
+        if not isinstance(items, list):
+            raise SportsWriterTransportError("Private Sports service returned an invalid team search payload.")
+        return [dict(item) for item in items if isinstance(item, dict)]
+
+    def search_leagues(self, *, provider_name: str, query: str) -> list[dict[str, Any]]:
+        payload = self._request("GET", "/internal/v1/search/leagues?" + urllib.parse.urlencode({"provider": provider_name, "query": query}))
+        items = payload.get("leagues", [])
+        if not isinstance(items, list):
+            raise SportsWriterTransportError("Private Sports service returned an invalid league search payload.")
+        return [dict(item) for item in items if isinstance(item, dict)]
+
+    def list_subscriptions_for_user(self, *, user_id: str) -> list[dict[str, Any]]:
+        payload = self._request("GET", "/internal/v1/subscriptions?" + urllib.parse.urlencode({"user_id": user_id}))
+        items = payload.get("subscriptions", [])
+        if not isinstance(items, list):
+            raise SportsWriterTransportError("Private Sports service returned an invalid subscriptions payload.")
+        return [dict(item) for item in items if isinstance(item, dict)]
+
+    def create_follow_subscription(self, *, user_id: str, provider_name: str, subscription_type: str, provider_id: str) -> tuple[dict[str, Any], bool]:
+        payload = self._request("POST", "/internal/v1/subscriptions", {"user_id": user_id, "provider": provider_name, "type": subscription_type, "provider_id": provider_id})
+        subscription = payload.get("subscription")
+        created = payload.get("created")
+        if not isinstance(subscription, dict) or not isinstance(created, bool):
+            raise SportsWriterTransportError("Private Sports service returned an invalid subscription payload.")
+        return dict(subscription), created
+
+    def remove_follow_subscription(self, *, user_id: str, subscription_id: str) -> bool:
+        payload = self._request("DELETE", "/internal/v1/subscriptions/" + urllib.parse.quote(subscription_id, safe="") + "?" + urllib.parse.urlencode({"user_id": user_id}))
+        removed = payload.get("removed")
+        if not isinstance(removed, bool):
+            raise SportsWriterTransportError("Private Sports service returned an invalid removal payload.")
+        return removed
+
     def _request(
         self,
         method: str,

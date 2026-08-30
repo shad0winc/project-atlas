@@ -386,12 +386,38 @@ def run_provider_pipeline() -> dict[str, Any] | None:
     }
 
 
+def _recording_enabled_games(
+    subscribed_games: list[dict[str, Any]],
+    subscriptions: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return subscribed games with at least one recording-enabled match."""
+    recording_subscriptions = [
+        subscription
+        for subscription in subscriptions
+        if bool(subscription.get("record", False))
+    ]
+
+    if not recording_subscriptions:
+        return []
+
+    return resolve_subscribed_games(
+        subscribed_games,
+        recording_subscriptions,
+    )
+
+
 def run_recording_pipeline(
     subscribed_games: list[dict[str, Any]],
+    subscriptions: list[dict[str, Any]] | None = None,
 ) -> dict[str, dict[str, Any]]:
-    """Plan recordings and reconcile recorder state."""
+    """Plan only explicitly requested recordings and reconcile state."""
+    recording_games = _recording_enabled_games(
+        subscribed_games,
+        subscriptions if subscriptions is not None else active_subscriptions(),
+    )
+
     plan_recordings(
-        subscribed_games
+        recording_games
     )
 
     return update_recording_statuses()

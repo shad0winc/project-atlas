@@ -97,3 +97,35 @@ class SportsSubscriptionResponse(_StrictSportsModel):
         info,
     ) -> str:
         return _required_text(value, info.field_name)
+
+class SportsSearchResultResponse(_StrictSportsModel):
+    id: str
+    name: str
+    sport: str = ""
+    league: str = ""
+
+
+class SportsSearchResponse(_StrictSportsModel):
+    results: list[SportsSearchResultResponse]
+
+
+class SportsFollowCreateRequest(_StrictSportsModel):
+    type: str
+    provider: str = "thesportsdb"
+    provider_id: str
+
+
+class SportsFollowResponse(_StrictSportsModel):
+    subscription_id: str
+    type: str
+    provider: str
+    provider_id: str
+    name: str
+    user_id: str
+    enabled: bool
+    record: bool = False
+    created_at: datetime | None = None
+
+
+class SportsFollowListResponse(_StrictSportsModel):
+    subscriptions: list[SportsFollowResponse]

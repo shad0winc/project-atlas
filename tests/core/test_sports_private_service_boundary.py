@@ -92,6 +92,8 @@ def _load_private_sports_api_for_failure_test(monkeypatch):
     subscriptions_module = types.ModuleType("subscriptions")
     subscriptions_module.load_subscriptions = lambda: []
     subscriptions_module.create_subscription = lambda *args, **kwargs: ({}, True)
+    subscriptions_module.normalize_subscription = lambda subscription: dict(subscription)
+    subscriptions_module.remove_subscription = lambda subscription_id: True
 
     monkeypatch.setitem(sys.modules, "providers", providers_package)
     monkeypatch.setitem(sys.modules, "providers.registry", registry_module)
@@ -253,4 +255,60 @@ def test_private_sports_image_is_minimal_and_runtime_root_is_read_only() -> None
         "/mnt/storage/configs/sportyfin/state:rw\n"
         in sports_writer
     )
+
+def test_private_sports_missing_follow_target_returns_target_not_found(
+    monkeypatch,
+) -> None:
+    import json
+    import threading
+    import urllib.error
+    import urllib.request
+
+    module = _load_private_sports_api_for_failure_test(monkeypatch)
+
+    class Provider:
+        name = "thesportsdb"
+
+        def fetch_team(self, team_id):
+            return None
+
+    monkeypatch.setattr(module, "_provider", lambda name: Provider())
+    monkeypatch.setenv("ATLAS_SPORTS_WRITER_TOKEN", "test-token")
+
+    server = module.ThreadingHTTPServer(("127.0.0.1", 0), module.Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        host, port = server.server_address
+        body = json.dumps(
+            {
+                "user_id": "usr-test",
+                "provider": "thesportsdb",
+                "type": "team",
+                "provider_id": "missing-team",
+            }
+        ).encode("utf-8")
+        request = urllib.request.Request(
+            f"http://{host}:{port}/internal/v1/subscriptions",
+            data=body,
+            headers={
+                "Authorization": "Bearer test-token",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            urllib.request.urlopen(request, timeout=2)
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 404
+            assert json.loads(exc.read().decode("utf-8")) == {
+                "code": "sports_target_not_found",
+                "error": "Sports target was not found.",
+            }
+        else:
+            raise AssertionError("expected missing Sports target 404")
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
 
