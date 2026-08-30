@@ -257,6 +257,28 @@ class AuthorizationServiceTests(unittest.TestCase):
             )
         )
 
+    def test_member_can_use_standard_sports_experience_without_sports_admin_wildcard(self) -> None:
+        subject = self.subject("member")
+
+        self.assertTrue(
+            self.service.is_allowed(
+                subject,
+                "sports.read",
+            )
+        )
+        self.assertTrue(
+            self.service.is_allowed(
+                subject,
+                "sports.events.request",
+            )
+        )
+        self.assertFalse(
+            self.service.is_allowed(
+                subject,
+                "sports.configuration.update",
+            )
+        )
+
     def test_direct_grant_adds_permission(self) -> None:
         subject = self.subject(
             "member",
