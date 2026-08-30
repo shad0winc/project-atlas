@@ -86,6 +86,36 @@ describe("AdminIdentityView surface spacing", () => {
     expect(source).toContain("assignableRoles.map");
   });
 
+  it("renders selected user management inline with the matching user card", () => {
+    const source = readFileSync(
+      join(
+        process.cwd(),
+        "features/admin-identity/components/AdminIdentityView.tsx"
+      ),
+      "utf8"
+    );
+
+    const mapStart = source.indexOf("{state.users.map((user) => {");
+    const invitationsStart = source.indexOf(
+      '<section aria-labelledby="invitations-title">'
+    );
+
+    expect(mapStart).toBeGreaterThan(-1);
+    expect(invitationsStart).toBeGreaterThan(mapStart);
+
+    const userListSource = source.slice(mapStart, invitationsStart);
+
+    expect(userListSource).toContain(
+      "const isSelected = selectedUser?.userId === user.userId;"
+    );
+    expect(userListSource).toContain("{isSelected && selectedUser ? (");
+    expect(userListSource).toContain("<UserDetail");
+    expect(userListSource).toContain("Manage {user.displayName}");
+    expect(source).toContain('className="admin-identity-inline-detail"');
+    expect(source).not.toContain("View {user.displayName}");
+    expect(source).not.toContain("key={selectedUser.userId}");
+  });
+
   it("does not make the assignable-role effect depend on the unstable can callback", () => {
     const source = readFileSync(
       join(

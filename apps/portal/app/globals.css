@@ -2521,6 +2521,12 @@ section[aria-labelledby="service-detail-title"] dd {
   padding: 1.15rem;
 }
 
+.admin-identity-inline-detail {
+  border-top: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
 /* PR64 — Settings self-service surface */
 .settings-grid {
   display: grid;
