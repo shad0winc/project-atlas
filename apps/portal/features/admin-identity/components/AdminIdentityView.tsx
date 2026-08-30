@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { ATLAS_PERMISSIONS, usePermission } from "../../../lib/authorization";
+import { loadAssignableRoleCatalog, type AssignableRole } from "../../administration/api/roles";
 import type { AdminInvitation, AdminUser } from "../api/admin-identity";
 import { useAdminIdentity } from "../hooks/use-admin-identity";
 
@@ -42,19 +43,20 @@ function UserDetail({
   canAssignRoles,
   busy,
   onClose,
-  onUpdate
+  onUpdate,
+  assignableRoles
 }: Readonly<{
   user: AdminUser;
   canUpdate: boolean;
   canAssignRoles: boolean;
   busy: boolean;
+  assignableRoles: readonly AssignableRole[];
   onClose: () => void;
   onUpdate: (
     updates: Readonly<{ status?: string; roles?: readonly string[] }>
   ) => Promise<boolean>;
 }>): React.ReactElement {
-  const [roles, setRoles] = useState(user.roles.join(", "));
-
+  const [roles, setRoles] = useState<readonly string[]>(user.roles);
 
   const nextStatus = user.status === "active" ? "disabled" : "active";
 
@@ -78,25 +80,25 @@ function UserDetail({
 
       {canAssignRoles ? (
         <div>
-          <label htmlFor="admin-user-roles">Roles</label>
-          <input
-            id="admin-user-roles"
-            onChange={(event) => setRoles(event.target.value)}
-            value={roles}
-          />
-          <button
-            disabled={busy}
-            onClick={() => {
-              const normalized = roles
-                .split(",")
-                .map((role) => role.trim())
-                .filter(Boolean);
-              void onUpdate({ roles: normalized });
-            }}
-            type="button"
-          >
-            Save roles
-          </button>
+          <fieldset disabled={busy}>
+            <legend>Roles</legend>
+            {roles.filter((name) => !assignableRoles.some((role) => role.name === name)).map((name) => (
+              <p key={name}>Retained protected/nonassignable role: {name}</p>
+            ))}
+            {assignableRoles.map((role) => (
+              <label key={role.name}>
+                <input
+                  checked={roles.includes(role.name)}
+                  onChange={(event) => setRoles(event.target.checked
+                    ? [...roles, role.name]
+                    : roles.filter((name) => name !== role.name))}
+                  type="checkbox"
+                />
+                {role.displayName}
+              </label>
+            ))}
+          </fieldset>
+          <button disabled={busy} onClick={() => void onUpdate({ roles })} type="button">Save roles</button>
         </div>
       ) : null}
 
@@ -125,9 +127,28 @@ export function AdminIdentityView(): React.ReactElement {
 
   const [showInvitationForm, setShowInvitationForm] = useState(false);
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<"user" | "admin">("user");
+  const [role, setRole] = useState("member");
   const [days, setDays] = useState("7");
   const [invitationCreated, setInvitationCreated] = useState(false);
+  const [assignableRoles, setAssignableRoles] = useState<readonly AssignableRole[]>([]);
+
+  useEffect(() => {
+    if (!can(ATLAS_PERMISSIONS.rolesAssign)) return;
+    const controller = new AbortController();
+    loadAssignableRoleCatalog(controller.signal)
+      .then((roles) => {
+        setAssignableRoles(roles);
+        if (roles.length) {
+          setRole((currentRole) =>
+            roles.some((item) => item.name === currentRole)
+              ? currentRole
+              : roles[0].name
+          );
+        }
+      })
+      .catch(() => setAssignableRoles([]));
+    return () => controller.abort();
+  }, [can]);
 
   const canCreate = can(ATLAS_PERMISSIONS.usersCreate);
   const canUpdate = can(ATLAS_PERMISSIONS.usersUpdate);
@@ -182,6 +203,7 @@ export function AdminIdentityView(): React.ReactElement {
       {selectedUser ? (
         <UserDetail
           key={selectedUser.userId}
+          assignableRoles={assignableRoles}
           busy={busyKey === `user:${selectedUser.userId}`}
           canAssignRoles={canAssignRoles}
           canUpdate={canUpdate}
@@ -194,7 +216,7 @@ export function AdminIdentityView(): React.ReactElement {
       <section aria-labelledby="invitations-title">
         <div>
           <h3 id="invitations-title">Invitations</h3>
-          {canCreate ? (
+          {canCreate && canAssignRoles ? (
             <button
               onClick={() => {
                 setShowInvitationForm(true);
@@ -237,11 +259,13 @@ export function AdminIdentityView(): React.ReactElement {
               <label htmlFor="admin-invitation-role">Role</label>
               <select
                 id="admin-invitation-role"
-                onChange={(event) => setRole(event.target.value as "user" | "admin")}
+                disabled={!assignableRoles.length}
+                onChange={(event) => setRole(event.target.value)}
                 value={role}
               >
-                <option value="user">User</option>
-                <option value="admin">Admin</option>
+                {assignableRoles.map((item) => (
+                  <option key={item.name} value={item.name}>{item.displayName}</option>
+                ))}
               </select>
             </div>
             <div>
@@ -254,7 +278,7 @@ export function AdminIdentityView(): React.ReactElement {
                 value={days}
               />
             </div>
-            <button disabled={busyKey === "invitation:create"} type="submit">
+            <button disabled={busyKey === "invitation:create" || !assignableRoles.length} type="submit">
               {busyKey === "invitation:create" ? "Creating…" : "Create invitation"}
             </button>
             <button onClick={() => setShowInvitationForm(false)} type="button">Cancel</button>

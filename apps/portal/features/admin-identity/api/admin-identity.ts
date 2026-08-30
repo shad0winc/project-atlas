@@ -20,7 +20,7 @@ export type AdminInvitation = Readonly<{
 
 export type InvitationCreateInput = Readonly<{
   email?: string;
-  role: "admin" | "user";
+  role: string;
   days: number;
 }>;
 

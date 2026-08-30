@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Callable
 
 from fastapi import Depends, HTTPException, status
 
-from atlas.user_profiles import UserProfileError, UserProfileStore
+from atlas.custom_roles import default_custom_role_store
+from atlas.user_profiles import VALID_ROLES, UserProfileError, UserProfileStore
 from atlas_api.auth.models import AuthenticatedUser
 from atlas_api.authorization import (
     AuthorizationService,
     AuthorizationSubject,
+    authorization_service_for_store,
 )
 from atlas_api.dependencies import (
     get_current_user,
@@ -26,11 +27,12 @@ from atlas_api.security.permissions import (
 SecurityDependency = Callable[..., AuthenticatedUser]
 
 
-@lru_cache(maxsize=1)
 def get_authorization_service() -> AuthorizationService:
-    """Return the process-wide Atlas authorization service."""
+    """Compose built-in and persistent custom roles for authorization."""
 
-    return AuthorizationService()
+    return authorization_service_for_store(
+        default_custom_role_store(reserved_names=VALID_ROLES)
+    )
 
 
 def require_permission(permission: str) -> SecurityDependency:

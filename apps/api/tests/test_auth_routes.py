@@ -231,6 +231,7 @@ class AuthenticationRouteTests(unittest.TestCase):
                         "retention.*",
                         "roles.*",
                         "scheduler.*",
+                        "sports.*",
                         "system.*",
                         "system.checks.run",
                         "users.*",

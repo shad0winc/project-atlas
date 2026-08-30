@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -72,4 +74,16 @@ describe("AdminIdentityView surface spacing", () => {
     );
     expect(markup).toContain("Example User");
   });
+  it("does not expose a free-text role editor", () => {
+    const source = readFileSync(
+      join(
+        process.cwd(),
+        "features/admin-identity/components/AdminIdentityView.tsx"
+      ),
+      "utf8"
+    );
+    expect(source).not.toContain('.split(",")');
+    expect(source).toContain("assignableRoles.map");
+  });
+
 });

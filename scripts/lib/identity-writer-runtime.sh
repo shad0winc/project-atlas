@@ -19,6 +19,13 @@ atlas_identity_writer_runtime_profiles_dir() {
   printf '%s/profiles\n' "${users_dir%/}"
 }
 
+atlas_identity_writer_runtime_custom_roles_dir() {
+  local identity_root
+  identity_root="${ATLAS_IDENTITY_DIR:-/mnt/storage/configs/atlas/identity}"
+  printf '%s/custom_roles\n' "${identity_root%/}"
+}
+
+
 atlas_identity_writer_runtime_invitations_dir() {
   local identity_root
   identity_root="$(
@@ -109,6 +116,7 @@ atlas_identity_writer_runtime_verify() {
   local users_dir
   local profiles_dir
   local invitations_dir
+  local custom_roles_dir
   local lifecycle_dir
   local profile_dir
 
@@ -117,6 +125,7 @@ atlas_identity_writer_runtime_verify() {
   invitations_dir="$(
     atlas_identity_writer_runtime_invitations_dir
   )" || return 1
+  custom_roles_dir="$(atlas_identity_writer_runtime_custom_roles_dir)" || return 1
 
   atlas_identity_writer_runtime_verify_directory \
     "$users_dir" \
@@ -151,6 +160,12 @@ atlas_identity_writer_runtime_verify() {
   done
 
   atlas_identity_writer_runtime_verify_directory \
+    "$custom_roles_dir" \
+    "$ATLAS_IDENTITY_WRITER_USERS_UID" \
+    "$ATLAS_IDENTITY_WRITER_USERS_GID" \
+    "$ATLAS_IDENTITY_WRITER_USERS_MODE" || return 1
+
+  atlas_identity_writer_runtime_verify_directory \
     "$invitations_dir" \
     "$ATLAS_IDENTITY_WRITER_INVITATIONS_UID" \
     "$ATLAS_IDENTITY_WRITER_INVITATIONS_GID" \
@@ -169,6 +184,7 @@ atlas_identity_writer_runtime_provision() {
   local users_dir
   local profiles_dir
   local invitations_dir
+  local custom_roles_dir
   local lifecycle_dir
   local profile_dir
 
@@ -177,6 +193,7 @@ atlas_identity_writer_runtime_provision() {
   invitations_dir="$(
     atlas_identity_writer_runtime_invitations_dir
   )" || return 1
+  custom_roles_dir="$(atlas_identity_writer_runtime_custom_roles_dir)" || return 1
 
   atlas_identity_writer_runtime_normalize_directory \
     "$users_dir" \
@@ -209,6 +226,12 @@ atlas_identity_writer_runtime_provision() {
       "$ATLAS_IDENTITY_WRITER_USERS_GID" \
       "$ATLAS_IDENTITY_WRITER_USERS_MODE" || return 1
   done
+
+  atlas_identity_writer_runtime_normalize_directory \
+    "$custom_roles_dir" \
+    "$ATLAS_IDENTITY_WRITER_USERS_UID" \
+    "$ATLAS_IDENTITY_WRITER_USERS_GID" \
+    "$ATLAS_IDENTITY_WRITER_USERS_MODE" || return 1
 
   atlas_identity_writer_runtime_normalize_directory \
     "$invitations_dir" \
