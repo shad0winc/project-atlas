@@ -219,6 +219,8 @@ _BUILT_IN_ROLES: dict[str, RoleDefinition] = {
                 "requests.cancel",
                 "requests.create",
                 "requests.read",
+                "sports.events.request",
+                "sports.read",
                 "users.self.read",
                 "users.self.update",
             }

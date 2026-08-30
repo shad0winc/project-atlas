@@ -4,6 +4,7 @@ from atlas_api.authorization import (
     BUILT_IN_ROLES,
     GLOBAL_ADMIN_ROLE,
     MEDIA_ADMIN_ROLE,
+    MEMBER_ROLE,
     SPORTS_ADMIN_ROLE,
 )
 
@@ -53,6 +54,14 @@ def test_media_administrator_is_focused_to_media_operations() -> None:
     assert "roles.*" not in role.permissions
     assert "users.*" not in role.permissions
     assert "gameservers.*" not in role.permissions
+    assert "sports.*" not in role.permissions
+
+
+def test_member_includes_standard_sports_consumer_permissions() -> None:
+    role = BUILT_IN_ROLES[MEMBER_ROLE]
+
+    assert "sports.read" in role.permissions
+    assert "sports.events.request" in role.permissions
     assert "sports.*" not in role.permissions
 
 
