@@ -102,7 +102,11 @@ atlas_update_validate_ingress_build_permissions() {
     apps/api/pyproject.toml \
     apps/api/atlas_api \
     atlas \
-    apps/portal
+    apps/portal \
+    modules/sports/Dockerfile.private-api \
+    modules/sports/src/private_api.py \
+    modules/sports/src/subscriptions.py \
+    modules/sports/src/providers
 }
 
 atlas_update_core_prepare() {
@@ -130,7 +134,7 @@ atlas_update_ingress_prepare() {
   docker compose \
     --env-file "$ATLAS_PROJECT_DIR/.env" \
     -f "$compose_file" \
-    build portal api ||
+    build portal api sports-writer ||
     return 1
 }
 

@@ -718,7 +718,7 @@ def test_update_acquires_network_artifacts_only_before_maintenance() -> None:
 
     assert "\n    pull" in core_prepare
     assert "\n    pull caddy" in ingress_prepare
-    assert "\n    build portal api" in ingress_prepare
+    assert "\n    build portal api sports-writer" in ingress_prepare
 
 
 def test_rollback_readiness_helpers_are_bounded_and_fail_closed() -> None:

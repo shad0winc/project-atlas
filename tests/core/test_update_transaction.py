@@ -506,7 +506,7 @@ def test_ingress_scope_prepares_builds_and_applies_without_network_in_maintenanc
         index for index, event in enumerate(events) if "pull caddy" in event
     )
     build = next(
-        index for index, event in enumerate(events) if "build portal api" in event
+        index for index, event in enumerate(events) if "build portal api sports-writer" in event
     )
     render = next(
         index for index, event in enumerate(events) if "config --images" in event
