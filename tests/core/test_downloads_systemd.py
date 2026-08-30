@@ -102,6 +102,7 @@ def test_example_credentials_fail_closed_before_network_access() -> None:
             "ATLAS_QBITTORRENT_USERNAME": "CHANGE_ME",
             "ATLAS_QBITTORRENT_PASSWORD": "CHANGE_ME",
             "ATLAS_QBITTORRENT_BASE_URL": "http://127.0.0.1:1",
+            "ATLAS_DOWNLOADS_JOB_ID_KEY": "test-only-job-id-key",
         }
     )
 

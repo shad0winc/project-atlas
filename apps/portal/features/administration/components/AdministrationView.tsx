@@ -12,6 +12,12 @@ const administrationDestinations = [
       "Manage Atlas users, roles, status, and invitations through the supported identity workflow."
   },
   {
+    route: PORTAL_ROUTES.downloadManagement,
+    title: "Download management",
+    description:
+      "Stop or resume seeding and remove completed download jobs while keeping downloaded media intact."
+  },
+  {
     route: PORTAL_ROUTES.services,
     title: "Managed services",
     description: "Review Atlas-managed service health, runtime details, and maintenance history."

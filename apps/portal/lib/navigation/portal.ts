@@ -19,6 +19,7 @@ export type PortalRouteId =
   | "requests"
   | "sports"
   | "downloads"
+  | "downloadManagement"
   | "users"
   | "services"
   | "administration"
@@ -107,6 +108,16 @@ export const portalRoutes: readonly PortalRoute[] = [
     section: PORTAL_ROUTE_SECTIONS.workspace
   },
   {
+    id: "downloadManagement",
+    path: "/portal/administration/downloads",
+    label: "Download Management",
+    navigationDescription: "Administrative download controls",
+    abbreviation: "DM",
+    permission: ATLAS_PERMISSIONS.downloadsManage,
+    section: PORTAL_ROUTE_SECTIONS.management,
+    pageDescription: "Stop or resume seeding and remove completed download jobs without deleting downloaded media."
+  },
+  {
     id: "users",
     path: "/portal/users",
     label: "Users",
@@ -163,6 +174,7 @@ export const PORTAL_ROUTES = {
   requests: routeById("requests"),
   sports: routeById("sports"),
   downloads: routeById("downloads"),
+  downloadManagement: routeById("downloadManagement"),
   users: routeById("users"),
   services: routeById("services"),
   administration: routeById("administration"),

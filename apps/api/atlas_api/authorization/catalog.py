@@ -50,6 +50,7 @@ _BUILT_IN_ROLES: dict[str, RoleDefinition] = {
                 "atlas.*",
                 "audit.*",
                 "cleanup.*",
+                "downloads.*",
                 "favorites.*",
                 "gameservers.*",
                 "media.*",
@@ -75,6 +76,7 @@ _BUILT_IN_ROLES: dict[str, RoleDefinition] = {
             {
                 "atlas.*",
                 "cleanup.*",
+                "downloads.*",
                 "favorites.*",
                 "media.*",
                 "modules.read",
@@ -127,6 +129,7 @@ _BUILT_IN_ROLES: dict[str, RoleDefinition] = {
         permissions=frozenset(
             {
                 "cleanup.run",
+                "downloads.manage",
                 "gameservers.restart",
                 "gameservers.start",
                 "gameservers.stop",

@@ -128,14 +128,26 @@ def test_identity_network_is_not_shared_with_public_ingress_services() -> None:
     api = _service_block(
         content,
         "api",
+        "downloads-writer",
+    )
+    downloads_writer = _service_block(
+        content,
+        "downloads-writer",
         "identity-writer",
     )
-    writer = _service_block(
+    identity_writer = _service_block(
         content,
         "identity-writer",
         "caddy",
     )
 
-    assert "      - atlas-identity\n" in api
-    assert "      - atlas-identity\n" in writer
-    assert content.count("      - atlas-identity\n") == 2
+    identity_network = "      - atlas-identity\n"
+
+    assert identity_network in api
+    assert identity_network in downloads_writer
+    assert identity_network in identity_writer
+
+    assert "      - atlas-ingress\n" not in downloads_writer
+    assert "      - atlas-backend\n" not in downloads_writer
+
+    assert content.count(identity_network) == 3

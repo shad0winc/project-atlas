@@ -9,6 +9,7 @@ from pathlib import Path
 import tempfile
 from typing import Any, Mapping
 
+from .job_ids import is_opaque_job_id
 from .models import (
     SCHEMA_VERSION,
     DownloadItem,
@@ -141,6 +142,10 @@ def read_snapshot(
         except ValueError as exc:
             raise DownloadsError(f"downloads[{index}].state is invalid") from exc
 
+        job_id = entry.get("job_id")
+        if not is_opaque_job_id(job_id):
+            raise DownloadsError(f"downloads[{index}].job_id is invalid")
+
         name = entry.get("name")
         if not isinstance(name, str) or not name.strip():
             raise DownloadsError(f"downloads[{index}].name is invalid")
@@ -161,6 +166,7 @@ def read_snapshot(
 
         items.append(
             DownloadItem(
+                job_id=job_id,
                 name=name,
                 category=category,
                 state=state,

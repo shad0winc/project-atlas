@@ -148,6 +148,17 @@ def get_login_attempt_limiter() -> LoginAttemptLimiter:
 
 
 @lru_cache(maxsize=1)
+def get_downloads_writer_client():
+    """Return the private Downloads mutation client."""
+    from atlas_api.services.downloads_writer import DownloadsWriterClient
+
+    return DownloadsWriterClient(
+        os.environ.get("ATLAS_DOWNLOADS_WRITER_URL", "http://downloads-writer:8002"),
+        os.environ.get("ATLAS_DOWNLOADS_WRITER_TOKEN", ""),
+    )
+
+
+@lru_cache(maxsize=1)
 def get_security_audit_writer():
     """Return the process-wide credential-safe security audit writer."""
 
@@ -498,6 +509,7 @@ def clear_dependency_caches() -> None:
     get_authentication_service.cache_clear()
     get_refresh_session_registry.cache_clear()
     get_login_attempt_limiter.cache_clear()
+    get_downloads_writer_client.cache_clear()
     get_security_audit_writer.cache_clear()
     get_dashboard_media_summary_service.cache_clear()
     get_dashboard_summary_service.cache_clear()

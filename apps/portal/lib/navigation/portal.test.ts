@@ -37,6 +37,7 @@ describe("Portal route model", () => {
       "requests",
       "sports",
       "downloads",
+      "downloadManagement",
       "users",
       "services",
       "administration",
@@ -75,7 +76,7 @@ describe("Portal route model", () => {
       },
       {
         label: PORTAL_ROUTE_SECTIONS.management,
-        routes: ["users", "services", "administration", "settings"]
+        routes: ["downloadManagement", "users", "services", "administration", "settings"]
       }
     ]);
   });
@@ -146,6 +147,7 @@ describe("Portal navigation authorization", () => {
       "Requests",
       "Sports",
       "Downloads",
+      "Download Management",
       "Users",
       "Services",
       "Administration",
@@ -171,7 +173,15 @@ describe("Portal navigation authorization", () => {
   it("honors explicit denials before wildcard grants", () => {
     expect(
       visibleLabels(authorization(["*"], ["favorites.read", "users.read", "system.health.read"]))
-    ).toEqual(["Dashboard", "Media", "Requests", "Sports", "Downloads", "Settings"]);
+    ).toEqual([
+      "Dashboard",
+      "Media",
+      "Requests",
+      "Sports",
+      "Downloads",
+      "Download Management",
+      "Settings"
+    ]);
   });
 
   it("uses favorites.read rather than favorites.write for navigation", () => {

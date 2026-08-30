@@ -14,7 +14,7 @@ class FakeDownloadsService:
         self.calls += 1
         if self.fail:
             raise DownloadsError("private provider detail")
-        return DownloadsSnapshot.build((DownloadItem(name="Example",category="tv",state=DownloadState.DOWNLOADING,progress=0.5,total_bytes=1000,downloaded_bytes=500,download_rate=100,upload_rate=10,eta_seconds=5),),total_download_rate=100,total_upload_rate=10)
+        return DownloadsSnapshot.build((DownloadItem(job_id="dl_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",name="Example",category="tv",state=DownloadState.DOWNLOADING,progress=0.5,total_bytes=1000,downloaded_bytes=500,download_rate=100,upload_rate=10,eta_seconds=5),),total_download_rate=100,total_upload_rate=10)
 
 def _client(service):
     app=create_app()

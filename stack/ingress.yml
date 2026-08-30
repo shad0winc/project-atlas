@@ -74,6 +74,8 @@ services:
       ATLAS_USERS_DIR: "/mnt/storage/configs/atlas/users"
       ATLAS_IDENTITY_WRITER_URL: "http://identity-writer:8001"
       ATLAS_IDENTITY_WRITER_TOKEN: "${ATLAS_IDENTITY_WRITER_TOKEN:?ATLAS_IDENTITY_WRITER_TOKEN is required}"
+      ATLAS_DOWNLOADS_WRITER_URL: "http://downloads-writer:8002"
+      ATLAS_DOWNLOADS_WRITER_TOKEN: "${ATLAS_DOWNLOADS_WRITER_TOKEN:?ATLAS_DOWNLOADS_WRITER_TOKEN is required}"
       ATLAS_SECURITY_AUDIT_PATH: "/mnt/storage/configs/atlas/runtime/events.jsonl"
       ATLAS_ARI_LATEST_FILE: "/mnt/storage/configs/atlas/runtime/ari/latest.json"
       ATLAS_ARI_LATEST_PATH: "/mnt/storage/configs/atlas/runtime/ari/latest.json"
@@ -90,6 +92,66 @@ services:
 
     security_opt:
       - no-new-privileges:true
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  downloads-writer:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    image: atlas-api:local
+    container_name: atlas-downloads-writer
+    restart: unless-stopped
+
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 256
+
+    networks:
+      - atlas-identity
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    expose:
+      - "8002"
+
+    environment:
+      ATLAS_DOWNLOADS_WRITER_TOKEN: "${ATLAS_DOWNLOADS_WRITER_TOKEN:?ATLAS_DOWNLOADS_WRITER_TOKEN is required}"
+      ATLAS_DOWNLOADS_JOB_ID_KEY: "${ATLAS_DOWNLOADS_JOB_ID_KEY:?ATLAS_DOWNLOADS_JOB_ID_KEY is required}"
+      ATLAS_QBITTORRENT_BASE_URL: "http://host.docker.internal:8080"
+      ATLAS_QBITTORRENT_USERNAME: "${ATLAS_QBITTORRENT_USERNAME:?ATLAS_QBITTORRENT_USERNAME is required}"
+      ATLAS_QBITTORRENT_PASSWORD: "${ATLAS_QBITTORRENT_PASSWORD:?ATLAS_QBITTORRENT_PASSWORD is required}"
+
+    command:
+      - python
+      - -m
+      - atlas_api.downloads_writer
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8002"
+
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
 
     logging:
       driver: json-file

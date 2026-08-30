@@ -21,6 +21,7 @@ def _snapshot(now: datetime) -> DownloadsSnapshot:
     return DownloadsSnapshot.build(
         (
             DownloadItem(
+                job_id="dl_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 name="Example",
                 category="tv",
                 state=DownloadState.DOWNLOADING,
@@ -42,6 +43,7 @@ def test_snapshot_contains_only_bounded_download_fields() -> None:
     payload = _snapshot(datetime.now(timezone.utc)).to_dict()
     assert set(payload) == {"schema_version", "generated_at", "summary", "downloads"}
     assert set(payload["downloads"][0]) == {
+        "job_id",
         "name",
         "category",
         "state",

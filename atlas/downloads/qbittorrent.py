@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 import json
 from http.cookiejar import CookieJar
 from typing import Any, Mapping, Sequence
@@ -9,6 +11,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urljoin, urlparse
 from urllib.request import HTTPCookieProcessor, Request, build_opener
 
+from .job_ids import opaque_job_id
 from .models import DownloadItem, DownloadsError, DownloadsSnapshot, DownloadState
 
 
@@ -68,6 +71,7 @@ class QBittorrentReadOnlyClient:
         password: str,
         *,
         timeout: float = 5.0,
+        job_id_key: str | None = None,
     ) -> None:
         parsed = urlparse(base_url)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
@@ -81,6 +85,7 @@ class QBittorrentReadOnlyClient:
         if timeout <= 0:
             raise ValueError("qBittorrent timeout must be positive")
 
+        self.job_id_key = job_id_key or os.environ.get("ATLAS_DOWNLOADS_JOB_ID_KEY", "")
         self._base_url = base_url.rstrip("/") + "/"
         self._username = username
         self._password = password
@@ -99,7 +104,10 @@ class QBittorrentReadOnlyClient:
         if not isinstance(transfer, Mapping):
             raise DownloadsError("qBittorrent transfer response must be an object")
 
-        normalized_items = (self._normalize_torrent(entry) for entry in torrents)
+        normalized_items = (
+            self._normalize_torrent(entry, job_id_key=self.job_id_key)
+            for entry in torrents
+        )
         items = tuple(
             sorted(normalized_items, key=_download_sort_key)[:MAX_DOWNLOAD_ITEMS]
         )
@@ -154,7 +162,7 @@ class QBittorrentReadOnlyClient:
             raise DownloadsError("qBittorrent returned invalid JSON") from exc
 
     @staticmethod
-    def _normalize_torrent(value: Any) -> DownloadItem:
+    def _normalize_torrent(value: Any, *, job_id_key: str) -> DownloadItem:
         if not isinstance(value, Mapping):
             raise DownloadsError("qBittorrent torrent entry must be an object")
 
@@ -167,7 +175,11 @@ class QBittorrentReadOnlyClient:
         eta_raw = _bounded_int(value.get("eta"))
         eta_seconds = None if eta_raw <= 0 or eta_raw >= 8_640_000 else eta_raw
 
+        torrent_hash = str(value.get("hash") or "")
+        job_id = opaque_job_id(torrent_hash, job_id_key)
+
         return DownloadItem(
+            job_id=job_id,
             name=name,
             category=category,
             state=state,
