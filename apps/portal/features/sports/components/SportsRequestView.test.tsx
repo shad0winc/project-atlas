@@ -3,10 +3,22 @@ import { describe, expect, it, vi } from "vitest";
 
 import { SportsRequestView } from "./SportsRequestView";
 
+const baseProps = {
+  follows: [],
+  searchResults: [],
+  searchType: "team" as const,
+  onSearch: vi.fn(),
+  onFollow: vi.fn(),
+  onUnfollow: vi.fn(),
+  onBrowse: vi.fn(),
+  onRequestEvent: vi.fn()
+};
+
 describe("SportsRequestView", () => {
-  it("renders the smallest v1 Sports request surface", () => {
+  it("renders discovery, following, and upcoming event surfaces", () => {
     const markup = renderToStaticMarkup(
       <SportsRequestView
+        {...baseProps}
         events={[
           {
             provider: "thesportsdb",
@@ -19,19 +31,67 @@ describe("SportsRequestView", () => {
             requested: false
           }
         ]}
-        onRequestEvent={vi.fn()}
       />
     );
 
-    expect(markup).toContain("Sports");
+    expect(markup).toContain("Find your Sports");
+    expect(markup).toContain("My Sports");
     expect(markup).toContain("Atlas United vs Atlas City");
-    expect(markup).toContain("Atlas Test League");
     expect(markup).toContain("Request event");
+    expect(markup).toContain("does not automatically record events");
   });
 
-  it("renders an already-requested event as disabled", () => {
+  it("renders team search results with follow and browse controls", () => {
     const markup = renderToStaticMarkup(
       <SportsRequestView
+        {...baseProps}
+        events={[]}
+        searchResults={[
+          {
+            id: "team-001",
+            name: "Atlas United",
+            sport: "Soccer",
+            league: "Atlas Test League"
+          }
+        ]}
+      />
+    );
+
+    expect(markup).toContain("Atlas United");
+    expect(markup).toContain("Follow");
+    expect(markup).toContain("View upcoming");
+  });
+
+  it("renders followed Sports with an unfollow control", () => {
+    const markup = renderToStaticMarkup(
+      <SportsRequestView
+        {...baseProps}
+        events={[]}
+        follows={[
+          {
+            subscriptionId: "sub-001",
+            type: "team",
+            provider: "thesportsdb",
+            providerId: "team-001",
+            name: "Atlas United",
+            userId: "usr-001",
+            enabled: true,
+            record: false,
+            createdAt: "2026-08-30T20:00:00.000Z"
+          }
+        ]}
+      />
+    );
+
+    expect(markup).toContain("Following");
+    expect(markup).toContain("Unfollow");
+    expect(markup).toContain("View upcoming");
+  });
+
+  it("preserves requested event identity and disabled state", () => {
+    const markup = renderToStaticMarkup(
+      <SportsRequestView
+        {...baseProps}
         events={[
           {
             provider: "thesportsdb",
@@ -44,35 +104,12 @@ describe("SportsRequestView", () => {
             requested: true
           }
         ]}
-        onRequestEvent={vi.fn()}
       />
     );
 
     expect(markup).toContain("Requested");
-    expect(markup).toMatch(/<button[^>]*disabled/);
-  });
-
-  it("preserves provider event identity on the request control", () => {
-    const markup = renderToStaticMarkup(
-      <SportsRequestView
-        events={[
-          {
-            provider: "thesportsdb",
-            providerEventId: "event-001",
-            name: "Atlas United vs Atlas City",
-            sport: "Soccer",
-            league: "Atlas Test League",
-            startAt: "2026-08-17T20:00:00.000Z",
-            status: "scheduled",
-            requested: false
-          }
-        ]}
-        onRequestEvent={vi.fn()}
-      />
-    );
-
     expect(markup).toContain('data-provider="thesportsdb"');
-
     expect(markup).toContain('data-provider-event-id="event-001"');
+    expect(markup).toMatch(/<button[^>]*disabled/);
   });
 });
