@@ -142,8 +142,8 @@ export function createDownloadsSnapshot(value: unknown): DownloadsSnapshot {
       queued: integerValue(summary.queued, "Queued download count"),
       completed: integerValue(summary.completed, "Completed download count"),
       error: integerValue(summary.error, "Download error count"),
-      downloadRate: integerValue(summary.download_rate, "Aggregate download rate"),
-      uploadRate: integerValue(summary.upload_rate, "Aggregate upload rate")
+      downloadRate: integerValue(summary.total_download_rate, "Aggregate download rate"),
+      uploadRate: integerValue(summary.total_upload_rate, "Aggregate upload rate")
     },
     downloads: payload.downloads.map(createDownloadItem)
   };
