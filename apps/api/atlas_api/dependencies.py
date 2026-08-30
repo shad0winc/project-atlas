@@ -6,6 +6,8 @@ from functools import lru_cache
 import os
 from pathlib import Path
 
+from atlas.downloads import DownloadsService
+
 from atlas.service_lifecycle import (
     ServiceLifecycleService,
     ServiceMaintenanceHistoryService,
@@ -314,6 +316,18 @@ def get_operations_repository() -> OperationsRepository:
         normalized_root,
     )
 
+
+
+@lru_cache(maxsize=1)
+def get_downloads_service() -> DownloadsService:
+    """Return the process-wide read-only Downloads service."""
+    snapshot_path = Path(
+        os.environ.get(
+            "ATLAS_DOWNLOADS_SNAPSHOT_PATH",
+            "/mnt/storage/configs/atlas/runtime/downloads/latest.json",
+        )
+    )
+    return DownloadsService(snapshot_path)
 
 
 @lru_cache(maxsize=1)

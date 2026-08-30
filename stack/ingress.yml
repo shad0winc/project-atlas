@@ -58,6 +58,7 @@ services:
       - /mnt/storage/configs/atlas/runtime/ari:/mnt/storage/configs/atlas/runtime/ari:ro
       - /mnt/storage/configs/atlas/runtime/services:/mnt/storage/configs/atlas/runtime/services:ro
       - /mnt/storage/configs/atlas/runtime/dashboard:/mnt/storage/configs/atlas/runtime/dashboard:ro
+      - /mnt/storage/configs/atlas/runtime/downloads:/mnt/storage/configs/atlas/runtime/downloads:ro
 
     expose:
       - "8000"
@@ -77,6 +78,7 @@ services:
       ATLAS_ARI_LATEST_FILE: "/mnt/storage/configs/atlas/runtime/ari/latest.json"
       ATLAS_ARI_LATEST_PATH: "/mnt/storage/configs/atlas/runtime/ari/latest.json"
       ATLAS_SERVICE_LIFECYCLE_SNAPSHOT_PATH: "/mnt/storage/configs/atlas/runtime/services/latest.json"
+      ATLAS_DOWNLOADS_SNAPSHOT_PATH: "/mnt/storage/configs/atlas/runtime/downloads/latest.json"
       ATLAS_DASHBOARD_HEALTH_SNAPSHOT_PATH: "/mnt/storage/configs/atlas/runtime/dashboard/health.json"
       ATLAS_DASHBOARD_SCHEDULER_SNAPSHOT_PATH: "/mnt/storage/configs/atlas/runtime/dashboard/scheduler.json"
       ATLAS_DASHBOARD_OPERATIONS_DIRECTORY: "/mnt/storage/configs/atlas/runtime/dashboard/operations/current"

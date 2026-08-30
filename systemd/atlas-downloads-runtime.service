@@ -1,0 +1,9 @@
+[Unit]
+Description=Project Atlas Downloads Runtime Publisher
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/project-atlas
+ExecStart=/bin/atlas downloads-runtime publish

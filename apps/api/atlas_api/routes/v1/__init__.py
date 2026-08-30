@@ -7,6 +7,7 @@ from .admin_users import router as admin_users_router
 from .auth import router as auth_router
 from .dashboard import router as dashboard_router
 from .dashboard_media import router as dashboard_media_router
+from .downloads import router as downloads_router
 from .favorites import router as favorites_router
 from .media_catalog import router as media_catalog_router
 from .media_discovery import router as media_discovery_router
@@ -29,6 +30,7 @@ router.include_router(admin_users_router)
 router.include_router(admin_invitations_router)
 router.include_router(dashboard_router)
 router.include_router(dashboard_media_router)
+router.include_router(downloads_router)
 router.include_router(favorites_router)
 router.include_router(media_catalog_router)
 router.include_router(media_discovery_router)
