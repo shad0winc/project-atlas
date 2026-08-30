@@ -93,6 +93,9 @@ describe("DownloadManagementView controls", () => {
     const markup = renderState("queued");
 
     expect(markup).toContain("State: queued");
+    expect(markup).toContain(
+      'class="card download-management-card"'
+    );
 
     expect(buttonMarkup(markup, "Stop seeding")).not.toContain("disabled");
     expect(buttonMarkup(markup, "Resume")).toContain("disabled");

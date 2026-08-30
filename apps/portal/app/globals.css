@@ -2514,6 +2514,13 @@ section[aria-labelledby="service-detail-title"] dd {
   align-self: flex-start;
 }
 
+/* PR72 — Portal administrative surface spacing */
+.download-management-card,
+.admin-identity-card {
+  min-width: 0;
+  padding: 1.15rem;
+}
+
 /* PR64 — Settings self-service surface */
 .settings-grid {
   display: grid;
