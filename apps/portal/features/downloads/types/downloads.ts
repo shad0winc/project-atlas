@@ -20,6 +20,7 @@ export type DownloadSummary = Readonly<{
 }>;
 
 export type DownloadItem = Readonly<{
+  jobId: string;
   name: string;
   category: string | null;
   state: DownloadState;
@@ -110,6 +111,7 @@ function createDownloadItem(value: unknown): DownloadItem {
   }
 
   return {
+    jobId: stringValue(item.job_id, "Download job identifier"),
     name: stringValue(item.name, "Download name"),
     category: nullableStringValue(item.category, "Download category"),
     state: downloadStateValue(item.state),

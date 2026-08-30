@@ -11,9 +11,33 @@ SNAPSHOT = f"{RUNTIME_DIR}/latest.json"
 
 def _api_service_block() -> str:
     content = INGRESS.read_text()
-    start = content.index("  api:\n")
-    end = content.index("\n  identity-writer:\n", start)
-    return content[start:end]
+    lines = content.splitlines(keepends=True)
+
+    collecting = False
+    block: list[str] = []
+
+    for line in lines:
+        if line == "  api:\n":
+            collecting = True
+            block.append(line)
+            continue
+
+        if not collecting:
+            continue
+
+        if (
+            line.startswith("  ")
+            and not line.startswith("    ")
+            and line.rstrip().endswith(":")
+        ):
+            break
+
+        block.append(line)
+
+    if not block:
+        raise AssertionError("api service block not found")
+
+    return "".join(block)
 
 
 def test_api_mounts_only_downloads_runtime_directory_read_only() -> None:

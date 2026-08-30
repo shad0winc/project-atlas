@@ -1,5 +1,6 @@
 """Bounded read-only Downloads runtime domain."""
 
+from .job_ids import is_opaque_job_id, opaque_job_id
 from .models import (
     SCHEMA_VERSION,
     DownloadItem,
@@ -22,6 +23,8 @@ __all__ = [
     "DownloadState",
     "DownloadSummary",
     "QBittorrentReadOnlyClient",
+    "is_opaque_job_id",
+    "opaque_job_id",
     "publish_snapshot",
     "read_snapshot",
 ]

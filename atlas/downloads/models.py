@@ -30,6 +30,7 @@ class DownloadState(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class DownloadItem:
+    job_id: str
     name: str
     category: str | None
     state: DownloadState
@@ -42,6 +43,7 @@ class DownloadItem:
 
     def to_dict(self) -> dict[str, Any]:
         return {
+            "job_id": self.job_id,
             "name": self.name,
             "category": self.category,
             "state": self.state.value,

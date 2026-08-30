@@ -47,6 +47,7 @@ describe("Downloads presentation", () => {
         downloads: [
           {
             name: "Example Movie",
+            jobId: "dl_0123456789abcdef0123456789abcdef",
             category: "movies",
             state: "downloading",
             progress: 0.5,
@@ -58,6 +59,7 @@ describe("Downloads presentation", () => {
           },
           {
             name: "Example Complete",
+            jobId: "dl_abcdefabcdefabcdefabcdefabcdefab",
             category: null,
             state: "seeding",
             progress: 1,
@@ -77,6 +79,7 @@ describe("Downloads presentation", () => {
     expect(markup).toContain("Progress 50%");
     expect(markup).toContain(">Refresh</button>");
     expect(markup).not.toMatch(/hash|magnet|tracker|peer|save path/i);
+    expect(markup).not.toContain("dl_0123456789abcdef0123456789abcdef");
   });
 
   it("renders an explicit valid empty state", () => {

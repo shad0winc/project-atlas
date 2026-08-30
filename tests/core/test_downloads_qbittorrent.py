@@ -34,12 +34,13 @@ def test_normalize_torrent_excludes_operational_and_sensitive_fields() -> None:
         "content_path": "/downloads/private/file",
         "peers": [{"ip": "203.0.113.1"}],
     }
-    item = QBittorrentReadOnlyClient._normalize_torrent(raw)
+    item = QBittorrentReadOnlyClient._normalize_torrent(raw, job_id_key="test-downloads-job-id-key")
     assert item.name == "Ubuntu ISO"
     assert item.category == "linux"
     assert item.state == DownloadState.DOWNLOADING
     assert item.progress == 0.25
     assert set(item.to_dict()) == {
+        "job_id",
         "name",
         "category",
         "state",
@@ -54,7 +55,8 @@ def test_normalize_torrent_excludes_operational_and_sensitive_fields() -> None:
 
 def test_unknown_qbittorrent_state_is_bounded() -> None:
     item = QBittorrentReadOnlyClient._normalize_torrent(
-        {"name": "Example", "state": "futureState"}
+        {"name": "Example", "state": "futureState", "hash": "example-hash"},
+        job_id_key="test-downloads-job-id-key",
     )
     assert item.state == DownloadState.UNKNOWN
 
@@ -174,7 +176,9 @@ def test_pr66_stage1c_upload_state_contract() -> None:
                 "name": raw_state,
                 "state": raw_state,
                 "progress": 1.0,
-            }
+                "hash": f"hash-{raw_state}",
+            },
+            job_id_key="test-downloads-job-id-key",
         )
         assert item.state == normalized_state
 
@@ -186,6 +190,7 @@ def test_pr66_stage1c_seeding_counts_as_completed_not_active() -> None:
     snapshot = DownloadsSnapshot.build(
         (
             DownloadItem(
+                job_id="dl_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 name="Seeder",
                 category="movies",
                 state=DownloadState.SEEDING,
@@ -212,6 +217,7 @@ def test_pr66_stage1c_collection_is_bounded_and_deterministic() -> None:
         "http://127.0.0.1:8080",
         "user",
         "password",
+        job_id_key="test-downloads-job-id-key",
     )
     client._login = lambda: None  # type: ignore[method-assign]
 
@@ -219,6 +225,7 @@ def test_pr66_stage1c_collection_is_bounded_and_deterministic() -> None:
     torrents = [
         {
             "name": name,
+            "hash": f"hash-{name}",
             "state": "downloading",
             "progress": 0.5,
             "size": 1000,

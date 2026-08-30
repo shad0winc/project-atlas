@@ -32,6 +32,7 @@ describe("AdministrationView", () => {
     expect(markup).toContain("Management surfaces");
     expect(markup).toContain('href="/portal/users"');
     expect(markup).toContain('href="/portal/services"');
+    expect(markup).toContain('href="/portal/administration/downloads"');
     expect(markup).toContain('href="/portal/requests"');
     expect(markup).toContain('href="/portal/media"');
     expect(markup).toContain('href="/portal/sports"');
@@ -43,6 +44,7 @@ describe("AdministrationView", () => {
 
     expect(markup).toContain('href="/portal/services"');
     expect(markup).not.toContain('href="/portal/users"');
+    expect(markup).not.toContain('href="/portal/administration/downloads"');
     expect(markup).not.toContain('href="/portal/requests"');
     expect(markup).not.toContain('href="/portal/media"');
     expect(markup).not.toContain('href="/portal/sports"');
