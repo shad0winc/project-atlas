@@ -1,12 +1,33 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import type { DownloadsState } from "../types/downloads";
+import { createDownloadsSnapshot, type DownloadsState } from "../types/downloads";
 import { DownloadsContent } from "./DownloadsView";
 
 function renderState(state: DownloadsState): string {
   return renderToStaticMarkup(<DownloadsContent refresh={() => undefined} state={state} />);
 }
+
+describe("Downloads API contract", () => {
+  it("maps aggregate rates from the canonical API summary fields", () => {
+    const snapshot = createDownloadsSnapshot({
+      schema_version: 1,
+      generated_at: "2026-08-30T00:30:00Z",
+      summary: {
+        active: 1,
+        queued: 2,
+        completed: 3,
+        error: 0,
+        total_download_rate: 1048576,
+        total_upload_rate: 524288
+      },
+      downloads: []
+    });
+
+    expect(snapshot.summary.downloadRate).toBe(1048576);
+    expect(snapshot.summary.uploadRate).toBe(524288);
+  });
+});
 
 describe("Downloads presentation", () => {
   it("renders the bounded read-only download snapshot", () => {
