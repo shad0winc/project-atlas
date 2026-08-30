@@ -124,12 +124,17 @@ class QBittorrentReadOnlyClient:
         )
         try:
             with self._opener.open(request, timeout=self._timeout) as response:
+                status = getattr(response, "status", None)
                 payload = response.read(64).decode("utf-8", errors="replace").strip()
         except (HTTPError, URLError, TimeoutError, OSError) as exc:
             raise DownloadsError("qBittorrent authentication failed") from exc
 
-        if payload != "Ok.":
-            raise DownloadsError("qBittorrent authentication failed")
+        if status == 204 and payload == "":
+            return
+        if status == 200 and payload == "Ok.":
+            return
+
+        raise DownloadsError("qBittorrent authentication failed")
 
     def _json_get(self, path: str) -> Any:
         request = Request(
