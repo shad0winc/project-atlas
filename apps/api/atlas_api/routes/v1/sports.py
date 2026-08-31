@@ -255,6 +255,45 @@ def search_sports_leagues(
     return SportsSearchResponse(results=[SportsSearchResultResponse(**item) for item in items])
 
 
+@router.get(
+    "/search/events",
+    response_model=SportsEventListResponse,
+    summary="Search upcoming Sports events",
+)
+def search_sports_events(
+    current_user: Annotated[AuthenticatedUser, Depends(require_sports_read)],
+    service: Annotated[SportsAPIService, Depends(get_sports_api_service)],
+    query: Annotated[str, Query(min_length=1)],
+    provider: Annotated[str, Query(min_length=1)] = "thesportsdb",
+) -> SportsEventListResponse:
+    try:
+        items = service.search_events(
+            user_id=current_user.user_id,
+            provider_name=provider,
+            query=query,
+        )
+    except SportsProviderRateLimitError as error:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                "Sports provider is temporarily rate limited. "
+                "Try again shortly."
+            ),
+            headers={
+                "Retry-After": str(error.retry_after_seconds),
+            },
+        ) from error
+    except (SportsProviderNotFoundError, SportsWriterTransportError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(error),
+        ) from error
+
+    return SportsEventListResponse(
+        events=[SportsEventResponse(**item) for item in items]
+    )
+
+
 def _follow_response(subscription: dict[str, object]) -> SportsFollowResponse:
     return SportsFollowResponse(
         subscription_id=str(subscription["subscription_id"]),

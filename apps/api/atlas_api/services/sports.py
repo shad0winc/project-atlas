@@ -339,6 +339,31 @@ class SportsWriterBackedAPIService:
             raise SportsWriterTransportError("Private Sports service returned an invalid league search payload.")
         return [dict(item) for item in items if isinstance(item, dict)]
 
+    def search_events(
+        self,
+        *,
+        user_id: str,
+        provider_name: str,
+        query: str,
+    ) -> list[dict[str, Any]]:
+        payload = self._request(
+            "GET",
+            "/internal/v1/search/events?"
+            + urllib.parse.urlencode(
+                {
+                    "user_id": user_id,
+                    "provider": provider_name,
+                    "query": query,
+                }
+            ),
+        )
+        items = payload.get("events", [])
+        if not isinstance(items, list):
+            raise SportsWriterTransportError(
+                "Private Sports service returned an invalid event search payload."
+            )
+        return [dict(item) for item in items if isinstance(item, dict)]
+
     def list_subscriptions_for_user(self, *, user_id: str) -> list[dict[str, Any]]:
         payload = self._request("GET", "/internal/v1/subscriptions?" + urllib.parse.urlencode({"user_id": user_id}))
         items = payload.get("subscriptions", [])

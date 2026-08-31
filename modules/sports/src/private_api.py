@@ -203,10 +203,17 @@ class Handler(BaseHTTPRequestHandler):
             self._json(HTTPStatus.OK, {"subscriptions": subscriptions})
             return
 
-        if parsed.path in {"/internal/v1/search/teams", "/internal/v1/search/leagues"}:
+        if parsed.path in {
+            "/internal/v1/search/teams",
+            "/internal/v1/search/leagues",
+            "/internal/v1/search/events",
+        }:
             query = str(params.get("query", [""])[0]).strip()
             if not query or not provider_name:
                 self._json(HTTPStatus.BAD_REQUEST, {"error": "query and provider are required."})
+                return
+            if parsed.path.endswith("/events") and not user_id:
+                self._json(HTTPStatus.BAD_REQUEST, {"error": "user_id is required for event search."})
                 return
             try:
                 provider = _provider(provider_name)
@@ -215,11 +222,31 @@ class Handler(BaseHTTPRequestHandler):
                     results = [self._safe_team(dict(item)) for item in raw if isinstance(item, dict)]
                     results = [item for item in results if item["id"] and item["name"]]
                     self._json(HTTPStatus.OK, {"teams": results})
-                else:
+                elif parsed.path.endswith("/leagues"):
                     raw = provider.search_leagues(query)
                     results = [self._safe_league(dict(item)) for item in raw if isinstance(item, dict)]
                     results = [item for item in results if item["id"] and item["name"]]
                     self._json(HTTPStatus.OK, {"leagues": results})
+                else:
+                    requested_ids = {
+                        str(subscription.get("id", "")).strip()
+                        for subscription in self._user_subscriptions(user_id)
+                        if str(subscription.get("type", "")).strip().lower() == "event"
+                        and str(subscription.get("provider", "")).strip().lower() == provider.name
+                        and bool(subscription.get("enabled", True))
+                    }
+                    raw = provider.search_events(query)
+                    results = []
+                    for item in raw:
+                        if not isinstance(item, dict):
+                            continue
+                        event = dict(item)
+                        provider_event_id = str(event.get("provider_event_id", "")).strip()
+                        if not provider_event_id:
+                            continue
+                        event["requested"] = provider_event_id in requested_ids
+                        results.append(self._safe_event(event))
+                    self._json(HTTPStatus.OK, {"events": results})
             except LookupError:
                 self._json(HTTPStatus.NOT_FOUND, {"code": "provider_not_found", "error": "Sports provider is unavailable."})
             except Exception as exc:

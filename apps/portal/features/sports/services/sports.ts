@@ -3,6 +3,7 @@ import { authenticatedAtlasApiRequest } from "../../../lib/services/authenticate
 
 import {
   createSportsEventCollection,
+  createSportsEventSearchCollection,
   createSportsFollow,
   createSportsFollowCollection,
   createSportsSearchCollection,
@@ -14,6 +15,7 @@ import {
   type SportsFollowTransport,
   type SportsSearchCollectionTransport,
   type SportsSearchResult,
+  type SportsSearchType,
   type SportsSubscription,
   type SportsSubscriptionTransport
 } from "../types/sports";
@@ -82,7 +84,7 @@ export async function requestSportsEvent(
 }
 
 export async function searchSports(
-  type: "team" | "league",
+  type: SportsSearchType,
   query: string,
   options: SportsRequestOptions = {}
 ): Promise<readonly SportsSearchResult[]> {
@@ -92,25 +94,36 @@ export async function searchSports(
     return [];
   }
 
-  const path = type === "team" ? "teams" : "leagues";
+  const path = type === "team" ? "teams" : type === "league" ? "leagues" : "events";
 
   try {
+    const requestOptions = {
+      method: "GET" as const,
+      cache: "no-store" as const,
+      signal: options.signal,
+      retryPolicy: {
+        maxRetries: 0,
+        baseDelayMs: 250,
+        maxDelayMs: 5_000
+      }
+    };
+
+    if (type === "event") {
+      const response =
+        await authenticatedAtlasApiRequest<SportsEventCollectionTransport>(
+          `/sports/search/${path}?provider=thesportsdb&query=${encodeURIComponent(normalizedQuery)}`,
+          requestOptions
+        );
+      return createSportsEventSearchCollection(response);
+    }
+
     const response =
       await authenticatedAtlasApiRequest<SportsSearchCollectionTransport>(
         `/sports/search/${path}?provider=thesportsdb&query=${encodeURIComponent(normalizedQuery)}`,
-        {
-          method: "GET",
-          cache: "no-store",
-          signal: options.signal,
-          retryPolicy: {
-            maxRetries: 0,
-            baseDelayMs: 250,
-            maxDelayMs: 5_000
-          }
-        }
+        requestOptions
       );
 
-    return createSportsSearchCollection(response);
+    return createSportsSearchCollection(type, response);
   } catch (error) {
     if (
       error instanceof AtlasApiError &&

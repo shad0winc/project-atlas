@@ -27,13 +27,13 @@ def test_public_search_routes_preserve_429_and_retry_after() -> None:
 
     assert source.count(
         "except SportsProviderRateLimitError as error:"
-    ) == 2
+    ) == 3
     assert source.count(
         "status_code=status.HTTP_429_TOO_MANY_REQUESTS"
-    ) == 2
+    ) == 3
     assert source.count(
         '"Retry-After": str(error.retry_after_seconds)'
-    ) == 2
+    ) == 3
 
 
 def test_generic_search_transport_failure_remains_503() -> None:
@@ -41,7 +41,7 @@ def test_generic_search_transport_failure_remains_503() -> None:
 
     assert source.count(
         "except (SportsProviderNotFoundError, SportsWriterTransportError) as error:"
-    ) == 2
+    ) == 3
     assert source.count(
         "status.HTTP_503_SERVICE_UNAVAILABLE"
     ) >= 2

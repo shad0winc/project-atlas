@@ -46,7 +46,10 @@ export type SportsSubscriptionTransport = Readonly<{
   created_at: string;
 }>;
 
-export type SportsSearchResult = Readonly<{ id: string; name: string; sport: string; league: string; }>;
+export type SportsSearchType = "team" | "league" | "event";
+export type SportsEntitySearchResult = Readonly<{ kind: "team" | "league"; id: string; name: string; sport: string; league: string; }>;
+export type SportsEventSearchResult = Readonly<{ kind: "event"; id: string; provider: string; name: string; sport: string; league: string; startAt: string; status: string; requested: boolean; }>;
+export type SportsSearchResult = SportsEntitySearchResult | SportsEventSearchResult;
 export type SportsSearchCollectionTransport = Readonly<{ results: readonly Readonly<{ id: string; name: string; sport?: string; league?: string; }>[]; }>;
 export type SportsFollow = Readonly<{ subscriptionId: string; type: "event" | "team" | "league"; provider: string; providerId: string; name: string; userId: string; enabled: boolean; record: boolean; createdAt: string | null; }>;
 export type SportsFollowTransport = Readonly<{ subscription_id: string; type: string; provider: string; provider_id: string; name: string; user_id: string; enabled: boolean; record?: boolean; created_at?: string | null; }>;
@@ -112,8 +115,31 @@ export function createSportsSubscription(input: SportsSubscriptionTransport): Sp
   });
 }
 
-export function createSportsSearchCollection(input: SportsSearchCollectionTransport): readonly SportsSearchResult[] {
-  return Object.freeze(input.results.map((item) => Object.freeze({ id: requiredText(item.id, "sportsSearch.id"), name: requiredText(item.name, "sportsSearch.name"), sport: String(item.sport ?? "").trim(), league: String(item.league ?? "").trim() })));
+export function createSportsSearchCollection(
+  kind: "team" | "league",
+  input: SportsSearchCollectionTransport
+): readonly SportsEntitySearchResult[] {
+  return Object.freeze(input.results.map((item) => Object.freeze({ kind, id: requiredText(item.id, "sportsSearch.id"), name: requiredText(item.name, "sportsSearch.name"), sport: String(item.sport ?? "").trim(), league: String(item.league ?? "").trim() })));
+}
+
+export function createSportsEventSearchCollection(
+  input: SportsEventCollectionTransport
+): readonly SportsEventSearchResult[] {
+  return Object.freeze(
+    input.events.map(createSportsEvent).map((event) =>
+      Object.freeze({
+        kind: "event" as const,
+        id: event.providerEventId,
+        provider: event.provider,
+        name: event.name,
+        sport: event.sport,
+        league: event.league,
+        startAt: event.startAt,
+        status: event.status,
+        requested: event.requested
+      })
+    )
+  );
 }
 export function createSportsFollow(input: SportsFollowTransport): SportsFollow {
   const type = requiredText(input.type, "sportsFollow.type");

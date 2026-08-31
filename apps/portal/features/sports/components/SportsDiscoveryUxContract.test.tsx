@@ -16,7 +16,7 @@ describe("Sports discovery UX contract", () => {
   });
 
   it("clears the query after a new follow succeeds", () => {
-    expect(view).toContain("await onFollow(searchType, result.id);");
+    expect(view).toContain("await onFollow(result.kind, result.id);");
     expect(view).toContain('setQuery("");');
   });
 
