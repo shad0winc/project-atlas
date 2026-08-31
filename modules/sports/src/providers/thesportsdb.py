@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import fcntl
 import json
 import os
 import threading
@@ -14,6 +15,7 @@ from collections import OrderedDict
 from email.utils import parsedate_to_datetime
 from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
+from pathlib import Path
 from typing import Any
 
 from providers.base import SportsProvider
@@ -41,6 +43,12 @@ _SEARCH_CACHE_TTL_SECONDS = 60
 _DISCOVERY_CACHE_TTL_SECONDS = 300
 _RATE_LIMIT_FALLBACK_SECONDS = 60
 _RATE_LIMIT_MAX_SECONDS = 300
+_PROVIDER_BUDGET_FILE = Path(
+    os.getenv(
+        "SPORTS_PROVIDER_REQUEST_BUDGET_FILE",
+        "/mnt/storage/configs/sportyfin/state/provider-request-budget.json",
+    )
+)
 
 
 def _cache_ttl_seconds(endpoint: str) -> int:
@@ -100,6 +108,77 @@ def _retry_after_seconds(error: urllib.error.HTTPError) -> int:
     )
 
 
+def _load_shared_rate_limit_until() -> float:
+    try:
+        with _PROVIDER_BUDGET_FILE.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return 0.0
+
+    if not isinstance(payload, dict):
+        return 0.0
+
+    try:
+        retry_until = float(payload.get("retry_until_epoch", 0.0))
+    except (TypeError, ValueError):
+        return 0.0
+
+    return max(0.0, retry_until)
+
+
+def _write_shared_rate_limit_until(retry_until_epoch: float) -> None:
+    _PROVIDER_BUDGET_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+    lock_file = _PROVIDER_BUDGET_FILE.with_name(
+        f"{_PROVIDER_BUDGET_FILE.name}.lock"
+    )
+
+    with lock_file.open("a+", encoding="utf-8") as lock_handle:
+        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+
+        current = _load_shared_rate_limit_until()
+        retry_until = max(current, float(retry_until_epoch))
+
+        temporary = _PROVIDER_BUDGET_FILE.with_name(
+            f"{_PROVIDER_BUDGET_FILE.name}.tmp.{os.getpid()}"
+        )
+        try:
+            with temporary.open("w", encoding="utf-8") as handle:
+                json.dump(
+                    {
+                        "provider": "thesportsdb",
+                        "retry_until_epoch": retry_until,
+                    },
+                    handle,
+                    separators=(",", ":"),
+                    sort_keys=True,
+                )
+                handle.write("\n")
+            temporary.replace(_PROVIDER_BUDGET_FILE)
+        finally:
+            try:
+                temporary.unlink()
+            except FileNotFoundError:
+                pass
+            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
+
+
+def _shared_retry_after_seconds(now_epoch: float | None = None) -> int:
+    now = time.time() if now_epoch is None else float(now_epoch)
+    retry_until = _load_shared_rate_limit_until()
+
+    if retry_until <= now:
+        return 0
+
+    return max(
+        1,
+        min(
+            int(retry_until - now),
+            _RATE_LIMIT_MAX_SECONDS,
+        ),
+    )
+
+
 def _reset_request_budget_for_tests() -> None:
     global _RATE_LIMIT_UNTIL
     with _CACHE_LOCK:
@@ -154,6 +233,10 @@ class TheSportsDBProvider(SportsProvider):
         key = _cache_key(endpoint, parameters)
         now = time.monotonic()
 
+        shared_retry_after = _shared_retry_after_seconds()
+        if shared_retry_after > 0:
+            raise SportsProviderRateLimitError(shared_retry_after)
+
         with _CACHE_LOCK:
             if _RATE_LIMIT_UNTIL > now:
                 raise SportsProviderRateLimitError(
@@ -197,6 +280,9 @@ class TheSportsDBProvider(SportsProvider):
                         _RATE_LIMIT_UNTIL,
                         time.monotonic() + retry_after,
                     )
+                _write_shared_rate_limit_until(
+                    time.time() + retry_after
+                )
                 raise SportsProviderRateLimitError(
                     retry_after
                 ) from exc

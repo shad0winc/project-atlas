@@ -185,6 +185,23 @@ def write_provider_health(
     )
 
 
+def publish_provider_health_event(
+    event_name: str,
+    payload: dict[str, Any],
+) -> None:
+    try:
+        publish_event(
+            "sports",
+            event_name,
+            payload,
+        )
+    except Exception as exc:
+        print(
+            f"Unable to publish {event_name}: {exc}",
+            file=sys.stderr,
+        )
+
+
 def mark_provider_healthy(
     health: dict[str, dict[str, Any]],
     provider_name: str,
@@ -214,8 +231,7 @@ def mark_provider_healthy(
     }
 
     if previous_status == "degraded":
-        publish_event(
-            "sports",
+        publish_provider_health_event(
             "sports.provider-recovered",
             {
                 "provider": provider_name,
@@ -265,8 +281,7 @@ def mark_provider_degraded(
     }
 
     if previous_status != "degraded":
-        publish_event(
-            "sports",
+        publish_provider_health_event(
             "sports.provider-degraded",
             {
                 "provider": provider_name,
