@@ -6,13 +6,16 @@ import { useEffect, useState } from "react";
 
 import { PortalPage } from "../../../../components/portal/PortalPage";
 import { MediaCatalogView } from "../../../../features/media";
-import { loadPlaybackAction } from "../../../../features/playback/api/playback";
+import { loadPlaybackSession } from "../../../../features/playback/api/session";
+import { AtlasTheaterPlayer } from "../../../../features/playback/components/AtlasTheaterPlayer";
+import type { PlaybackSession } from "../../../../features/playback/types/session";
 import { PORTAL_ROUTES } from "../../../../lib/navigation/portal";
 
 const theaterRoute = PORTAL_ROUTES.theater;
 
 type TheaterState =
   | Readonly<{ status: "loading" }>
+  | Readonly<{ status: "ready"; session: PlaybackSession }>
   | Readonly<{ status: "error"; message: string }>;
 
 export function TheaterPageClient(): React.ReactElement {
@@ -33,25 +36,12 @@ export function TheaterPageClient(): React.ReactElement {
 
     const controller = new AbortController();
 
-    void loadPlaybackAction(provider, itemId, {
-      signal: controller.signal
-    })
-      .then((action) => {
-        if (!action.available || !action.href) {
+    void loadPlaybackSession(provider, itemId, controller.signal)
+      .then((session) => {
+        if (!session.available) {
           throw new Error("Playback is not currently available.");
         }
-
-        const playbackWindow = window.open(
-          action.href,
-          "_blank",
-          "noopener,noreferrer"
-        );
-
-        if (playbackWindow === null) {
-          throw new Error(
-            "Playback window was blocked. Allow pop-ups for Atlas and try again."
-          );
-        }
+        setState({ status: "ready", session });
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) {
@@ -111,11 +101,36 @@ export function TheaterPageClient(): React.ReactElement {
     );
   }
 
+  if (state.status === "ready") {
+    return (
+      <PortalPage
+        accessDeniedDescription="Your Atlas account does not have permission to use Theater."
+        description="Secure Atlas playback powered by Jellyfin."
+        eyebrow={theaterRoute.label}
+        permission={theaterRoute.permission}
+        title={state.session.title}
+      >
+        <section aria-labelledby="atlas-player-title" className="media-discovery-view">
+          <div className="media-discovery-results-header">
+            <div>
+              <p className="media-discovery-eyebrow">Atlas Theater</p>
+              <h2 id="atlas-player-title">{state.session.title}</h2>
+              <p className="media-discovery-overview">
+                Atlas is the playback interface. Jellyfin selects and delivers the compatible media stream.
+              </p>
+            </div>
+          </div>
+          <AtlasTheaterPlayer session={state.session} />
+        </section>
+      </PortalPage>
+    );
+  }
+
   return (
     <section aria-busy="true" aria-labelledby="theater-loading-title">
       <p className="portal-page-eyebrow">Theater</p>
       <h1 id="theater-loading-title">Preparing playback</h1>
-      <p>Atlas is opening the exact playable item.</p>
+      <p>Atlas is preparing the exact playable item.</p>
     </section>
   );
 }

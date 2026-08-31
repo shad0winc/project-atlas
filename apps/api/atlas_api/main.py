@@ -7,6 +7,7 @@ from fastapi import FastAPI
 
 from atlas_api.core.settings import AtlasAPISettings
 from atlas_api.routes import v1_router
+from atlas_api.routes.playback_gateway import router as playback_gateway_router
 
 
 @asynccontextmanager
@@ -31,6 +32,7 @@ def create_app() -> FastAPI:
     )
 
     application.include_router(v1_router)
+    application.include_router(playback_gateway_router)
 
     return application
 

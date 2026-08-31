@@ -20,6 +20,42 @@ class PlaybackSourceType(str, Enum):
 
 
 @dataclass(frozen=True, slots=True)
+class PlaybackTrack:
+    """A browser-safe selectable media track."""
+
+    index: int
+    kind: str
+    label: str
+    language: str | None = None
+    codec: str | None = None
+    default: bool = False
+    forced: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class PlaybackSession:
+    """A safe Atlas Theater playback session contract."""
+
+    available: bool
+    action: PlaybackActionKind
+    label: str
+    backend: str
+    source_type: PlaybackSourceType
+    provider: str
+    requested_target_id: str
+    playable_target_id: str
+    title: str
+    media_type: str
+    duration_ticks: int | None
+    can_seek: bool
+    audio_tracks: tuple[PlaybackTrack, ...]
+    subtitle_tracks: tuple[PlaybackTrack, ...]
+    stream_path: str = ""
+    previous_target_id: str | None = None
+    next_target_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class PlaybackAction:
     """A safe user-facing playback capability."""
 
