@@ -1,3 +1,4 @@
+import { AtlasApiError } from "../../../lib/api/errors";
 import { authenticatedAtlasApiRequest } from "../../../lib/services/authenticated";
 
 import {
@@ -80,10 +81,51 @@ export async function requestSportsEvent(
   return createSportsSubscription(response);
 }
 
-export async function searchSports(type: "team" | "league", query: string, options: SportsRequestOptions = {}): Promise<readonly SportsSearchResult[]> {
-  const q=query.trim(); if (!q) return []; const path=type === "team" ? "teams" : "leagues";
-  return createSportsSearchCollection(await authenticatedAtlasApiRequest<SportsSearchCollectionTransport>(`/sports/search/${path}?provider=thesportsdb&query=${encodeURIComponent(q)}`, { method: "GET", cache: "no-store", signal: options.signal }));
+export async function searchSports(
+  type: "team" | "league",
+  query: string,
+  options: SportsRequestOptions = {}
+): Promise<readonly SportsSearchResult[]> {
+  const normalizedQuery = query.trim();
+
+  if (!normalizedQuery) {
+    return [];
+  }
+
+  const path = type === "team" ? "teams" : "leagues";
+
+  try {
+    const response =
+      await authenticatedAtlasApiRequest<SportsSearchCollectionTransport>(
+        `/sports/search/${path}?provider=thesportsdb&query=${encodeURIComponent(normalizedQuery)}`,
+        {
+          method: "GET",
+          cache: "no-store",
+          signal: options.signal,
+          retryPolicy: {
+            maxRetries: 0,
+            baseDelayMs: 250,
+            maxDelayMs: 5_000
+          }
+        }
+      );
+
+    return createSportsSearchCollection(response);
+  } catch (error) {
+    if (
+      error instanceof AtlasApiError &&
+      error.kind === "rate-limit"
+    ) {
+      throw new Error(
+        "Sports search is temporarily rate limited. "
+          + "Please try again shortly."
+      );
+    }
+
+    throw error;
+  }
 }
+
 export async function loadSportsFollows(options: SportsRequestOptions = {}): Promise<readonly SportsFollow[]> { return createSportsFollowCollection(await authenticatedAtlasApiRequest<SportsFollowCollectionTransport>("/sports/follows", { method: "GET", cache: "no-store", signal: options.signal })); }
 export async function followSports(type: "event" | "team" | "league", providerId: string, options: SportsRequestOptions = {}): Promise<SportsFollow> {
   const id=providerId.trim(); if (!id) throw new Error("sportsFollow.providerId must not be empty.");

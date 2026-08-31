@@ -90,6 +90,32 @@ class Handler(BaseHTTPRequestHandler):
             },
         )
 
+    def _provider_rate_limited(self, error: Exception) -> None:
+        retry_after = max(
+            1,
+            min(
+                int(getattr(error, "retry_after_seconds", 60)),
+                300,
+            ),
+        )
+        self.send_response(HTTPStatus.TOO_MANY_REQUESTS)
+        self.send_header(
+            "Content-Type",
+            "application/json; charset=utf-8",
+        )
+        self.send_header("Retry-After", str(retry_after))
+        payload = json.dumps(
+            {
+                "code": "sports_provider_rate_limited",
+                "error": "Sports provider is temporarily rate limited.",
+                "retry_after_seconds": retry_after,
+            },
+            separators=(",", ":"),
+        ).encode("utf-8")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
     @staticmethod
     def _safe_team(team: dict[str, Any]) -> dict[str, str]:
         return {
@@ -182,8 +208,11 @@ class Handler(BaseHTTPRequestHandler):
                     self._json(HTTPStatus.OK, {"leagues": results})
             except LookupError:
                 self._json(HTTPStatus.NOT_FOUND, {"code": "provider_not_found", "error": "Sports provider is unavailable."})
-            except Exception:
-                self._backend_unavailable()
+            except Exception as exc:
+                if getattr(exc, "provider_rate_limited", False):
+                    self._provider_rate_limited(exc)
+                else:
+                    self._backend_unavailable()
             return
 
         if parsed.path != "/internal/v1/events":

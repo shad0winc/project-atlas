@@ -2,15 +2,109 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import os
+import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections import OrderedDict
+from email.utils import parsedate_to_datetime
 from datetime import datetime, timedelta, timezone
+from http import HTTPStatus
 from typing import Any
 
 from providers.base import SportsProvider
+
+
+class SportsProviderRateLimitError(RuntimeError):
+    provider_rate_limited = True
+
+    def __init__(self, retry_after_seconds: int) -> None:
+        self.retry_after_seconds = retry_after_seconds
+        super().__init__(
+            "Sports provider is temporarily rate limited."
+        )
+
+
+_CACHE_LOCK = threading.Lock()
+_RESPONSE_CACHE: OrderedDict[
+    tuple[str, tuple[tuple[str, str], ...]],
+    tuple[float, dict[str, Any]],
+] = OrderedDict()
+_RATE_LIMIT_UNTIL = 0.0
+
+_CACHE_MAX_ENTRIES = 512
+_SEARCH_CACHE_TTL_SECONDS = 60
+_DISCOVERY_CACHE_TTL_SECONDS = 300
+_RATE_LIMIT_FALLBACK_SECONDS = 60
+_RATE_LIMIT_MAX_SECONDS = 300
+
+
+def _cache_ttl_seconds(endpoint: str) -> int:
+    if endpoint == "searchteams.php":
+        return _SEARCH_CACHE_TTL_SECONDS
+    return _DISCOVERY_CACHE_TTL_SECONDS
+
+
+def _cache_key(
+    endpoint: str,
+    parameters: dict[str, str],
+) -> tuple[str, tuple[tuple[str, str], ...]]:
+    return (
+        endpoint,
+        tuple(
+            sorted(
+                (str(key), str(value))
+                for key, value in parameters.items()
+            )
+        ),
+    )
+
+
+def _retry_after_seconds(error: urllib.error.HTTPError) -> int:
+    raw = ""
+    if error.headers is not None:
+        raw = str(error.headers.get("Retry-After", "")).strip()
+
+    seconds: int | None = None
+
+    if raw:
+        try:
+            seconds = int(raw)
+        except ValueError:
+            try:
+                parsed = parsedate_to_datetime(raw)
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=timezone.utc)
+                seconds = int(
+                    max(
+                        1,
+                        (
+                            parsed
+                            - datetime.now(timezone.utc)
+                        ).total_seconds(),
+                    )
+                )
+            except (TypeError, ValueError, OverflowError):
+                seconds = None
+
+    if seconds is None:
+        seconds = _RATE_LIMIT_FALLBACK_SECONDS
+
+    return max(
+        1,
+        min(seconds, _RATE_LIMIT_MAX_SECONDS),
+    )
+
+
+def _reset_request_budget_for_tests() -> None:
+    global _RATE_LIMIT_UNTIL
+    with _CACHE_LOCK:
+        _RESPONSE_CACHE.clear()
+        _RATE_LIMIT_UNTIL = 0.0
 
 
 class TheSportsDBProvider(SportsProvider):
@@ -55,21 +149,36 @@ class TheSportsDBProvider(SportsProvider):
         endpoint: str,
         parameters: dict[str, str],
     ) -> dict[str, Any]:
-        query = urllib.parse.urlencode(parameters)
+        global _RATE_LIMIT_UNTIL
 
+        key = _cache_key(endpoint, parameters)
+        now = time.monotonic()
+
+        with _CACHE_LOCK:
+            if _RATE_LIMIT_UNTIL > now:
+                raise SportsProviderRateLimitError(
+                    max(1, int(_RATE_LIMIT_UNTIL - now))
+                )
+
+            cached = _RESPONSE_CACHE.get(key)
+            if cached is not None:
+                expires_at, payload = cached
+                if expires_at > now:
+                    _RESPONSE_CACHE.move_to_end(key)
+                    return copy.deepcopy(payload)
+                del _RESPONSE_CACHE[key]
+
+        query = urllib.parse.urlencode(parameters)
         url = (
             "https://www.thesportsdb.com/"
             f"api/v1/json/{self.api_key}/"
             f"{endpoint}?{query}"
         )
-
         request = urllib.request.Request(
             url,
             headers={
                 "Accept": "application/json",
-                "User-Agent": (
-                    "Project-Atlas-Sports/0.1"
-                ),
+                "User-Agent": "Project-Atlas-Sports/0.1",
             },
         )
 
@@ -78,17 +187,44 @@ class TheSportsDBProvider(SportsProvider):
                 request,
                 timeout=self.timeout,
             ) as response:
-                return json.load(response)
+                payload = json.load(response)
+
+        except urllib.error.HTTPError as exc:
+            if exc.code == HTTPStatus.TOO_MANY_REQUESTS:
+                retry_after = _retry_after_seconds(exc)
+                with _CACHE_LOCK:
+                    _RATE_LIMIT_UNTIL = max(
+                        _RATE_LIMIT_UNTIL,
+                        time.monotonic() + retry_after,
+                    )
+                raise SportsProviderRateLimitError(
+                    retry_after
+                ) from exc
+
+            raise RuntimeError(
+                f"TheSportsDB request failed: HTTP {exc.code}"
+            ) from exc
 
         except (
-            urllib.error.HTTPError,
             urllib.error.URLError,
             TimeoutError,
             json.JSONDecodeError,
         ) as exc:
             raise RuntimeError(
-                f"TheSportsDB request failed: {exc}"
+                "TheSportsDB request failed."
             ) from exc
+
+        ttl_seconds = _cache_ttl_seconds(endpoint)
+        with _CACHE_LOCK:
+            _RESPONSE_CACHE[key] = (
+                time.monotonic() + ttl_seconds,
+                copy.deepcopy(payload),
+            )
+            _RESPONSE_CACHE.move_to_end(key)
+            while len(_RESPONSE_CACHE) > _CACHE_MAX_ENTRIES:
+                _RESPONSE_CACHE.popitem(last=False)
+
+        return payload
 
     def fetch_day_events(
         self,
