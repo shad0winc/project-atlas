@@ -8,7 +8,8 @@ export {
   loadSportsFollows,
   requestSportsEvent,
   searchSports,
-  unfollowSports
+  unfollowSports,
+  updateSportsRecordingIntent
 } from "./services/sports";
 
 export type {

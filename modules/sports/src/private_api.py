@@ -16,6 +16,7 @@ from subscriptions import (
     load_subscriptions,
     normalize_subscription,
     remove_subscription,
+    update_subscription_recording,
 )
 
 MAX_BODY_BYTES = 16 * 1024
@@ -314,6 +315,91 @@ class Handler(BaseHTTPRequestHandler):
             self._backend_unavailable()
             return
         self._json(HTTPStatus.OK, {"subscription": subscription, "created": created})
+
+    def do_PATCH(self) -> None:
+        parsed = urllib.parse.urlsplit(self.path)
+        prefix = "/internal/v1/subscriptions/"
+        suffix = "/recording"
+
+        if not (
+            parsed.path.startswith(prefix)
+            and parsed.path.endswith(suffix)
+        ):
+            self._json(
+                HTTPStatus.NOT_FOUND,
+                {"error": "Not found."},
+            )
+            return
+
+        if not self._require_auth():
+            return
+
+        atlas_subscription_id = urllib.parse.unquote(
+            parsed.path[
+                len(prefix) : -len(suffix)
+            ]
+        ).strip()
+
+        payload = self._read_payload()
+        if payload is None:
+            return
+
+        user_id = str(
+            payload.get("user_id", "")
+        ).strip()
+        record = payload.get("record")
+
+        if (
+            not atlas_subscription_id
+            or not user_id
+            or not isinstance(record, bool)
+        ):
+            self._json(
+                HTTPStatus.BAD_REQUEST,
+                {
+                    "error": (
+                        "subscription id, user_id, and boolean record "
+                        "are required."
+                    )
+                },
+            )
+            return
+
+        try:
+            updated = update_subscription_recording(
+                atlas_subscription_id,
+                user_id,
+                record,
+            )
+        except ValueError as exc:
+            self._json(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                {
+                    "code": "sports_recording_target_unsupported",
+                    "error": str(exc),
+                },
+            )
+            return
+        except Exception:
+            self._backend_unavailable()
+            return
+
+        if updated is None:
+            self._json(
+                HTTPStatus.NOT_FOUND,
+                {
+                    "code": "sports_subscription_not_found",
+                    "error": (
+                        "Sports subscription was not found."
+                    ),
+                },
+            )
+            return
+
+        self._json(
+            HTTPStatus.OK,
+            {"subscription": updated},
+        )
 
     def do_DELETE(self) -> None:
         parsed = urllib.parse.urlsplit(self.path)

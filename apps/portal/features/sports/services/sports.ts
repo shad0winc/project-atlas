@@ -135,3 +135,19 @@ export async function unfollowSports(subscriptionId: string, options: SportsRequ
   const id=subscriptionId.trim(); if (!id) throw new Error("sportsFollow.subscriptionId must not be empty.");
   await authenticatedAtlasApiRequest<unknown>(`/sports/follows/${encodeURIComponent(id)}`, { method: "DELETE", cache: "no-store", signal: options.signal });
 }
+
+export async function updateSportsRecordingIntent(
+  subscriptionId: string,
+  record: boolean,
+  options: SportsRequestOptions = {}
+): Promise<SportsFollow> {
+  const id = subscriptionId.trim();
+  if (!id) throw new Error("sportsFollow.subscriptionId must not be empty.");
+  return createSportsFollow(
+    await authenticatedAtlasApiRequest<SportsFollowTransport>(
+      `/sports/follows/${encodeURIComponent(id)}/recording`,
+      { method: "PATCH", cache: "no-store", signal: options.signal, body: { record },
+        retryPolicy: { maxRetries: 0, baseDelayMs: 250, maxDelayMs: 5_000 } }
+    )
+  );
+}

@@ -115,6 +115,10 @@ class SportsFollowCreateRequest(_StrictSportsModel):
     provider_id: str
 
 
+class SportsRecordingIntentRequest(_StrictSportsModel):
+    record: bool
+
+
 class SportsFollowResponse(_StrictSportsModel):
     subscription_id: str
     type: str

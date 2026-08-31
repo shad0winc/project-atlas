@@ -10,6 +10,7 @@ const baseProps = {
   onSearch: vi.fn(),
   onFollow: vi.fn(),
   onUnfollow: vi.fn(),
+  onSetRecording: vi.fn(),
   onBrowse: vi.fn(),
   onRequestEvent: vi.fn()
 };
