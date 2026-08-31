@@ -90,6 +90,44 @@ describe("SportsRequestView", () => {
     expect(markup).toContain("View upcoming");
   });
 
+  it("renders recording controls for followed events", () => {
+    const markup = renderToStaticMarkup(
+      <SportsRequestView
+        {...baseProps}
+        events={[]}
+        follows={[
+          {
+            subscriptionId: "sub-event-001",
+            type: "event",
+            provider: "thesportsdb",
+            providerId: "event-001",
+            name: "Atlas United vs Atlas City",
+            userId: "usr-001",
+            enabled: true,
+            record: false,
+            createdAt: "2026-08-30T20:00:00.000Z"
+          },
+          {
+            subscriptionId: "sub-event-002",
+            type: "event",
+            provider: "thesportsdb",
+            providerId: "event-002",
+            name: "Atlas Rovers vs Atlas County",
+            userId: "usr-001",
+            enabled: true,
+            record: true,
+            createdAt: "2026-08-30T20:00:00.000Z"
+          }
+        ]}
+      />
+    );
+
+    expect(markup).toContain("Atlas United vs Atlas City");
+    expect(markup).toContain("Record event");
+    expect(markup).toContain("Cancel recording");
+    expect(markup).toContain("Unfollow");
+  });
+
   it("preserves requested event identity and disabled state", () => {
     const markup = renderToStaticMarkup(
       <SportsRequestView

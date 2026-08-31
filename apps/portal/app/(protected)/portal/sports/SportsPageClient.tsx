@@ -164,12 +164,31 @@ export function SportsPageClient(): React.ReactElement {
           : result
       )
     );
+    setFollows((current) => {
+      const follow = {
+        subscriptionId: subscription.subscriptionId,
+        type: "event" as const,
+        provider: subscription.provider,
+        providerId: subscription.providerEventId,
+        name: subscription.name,
+        userId: subscription.userId,
+        enabled: subscription.enabled,
+        record: false,
+        createdAt: subscription.createdAt
+      };
+
+      return current.some(
+        (item) => item.subscriptionId === follow.subscriptionId
+      )
+        ? current
+        : [...current, follow];
+    });
 
     return subscription;
   }
 
   async function handleSetRecording(
-    event: SportsEvent,
+    event: Pick<SportsEvent, "provider" | "providerEventId">,
     record: boolean
   ): Promise<void> {
     let eventFollow = follows.find(

@@ -25,7 +25,10 @@ export type SportsRequestViewProps = Readonly<{
   onUnfollow: (subscriptionId: string) => Promise<void>;
   onBrowse: (type: "team" | "league", providerId: string) => Promise<void>;
   onRequestEvent: (input: SportsRequestInput) => Promise<SportsSubscription>;
-  onSetRecording: (event: SportsEvent, record: boolean) => Promise<void>;
+  onSetRecording: (
+    event: Pick<SportsEvent, "provider" | "providerEventId">,
+    record: boolean
+  ) => Promise<void>;
 }>;
 
 export function SportsRequestView({
@@ -304,7 +307,7 @@ export function SportsRequestView({
         <div>
           <p className="portal-page-eyebrow">Following</p>
           <h2>My Sports</h2>
-          <p>Following keeps teams and leagues handy. It does not automatically record events.</p>
+          <p>Following keeps teams, leagues, and events handy. It does not automatically record events.</p>
         </div>
       </div>
 
@@ -324,6 +327,33 @@ export function SportsRequestView({
                 </div>
                 <span className="request-status">Following</span>
               </div>
+
+              {follow.type === "event" ? (
+                <button
+                  className="requests-refresh-button"
+                  disabled={pending === `record:${follow.subscriptionId}`}
+                  onClick={() => {
+                    void mutate(
+                      `record:${follow.subscriptionId}`,
+                      () =>
+                        onSetRecording(
+                          {
+                            provider: follow.provider,
+                            providerEventId: follow.providerId
+                          },
+                          !follow.record
+                        )
+                    );
+                  }}
+                  type="button"
+                >
+                  {pending === `record:${follow.subscriptionId}`
+                    ? "Updating recording..."
+                    : follow.record
+                      ? "Cancel recording"
+                      : "Record event"}
+                </button>
+              ) : null}
 
               {follow.type === "team" || follow.type === "league" ? (
                 <>
