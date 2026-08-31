@@ -8,6 +8,11 @@ networks:
   atlas-backend:
     name: atlas-backend
     external: true
+
+  atlas-ingress:
+    name: atlas-ingress
+    external: true
+
   atlas-identity:
     name: atlas-identity
     driver: bridge
@@ -28,6 +33,7 @@ services:
     networks:
       - atlas
       - atlas-identity
+      - atlas-ingress
     ports:
       - "${JELLYFIN_PORT:-8096}:8096"
     volumes:
