@@ -43,9 +43,15 @@ class PublishEventTests(unittest.TestCase):
                 "active": True,
             },
         )
-        run_mock.assert_called_once_with(
-            command,
-            check=True,
+        run_mock.assert_called_once()
+        self.assertTrue(
+            run_mock.call_args.kwargs["check"],
+        )
+        self.assertEqual(
+            run_mock.call_args.kwargs["env"][
+                "ATLAS_SKIP_ENV_FILE"
+            ],
+            "1",
         )
 
     @patch("atlas.events.subprocess.run")
