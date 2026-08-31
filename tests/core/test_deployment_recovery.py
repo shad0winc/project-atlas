@@ -809,6 +809,11 @@ def test_core_rollback_bypasses_ingress_readiness_by_scope() -> None:
     section = content[start:]
 
     readiness_guard = """if [[ "$scope" == 'ingress' || "$scope" == 'all' ]]; then
+    docker restart atlas-caddy >/dev/null || {
+      echo 'ERROR: unable to activate restored Caddy ingress configuration.' >&2
+      return 1
+    }
+
     echo 'Post-restore ingress readiness:'
     atlas_deployment_wait_for_ingress_readiness"""
 

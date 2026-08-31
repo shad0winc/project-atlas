@@ -270,7 +270,24 @@ export async function readRequests({
     }
   );
 
-  return createMediaRequestCollection(response.requests.map(mapMediaRequest), normalizedUserId);
+  for (const request of response.requests) {
+    if (normalizeRequestUserId(request.user_id) !== normalizedUserId) {
+      throw new Error("Media Requests response crossed the authenticated-user boundary.");
+    }
+  }
+
+  const validRequests: MediaRequest[] = [];
+
+  for (const request of response.requests) {
+    try {
+      validRequests.push(mapMediaRequest(request));
+    } catch {
+      // Quarantine malformed historical records while preserving the
+      // authenticated-owner boundary checked above.
+    }
+  }
+
+  return createMediaRequestCollection(validRequests, normalizedUserId);
 }
 
 export async function cancelRequestRecord(
