@@ -7,7 +7,7 @@ ATLAS_MODULE_CONFIG_FILE="$PROJECT_DIR/config/modules/modules.conf"
 ATLAS_CLI_ROOT="$PROJECT_DIR/scripts"
 ATLAS_ENV_FILE="$PROJECT_DIR/.env"
 
-if [[ -f "$ATLAS_ENV_FILE" ]]; then
+if [[ "${ATLAS_SKIP_ENV_FILE:-0}" != "1" && -f "$ATLAS_ENV_FILE" ]]; then
   set -a
   # shellcheck disable=SC1090
   source "$ATLAS_ENV_FILE"
