@@ -22,7 +22,15 @@ class _Response:
 
 
 @pytest.fixture(autouse=True)
-def _reset_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+def _reset_budget(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setattr(
+        thesportsdb,
+        "_PROVIDER_BUDGET_FILE",
+        tmp_path / "provider-request-budget.json",
+    )
     thesportsdb._reset_request_budget_for_tests()
     monkeypatch.setenv("SPORTS_THESPORTSDB_API_KEY", "test-key")
     monkeypatch.setenv("SPORTS_PROVIDER_TIMEOUT_SECONDS", "15")
@@ -148,3 +156,28 @@ def test_cache_entry_count_is_bounded(
         provider.search_teams(value)
 
     assert len(thesportsdb._RESPONSE_CACHE) == 3
+
+
+def test_shared_cooldown_blocks_second_process_budget(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    budget_file = tmp_path / "provider-request-budget.json"
+    monkeypatch.setattr(thesportsdb, "_PROVIDER_BUDGET_FILE", budget_file)
+    monkeypatch.setattr(thesportsdb.time, "time", lambda: 1_000.0)
+    thesportsdb._write_shared_rate_limit_until(1_045.0)
+    provider = thesportsdb.TheSportsDBProvider()
+    with pytest.raises(thesportsdb.SportsProviderRateLimitError) as exc_info:
+        provider.request_json("searchteams.php", {"t": "Detroit Lions"})
+    assert 44 <= exc_info.value.retry_after_seconds <= 45
+
+
+def test_shared_cooldown_ignores_expired_state(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    budget_file = tmp_path / "provider-request-budget.json"
+    monkeypatch.setattr(thesportsdb, "_PROVIDER_BUDGET_FILE", budget_file)
+    monkeypatch.setattr(thesportsdb.time, "time", lambda: 1_000.0)
+    thesportsdb._write_shared_rate_limit_until(990.0)
+    assert thesportsdb._shared_retry_after_seconds() == 0
