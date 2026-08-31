@@ -115,13 +115,46 @@ class JellyfinProvider:
         """Return normalized metadata for one Jellyfin item."""
 
         normalized_id = _required(item_id, "item_id")
-        item = self._get_json(
-            f"/Items/{quote(normalized_id, safe='')}"
+        query = urlencode(
+            {
+                "Ids": normalized_id,
+                "Recursive": "true",
+                "Limit": 1,
+            }
         )
+        payload = self._get_json(f"/Items?{query}")
 
-        if not isinstance(item, dict):
+        if not isinstance(payload, dict):
             raise MediaProviderError(
                 "Jellyfin returned an invalid item response"
+            )
+
+        items = payload.get("Items")
+
+        if not isinstance(items, list):
+            raise MediaProviderError(
+                "Jellyfin returned an invalid item response"
+            )
+
+        if not items:
+            raise _JellyfinResourceNotFoundError(
+                "Jellyfin resource not found"
+            )
+
+        if len(items) != 1 or not isinstance(items[0], dict):
+            raise MediaProviderError(
+                "Jellyfin returned an invalid item response"
+            )
+
+        item = items[0]
+        returned_id = _required(
+            item.get("Id"),
+            "Jellyfin item ID",
+        )
+
+        if returned_id.lower() != normalized_id.lower():
+            raise MediaProviderError(
+                "Jellyfin returned a mismatched item response"
             )
 
         title = _required(
