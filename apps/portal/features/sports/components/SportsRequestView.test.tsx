@@ -49,6 +49,7 @@ describe("SportsRequestView", () => {
         events={[]}
         searchResults={[
           {
+            kind: "team",
             id: "team-001",
             name: "Atlas United",
             sport: "Soccer",
@@ -113,4 +114,33 @@ describe("SportsRequestView", () => {
     expect(markup).toContain('data-provider-event-id="event-001"');
     expect(markup).toMatch(/<button[^>]*disabled/);
   });
+
+  it("renders event search results with request and recording controls", () => {
+    const markup = renderToStaticMarkup(
+      <SportsRequestView
+        {...baseProps}
+        events={[]}
+        searchType="event"
+        searchResults={[
+          {
+            kind: "event",
+            id: "event-090",
+            provider: "thesportsdb",
+            name: "Detroit Lions vs New Orleans Saints",
+            sport: "American Football",
+            league: "NFL",
+            startAt: "2026-09-06T17:00:00.000Z",
+            status: "scheduled",
+            requested: false
+          }
+        ]}
+      />
+    );
+
+    expect(markup).toContain("Detroit Lions vs New Orleans Saints");
+    expect(markup).toContain("Request event");
+    expect(markup).toContain("Record event");
+    expect(markup).not.toContain("View upcoming");
+  });
+
 });

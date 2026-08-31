@@ -432,6 +432,38 @@ class TheSportsDBProvider(SportsProvider):
 
         return results
 
+    def search_events(
+        self,
+        query: str,
+    ) -> list[dict[str, Any]]:
+        normalized_query = query.strip().casefold()
+
+        if not normalized_query:
+            return []
+
+        events = self.fetch_games(
+            league_ids=self.league_ids,
+        )
+
+        results: list[dict[str, Any]] = []
+
+        for event in events:
+            searchable = (
+                event.get("name"),
+                event.get("sport"),
+                event.get("league"),
+                event.get("home_team"),
+                event.get("away_team"),
+            )
+
+            if any(
+                normalized_query in str(value or "").casefold()
+                for value in searchable
+            ):
+                results.append(event)
+
+        return results
+
     def upcoming_team_games(
         self,
         team_id: str,

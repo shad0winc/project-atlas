@@ -328,3 +328,34 @@ def test_sports_writer_adapter_maps_dropped_connection_to_transport_error(
             user_id="usr-test",
             provider_name="thesportsdb",
         )
+
+
+def test_search_sports_events_is_authenticated_user_scoped() -> None:
+    service = FakeSportsService()
+
+    def search_events(*, user_id: str, provider_name: str, query: str):
+        assert user_id == USER.user_id
+        assert provider_name == "thesportsdb"
+        assert query == "Lions"
+        return [
+            {
+                "provider": "thesportsdb",
+                "provider_event_id": "event-090",
+                "name": "Detroit Lions vs New Orleans Saints",
+                "sport": "American Football",
+                "league": "NFL",
+                "start_at": "2026-09-06T17:00:00Z",
+                "status": "scheduled",
+                "requested": True,
+            }
+        ]
+
+    service.search_events = search_events  # type: ignore[attr-defined]
+    client = build_client(service)
+    response = client.get(
+        "/api/v1/sports/search/events",
+        params={"provider": "thesportsdb", "query": "Lions"},
+    )
+    assert response.status_code == 200
+    assert response.json()["events"][0]["provider_event_id"] == "event-090"
+    assert response.json()["events"][0]["requested"] is True

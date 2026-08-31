@@ -36,6 +36,7 @@ export type {
   SportsFollowTransport,
   SportsSearchCollectionTransport,
   SportsSearchResult,
+  SportsSearchType,
   SportsSubscription,
   SportsSubscriptionTransport
 } from "./types/sports";

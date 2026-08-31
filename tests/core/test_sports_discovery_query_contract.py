@@ -87,3 +87,20 @@ def test_public_events_route_exposes_team_and_league_filters() -> None:
     assert {"team_id", "league_id"} <= arguments
     assert "team_ids=(" in source
     assert "league_ids=(" in source
+
+
+def test_event_search_reuses_bounded_configured_league_discovery() -> None:
+    provider = Path(
+        "modules/sports/src/providers/thesportsdb.py"
+    ).read_text(encoding="utf-8")
+    private_api = Path(
+        "modules/sports/src/private_api.py"
+    ).read_text(encoding="utf-8")
+
+    assert "def search_events(" in provider
+    assert "league_ids=self.league_ids" in provider
+    assert 'event.get("name")' in provider
+    assert 'event.get("home_team")' in provider
+    assert 'event.get("away_team")' in provider
+    assert '"/internal/v1/search/events"' in private_api
+    assert 'results.append(self._safe_event(event))' in private_api

@@ -16,6 +16,7 @@ import {
   type SportsFollow,
   type SportsRequestInput,
   type SportsSearchResult,
+  type SportsSearchType,
   type SportsSubscription
 } from "../../../../features/sports";
 import { PORTAL_ROUTES } from "../../../../lib/navigation/portal";
@@ -26,7 +27,7 @@ export function SportsPageClient(): React.ReactElement {
   const [events, setEvents] = useState<readonly SportsEvent[]>([]);
   const [follows, setFollows] = useState<readonly SportsFollow[]>([]);
   const [searchResults, setSearchResults] = useState<readonly SportsSearchResult[]>([]);
-  const [searchType, setSearchType] = useState<"team" | "league">("team");
+  const [searchType, setSearchType] = useState<SportsSearchType>("team");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -87,7 +88,7 @@ export function SportsPageClient(): React.ReactElement {
   }, []);
 
   async function handleSearch(
-    type: "team" | "league",
+    type: SportsSearchType,
     query: string
   ): Promise<void> {
     setSearchType(type);
@@ -152,6 +153,15 @@ export function SportsPageClient(): React.ReactElement {
         event.providerEventId === subscription.providerEventId
           ? { ...event, requested: true }
           : event
+      )
+    );
+    setSearchResults((current) =>
+      current.map((result) =>
+        result.kind === "event" &&
+        result.provider === subscription.provider &&
+        result.id === subscription.providerEventId
+          ? { ...result, requested: true }
+          : result
       )
     );
 
