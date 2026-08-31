@@ -105,6 +105,10 @@ export function SportsPageClient(): React.ReactElement {
         ? current
         : [...current, follow]
     );
+
+    setSearchResults((current) =>
+      current.filter((item) => item.id !== providerId)
+    );
   }
 
   async function handleUnfollow(
@@ -121,14 +125,20 @@ export function SportsPageClient(): React.ReactElement {
     type: "team" | "league",
     providerId: string
   ): Promise<void> {
-    setEvents(
-      await loadSportsEvents(
-        {},
-        type === "team"
-          ? { teamIds: [providerId] }
-          : { leagueIds: [providerId] }
-      )
+    const loadedEvents = await loadSportsEvents(
+      {},
+      type === "team"
+        ? { teamIds: [providerId] }
+        : { leagueIds: [providerId] }
     );
+
+    setEvents(loadedEvents);
+
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById("sports-upcoming-events")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
 
   async function handleRequestEvent(

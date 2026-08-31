@@ -42,7 +42,10 @@ export function SportsRequestView({
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState<"team" | "league">("team");
   const [pending, setPending] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Readonly<{
+    identity: string;
+    message: string;
+  }> | null>(null);
 
   async function mutate(
     identity: string,
@@ -58,11 +61,13 @@ export function SportsRequestView({
     try {
       await action();
     } catch (mutationError) {
-      setError(
-        mutationError instanceof Error
-          ? mutationError.message
-          : "Atlas could not update Sports."
-      );
+      setError({
+        identity,
+        message:
+          mutationError instanceof Error
+            ? mutationError.message
+            : "Atlas could not update Sports."
+      });
     } finally {
       setPending(null);
     }
@@ -116,10 +121,10 @@ export function SportsRequestView({
         </button>
       </form>
 
-      {error ? (
+      {error && !error.identity.startsWith("browse:") ? (
         <section aria-live="polite" className="requests-mutation-error">
           <strong>Sports action failed</strong>
-          <p>{error}</p>
+          <p>{error.message}</p>
         </section>
       ) : null}
 
@@ -148,6 +153,7 @@ export function SportsRequestView({
 
                 <button
                   className="requests-refresh-button"
+                  disabled={pending === `browse:${identity}`}
                   onClick={() => {
                     void mutate(
                       `browse:${identity}`,
@@ -156,8 +162,20 @@ export function SportsRequestView({
                   }}
                   type="button"
                 >
-                  View upcoming
+                  {pending === `browse:${identity}`
+                    ? "Loading upcoming..."
+                    : "View upcoming"}
                 </button>
+
+                {error?.identity === `browse:${identity}` ? (
+                  <section
+                    aria-live="polite"
+                    className="requests-mutation-error"
+                  >
+                    <strong>Could not load upcoming events</strong>
+                    <p>{error.message}</p>
+                  </section>
+                ) : null}
 
                 <button
                   className="requests-refresh-button"
@@ -165,10 +183,15 @@ export function SportsRequestView({
                   onClick={() => {
                     void mutate(
                       identity,
-                      () =>
-                        existing
-                          ? onUnfollow(existing.subscriptionId)
-                          : onFollow(searchType, result.id)
+                      async () => {
+                        if (existing) {
+                          await onUnfollow(existing.subscriptionId);
+                          return;
+                        }
+
+                        await onFollow(searchType, result.id);
+                        setQuery("");
+                      }
                     );
                   }}
                   type="button"
@@ -207,23 +230,38 @@ export function SportsRequestView({
               </div>
 
               {follow.type === "team" || follow.type === "league" ? (
-                <button
-                  className="requests-refresh-button"
-                  onClick={() => {
-                    const browseType: "team" | "league" =
-                      follow.type === "team"
-                        ? "team"
-                        : "league";
+                <>
+                  <button
+                    className="requests-refresh-button"
+                    disabled={pending === `browse:${follow.subscriptionId}`}
+                    onClick={() => {
+                      const browseType: "team" | "league" =
+                        follow.type === "team"
+                          ? "team"
+                          : "league";
 
-                    void mutate(
-                      `browse:${follow.subscriptionId}`,
-                      () => onBrowse(browseType, follow.providerId)
-                    );
-                  }}
-                  type="button"
-                >
-                  View upcoming
-                </button>
+                      void mutate(
+                        `browse:${follow.subscriptionId}`,
+                        () => onBrowse(browseType, follow.providerId)
+                      );
+                    }}
+                    type="button"
+                  >
+                    {pending === `browse:${follow.subscriptionId}`
+                      ? "Loading upcoming..."
+                      : "View upcoming"}
+                  </button>
+
+                  {error?.identity === `browse:${follow.subscriptionId}` ? (
+                    <section
+                      aria-live="polite"
+                      className="requests-mutation-error"
+                    >
+                      <strong>Could not load upcoming events</strong>
+                      <p>{error.message}</p>
+                    </section>
+                  ) : null}
+                </>
               ) : null}
 
               <button
@@ -243,7 +281,10 @@ export function SportsRequestView({
         </section>
       )}
 
-      <div className="media-discovery-results-header">
+      <div
+        className="media-discovery-results-header"
+        id="sports-upcoming-events"
+      >
         <div>
           <p className="portal-page-eyebrow">Upcoming events</p>
           <h2>Sports</h2>
