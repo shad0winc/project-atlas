@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
 import json
 import os
 from dataclasses import dataclass, field
@@ -199,6 +201,213 @@ class JellyfinProvider:
             metadata,
         )
 
+    def list_series_episodes(
+        self,
+        series_id: str,
+    ) -> tuple[dict[str, Any], ...]:
+        # Return ordered browser-safe episode identities for a Series.
+
+        normalized_id = _required(series_id, "series_id")
+        query = urlencode(
+            {
+                "ParentId": normalized_id,
+                "Recursive": "true",
+                "IncludeItemTypes": "Episode",
+                "SortBy": "ParentIndexNumber,IndexNumber",
+                "SortOrder": "Ascending",
+                "Fields": (
+                    "SeriesName,ParentIndexNumber,IndexNumber"
+                ),
+            }
+        )
+
+        payload = self._get_json(f"/Items?{query}")
+
+        if not isinstance(payload, dict):
+            raise MediaProviderError(
+                "Jellyfin returned an invalid episode list response"
+            )
+
+        items = payload.get("Items")
+        if not isinstance(items, list):
+            raise MediaProviderError(
+                "Jellyfin episode list is invalid"
+            )
+
+        episodes: list[dict[str, Any]] = []
+
+        for item in items:
+            if not isinstance(item, dict):
+                raise MediaProviderError(
+                    "Jellyfin returned an invalid episode entry"
+                )
+
+            episode_id = _required(
+                item.get("Id"),
+                "Jellyfin episode ID",
+            )
+            title = _required(
+                item.get("Name"),
+                "Jellyfin episode name",
+            )
+
+            season_number = item.get("ParentIndexNumber")
+            if (
+                isinstance(season_number, bool)
+                or not isinstance(season_number, int)
+            ):
+                season_number = None
+
+            episode_number = item.get("IndexNumber")
+            if (
+                isinstance(episode_number, bool)
+                or not isinstance(episode_number, int)
+            ):
+                episode_number = None
+
+            series_name = item.get("SeriesName")
+            if not isinstance(series_name, str):
+                series_name = None
+            elif not series_name.strip():
+                series_name = None
+            else:
+                series_name = series_name.strip()
+
+            episodes.append(
+                {
+                    "id": episode_id,
+                    "title": title,
+                    "series_name": series_name,
+                    "season_number": season_number,
+                    "episode_number": episode_number,
+                }
+            )
+
+        return tuple(episodes)
+
+    def get_playback_info(
+        self,
+        item_id: str,
+        *,
+        user_id: str,
+    ) -> dict[str, Any]:
+        normalized_id = _required(item_id, "item_id")
+        normalized_user_id = _required(user_id, "user_id")
+        payload = self._request_json(
+            f"/Items/{quote(normalized_id, safe='')}/PlaybackInfo",
+            method="POST",
+            payload={
+                "UserId": normalized_user_id,
+                "EnableDirectPlay": True,
+                "EnableDirectStream": True,
+                "EnableTranscoding": True,
+                "AllowVideoStreamCopy": True,
+                "AllowAudioStreamCopy": True,
+                "DeviceProfile": {
+                    "Name": "Atlas Theater Browser",
+                    "MaxStreamingBitrate": 120000000,
+                    "DirectPlayProfiles": [
+                        {
+                            "Container": "mp4,m4v",
+                            "Type": "Video",
+                            "VideoCodec": "h264",
+                            "AudioCodec": "aac,mp3,ac3,eac3",
+                        }
+                    ],
+                    "TranscodingProfiles": [
+                        {
+                            "Container": "ts",
+                            "Type": "Video",
+                            "Protocol": "hls",
+                            "VideoCodec": "h264",
+                            "AudioCodec": "aac",
+                            "Context": "Streaming",
+                            "EnableMpegtsM2TsMode": True,
+                        }
+                    ],
+                    "CodecProfiles": [],
+                    "SubtitleProfiles": [
+                        {"Format": "vtt", "Method": "External"},
+                        {"Format": "srt", "Method": "External"},
+                    ],
+                },
+            },
+        )
+        if not isinstance(payload, dict):
+            raise MediaProviderError("Jellyfin returned invalid playback info")
+        sources = payload.get("MediaSources")
+        if not isinstance(sources, list) or not sources:
+            raise MediaProviderError("Jellyfin returned no playable media source")
+        source = next((entry for entry in sources if isinstance(entry, dict)), None)
+        if source is None:
+            raise MediaProviderError("Jellyfin returned no playable media source")
+
+        media_source_id = str(source.get("Id") or "").strip()
+        if not media_source_id:
+            raise MediaProviderError("Jellyfin playback source has no ID")
+
+        runtime = source.get("RunTimeTicks")
+        duration_ticks = runtime if isinstance(runtime, int) and runtime >= 0 else None
+        supports_direct_play = bool(source.get("SupportsDirectPlay"))
+        supports_direct_stream = bool(source.get("SupportsDirectStream"))
+        supports_transcoding = bool(source.get("SupportsTranscoding"))
+
+        raw_stream_url = source.get("TranscodingUrl") or source.get("DirectStreamUrl")
+        if not isinstance(raw_stream_url, str) or not raw_stream_url.strip():
+            raise MediaProviderError("Jellyfin did not return a browser stream URL")
+        stream_path = _safe_playback_stream_path(raw_stream_url, normalized_id)
+
+        tracks: list[dict[str, Any]] = []
+        streams = source.get("MediaStreams")
+        if isinstance(streams, list):
+            for stream in streams:
+                if not isinstance(stream, dict):
+                    continue
+                kind = str(stream.get("Type") or "").strip().lower()
+                if kind not in {"audio", "subtitle"}:
+                    continue
+                index = stream.get("Index")
+                if not isinstance(index, int):
+                    continue
+                language = stream.get("Language")
+                codec = stream.get("Codec")
+                tracks.append(
+                    {
+                        "index": index,
+                        "kind": kind,
+                        "label": str(
+                            stream.get("DisplayTitle")
+                            or stream.get("Title")
+                            or ("Audio" if kind == "audio" else "Subtitle")
+                        ).strip(),
+                        "language": (
+                            str(language).strip()
+                            if language is not None and str(language).strip()
+                            else None
+                        ),
+                        "codec": (
+                            str(codec).strip()
+                            if codec is not None and str(codec).strip()
+                            else None
+                        ),
+                        "default": bool(stream.get("IsDefault")),
+                        "forced": bool(stream.get("IsForced")),
+                    }
+                )
+
+        return {
+            "media_source_id": media_source_id,
+            "duration_ticks": duration_ticks,
+            "can_seek": bool(
+                supports_direct_play or supports_direct_stream or supports_transcoding
+            ),
+            "supports_direct_play": supports_direct_play,
+            "supports_direct_stream": supports_direct_stream,
+            "supports_transcoding": supports_transcoding,
+            "tracks": tuple(tracks),
+            "stream_path": stream_path,
+        }
+
     def preview_delete_item(
         self,
         item_id: str,
@@ -368,36 +577,45 @@ class JellyfinProvider:
 
         return None
 
-    def _get_json(self, path: str) -> Any:
-        """Perform an authenticated Jellyfin JSON request."""
-
+    def _request_json(
+        self,
+        path: str,
+        *,
+        method: str = "GET",
+        payload: dict[str, Any] | None = None,
+    ) -> Any:
         if not self.api_key.strip():
             raise MediaProviderError(
                 "ATLAS_JELLYFIN_API_KEY is required"
             )
 
+        body = None
+        headers = {
+            "Accept": "application/json",
+            "X-Emby-Token": self.api_key.strip(),
+        }
+        if payload is not None:
+            body = json.dumps(payload).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+
         request = Request(
             f"{self.base_url.rstrip('/')}{path}",
-            headers={
-                "Accept": "application/json",
-                "X-Emby-Token": self.api_key.strip(),
-            },
+            data=body,
+            headers=headers,
+            method=method,
         )
 
         try:
-            with urlopen(
-                request,
-                timeout=self.timeout,
-            ) as response:
-                return json.loads(
-                    response.read().decode("utf-8")
-                )
+            with urlopen(request, timeout=self.timeout) as response:
+                raw = response.read()
+                if not raw:
+                    return None
+                return json.loads(raw.decode("utf-8"))
         except HTTPError as exc:
             if exc.code == 404:
                 raise _JellyfinResourceNotFoundError(
                     "Jellyfin resource not found"
                 ) from exc
-
             raise MediaProviderError(
                 f"Jellyfin request failed with HTTP {exc.code}"
             ) from exc
@@ -405,14 +623,32 @@ class JellyfinProvider:
             raise MediaProviderError(
                 f"Jellyfin is unreachable: {exc}"
             ) from exc
-        except (
-            UnicodeDecodeError,
-            json.JSONDecodeError,
-        ) as exc:
-            raise MediaProviderError(
-                "Jellyfin returned invalid JSON"
-            ) from exc
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise MediaProviderError("Jellyfin returned invalid JSON") from exc
 
+    def _get_json(self, path: str) -> Any:
+        return self._request_json(path)
+
+
+
+def _safe_playback_stream_path(raw_url: str, expected_item_id: str) -> str:
+    parsed = urlsplit(raw_url.strip())
+    if parsed.scheme or parsed.netloc or parsed.fragment:
+        raise MediaProviderError("Jellyfin returned a non-relative playback URL")
+    components = [part for part in parsed.path.split("/") if part]
+    if len(components) < 3 or components[0].lower() != "videos":
+        raise MediaProviderError("Jellyfin returned an unexpected playback path")
+    if components[1].replace("-", "").lower() != expected_item_id.replace("-", "").lower():
+        raise MediaProviderError(
+            "Jellyfin playback path did not match the playable item"
+        )
+    forbidden = {"apikey", "api_key", "token", "x-emby-token"}
+    safe_query = [
+        (name, value)
+        for name, value in parse_qsl(parsed.query, keep_blank_values=True)
+        if name.lower() not in forbidden
+    ]
+    return urlunsplit(("", "", parsed.path, urlencode(safe_query), ""))
 
 def default_jellyfin_provider() -> JellyfinProvider:
     """Build the configured Jellyfin provider."""

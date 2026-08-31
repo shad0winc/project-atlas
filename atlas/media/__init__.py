@@ -31,7 +31,9 @@ from atlas.media.mutations import (
 from atlas.media.playback import (
     PlaybackAction,
     PlaybackActionKind,
+    PlaybackSession,
     PlaybackSourceType,
+    PlaybackTrack,
 )
 from atlas.media.provider import (
     MediaItem,
@@ -49,7 +51,9 @@ __all__ = [
     "JellyfinProvider",
     "PlaybackAction",
     "PlaybackActionKind",
+    "PlaybackSession",
     "PlaybackSourceType",
+    "PlaybackTrack",
     "MEDIA_LIBRARY_IDS",
     "MediaLibraryDetail",
     "MediaLibraryDetailStatus",
