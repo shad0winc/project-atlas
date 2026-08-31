@@ -135,6 +135,19 @@ class Handler(BaseHTTPRequestHandler):
         }
 
     @staticmethod
+    def _safe_event(event: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "provider": str(event.get("provider", "")).strip(),
+            "provider_event_id": str(event.get("provider_event_id", "")).strip(),
+            "name": str(event.get("name", "")).strip(),
+            "sport": str(event.get("sport", "") or "").strip(),
+            "league": str(event.get("league", "") or "").strip(),
+            "start_at": event.get("start_at"),
+            "status": str(event.get("status", "")).strip(),
+            "requested": bool(event.get("requested", False)),
+        }
+
+    @staticmethod
     def _user_subscriptions(user_id: str) -> list[dict[str, Any]]:
         result: list[dict[str, Any]] = []
         for raw in load_subscriptions():
@@ -257,7 +270,7 @@ class Handler(BaseHTTPRequestHandler):
             if not provider_event_id:
                 continue
             event["requested"] = provider_event_id in requested_ids
-            events.append(event)
+            events.append(self._safe_event(event))
         self._json(HTTPStatus.OK, {"events": events})
 
     def do_POST(self) -> None:
