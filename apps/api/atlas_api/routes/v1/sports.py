@@ -23,6 +23,7 @@ from atlas_api.schemas.sports import (
     SportsFollowCreateRequest,
     SportsFollowListResponse,
     SportsFollowResponse,
+    SportsRecordingIntentRequest,
     SportsSearchResponse,
     SportsSearchResultResponse,
 )
@@ -32,6 +33,8 @@ from atlas_api.services.sports import (
     SportsEventNotFoundError,
     SportsProviderNotFoundError,
     SportsProviderRateLimitError,
+    SportsRecordingTargetUnsupportedError,
+    SportsSubscriptionNotFoundError,
     SportsWriterTransportError,
     build_default_sports_api_service,
 )
@@ -40,6 +43,9 @@ from atlas_api.services.sports import (
 SPORTS_READ_PERMISSION: Final = "sports.read"
 SPORTS_EVENTS_REQUEST_PERMISSION: Final = (
     "sports.events.request"
+)
+SPORTS_RECORDINGS_MANAGE_PERMISSION: Final = (
+    "sports.recordings.manage"
 )
 
 router = APIRouter(
@@ -53,6 +59,9 @@ require_sports_read = require_permission(
 
 require_sports_events_request = require_permission(
     SPORTS_EVENTS_REQUEST_PERMISSION
+)
+require_sports_recordings_manage = require_permission(
+    SPORTS_RECORDINGS_MANAGE_PERMISSION
 )
 
 
@@ -293,6 +302,48 @@ def create_sports_follow(
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
     if not created:
         response.status_code = status.HTTP_200_OK
+    return _follow_response(subscription)
+
+
+@router.patch(
+    "/follows/{subscription_id}/recording",
+    response_model=SportsFollowResponse,
+    summary="Update recording intent for an event subscription",
+)
+def update_sports_recording_intent(
+    subscription_id: str,
+    request: SportsRecordingIntentRequest,
+    current_user: Annotated[
+        AuthenticatedUser,
+        Depends(require_sports_recordings_manage),
+    ],
+    service: Annotated[
+        SportsAPIService,
+        Depends(get_sports_api_service),
+    ],
+) -> SportsFollowResponse:
+    try:
+        subscription = service.update_follow_recording(
+            user_id=current_user.user_id,
+            subscription_id=subscription_id,
+            record=request.record,
+        )
+    except SportsSubscriptionNotFoundError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(error),
+        ) from error
+    except SportsRecordingTargetUnsupportedError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(error),
+        ) from error
+    except SportsWriterTransportError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(error),
+        ) from error
+
     return _follow_response(subscription)
 
 

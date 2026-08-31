@@ -24,6 +24,14 @@ class SportsEventNotFoundError(SportsError):
     """Requested Sports event does not exist."""
 
 
+class SportsSubscriptionNotFoundError(SportsError):
+    """Requested Sports subscription does not exist for the user."""
+
+
+class SportsRecordingTargetUnsupportedError(SportsError):
+    """Recording intent is unsupported for the requested target."""
+
+
 CreateSubscription = Callable[
     [str, str, str, str, str],
     tuple[dict[str, Any], bool],
@@ -353,6 +361,31 @@ class SportsWriterBackedAPIService:
             raise SportsWriterTransportError("Private Sports service returned an invalid removal payload.")
         return removed
 
+    def update_follow_recording(
+        self,
+        *,
+        user_id: str,
+        subscription_id: str,
+        record: bool,
+    ) -> dict[str, Any]:
+        payload = self._request(
+            "PATCH",
+            "/internal/v1/subscriptions/"
+            + urllib.parse.quote(subscription_id, safe="")
+            + "/recording",
+            {
+                "user_id": user_id,
+                "record": record,
+            },
+        )
+        subscription = payload.get("subscription")
+        if not isinstance(subscription, dict):
+            raise SportsWriterTransportError(
+                "Private Sports service returned an invalid subscription payload."
+            )
+        return dict(subscription)
+
+
     def _request(
         self,
         method: str,
@@ -398,6 +431,10 @@ class SportsWriterBackedAPIService:
                 raise SportsProviderNotFoundError(message) from exc
             if code == "event_not_found":
                 raise SportsEventNotFoundError(message) from exc
+            if code == "sports_subscription_not_found":
+                raise SportsSubscriptionNotFoundError(message) from exc
+            if code == "sports_recording_target_unsupported":
+                raise SportsRecordingTargetUnsupportedError(message) from exc
             if code == "sports_provider_rate_limited":
                 retry_after_raw = error_payload.get(
                     "retry_after_seconds",

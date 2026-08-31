@@ -11,6 +11,7 @@ import {
   requestSportsEvent,
   searchSports,
   unfollowSports,
+  updateSportsRecordingIntent,
   type SportsEvent,
   type SportsFollow,
   type SportsRequestInput,
@@ -147,6 +148,48 @@ export function SportsPageClient(): React.ReactElement {
     return subscription;
   }
 
+  async function handleSetRecording(
+    event: SportsEvent,
+    record: boolean
+  ): Promise<void> {
+    let eventFollow = follows.find(
+      (follow) =>
+        follow.type === "event" &&
+        follow.provider === event.provider &&
+        follow.providerId === event.providerEventId
+    );
+
+    if (!eventFollow) {
+      const created = await followSports("event", event.providerEventId);
+      eventFollow = created;
+      setFollows((current) =>
+        current.some((item) => item.subscriptionId === created.subscriptionId)
+          ? current
+          : [...current, created]
+      );
+      setEvents((current) =>
+        current.map((item) =>
+          item.provider === event.provider &&
+          item.providerEventId === event.providerEventId
+            ? { ...item, requested: true }
+            : item
+        )
+      );
+    }
+
+    const updated = await updateSportsRecordingIntent(
+      eventFollow.subscriptionId,
+      record
+    );
+    setFollows((current) =>
+      current.some((item) => item.subscriptionId === updated.subscriptionId)
+        ? current.map((item) =>
+            item.subscriptionId === updated.subscriptionId ? updated : item
+          )
+        : [...current, updated]
+    );
+  }
+
   return (
     <PortalPage
       accessDeniedDescription="Your Atlas account does not have permission to browse Sports events."
@@ -189,6 +232,7 @@ export function SportsPageClient(): React.ReactElement {
           onBrowse={handleBrowse}
           onFollow={handleFollow}
           onRequestEvent={handleRequestEvent}
+          onSetRecording={handleSetRecording}
           onSearch={handleSearch}
           onUnfollow={handleUnfollow}
           searchResults={searchResults}

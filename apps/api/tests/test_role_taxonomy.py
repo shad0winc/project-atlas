@@ -62,6 +62,7 @@ def test_member_includes_standard_sports_consumer_permissions() -> None:
 
     assert "sports.read" in role.permissions
     assert "sports.events.request" in role.permissions
+    assert "sports.recordings.manage" in role.permissions
     assert "sports.*" not in role.permissions
 
 
@@ -75,5 +76,6 @@ def test_sports_administrator_matches_current_sports_contract_only() -> None:
         {
             "sports.events.request",
             "sports.read",
+            "sports.recordings.manage",
         }
     )

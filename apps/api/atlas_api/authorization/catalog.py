@@ -138,6 +138,7 @@ _BUILT_IN_ROLES: dict[str, RoleDefinition] = {
             {
                 "sports.events.request",
                 "sports.read",
+                "sports.recordings.manage",
             }
         ),
     ),
@@ -221,6 +222,7 @@ _BUILT_IN_ROLES: dict[str, RoleDefinition] = {
                 "requests.read",
                 "sports.events.request",
                 "sports.read",
+                "sports.recordings.manage",
                 "users.self.read",
                 "users.self.update",
             }

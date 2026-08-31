@@ -94,6 +94,7 @@ def _load_private_sports_api_for_failure_test(monkeypatch):
     subscriptions_module.create_subscription = lambda *args, **kwargs: ({}, True)
     subscriptions_module.normalize_subscription = lambda subscription: dict(subscription)
     subscriptions_module.remove_subscription = lambda subscription_id: True
+    subscriptions_module.update_subscription_recording = lambda subscription_id, user_id, record: None
 
     monkeypatch.setitem(sys.modules, "providers", providers_package)
     monkeypatch.setitem(sys.modules, "providers.registry", registry_module)

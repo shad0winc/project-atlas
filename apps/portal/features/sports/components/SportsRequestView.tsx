@@ -24,6 +24,7 @@ export type SportsRequestViewProps = Readonly<{
   onUnfollow: (subscriptionId: string) => Promise<void>;
   onBrowse: (type: "team" | "league", providerId: string) => Promise<void>;
   onRequestEvent: (input: SportsRequestInput) => Promise<SportsSubscription>;
+  onSetRecording: (event: SportsEvent, record: boolean) => Promise<void>;
 }>;
 
 export function SportsRequestView({
@@ -35,7 +36,8 @@ export function SportsRequestView({
   onFollow,
   onUnfollow,
   onBrowse,
-  onRequestEvent
+  onRequestEvent,
+  onSetRecording
 }: SportsRequestViewProps): React.ReactElement {
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState<"team" | "league">("team");
@@ -260,6 +262,14 @@ export function SportsRequestView({
           {events.map((event) => {
             const identity = `${event.provider}:${event.providerEventId}`;
             const pendingIdentity = `event:${identity}`;
+            const recordingIdentity = `recording:${identity}`;
+            const eventFollow = follows.find(
+              (follow) =>
+                follow.type === "event" &&
+                follow.provider === event.provider &&
+                follow.providerId === event.providerEventId
+            );
+            const recording = Boolean(eventFollow?.record);
 
             return (
               <article className="request-card" key={identity}>
@@ -306,6 +316,25 @@ export function SportsRequestView({
                     : pending === pendingIdentity
                       ? "Requesting..."
                       : "Request event"}
+                </button>
+
+
+                <button
+                  className="requests-refresh-button"
+                  disabled={pending === recordingIdentity}
+                  onClick={() => {
+                    void mutate(
+                      recordingIdentity,
+                      () => onSetRecording(event, !recording)
+                    );
+                  }}
+                  type="button"
+                >
+                  {pending === recordingIdentity
+                    ? "Updating recording..."
+                    : recording
+                      ? "Cancel recording"
+                      : "Record event"}
                 </button>
               </article>
             );
