@@ -31,6 +31,7 @@ from atlas_api.services.sports import (
     SportsAPIService,
     SportsEventNotFoundError,
     SportsProviderNotFoundError,
+    SportsProviderRateLimitError,
     SportsWriterTransportError,
     build_default_sports_api_service,
 )
@@ -204,6 +205,17 @@ def search_sports_teams(
 ) -> SportsSearchResponse:
     try:
         items = service.search_teams(provider_name=provider, query=query)
+    except SportsProviderRateLimitError as error:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                "Sports provider is temporarily rate limited. "
+                "Try again shortly."
+            ),
+            headers={
+                "Retry-After": str(error.retry_after_seconds),
+            },
+        ) from error
     except (SportsProviderNotFoundError, SportsWriterTransportError) as error:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
     return SportsSearchResponse(results=[SportsSearchResultResponse(**item) for item in items])
@@ -218,6 +230,17 @@ def search_sports_leagues(
 ) -> SportsSearchResponse:
     try:
         items = service.search_leagues(provider_name=provider, query=query)
+    except SportsProviderRateLimitError as error:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                "Sports provider is temporarily rate limited. "
+                "Try again shortly."
+            ),
+            headers={
+                "Retry-After": str(error.retry_after_seconds),
+            },
+        ) from error
     except (SportsProviderNotFoundError, SportsWriterTransportError) as error:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
     return SportsSearchResponse(results=[SportsSearchResultResponse(**item) for item in items])

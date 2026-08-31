@@ -220,6 +220,19 @@ def _load_sports_module_env(
         )
 
 
+class SportsProviderRateLimitError(SportsError):
+    def __init__(
+        self,
+        message: str,
+        retry_after_seconds: int,
+    ) -> None:
+        self.retry_after_seconds = max(
+            1,
+            min(int(retry_after_seconds), 300),
+        )
+        super().__init__(message)
+
+
 class SportsWriterTransportError(SportsError):
     """Private Sports service could not satisfy an API request."""
 
@@ -385,6 +398,20 @@ class SportsWriterBackedAPIService:
                 raise SportsProviderNotFoundError(message) from exc
             if code == "event_not_found":
                 raise SportsEventNotFoundError(message) from exc
+            if code == "sports_provider_rate_limited":
+                retry_after_raw = error_payload.get(
+                    "retry_after_seconds",
+                    exc.headers.get("Retry-After", "60"),
+                )
+                try:
+                    retry_after = int(retry_after_raw)
+                except (TypeError, ValueError):
+                    retry_after = 60
+                raise SportsProviderRateLimitError(
+                    message
+                    or "Sports provider is temporarily rate limited.",
+                    retry_after,
+                ) from exc
             raise SportsWriterTransportError(message) from exc
         except (
             urllib.error.URLError,
