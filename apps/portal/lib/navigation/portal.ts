@@ -15,9 +15,11 @@ export type PortalRouteSection = (typeof PORTAL_ROUTE_SECTIONS)[keyof typeof POR
 export type PortalRouteId =
   | "dashboard"
   | "media"
+  | "library"
   | "favorites"
   | "requests"
   | "sports"
+  | "theater"
   | "downloads"
   | "downloadManagement"
   | "users"
@@ -40,6 +42,7 @@ export type PortalRoute = Readonly<{
   abbreviation: string;
   permission: AtlasPermission;
   section: PortalRouteSection;
+  navigation?: boolean;
   pageDescription?: string;
 }>;
 
@@ -70,6 +73,16 @@ export const portalRoutes: readonly PortalRoute[] = [
     pageDescription: "Browse and search movies and TV shows available through Atlas."
   },
   {
+    id: "library",
+    path: "/portal/library",
+    label: "Library",
+    navigationDescription: "Available media and request status",
+    abbreviation: "LI",
+    permission: ATLAS_PERMISSIONS.mediaRead,
+    section: PORTAL_ROUTE_SECTIONS.workspace,
+    pageDescription: "Watch available media and follow the lifecycle of media requested through Atlas."
+  },
+  {
     id: "favorites",
     path: "/portal/favorites",
     label: "Favorites",
@@ -86,7 +99,8 @@ export const portalRoutes: readonly PortalRoute[] = [
     navigationDescription: "Media requests and approvals",
     abbreviation: "RQ",
     permission: ATLAS_PERMISSIONS.requestsRead,
-    section: PORTAL_ROUTE_SECTIONS.workspace
+    section: PORTAL_ROUTE_SECTIONS.workspace,
+    navigation: false
   },
   {
     id: "sports",
@@ -99,13 +113,24 @@ export const portalRoutes: readonly PortalRoute[] = [
     pageDescription: "Browse upcoming supported sporting events and request one through Atlas."
   },
   {
+    id: "theater",
+    path: "/portal/theater",
+    label: "Theater",
+    navigationDescription: "Watch media through Atlas",
+    abbreviation: "TH",
+    permission: ATLAS_PERMISSIONS.mediaRead,
+    section: PORTAL_ROUTE_SECTIONS.workspace,
+    pageDescription: "Open your Atlas playback hub or continue to an exact playable item."
+  },
+  {
     id: "downloads",
     path: "/portal/downloads",
     label: "Downloads",
     navigationDescription: "Download activity and status",
     abbreviation: "DL",
     permission: ATLAS_PERMISSIONS.monitoringRead,
-    section: PORTAL_ROUTE_SECTIONS.workspace
+    section: PORTAL_ROUTE_SECTIONS.workspace,
+    navigation: false
   },
   {
     id: "downloadManagement",
@@ -153,7 +178,7 @@ export const portalRoutes: readonly PortalRoute[] = [
     navigationDescription: "Portal preferences",
     abbreviation: "ST",
     permission: ATLAS_PERMISSIONS.usersSelfRead,
-    section: PORTAL_ROUTE_SECTIONS.management
+    section: PORTAL_ROUTE_SECTIONS.workspace
   }
 ];
 
@@ -170,9 +195,11 @@ function routeById(routeId: PortalRouteId): PortalRoute {
 export const PORTAL_ROUTES = {
   dashboard: routeById("dashboard"),
   media: routeById("media"),
+  library: routeById("library"),
   favorites: routeById("favorites"),
   requests: routeById("requests"),
   sports: routeById("sports"),
+  theater: routeById("theater"),
   downloads: routeById("downloads"),
   downloadManagement: routeById("downloadManagement"),
   users: routeById("users"),
@@ -221,13 +248,19 @@ function navigationSectionsFromRoutes(
  * Navigation is a projection of the canonical route model.
  */
 export const portalNavigationSections: readonly PortalNavigationSection[] =
-  navigationSectionsFromRoutes(portalRoutes);
+  navigationSectionsFromRoutes(
+    portalRoutes.filter((route) => route.navigation !== false)
+  );
 
 export function visiblePortalNavigationSections(
   authorization: AtlasEffectivePermissionPatterns
 ): readonly PortalNavigationSection[] {
   return navigationSectionsFromRoutes(
-    portalRoutes.filter((route) => hasAtlasPermission(authorization, route.permission))
+    portalRoutes.filter(
+      (route) =>
+        route.navigation !== false &&
+        hasAtlasPermission(authorization, route.permission)
+    )
   );
 }
 

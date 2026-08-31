@@ -4,7 +4,12 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { PortalPage } from "../../../../components/portal/PortalPage";
+import { MediaCatalogView } from "../../../../features/media";
 import { loadPlaybackAction } from "../../../../features/playback/api/playback";
+import { PORTAL_ROUTES } from "../../../../lib/navigation/portal";
+
+const theaterRoute = PORTAL_ROUTES.theater;
 
 type TheaterState =
   | Readonly<{ status: "loading" }>
@@ -59,12 +64,29 @@ export function TheaterPageClient(): React.ReactElement {
 
   if (!hasValidTarget) {
     return (
-      <section aria-labelledby="theater-error-title">
-        <p className="portal-page-eyebrow">Theater</p>
-        <h1 id="theater-error-title">Playback unavailable</h1>
-        <p>Atlas Theater did not receive a valid playback target.</p>
-        <Link href="/portal/media">Return to Media</Link>
-      </section>
+      <PortalPage
+        accessDeniedDescription="Your Atlas account does not have permission to use Theater."
+        description={
+          theaterRoute.pageDescription ??
+          "Open your Atlas playback hub or continue to an exact playable item."
+        }
+        eyebrow={theaterRoute.label}
+        permission={theaterRoute.permission}
+        title="Theater"
+      >
+        <section aria-labelledby="theater-library-title" className="media-discovery-view">
+          <div className="media-discovery-results-header">
+            <div>
+              <p className="media-discovery-eyebrow">Playback hub</p>
+              <h2 id="theater-library-title">Available to watch</h2>
+              <p className="media-discovery-overview">
+                Choose an available item and Atlas will hand playback to Jellyfin.
+              </p>
+            </div>
+          </div>
+          <MediaCatalogView />
+        </section>
+      </PortalPage>
     );
   }
 

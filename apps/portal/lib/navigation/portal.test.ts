@@ -33,9 +33,11 @@ describe("Portal route model", () => {
     expect(portalRoutes.map((route) => route.id)).toEqual([
       "dashboard",
       "media",
+      "library",
       "favorites",
       "requests",
       "sports",
+      "theater",
       "downloads",
       "downloadManagement",
       "users",
@@ -54,6 +56,8 @@ describe("Portal route model", () => {
   it("provides stable named route access", () => {
     expect(PORTAL_ROUTES.dashboard.path).toBe("/portal");
     expect(PORTAL_ROUTES.media.path).toBe("/portal/media");
+    expect(PORTAL_ROUTES.library.path).toBe("/portal/library");
+    expect(PORTAL_ROUTES.theater.path).toBe("/portal/theater");
     expect(PORTAL_ROUTES.media.navigationDescription).toBe("Browse and search movies and TV shows");
     expect(PORTAL_ROUTES.media.pageDescription).toBe(
       "Browse and search movies and TV shows available through Atlas."
@@ -72,13 +76,20 @@ describe("Portal route model", () => {
     ).toEqual([
       {
         label: PORTAL_ROUTE_SECTIONS.workspace,
-        routes: ["dashboard", "media", "favorites", "requests", "sports", "downloads"]
+        routes: ["dashboard", "media", "library", "favorites", "sports", "theater", "settings"]
       },
       {
         label: PORTAL_ROUTE_SECTIONS.management,
-        routes: ["downloadManagement", "users", "services", "administration", "settings"]
+        routes: ["downloadManagement", "users", "services", "administration"]
       }
     ]);
+  });
+
+  it("keeps legacy Requests and Downloads routes registered but out of navigation", () => {
+    expect(PORTAL_ROUTES.requests.path).toBe("/portal/requests");
+    expect(PORTAL_ROUTES.downloads.path).toBe("/portal/downloads");
+    expect(PORTAL_ROUTES.requests.navigation).toBe(false);
+    expect(PORTAL_ROUTES.downloads.navigation).toBe(false);
   });
 
   it("matches the dashboard only at its exact path", () => {
@@ -121,7 +132,14 @@ describe("Portal navigation authorization", () => {
           "users.self.read"
         ])
       )
-    ).toEqual(["Dashboard", "Media", "Favorites", "Requests", "Settings"]);
+    ).toEqual([
+      "Dashboard",
+      "Media",
+      "Library",
+      "Favorites",
+      "Theater",
+      "Settings"
+    ]);
   });
 
   it("hides management navigation without effective grants", () => {
@@ -143,15 +161,15 @@ describe("Portal navigation authorization", () => {
     expect(visibleLabels(authorization(["*"]))).toEqual([
       "Dashboard",
       "Media",
+      "Library",
       "Favorites",
-      "Requests",
       "Sports",
-      "Downloads",
+      "Theater",
+      "Settings",
       "Download Management",
       "Users",
       "Services",
-      "Administration",
-      "Settings"
+      "Administration"
     ]);
   });
 
@@ -159,14 +177,14 @@ describe("Portal navigation authorization", () => {
     expect(visibleLabels(authorization(["*.read"]))).toEqual([
       "Dashboard",
       "Media",
+      "Library",
       "Favorites",
-      "Requests",
       "Sports",
-      "Downloads",
+      "Theater",
+      "Settings",
       "Users",
       "Services",
-      "Administration",
-      "Settings"
+      "Administration"
     ]);
   });
 
@@ -176,11 +194,11 @@ describe("Portal navigation authorization", () => {
     ).toEqual([
       "Dashboard",
       "Media",
-      "Requests",
+      "Library",
       "Sports",
-      "Downloads",
-      "Download Management",
-      "Settings"
+      "Theater",
+      "Settings",
+      "Download Management"
     ]);
   });
 
