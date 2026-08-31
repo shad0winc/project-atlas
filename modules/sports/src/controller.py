@@ -153,6 +153,7 @@ def process_games(
             current_state,
         ):
             publish_event(
+                "sports",
                 "sports.game-started",
                 {
                     "game_id": game_id,
@@ -185,6 +186,7 @@ def process_games(
             current_state,
         ):
             publish_event(
+                "sports",
                 "sports.game-finished",
                 {
                     "game_id": game_id,
