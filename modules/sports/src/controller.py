@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from feed import generate_feed
+from atlas.events import publish_event
 
 from lifecycle import (
     lifecycle_state,
