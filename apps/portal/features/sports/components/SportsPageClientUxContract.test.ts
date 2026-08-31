@@ -13,6 +13,18 @@ describe("Sports page UX coordination", () => {
     );
   });
 
+  it("adds a requested event to local follow state without a reload", () => {
+    expect(source).toContain(
+      "providerId: subscription.providerEventId"
+    );
+    expect(source).toContain(
+      "subscriptionId: subscription.subscriptionId"
+    );
+    expect(source).toContain(
+      "record: false"
+    );
+  });
+
   it("scrolls to Upcoming Events after browse succeeds", () => {
     expect(source).toContain(
       'getElementById("sports-upcoming-events")'
