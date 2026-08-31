@@ -96,8 +96,30 @@ class PlaybackSessionResponse(BaseModel):
             can_seek=session.can_seek,
             playback_bootstrap_url=playback_bootstrap_url,
             playback_capability=playback_capability,
-            audio_tracks=tuple(PlaybackTrackResponse(**track.__dict__) for track in session.audio_tracks),
-            subtitle_tracks=tuple(PlaybackTrackResponse(**track.__dict__) for track in session.subtitle_tracks),
+            audio_tracks=tuple(
+                PlaybackTrackResponse(
+                    index=track.index,
+                    kind=track.kind,
+                    label=track.label,
+                    language=track.language,
+                    codec=track.codec,
+                    default=track.default,
+                    forced=track.forced,
+                )
+                for track in session.audio_tracks
+            ),
+            subtitle_tracks=tuple(
+                PlaybackTrackResponse(
+                    index=track.index,
+                    kind=track.kind,
+                    label=track.label,
+                    language=track.language,
+                    codec=track.codec,
+                    default=track.default,
+                    forced=track.forced,
+                )
+                for track in session.subtitle_tracks
+            ),
             previous_target_id=session.previous_target_id,
             next_target_id=session.next_target_id,
         )
