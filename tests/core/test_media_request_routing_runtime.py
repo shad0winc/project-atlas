@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_ingress_passes_tv_routing_without_hard_coded_ids() -> None:
+def test_ingress_passes_media_routing_without_hard_coded_ids() -> None:
     content = (
         ROOT
         / "stack"
@@ -18,8 +18,18 @@ def test_ingress_passes_tv_routing_without_hard_coded_ids() -> None:
     )
 
     assert (
+        'ATLAS_JELLYSEERR_MOVIE_SERVER_ID: '
+        '"${ATLAS_JELLYSEERR_MOVIE_SERVER_ID:-}"'
+        in content
+    )
+    assert (
         'ATLAS_JELLYSEERR_TV_SERVER_ID: '
         '"${ATLAS_JELLYSEERR_TV_SERVER_ID:-}"'
+        in content
+    )
+    assert (
+        'ATLAS_JELLYSEERR_ANIME_MOVIE_SERVER_ID: '
+        '"${ATLAS_JELLYSEERR_ANIME_MOVIE_SERVER_ID:-}"'
         in content
     )
     assert (
@@ -38,7 +48,7 @@ def test_ingress_passes_tv_routing_without_hard_coded_ids() -> None:
     )
 
 
-def test_environment_example_declares_explicit_tv_routes() -> None:
+def test_environment_example_declares_explicit_media_routes() -> None:
     content = (
         ROOT
         / ".env.example"
@@ -47,7 +57,15 @@ def test_environment_example_declares_explicit_tv_routes() -> None:
     )
 
     assert (
+        "ATLAS_JELLYSEERR_MOVIE_SERVER_ID="
+        in content
+    )
+    assert (
         "ATLAS_JELLYSEERR_TV_SERVER_ID="
+        in content
+    )
+    assert (
+        "ATLAS_JELLYSEERR_ANIME_MOVIE_SERVER_ID="
         in content
     )
     assert (

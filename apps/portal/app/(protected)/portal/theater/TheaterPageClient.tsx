@@ -41,7 +41,17 @@ export function TheaterPageClient(): React.ReactElement {
           throw new Error("Playback is not currently available.");
         }
 
-        window.location.replace(action.href);
+        const playbackWindow = window.open(
+          action.href,
+          "_blank",
+          "noopener,noreferrer"
+        );
+
+        if (playbackWindow === null) {
+          throw new Error(
+            "Playback window was blocked. Allow pop-ups for Atlas and try again."
+          );
+        }
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) {

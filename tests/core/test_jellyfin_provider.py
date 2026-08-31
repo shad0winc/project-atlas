@@ -68,7 +68,7 @@ class JellyfinProviderTests(unittest.TestCase):
                     "TotalRecordCount": 1,
                 }
             ),
-            Response([{"Name": "Movies", "Type": "CollectionFolder"}]),
+            Response([{"Name": "Movies", "Type": "Folder"}]),
         ]
         with patch(
             "atlas.media.jellyfin.urlopen",

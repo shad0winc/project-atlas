@@ -52,7 +52,9 @@ def _utc_now() -> datetime:
 class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
     """Translate Jellyseerr request resources into Atlas contracts."""
 
+    movie_server_id: int | None = None
     tv_server_id: int | None = None
+    anime_movie_server_id: int | None = None
     anime_tv_server_id: int | None = None
     clock: Clock = field(
         default=_utc_now,
@@ -65,22 +67,20 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
             self
         )
 
-        object.__setattr__(
-            self,
+        for field_name in (
+            "movie_server_id",
             "tv_server_id",
-            _optional_server_id(
-                self.tv_server_id,
-                "tv_server_id",
-            ),
-        )
-        object.__setattr__(
-            self,
+            "anime_movie_server_id",
             "anime_tv_server_id",
-            _optional_server_id(
-                self.anime_tv_server_id,
-                "anime_tv_server_id",
-            ),
-        )
+        ):
+            object.__setattr__(
+                self,
+                field_name,
+                _optional_server_id(
+                    getattr(self, field_name),
+                    field_name,
+                ),
+            )
 
     @property
     def name(self) -> str:
@@ -130,13 +130,9 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
                 "numeric TMDB identifier"
             )
 
-        if request.media_type in {
-            MediaRequestType.TV,
-            MediaRequestType.ANIME_TV,
-        }:
-            self._server_id_for(
-                request.media_type
-            )
+        self._server_id_for(
+            request.media_type
+        )
 
     def submit(
         self,
@@ -154,15 +150,16 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
             ),
         }
 
+        payload["serverId"] = (
+            self._server_id_for(
+                request.media_type
+            )
+        )
+
         if request.media_type in {
             MediaRequestType.TV,
             MediaRequestType.ANIME_TV,
         }:
-            payload["serverId"] = (
-                self._server_id_for(
-                    request.media_type
-                )
-            )
             payload["seasons"] = (
                 [request.season_number]
                 if request.season_number is not None
@@ -201,15 +198,21 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
         self,
         media_type: MediaRequestType,
     ) -> int:
-        if media_type is MediaRequestType.TV:
+        if media_type is MediaRequestType.MOVIE:
+            server_id = self.movie_server_id
+            label = "movie"
+        elif media_type is MediaRequestType.TV:
             server_id = self.tv_server_id
             label = "TV"
+        elif media_type is MediaRequestType.ANIME_MOVIE:
+            server_id = self.anime_movie_server_id
+            label = "anime movie"
         elif media_type is MediaRequestType.ANIME_TV:
             server_id = self.anime_tv_server_id
             label = "anime TV"
         else:
             raise MediaRequestProviderError(
-                "server routing is only valid for TV requests"
+                "server routing is not supported for this request type"
             )
 
         if server_id is None:
@@ -658,8 +661,14 @@ def default_jellyseerr_media_request_provider(
     return JellyseerrMediaRequestProvider(
         base_url=base_url,
         api_key=os.getenv("ATLAS_JELLYSEERR_API_KEY", ""),
+        movie_server_id=_environment_server_id(
+            "ATLAS_JELLYSEERR_MOVIE_SERVER_ID"
+        ),
         tv_server_id=_environment_server_id(
             "ATLAS_JELLYSEERR_TV_SERVER_ID"
+        ),
+        anime_movie_server_id=_environment_server_id(
+            "ATLAS_JELLYSEERR_ANIME_MOVIE_SERVER_ID"
         ),
         anime_tv_server_id=_environment_server_id(
             "ATLAS_JELLYSEERR_ANIME_TV_SERVER_ID"
