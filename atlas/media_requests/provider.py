@@ -180,9 +180,11 @@ class ProviderSubmissionResult:
             "updated_at",
         )
 
-        if updated_at is not None and updated_at < submitted_at:
-            raise MediaRequestProviderError(
-                "updated_at must not be earlier than submitted_at",
+        if updated_at is not None:
+            updated_at = _ordered_provider_timestamp(
+                submitted_at,
+                updated_at,
+                field_name="updated_at",
             )
 
         if (
@@ -414,6 +416,34 @@ class MediaRequestProvider(ABC):
 
 def _now_timestamp() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _timestamp_instant(value: str) -> datetime:
+    candidate = value[:-1] + "+00:00" if value.endswith("Z") else value
+    return datetime.fromisoformat(candidate).astimezone(timezone.utc)
+
+
+def _ordered_provider_timestamp(
+    submitted_at: str,
+    candidate: str,
+    *,
+    field_name: str,
+) -> str:
+    submitted_instant = _timestamp_instant(submitted_at)
+    candidate_instant = _timestamp_instant(candidate)
+
+    if candidate_instant >= submitted_instant:
+        return candidate
+
+    if (
+        submitted_instant.replace(microsecond=0)
+        == candidate_instant.replace(microsecond=0)
+    ):
+        return submitted_at
+
+    raise MediaRequestProviderError(
+        f"{field_name} must not be earlier than submitted_at",
+    )
 
 
 def _required_text(value: object, field_name: str) -> str:

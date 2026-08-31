@@ -346,6 +346,11 @@ atlas_update_ingress_apply() {
     --no-build \
     --pull never ||
     return 1
+
+  docker restart atlas-caddy >/dev/null || {
+    echo 'ERROR: unable to activate Caddy ingress configuration.' >&2
+    return 1
+  }
 }
 
 atlas_update_apply_scope() {
