@@ -54,6 +54,7 @@ def test_core_compose_limits_identity_network_to_jellyfin() -> None:
     assert "    name: atlas-identity\n" in content
     assert "      - atlas\n" in jellyfin
     assert "      - atlas-identity\n" in jellyfin
+    assert "      - atlas-ingress\n" in jellyfin
     assert content.count("      - atlas-identity\n") == 1
 
 
@@ -69,6 +70,10 @@ def test_ingress_api_has_read_only_identity_access() -> None:
         "/mnt/storage/configs/atlas/users:ro\n"
     ) in api
     assert '      ATLAS_JELLYFIN_URL: "http://jellyfin:8096"\n' in api
+    assert (
+        '      ATLAS_JELLYFIN_PUBLIC_URL: '
+        '"https://jellyfin.shadowinc.co"\n'
+    ) in api
     assert (
         '      ATLAS_JELLYFIN_API_KEY: '
         '"${ATLAS_JELLYFIN_API_KEY:'

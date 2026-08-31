@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { addFavorite } from "../../favorites";
+import { WatchAction } from "../../playback/components/WatchAction";
 
 import { ATLAS_PERMISSIONS } from "../../../lib/authorization/permissions";
 
@@ -95,6 +96,8 @@ export function MediaCatalogContent({
                 ) : null}
 
                 <p className="media-discovery-status">Provider: {item.provider}</p>
+
+                <WatchAction provider={item.provider} itemId={item.itemId} />
 
                 {canFavorite ? (
                   <button

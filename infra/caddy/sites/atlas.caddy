@@ -42,3 +42,14 @@ atlas.shadowinc.co {
                 }
         }
 }
+
+# Jellyfin is the playback/transcoding backend behind Atlas Theater.
+# End users enter playback through /portal/theater; this hostname exists as
+# the HTTPS transport destination for Jellyfin web/native clients.
+jellyfin.shadowinc.co {
+        import atlas_access_log
+
+        encode zstd gzip
+
+        reverse_proxy jellyfin:8096
+}

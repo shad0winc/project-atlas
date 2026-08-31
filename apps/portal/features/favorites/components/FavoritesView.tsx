@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { WatchAction } from "../../playback/components/WatchAction";
+
 import { ATLAS_PERMISSIONS, usePermission } from "../../../lib/authorization";
 
 import { useFavorites } from "../hooks/use-favorites";
@@ -81,6 +83,8 @@ function FavoriteCard({
           </dd>
         </div>
       </dl>
+
+      <WatchAction provider={favorite.provider} itemId={favorite.itemId} />
 
       {!canRemove ? (
         <p className="favorite-read-only">Read-only access</p>

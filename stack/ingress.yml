@@ -66,6 +66,7 @@ services:
 
     environment:
       ATLAS_JELLYFIN_URL: "http://jellyfin:8096"
+      ATLAS_JELLYFIN_PUBLIC_URL: "https://jellyfin.shadowinc.co"
       ATLAS_JELLYFIN_API_KEY: "${ATLAS_JELLYFIN_API_KEY:?ATLAS_JELLYFIN_API_KEY is required}"
       ATLAS_JELLYSEERR_URL: "http://jellyseerr:5055"
       ATLAS_JELLYSEERR_API_KEY: "${ATLAS_JELLYSEERR_API_KEY:?ATLAS_JELLYSEERR_API_KEY is required}"
