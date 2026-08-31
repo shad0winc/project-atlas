@@ -79,6 +79,10 @@ services:
       - /opt/project-atlas:/opt/project-atlas:ro
       - /mnt/storage/configs/sportyfin:/mnt/storage/configs/sportyfin
       - /mnt/storage/media/Sports:/mnt/storage/media/Sports
+      - /mnt/storage/configs/atlas/runtime/events.jsonl:/mnt/storage/configs/atlas/runtime/events.jsonl
+
+    group_add:
+      - "20000"
 
     security_opt:
       - no-new-privileges:true
