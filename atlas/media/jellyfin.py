@@ -356,7 +356,10 @@ class JellyfinProvider:
                 isinstance(ancestor, dict)
                 and str(
                     ancestor.get("Type") or ""
-                ).lower() == "collectionfolder"
+                ).lower() in {
+                    "collectionfolder",
+                    "folder",
+                }
             ):
                 name = ancestor.get("Name")
 
