@@ -214,3 +214,111 @@ def test_playback_info_forwards_subtitle_off():
     payload = json.loads(sent.data.decode("utf-8"))
 
     assert payload["SubtitleStreamIndex"] == -1
+
+
+
+def test_selected_subtitle_requests_jellyfin_burn_in() -> None:
+    provider = JellyfinProvider(
+        "http://jellyfin:8096",
+        "server-secret",
+    )
+
+    with patch(
+        "atlas.media.jellyfin.urlopen",
+        return_value=Response(
+            {
+                "MediaSources": [
+                    {
+                        "Id": "source-1",
+                        "SupportsDirectPlay": True,
+                        "SupportsDirectStream": True,
+                        "SupportsTranscoding": True,
+                        "TranscodingUrl": (
+                            "/videos/abc/master.m3u8"
+                            "?MediaSourceId=source-1"
+                            "&SubtitleStreamIndex=2"
+                        ),
+                        "MediaStreams": [
+                            {
+                                "Index": 2,
+                                "Type": "Subtitle",
+                                "Codec": "subrip",
+                                "DisplayTitle": "English",
+                                "IsDefault": False,
+                                "IsForced": False,
+                            }
+                        ],
+                    }
+                ]
+            }
+        ),
+    ) as request:
+        provider.get_playback_info(
+            "abc",
+            user_id="a" * 32,
+            subtitle_stream_index=2,
+        )
+
+    sent = request.call_args.args[0]
+    payload = json.loads(sent.data.decode("utf-8"))
+
+    assert payload["SubtitleStreamIndex"] == 2
+    assert (
+        payload["AlwaysBurnInSubtitleWhenTranscoding"]
+        is True
+    )
+
+    subtitle_profiles = payload["DeviceProfile"][
+        "SubtitleProfiles"
+    ]
+
+    assert {
+        "Format": "subrip",
+        "Method": "Encode",
+    } in subtitle_profiles
+
+    assert "server-secret" not in sent.data.decode("utf-8")
+
+
+def test_subtitle_off_does_not_request_burn_in() -> None:
+    provider = JellyfinProvider(
+        "http://jellyfin:8096",
+        "server-secret",
+    )
+
+    with patch(
+        "atlas.media.jellyfin.urlopen",
+        return_value=Response(
+            {
+                "MediaSources": [
+                    {
+                        "Id": "source-1",
+                        "SupportsDirectPlay": True,
+                        "SupportsDirectStream": True,
+                        "SupportsTranscoding": True,
+                        "TranscodingUrl": (
+                            "/videos/abc/master.m3u8"
+                            "?MediaSourceId=source-1"
+                        ),
+                        "MediaStreams": [],
+                    }
+                ]
+            }
+        ),
+    ) as request:
+        provider.get_playback_info(
+            "abc",
+            user_id="a" * 32,
+            subtitle_stream_index=-1,
+        )
+
+    sent = request.call_args.args[0]
+    payload = json.loads(sent.data.decode("utf-8"))
+
+    assert payload["SubtitleStreamIndex"] == -1
+    assert (
+        "AlwaysBurnInSubtitleWhenTranscoding"
+        not in payload
+    )
+
+    assert "server-secret" not in sent.data.decode("utf-8")

@@ -211,7 +211,7 @@ export function AtlasTheaterPlayer({
     try {
       const refreshed = await resolvePlaybackSession(
         activeSession.provider,
-        activeSession.requestedTargetId,
+        activeSession.playableTargetId,
         undefined,
         selection
       );
