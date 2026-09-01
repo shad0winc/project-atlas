@@ -290,48 +290,68 @@ class JellyfinProvider:
         item_id: str,
         *,
         user_id: str,
+        subtitle_stream_index: int | None = None,
     ) -> dict[str, Any]:
         normalized_id = _required(item_id, "item_id")
         normalized_user_id = _required(user_id, "user_id")
+
+        if (
+            subtitle_stream_index is not None
+            and (
+                isinstance(subtitle_stream_index, bool)
+                or not isinstance(subtitle_stream_index, int)
+                or subtitle_stream_index < -1
+            )
+        ):
+            raise MediaProviderError(
+                "subtitle_stream_index must be -1 or a non-negative integer"
+            )
+        playback_payload: dict[str, Any] = {
+            "UserId": normalized_user_id,
+            "EnableDirectPlay": True,
+            "EnableDirectStream": True,
+            "EnableTranscoding": True,
+            "AllowVideoStreamCopy": True,
+            "AllowAudioStreamCopy": True,
+            "DeviceProfile": {
+                "Name": "Atlas Theater Browser",
+                "MaxStreamingBitrate": 120000000,
+                "DirectPlayProfiles": [
+                    {
+                        "Container": "mp4,m4v",
+                        "Type": "Video",
+                        "VideoCodec": "h264",
+                        "AudioCodec": "aac,mp3,ac3,eac3",
+                    }
+                ],
+                "TranscodingProfiles": [
+                    {
+                        "Container": "ts",
+                        "Type": "Video",
+                        "Protocol": "hls",
+                        "VideoCodec": "h264",
+                        "AudioCodec": "aac",
+                        "Context": "Streaming",
+                        "EnableMpegtsM2TsMode": True,
+                    }
+                ],
+                "CodecProfiles": [],
+                "SubtitleProfiles": [
+                    {"Format": "vtt", "Method": "External"},
+                    {"Format": "srt", "Method": "External"},
+                ],
+            },
+        }
+
+        if subtitle_stream_index is not None:
+            playback_payload["SubtitleStreamIndex"] = (
+                subtitle_stream_index
+            )
+
         payload = self._request_json(
             f"/Items/{quote(normalized_id, safe='')}/PlaybackInfo",
             method="POST",
-            payload={
-                "UserId": normalized_user_id,
-                "EnableDirectPlay": True,
-                "EnableDirectStream": True,
-                "EnableTranscoding": True,
-                "AllowVideoStreamCopy": True,
-                "AllowAudioStreamCopy": True,
-                "DeviceProfile": {
-                    "Name": "Atlas Theater Browser",
-                    "MaxStreamingBitrate": 120000000,
-                    "DirectPlayProfiles": [
-                        {
-                            "Container": "mp4,m4v",
-                            "Type": "Video",
-                            "VideoCodec": "h264",
-                            "AudioCodec": "aac,mp3,ac3,eac3",
-                        }
-                    ],
-                    "TranscodingProfiles": [
-                        {
-                            "Container": "ts",
-                            "Type": "Video",
-                            "Protocol": "hls",
-                            "VideoCodec": "h264",
-                            "AudioCodec": "aac",
-                            "Context": "Streaming",
-                            "EnableMpegtsM2TsMode": True,
-                        }
-                    ],
-                    "CodecProfiles": [],
-                    "SubtitleProfiles": [
-                        {"Format": "vtt", "Method": "External"},
-                        {"Format": "srt", "Method": "External"},
-                    ],
-                },
-            },
+            payload=playback_payload,
         )
         if not isinstance(payload, dict):
             raise MediaProviderError("Jellyfin returned invalid playback info")

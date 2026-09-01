@@ -136,3 +136,81 @@ def test_series_episode_listing_is_browser_safe_and_ordered():
     serialized = json.dumps(episodes)
     assert "/media/private/" not in serialized
     assert "server-secret" not in serialized
+
+
+def test_playback_info_forwards_selected_subtitle_stream():
+    provider = JellyfinProvider(
+        "http://jellyfin:8096",
+        "server-secret",
+    )
+
+    with patch(
+        "atlas.media.jellyfin.urlopen",
+        return_value=Response(
+            {
+                "MediaSources": [
+                    {
+                        "Id": "source-1",
+                        "SupportsDirectPlay": True,
+                        "SupportsDirectStream": True,
+                        "SupportsTranscoding": True,
+                        "TranscodingUrl": (
+                            "/videos/abc/master.m3u8"
+                            "?MediaSourceId=source-1"
+                            "&SubtitleStreamIndex=2"
+                        ),
+                        "MediaStreams": [],
+                    }
+                ]
+            }
+        ),
+    ) as request:
+        provider.get_playback_info(
+            "abc",
+            user_id="a" * 32,
+            subtitle_stream_index=2,
+        )
+
+    sent = request.call_args.args[0]
+    payload = json.loads(sent.data.decode("utf-8"))
+
+    assert payload["SubtitleStreamIndex"] == 2
+    assert "server-secret" not in sent.data.decode("utf-8")
+
+
+def test_playback_info_forwards_subtitle_off():
+    provider = JellyfinProvider(
+        "http://jellyfin:8096",
+        "server-secret",
+    )
+
+    with patch(
+        "atlas.media.jellyfin.urlopen",
+        return_value=Response(
+            {
+                "MediaSources": [
+                    {
+                        "Id": "source-1",
+                        "SupportsDirectPlay": True,
+                        "SupportsDirectStream": True,
+                        "SupportsTranscoding": True,
+                        "TranscodingUrl": (
+                            "/videos/abc/master.m3u8"
+                            "?MediaSourceId=source-1"
+                        ),
+                        "MediaStreams": [],
+                    }
+                ]
+            }
+        ),
+    ) as request:
+        provider.get_playback_info(
+            "abc",
+            user_id="a" * 32,
+            subtitle_stream_index=-1,
+        )
+
+    sent = request.call_args.args[0]
+    payload = json.loads(sent.data.decode("utf-8"))
+
+    assert payload["SubtitleStreamIndex"] == -1

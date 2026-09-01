@@ -120,7 +120,14 @@ export function TheaterPageClient(): React.ReactElement {
               </p>
             </div>
           </div>
-          <AtlasTheaterPlayer session={state.session} />
+          <AtlasTheaterPlayer
+            key={[
+              state.session.provider,
+              state.session.requestedTargetId,
+              state.session.playableTargetId
+            ].join(":")}
+            session={state.session}
+          />
         </section>
       </PortalPage>
     );

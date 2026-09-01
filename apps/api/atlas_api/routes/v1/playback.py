@@ -5,7 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 
 from atlas.user_profiles import UserProfileError, UserProfileStore
 from atlas_api.auth.models import AuthenticatedUser
@@ -26,6 +26,39 @@ from atlas_api.services.playback import (
 
 router = APIRouter(prefix="/media/playback", tags=["media"])
 require_playback_read = require_permission("media.read")
+
+
+def _subtitle_stream_index(value: str | None) -> int | None:
+    """Normalize Atlas subtitle-selection intent."""
+    if value is None:
+        return None
+
+    normalized = value.strip().lower()
+
+    if not normalized or normalized == "auto":
+        return None
+
+    if normalized == "off":
+        return -1
+
+    try:
+        index = int(normalized)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Subtitle selection must be auto, off, "
+                "or a stream index."
+            ),
+        ) from exc
+
+    if index < 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Subtitle stream index must be non-negative.",
+        )
+
+    return index
 
 
 @lru_cache(maxsize=1)
@@ -63,6 +96,10 @@ def read_playback_session(
     ],
     provider: Annotated[str, Path(min_length=1, max_length=32)],
     item_id: Annotated[str, Path(min_length=1, max_length=256)],
+    subtitle: Annotated[
+        str | None,
+        Query(max_length=16),
+    ] = None,
 ) -> PlaybackSessionResponse:
     try:
         profile = profiles.get_user(current_user.user_id)
@@ -87,6 +124,7 @@ def read_playback_session(
             provider=provider,
             item_id=item_id,
             jellyfin_user_id=jellyfin_user_id,
+            subtitle_stream_index=_subtitle_stream_index(subtitle),
         )
     except PlaybackNotFoundError as exc:
         raise HTTPException(

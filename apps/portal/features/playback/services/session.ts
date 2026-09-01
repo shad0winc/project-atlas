@@ -44,10 +44,13 @@ function mapTrack(track: PlaybackTrackTransport): PlaybackTrack {
   });
 }
 
+export type SubtitleSelection = "auto" | "off" | number;
+
 export async function resolvePlaybackSession(
   provider: string,
   itemId: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  subtitle: SubtitleSelection = "auto"
 ): Promise<PlaybackSession> {
   const normalizedProvider = provider.trim().toLowerCase();
   const normalizedItemId = itemId.trim();
@@ -55,8 +58,19 @@ export async function resolvePlaybackSession(
     throw new Error("Playback identity is incomplete.");
   }
 
+  const subtitleValue =
+    typeof subtitle === "number" ? String(subtitle) : subtitle;
+
+  const query = new URLSearchParams();
+
+  if (subtitleValue !== "auto") {
+    query.set("subtitle", subtitleValue);
+  }
+
+  const suffix = query.size === 0 ? "" : `?${query.toString()}`;
+
   const response = await authenticatedAtlasApiRequest<PlaybackSessionTransport>(
-    `/media/playback/${encodeURIComponent(normalizedProvider)}/${encodeURIComponent(normalizedItemId)}/session`,
+    `/media/playback/${encodeURIComponent(normalizedProvider)}/${encodeURIComponent(normalizedItemId)}/session${suffix}`,
     { method: "GET", cache: "no-store", signal }
   );
 

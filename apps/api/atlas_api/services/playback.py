@@ -41,6 +41,7 @@ class PlaybackService:
         provider: str,
         item_id: str,
         jellyfin_user_id: str,
+        subtitle_stream_index: int | None = None,
     ) -> PlaybackSession:
         normalized_provider = provider.strip().lower()
         if normalized_provider != "jellyfin":
@@ -54,6 +55,18 @@ class PlaybackService:
         if not normalized_jellyfin_user_id:
             raise PlaybackUnavailableError(
                 "Atlas user is not linked to Jellyfin"
+            )
+
+        if (
+            subtitle_stream_index is not None
+            and (
+                isinstance(subtitle_stream_index, bool)
+                or not isinstance(subtitle_stream_index, int)
+                or subtitle_stream_index < -1
+            )
+        ):
+            raise PlaybackUnavailableError(
+                "subtitle selection is invalid"
             )
 
         try:
@@ -95,10 +108,17 @@ class PlaybackService:
                 if len(episodes) > 1:
                     next_target_id = episodes[1]["id"]
 
-            playback = self._jellyfin.get_playback_info(
-                playable_target_id,
-                user_id=normalized_jellyfin_user_id,
-            )
+            if subtitle_stream_index is None:
+                playback = self._jellyfin.get_playback_info(
+                    playable_target_id,
+                    user_id=normalized_jellyfin_user_id,
+                )
+            else:
+                playback = self._jellyfin.get_playback_info(
+                    playable_target_id,
+                    user_id=normalized_jellyfin_user_id,
+                    subtitle_stream_index=subtitle_stream_index,
+                )
         except PlaybackNotFoundError:
             raise
         except MediaProviderError as exc:
