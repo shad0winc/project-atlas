@@ -328,6 +328,7 @@ atlas_update_ingress_apply() {
 
   source "$ATLAS_PROJECT_DIR/scripts/lib/audit-runtime.sh"
   source "$ATLAS_PROJECT_DIR/scripts/lib/identity-writer-runtime.sh"
+  source "$ATLAS_PROJECT_DIR/scripts/lib/favorites-runtime.sh"
 
   atlas_audit_runtime_provision || {
     echo 'ERROR: security audit runtime provisioning failed.' >&2
@@ -336,6 +337,11 @@ atlas_update_ingress_apply() {
 
   atlas_identity_writer_runtime_provision || {
     echo 'ERROR: identity writer runtime provisioning failed.' >&2
+    return 1
+  }
+
+  atlas_favorites_runtime_provision || {
+    echo 'ERROR: Favorites runtime provisioning failed.' >&2
     return 1
   }
 
