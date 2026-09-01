@@ -86,6 +86,17 @@ def prepare_runtime(tmp_path: Path, *, branch: str = "main") -> dict[str, str]:
     )
 
     write_executable(
+        project / "scripts" / "lib" / "favorites-runtime.sh",
+        """
+        #!/usr/bin/env bash
+        atlas_favorites_runtime_provision() {
+          echo favorites-runtime:provision >> "$ATLAS_TEST_EVENTS"
+          return "${ATLAS_TEST_FAVORITES_RUNTIME_STATUS:-0}"
+        }
+        """,
+    )
+
+    write_executable(
         bin_dir / "git",
         f"""
         #!/usr/bin/env bash
