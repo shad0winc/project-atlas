@@ -339,6 +339,15 @@ class JellyfinProvider:
                 "SubtitleProfiles": [
                     {"Format": "vtt", "Method": "External"},
                     {"Format": "srt", "Method": "External"},
+                    {"Format": "subrip", "Method": "External"},
+                    {"Format": "vtt", "Method": "Encode"},
+                    {"Format": "srt", "Method": "Encode"},
+                    {"Format": "subrip", "Method": "Encode"},
+                    {"Format": "ass", "Method": "Encode"},
+                    {"Format": "ssa", "Method": "Encode"},
+                    {"Format": "pgs", "Method": "Encode"},
+                    {"Format": "pgssub", "Method": "Encode"},
+                    {"Format": "dvdsub", "Method": "Encode"},
                 ],
             },
         }
@@ -347,6 +356,11 @@ class JellyfinProvider:
             playback_payload["SubtitleStreamIndex"] = (
                 subtitle_stream_index
             )
+
+            if subtitle_stream_index >= 0:
+                playback_payload[
+                    "AlwaysBurnInSubtitleWhenTranscoding"
+                ] = True
 
         payload = self._request_json(
             f"/Items/{quote(normalized_id, safe='')}/PlaybackInfo",
