@@ -55,6 +55,10 @@ def _write_fake_docker(path: Path) -> None:
               fi
             fi
 
+            if [[ "${1:-} ${2:-} ${3:-}" == "exec atlas-api sh" ]]; then
+              exit "${ATLAS_TEST_FAVORITES_ACCESS_STATUS:-0}"
+            fi
+
             if [[ "${1:-} ${2:-} ${3:-}" == "exec atlas-caddy caddy" ]]; then
               exit 0
             fi
@@ -90,7 +94,14 @@ def _write_fake_docker(path: Path) -> None:
     path.chmod(0o755)
 
 
-def _run_verifier(tmp_path: Path, *, maintenance: bool, public_status: str = "503") -> subprocess.CompletedProcess[str]:
+def _run_verifier(
+    tmp_path: Path,
+    *,
+    maintenance: bool,
+    public_status: str = "503",
+    favorites_runtime_status: str = "0",
+    favorites_access_status: str = "0",
+) -> subprocess.CompletedProcess[str]:
     project = tmp_path / "project"
     runtime = tmp_path / "runtime"
     bin_dir = tmp_path / "bin"
@@ -116,6 +127,25 @@ def _run_verifier(tmp_path: Path, *, maintenance: bool, public_status: str = "50
     )
     audit_runtime.chmod(0o755)
 
+    favorites_runtime = (
+        project
+        / "scripts"
+        / "lib"
+        / "favorites-runtime.sh"
+    )
+    favorites_runtime.write_text(
+        textwrap.dedent(
+            """
+            #!/usr/bin/env bash
+            atlas_favorites_runtime_verify() {
+              return "${ATLAS_TEST_FAVORITES_RUNTIME_STATUS:-0}"
+            }
+            """
+        ).lstrip(),
+        encoding="utf-8",
+    )
+    favorites_runtime.chmod(0o755)
+
     if maintenance:
         maintenance_dir = runtime / "maintenance"
         maintenance_dir.mkdir()
@@ -128,6 +158,8 @@ def _run_verifier(tmp_path: Path, *, maintenance: bool, public_status: str = "50
             "ATLAS_PROJECT_DIR": str(project),
             "ATLAS_RUNTIME_CONFIG_DIR": str(runtime),
             "ATLAS_TEST_PUBLIC_STATUS": public_status,
+            "ATLAS_TEST_FAVORITES_RUNTIME_STATUS": favorites_runtime_status,
+            "ATLAS_TEST_FAVORITES_ACCESS_STATUS": favorites_access_status,
         }
     )
     return subprocess.run(
@@ -166,4 +198,34 @@ def test_maintenance_mode_fails_if_public_traffic_is_not_isolated(tmp_path: Path
     assert result.returncode != 0
     assert "Portal public maintenance isolation" in result.stderr
     assert "API public maintenance isolation" in result.stderr
+    assert "Atlas Ingress Status: FAIL" in result.stderr
+
+def test_normal_mode_fails_if_favorites_runtime_contract_is_invalid(
+    tmp_path: Path,
+) -> None:
+    result = _run_verifier(
+        tmp_path,
+        maintenance=False,
+        favorites_runtime_status="1",
+    )
+
+    assert result.returncode != 0
+    assert (
+        "Favorites runtime ownership / access contract"
+        in result.stderr
+    )
+    assert "Atlas Ingress Status: FAIL" in result.stderr
+
+
+def test_normal_mode_fails_if_api_cannot_access_favorites_persistence(
+    tmp_path: Path,
+) -> None:
+    result = _run_verifier(
+        tmp_path,
+        maintenance=False,
+        favorites_access_status="1",
+    )
+
+    assert result.returncode != 0
+    assert "Atlas API Favorites persistence access" in result.stderr
     assert "Atlas Ingress Status: FAIL" in result.stderr
