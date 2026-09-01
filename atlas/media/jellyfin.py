@@ -306,6 +306,31 @@ class JellyfinProvider:
             raise MediaProviderError(
                 "subtitle_stream_index must be -1 or a non-negative integer"
             )
+        external_subtitle_profiles = [
+            {"Format": "vtt", "Method": "External"},
+            {"Format": "srt", "Method": "External"},
+            {"Format": "subrip", "Method": "External"},
+            {"Format": "vtt", "Method": "Encode"},
+            {"Format": "srt", "Method": "Encode"},
+            {"Format": "subrip", "Method": "Encode"},
+            {"Format": "ass", "Method": "Encode"},
+            {"Format": "ssa", "Method": "Encode"},
+            {"Format": "pgs", "Method": "Encode"},
+            {"Format": "pgssub", "Method": "Encode"},
+            {"Format": "dvdsub", "Method": "Encode"},
+        ]
+
+        encode_subtitle_profiles = [
+            {"Format": "vtt", "Method": "Encode"},
+            {"Format": "srt", "Method": "Encode"},
+            {"Format": "subrip", "Method": "Encode"},
+            {"Format": "ass", "Method": "Encode"},
+            {"Format": "ssa", "Method": "Encode"},
+            {"Format": "pgs", "Method": "Encode"},
+            {"Format": "pgssub", "Method": "Encode"},
+            {"Format": "dvdsub", "Method": "Encode"},
+        ]
+
         playback_payload: dict[str, Any] = {
             "UserId": normalized_user_id,
             "EnableDirectPlay": True,
@@ -336,49 +361,107 @@ class JellyfinProvider:
                     }
                 ],
                 "CodecProfiles": [],
-                "SubtitleProfiles": [
-                    {"Format": "vtt", "Method": "External"},
-                    {"Format": "srt", "Method": "External"},
-                    {"Format": "subrip", "Method": "External"},
-                    {"Format": "vtt", "Method": "Encode"},
-                    {"Format": "srt", "Method": "Encode"},
-                    {"Format": "subrip", "Method": "Encode"},
-                    {"Format": "ass", "Method": "Encode"},
-                    {"Format": "ssa", "Method": "Encode"},
-                    {"Format": "pgs", "Method": "Encode"},
-                    {"Format": "pgssub", "Method": "Encode"},
-                    {"Format": "dvdsub", "Method": "Encode"},
-                ],
+                "SubtitleProfiles": external_subtitle_profiles,
             },
         }
 
-        if subtitle_stream_index is not None:
-            playback_payload["SubtitleStreamIndex"] = (
-                subtitle_stream_index
+        playback_path = (
+            f"/Items/{quote(normalized_id, safe='')}/PlaybackInfo"
+        )
+
+        def first_media_source(
+            response: Any,
+        ) -> dict[str, Any]:
+            if not isinstance(response, dict):
+                raise MediaProviderError(
+                    "Jellyfin returned invalid playback info"
+                )
+
+            response_sources = response.get("MediaSources")
+
+            if not isinstance(response_sources, list) or not response_sources:
+                raise MediaProviderError(
+                    "Jellyfin returned no playable media source"
+                )
+
+            response_source = next(
+                (
+                    entry
+                    for entry in response_sources
+                    if isinstance(entry, dict)
+                ),
+                None,
             )
 
-            if subtitle_stream_index >= 0:
-                playback_payload[
-                    "AlwaysBurnInSubtitleWhenTranscoding"
-                ] = True
+            if response_source is None:
+                raise MediaProviderError(
+                    "Jellyfin returned no playable media source"
+                )
+
+            return response_source
 
         payload = self._request_json(
-            f"/Items/{quote(normalized_id, safe='')}/PlaybackInfo",
+            playback_path,
             method="POST",
             payload=playback_payload,
         )
-        if not isinstance(payload, dict):
-            raise MediaProviderError("Jellyfin returned invalid playback info")
-        sources = payload.get("MediaSources")
-        if not isinstance(sources, list) or not sources:
-            raise MediaProviderError("Jellyfin returned no playable media source")
-        source = next((entry for entry in sources if isinstance(entry, dict)), None)
-        if source is None:
-            raise MediaProviderError("Jellyfin returned no playable media source")
 
-        media_source_id = str(source.get("Id") or "").strip()
+        source = first_media_source(payload)
+
+        media_source_id = str(
+            source.get("Id") or ""
+        ).strip()
+
         if not media_source_id:
-            raise MediaProviderError("Jellyfin playback source has no ID")
+            raise MediaProviderError(
+                "Jellyfin playback source has no ID"
+            )
+
+        if subtitle_stream_index is not None:
+            selected_profile = {
+                **playback_payload["DeviceProfile"],
+                "SubtitleProfiles": (
+                    encode_subtitle_profiles
+                    if subtitle_stream_index >= 0
+                    else external_subtitle_profiles
+                ),
+            }
+
+            selected_payload: dict[str, Any] = {
+                **playback_payload,
+                "MediaSourceId": media_source_id,
+                "SubtitleStreamIndex": subtitle_stream_index,
+                "DeviceProfile": selected_profile,
+            }
+
+            if subtitle_stream_index >= 0:
+                selected_payload[
+                    "AlwaysBurnInSubtitleWhenTranscoding"
+                ] = True
+
+            payload = self._request_json(
+                playback_path,
+                method="POST",
+                payload=selected_payload,
+            )
+
+            source = first_media_source(payload)
+
+            selected_media_source_id = str(
+                source.get("Id") or ""
+            ).strip()
+
+            if not selected_media_source_id:
+                raise MediaProviderError(
+                    "Jellyfin playback source has no ID"
+                )
+
+            if selected_media_source_id != media_source_id:
+                raise MediaProviderError(
+                    "Jellyfin changed media source during subtitle selection"
+                )
+
+            media_source_id = selected_media_source_id
 
         runtime = source.get("RunTimeTicks")
         duration_ticks = runtime if isinstance(runtime, int) and runtime >= 0 else None
