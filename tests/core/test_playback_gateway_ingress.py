@@ -15,6 +15,8 @@ def test_playback_origin_uses_internal_forward_auth() -> None:
         "header_up X-Emby-Token "
         "{http.request.header.X-Atlas-Jellyfin-Token}"
     ) in source
+    assert "header_down -Access-Control-Allow-Origin" in source
+    assert "header_down -Access-Control-Allow-Credentials" in source
 
 
 def test_playback_origin_does_not_embed_jellyfin_secret() -> None:

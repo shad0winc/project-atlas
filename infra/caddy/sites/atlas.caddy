@@ -77,6 +77,12 @@ playback.shadowinc.co {
                 reverse_proxy jellyfin:8096 {
                         header_up X-Emby-Token {http.request.header.X-Atlas-Jellyfin-Token}
                         header_up -X-Atlas-Jellyfin-Token
+
+                        # Atlas owns browser CORS on the dedicated playback
+                        # origin. Do not expose Jellyfin's wildcard CORS
+                        # response alongside Atlas's credentialed origin.
+                        header_down -Access-Control-Allow-Origin
+                        header_down -Access-Control-Allow-Credentials
                 }
         }
 
