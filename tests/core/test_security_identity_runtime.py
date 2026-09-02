@@ -54,6 +54,7 @@ def test_core_compose_limits_identity_network_to_jellyfin() -> None:
     assert "    name: atlas-identity\n" in content
     assert "      - atlas\n" in jellyfin
     assert "      - atlas-identity\n" in jellyfin
+    assert "      - atlas-ingress\n" in jellyfin
     assert content.count("      - atlas-identity\n") == 1
 
 
@@ -70,6 +71,10 @@ def test_ingress_api_has_read_only_identity_access() -> None:
     ) in api
     assert '      ATLAS_JELLYFIN_URL: "http://jellyfin:8096"\n' in api
     assert (
+        '      ATLAS_JELLYFIN_PUBLIC_URL: '
+        '"https://jellyfin.shadowinc.co"\n'
+    ) in api
+    assert (
         '      ATLAS_JELLYFIN_API_KEY: '
         '"${ATLAS_JELLYFIN_API_KEY:'
         '?ATLAS_JELLYFIN_API_KEY is required}"\n'
@@ -82,12 +87,22 @@ def test_ingress_api_has_read_only_identity_access() -> None:
 
 def test_ingress_api_limits_writable_identity_state_to_favorites() -> None:
     content = INGRESS_COMPOSE.read_text(encoding="utf-8")
-    api = _service_block(content, "api", "caddy")
+    api = _service_block(content, "api", "identity-writer")
 
     assert (
         "      - /mnt/storage/configs/atlas/users:"
         "/mnt/storage/configs/atlas/users:ro\n"
     ) in api
+
+    assert (
+        "      - /mnt/storage/configs/atlas/identity/invitations:"
+        "/mnt/storage/configs/atlas/identity/invitations:ro\n"
+    ) in api
+
+    assert (
+        "/mnt/storage/configs/atlas/identity/invitations:"
+        "/mnt/storage/configs/atlas/identity/invitations:rw"
+    ) not in api
 
     assert (
         "      - /mnt/storage/configs/atlas/identity/favorites:"
@@ -114,4 +129,38 @@ def test_identity_network_is_not_shared_with_public_ingress_services() -> None:
 
     assert "atlas-identity" not in portal
     assert "atlas-identity" not in caddy
-    assert content.count("      - atlas-identity\n") == 1
+
+    api = _service_block(
+        content,
+        "api",
+        "downloads-writer",
+    )
+    downloads_writer = _service_block(
+        content,
+        "downloads-writer",
+        "sports-writer",
+    )
+    sports_writer = _service_block(
+        content,
+        "sports-writer",
+        "identity-writer",
+    )
+    identity_writer = _service_block(
+        content,
+        "identity-writer",
+        "caddy",
+    )
+
+    identity_network = "      - atlas-identity\n"
+
+    assert identity_network in api
+    assert identity_network in downloads_writer
+    assert identity_network in sports_writer
+    assert identity_network in identity_writer
+
+    assert "      - atlas-ingress\n" not in downloads_writer
+    assert "      - atlas-backend\n" not in downloads_writer
+    assert "      - atlas-ingress\n" not in sports_writer
+    assert "      - atlas-backend\n" not in sports_writer
+
+    assert content.count(identity_network) == 4

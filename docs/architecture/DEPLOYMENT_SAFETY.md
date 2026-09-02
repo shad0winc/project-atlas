@@ -196,6 +196,38 @@ change requires them.
 Application builds must come from the approved source commit. Untracked or
 dirty source fails the deployment gate.
 
+## Post-Apply Ingress Readiness
+
+A successful deterministic Compose apply is not equivalent to verified ingress
+readiness.
+
+For update scopes that recreate ingress services, Atlas performs a bounded,
+read-only readiness observation after Compose apply and before authoritative
+post-update verification.
+
+The readiness boundary observes `atlas-api`, `atlas-portal`, and `atlas-caddy`.
+
+Success requires both:
+
+- container state `running`; and
+- health state `healthy`.
+
+The only transient retry state is `running + starting`.
+
+Atlas fails closed immediately for a missing container, Docker inspection
+failure, non-running container, `unhealthy` health state, missing health
+contract, or any unexpected health state. Remaining in `running + starting`
+beyond the bounded readiness deadline also fails closed.
+
+The readiness phase performs inspection only. It does not restart, stop, start,
+recreate, pull, build, invoke Compose, change maintenance state, release the
+deployment lock, or modify deployment records.
+
+Readiness does not replace or weaken authoritative verification. Its purpose is
+only to distinguish a legitimate bounded health-startup interval from a
+terminal verification failure before the existing strict verification gates
+run.
+
 ## Post-Update Verification
 
 Required validation is selected by the affected surface and includes the
@@ -220,6 +252,35 @@ If apply or post-update validation fails:
 - the operator chooses rollback or explicit forward recovery.
 
 Failure is not converted into success because containers happen to be running.
+
+## Post-Restore Rollback Readiness
+
+A successful rollback restore command is not equivalent to verified rollback
+readiness.
+
+For rollback scopes that restore ingress services, Atlas performs a bounded,
+inspection-only readiness observation after ingress restoration and before
+authoritative rollback verification.
+
+The readiness boundary observes `atlas-api`, `atlas-portal`, and `atlas-caddy`.
+
+Success requires container state `running` and health state `healthy`.
+The only bounded retry state is `running + starting`.
+
+Missing containers, Docker inspection failure, non-running state, `unhealthy`,
+missing health metadata, unexpected health state, and timeout fail closed.
+
+The readiness phase performs inspection only. It does not restart, stop, start,
+recreate, pull, build, invoke Compose, change maintenance state, release the
+deployment lock, change the current verified baseline, change deployment
+status, or modify deployment records.
+
+Authoritative rollback verification remains unchanged and strict.
+
+Readiness occurs before maintenance disable, current-baseline finalization,
+`rolled_back` transaction finalization, and final lock release. Failure
+therefore preserves the failed transaction, maintenance isolation, lock
+ownership, and the previous verified baseline for explicit recovery.
 
 ## Rollback
 
@@ -297,6 +358,37 @@ remains held for explicit recovery.
 The standalone `scripts/update.sh` delegates to the canonical Atlas CLI and no
 longer provides a weaker alternate deployment path. Update paths do not prune
 rollback images.
+
+## v1.0 RC Deployment Remediation Contract
+
+The first exact `1.0.0-rc.1` production deployment attempt on 2026-08-24
+failed closed and preserved the previous verified production baseline.
+
+The incident established three permanent deployment-safety requirements:
+
+1. **Build-context permission preflight.** Before any first-party ingress pull
+   or build, Atlas validates tracked file readability and required parent
+   directory traversal for the container-runtime boundary.
+2. **Digest-safe rollback aliases.** Rollback restores from transaction-scoped
+   `atlas-rollback:` aliases recorded in `rollback-images.tsv` and verifies
+   every alias against the exact captured image ID. It does not retag a
+   digest-shaped captured reference.
+3. **Persistent rollback source lifetime.** Recovery extraction used by
+   recreated services must live beneath the persistent deployment transaction
+   record at `<deployment-root>/records/<transaction-id>/` and remain available
+   after restore returns.
+
+Exactly 17 tracked files whose Git mode was already `100644` but whose checkout
+mode had drifted to `0600` were normalized to filesystem `0644` without a Git
+content or executable-mode delta.
+
+The failed transaction `update-20260824T165151Z-3258027` remains historical
+evidence. Production was recovered to verified baseline
+`baseline-reconciliation-20260824T164541Z-927002`.
+
+This remediation certifies the machinery required for a controlled retry. It
+does not claim successful exact-RC production deployment and does not close
+that Roadmap gate.
 
 ## Validation Strategy
 
@@ -423,3 +515,20 @@ The incident establishes the following permanent deployment rules:
 
 These rules extend the existing rollback and forward-recovery architecture; they
 do not create a second deployment or lifecycle system.
+
+## Identity-writer runtime permission prerequisite
+
+The identity-writer applies the existing non-root runtime ownership rule to
+two bounded persistent directory roots. Before ingress Compose apply,
+deployment provisions and verifies:
+
+- `ATLAS_USERS_DIR`: UID `0`, GID `20000`, mode `2770`;
+- `${ATLAS_IDENTITY_DIR}/invitations`: UID `0`, GID `20001`, mode `2770`.
+
+Provisioning is intentionally non-recursive. Existing child files and
+directories are not mass-chowned or mass-chmodded, and unrelated identity
+state is outside this operation. The setgid directory mode preserves group
+inheritance for newly created children.
+
+If this prerequisite cannot be established or verified, the ingress update
+must fail before Compose apply and remain in the transaction's failure state.

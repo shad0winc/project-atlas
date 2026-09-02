@@ -763,6 +763,11 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
   - [x] Complete the second controlled Jellyseerr-to-Seerr migration with the verified deployment transaction retained through runtime acceptance
   - [x] Certify standard-TV and Anime-TV server-owned routing, monitoring policy, and production E2E isolation under E2.5
   - [x] Harden target-artifact, isolation, lifecycle-ordering, and recovery contracts from E2.5 attempt #1
+  - [x] Fail closed before first-party ingress pull/build when tracked build-context permissions are incompatible
+  - [x] Restore captured image identities through verified transaction-scoped rollback aliases
+  - [x] Require rollback recovery sources beneath the persistent Atlas deployment-record namespace
+  - [x] Reconcile the exact 17-file checkout permission drift from `0600` to repository-authoritative `0644`
+  - [x] Certify the combined RC deployment-safety remediation while preserving failed deployment evidence and the recovered production baseline
 
 ### Backup and Recovery
 
@@ -871,8 +876,20 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 
 ### Release
 
-- [ ] Create v1.0 release candidate
-- [ ] Deploy release candidate to production
+- [x] Create v1.0 release candidate
+- [x] Deploy release candidate to production
+  - [x] First exact `1.0.0-rc.1` production attempt failed closed and was
+    recovered (`update-20260824T165151Z-3258027`).
+  - [x] Deployment-safety remediation for build-context permissions,
+    digest-safe rollback, and persistent recovery-source lifetime certified.
+  - [x] Second exact `1.0.0-rc.1` production attempt failed closed at the
+    post-apply ingress-readiness boundary (`update-20260824T222351Z-3794932`).
+  - [x] Bounded read-only ingress-readiness remediation certified.
+  - [x] Certify bounded inspection-only post-restore rollback-readiness
+    remediation for failed transaction `update-20260824T222351Z-3794932` while preserving
+    maintenance, deployment-lock ownership, and the previous verified baseline.
+  - [x] Complete a successful controlled exact-RC production retry (`update-20260825T232236Z-1274121`) and verify post-deployment baseline `baseline-20260825T232627Z-1296276`.
+  - [x] Deploy and production-accept the bounded Administrator identity remediation through ingress-scoped transaction `update-20260826T035129Z-1615937`.
 - [ ] Complete controlled user pilot
 - [ ] Complete stabilization period
 - [ ] Resolve pilot defects

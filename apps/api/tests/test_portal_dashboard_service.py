@@ -8,6 +8,7 @@ from atlas.operations import (
     OperationsComparisonService,
     OperationsReport,
     OperationsReportNotFoundError,
+    OperationsRepositoryError,
     OperationsSection,
 )
 from atlas_api.schemas.dashboard_media import (
@@ -199,6 +200,28 @@ def test_missing_report_normalizes_complete_unavailable_state() -> None:
     assert repository.history_limits == []
 
 
+class InvalidRuntimeRepository(RecordingRepository):
+    def latest(self) -> OperationsReport:
+        self.latest_count += 1
+        raise OperationsRepositoryError(
+            "Operations report contains invalid JSON"
+        )
+
+
+def test_invalid_runtime_report_normalizes_complete_unavailable_state() -> None:
+    repository = InvalidRuntimeRepository(())
+
+    dashboard = service(repository).read_dashboard()
+
+    assert dashboard.operations.status == "unavailable"
+    assert dashboard.operations.report is None
+    assert dashboard.operations.summary is None
+    assert dashboard.operations.recent_attention == ()
+    assert dashboard.operations.comparison.status == "unavailable"
+    assert repository.latest_count == 1
+    assert repository.history_limits == []
+
+
 def test_one_report_provides_summary_without_comparison() -> None:
     latest = operations_report()
     repository = RecordingRepository((latest,))
@@ -212,6 +235,7 @@ def test_one_report_provides_summary_without_comparison() -> None:
     assert operations.summary.score == 100
     assert operations.summary.attention_count == 0
     assert operations.summary.generated_at == GENERATED_AT
+    assert operations.summary.currentness == "historical"
     assert operations.comparison.status == "unavailable"
     assert operations.recent_attention == ()
     assert repository.history_limits == [

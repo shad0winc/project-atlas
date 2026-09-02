@@ -31,6 +31,12 @@ def notification_route(notification: dict[str, Any]) -> str:
     if event_name.startswith("anime-tv."):
         return "anime_tv"
 
+    if event_name in {
+        "sports.provider-degraded",
+        "sports.provider-recovered",
+    }:
+        return "system"
+
     if event_name.startswith("sports."):
         return "sports"
 

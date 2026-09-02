@@ -47,9 +47,13 @@ def publish_event(
         serialized_payload,
     ]
 
+    environment = os.environ.copy()
+    environment["ATLAS_SKIP_ENV_FILE"] = "1"
+
     subprocess.run(
         command,
         check=True,
+        env=environment,
     )
 
 

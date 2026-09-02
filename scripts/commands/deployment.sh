@@ -26,6 +26,64 @@ atlas_deployment_record_dir() {
   printf '%s/%s\n' "$(atlas_deployment_records_dir)" "$identifier"
 }
 
+atlas_deployment_create_recovery_dir() {
+  local transaction="$1"
+  local surface="$2"
+  local records
+  local records_real
+  local transaction_real
+  local transaction_id
+
+  case "$surface" in
+    core|ingress)
+      ;;
+    *)
+      printf \
+        'ERROR: unsupported rollback recovery surface: %s\n' \
+        "$surface" >&2
+      return 1
+      ;;
+  esac
+
+  [[ -d "$transaction" ]] || {
+    printf \
+      'ERROR: rollback transaction directory is missing: %s\n' \
+      "$transaction" >&2
+    return 1
+  }
+
+  records="$(atlas_deployment_records_dir)"
+
+  [[ -d "$records" ]] || {
+    printf \
+      'ERROR: deployment records directory is missing: %s\n' \
+      "$records" >&2
+    return 1
+  }
+
+  records_real="$(realpath -e "$records")" || return 1
+  transaction_real="$(realpath -e "$transaction")" || return 1
+
+  [[ "$(dirname "$transaction_real")" == "$records_real" ]] || {
+    printf \
+      'ERROR: rollback transaction is outside the deployment records namespace: %s\n' \
+      "$transaction_real" >&2
+    return 1
+  }
+
+  transaction_id="$(basename "$transaction_real")"
+
+  atlas_deployment_valid_id "$transaction_id" || {
+    printf \
+      'ERROR: invalid rollback transaction identity: %s\n' \
+      "$transaction_id" >&2
+    return 1
+  }
+
+  mktemp -d \
+    "$transaction_real/recovery-${surface}.XXXXXX"
+}
+
 atlas_deployment_record_value() {
   local record="$1"
   local key="$2"
@@ -408,6 +466,8 @@ atlas_deployment_restore_surface() {
   local surface="$3"
   local recovery
   local archive="$baseline/${surface}-source.tar.gz"
+  local rollback_images="$transaction/rollback-images.tsv"
+  local override
   local row
   local compose_relative
   local project
@@ -415,35 +475,222 @@ atlas_deployment_restore_surface() {
   local container_name
   local image_reference
   local image_id
+  local recovery_tag
+  local restored=0
 
   [[ -s "$archive" ]] || return 1
-  recovery="$(mktemp -d "$transaction/recovery-${surface}.XXXXXX")"
+  [[ -s "$rollback_images" ]] || {
+    echo 'ERROR: rollback image alias evidence is missing.' >&2
+    return 1
+  }
+
+  recovery="$(
+    atlas_deployment_create_recovery_dir       "$transaction"       "$surface"
+  )" || return 1
+
   tar -xzf "$archive" -C "$recovery" || return 1
 
   if [[ -f "$ATLAS_PROJECT_DIR/.env" && ! -e "$recovery/.env" ]]; then
     ln -s -- "$ATLAS_PROJECT_DIR/.env" "$recovery/.env"
   fi
 
+  override="$recovery/rollback-images.yml"
+
+  printf 'services:\n' > "$override"
+
   while IFS='|' read -r \
     row compose_relative project service container_name image_reference image_id
   do
     [[ "$row" == "$surface" ]] || continue
-    docker image inspect "$image_id" >/dev/null 2>&1 || return 1
-    docker image tag "$image_id" "$image_reference" || return 1
+    [[ -n "$service" && -n "$image_id" ]] || return 1
+
+    recovery_tag="$(
+      awk -F'|' -v expected="$image_id" \
+        '$1 == expected {print $2; exit}' \
+        "$rollback_images"
+    )"
+
+    [[ -n "$recovery_tag" ]] || {
+      printf \
+        'ERROR: rollback alias missing for image %s (%s).\n' \
+        "$image_id" \
+        "$service" >&2
+      return 1
+    }
+
+    docker image inspect "$recovery_tag" >/dev/null 2>&1 || {
+      printf \
+        'ERROR: rollback alias unavailable: %s\n' \
+        "$recovery_tag" >&2
+      return 1
+    }
+
+    [[ "$(
+      docker image inspect \
+        --format '{{.Id}}' \
+        "$recovery_tag"
+    )" == "$image_id" ]] || {
+      printf \
+        'ERROR: rollback alias identity mismatch: %s\n' \
+        "$recovery_tag" >&2
+      return 1
+    }
+
+    printf '  %s:\n' "$service" >> "$override"
+    printf '    image: %s\n' "$recovery_tag" >> "$override"
+
+    restored=$((restored + 1))
   done < "$baseline/images.tsv"
 
-  compose_relative="$(awk -F'|' -v surface="$surface" '$1 == surface {print $2; exit}' "$baseline/images.tsv")"
-  project="$(awk -F'|' -v surface="$surface" '$1 == surface {print $3; exit}' "$baseline/images.tsv")"
+  [[ "$restored" -gt 0 ]] || {
+    printf \
+      'ERROR: no rollback services found for surface: %s\n' \
+      "$surface" >&2
+    return 1
+  }
+
+  compose_relative="$(
+    awk -F'|' \
+      -v surface="$surface" \
+      '$1 == surface {print $2; exit}' \
+      "$baseline/images.tsv"
+  )"
+
+  project="$(
+    awk -F'|' \
+      -v surface="$surface" \
+      '$1 == surface {print $3; exit}' \
+      "$baseline/images.tsv"
+  )"
+
   [[ -n "$compose_relative" && -n "$project" ]] || return 1
 
   (
     cd "$recovery"
+
     docker compose \
       --env-file "$recovery/.env" \
       --project-name "$project" \
       -f "$recovery/$compose_relative" \
+      -f "$override" \
       up -d --no-build --pull never
   )
+}
+
+atlas_deployment_ingress_container_state() {
+  local container="$1"
+  local status
+  local health
+
+  status="$(
+    docker inspect \
+      --format '{{.State.Status}}' \
+      "$container"
+  )" || return 1
+
+  health="$(
+    docker inspect \
+      --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' \
+      "$container"
+  )" || return 1
+
+  printf '%s|%s\n' "$status" "$health"
+}
+
+atlas_deployment_readiness_sleep() {
+  sleep "$1"
+}
+
+atlas_deployment_wait_for_ingress_readiness() {
+  local attempts="${ATLAS_ROLLBACK_READINESS_ATTEMPTS:-18}"
+  local interval="${ATLAS_ROLLBACK_READINESS_INTERVAL_SECONDS:-5}"
+  local attempt
+  local container
+  local state
+  local status
+  local health
+  local pending
+
+  [[ "$attempts" =~ ^[1-9][0-9]*$ ]] || {
+    printf \
+      'ERROR: ATLAS_ROLLBACK_READINESS_ATTEMPTS must be a positive integer: %s\n' \
+      "$attempts" >&2
+    return 1
+  }
+
+  [[ "$interval" =~ ^[0-9]+$ ]] || {
+    printf \
+      'ERROR: ATLAS_ROLLBACK_READINESS_INTERVAL_SECONDS must be a non-negative integer: %s\n' \
+      "$interval" >&2
+    return 1
+  }
+
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
+    pending=0
+
+    for container in \
+      atlas-api \
+      atlas-portal \
+      atlas-caddy
+    do
+      state="$(
+        atlas_deployment_ingress_container_state "$container"
+      )" || {
+        printf \
+          'ERROR: rollback ingress readiness failed: unable to inspect %s\n' \
+          "$container" >&2
+        return 1
+      }
+
+      IFS='|' read -r status health <<<"$state"
+
+      if [[ "$status" != 'running' ]]; then
+        printf \
+          'ERROR: rollback ingress readiness failed: %s is not running (status=%s health=%s)\n' \
+          "$container" \
+          "${status:-missing}" \
+          "${health:-missing}" >&2
+        return 1
+      fi
+
+      case "$health" in
+        healthy)
+          ;;
+        starting)
+          pending=1
+          ;;
+        unhealthy|missing|'')
+          printf \
+            'ERROR: rollback ingress readiness failed: %s health=%s\n' \
+            "$container" \
+            "${health:-missing}" >&2
+          return 1
+          ;;
+        *)
+          printf \
+            'ERROR: rollback ingress readiness failed: %s has unexpected health state=%s\n' \
+            "$container" \
+            "$health" >&2
+          return 1
+          ;;
+      esac
+    done
+
+    if [[ "$pending" -eq 0 ]]; then
+      return 0
+    fi
+
+    if [[ "$attempt" -ge "$attempts" ]]; then
+      printf \
+        'ERROR: rollback ingress readiness timed out after %s attempts.\n' \
+        "$attempts" >&2
+      return 1
+    fi
+
+    atlas_deployment_readiness_sleep "$interval"
+  done
+
+  return 1
 }
 
 atlas_deployment_rollback() {
@@ -540,6 +787,19 @@ atlas_deployment_rollback() {
       return 1
       ;;
   esac
+
+  if [[ "$scope" == 'ingress' || "$scope" == 'all' ]]; then
+    docker restart atlas-caddy >/dev/null || {
+      echo 'ERROR: unable to activate restored Caddy ingress configuration.' >&2
+      return 1
+    }
+
+    echo 'Post-restore ingress readiness:'
+    atlas_deployment_wait_for_ingress_readiness || {
+      echo 'ERROR: rollback ingress readiness failed.' >&2
+      return 1
+    }
+  fi
 
   atlas_command_doctor || return 1
   atlas_command_verify || return 1

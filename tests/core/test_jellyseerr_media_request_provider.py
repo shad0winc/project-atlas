@@ -43,7 +43,9 @@ def make_provider() -> JellyseerrMediaRequestProvider:
     return JellyseerrMediaRequestProvider(
         base_url="http://127.0.0.1:5055",
         api_key="secret",
+        movie_server_id=10,
         tv_server_id=0,
+        anime_movie_server_id=11,
         anime_tv_server_id=1,
         clock=lambda: datetime(
             2026,
@@ -113,6 +115,7 @@ def test_submit_movie_payload_and_result() -> None:
         {
             "mediaType": "movie",
             "mediaId": 157336,
+            "serverId": 10,
         },
     )
     assert result.provider == "jellyseerr"
@@ -162,11 +165,10 @@ def test_submit_maps_media_types(
     payload = post.call_args.args[1]
     assert payload["mediaType"] == expected_type
 
-    if media_type in {
-        "movie",
-        "anime_movie",
-    }:
-        assert "serverId" not in payload
+    if media_type == "movie":
+        assert payload["serverId"] == 10
+    elif media_type == "anime_movie":
+        assert payload["serverId"] == 11
 
 
 def test_submit_tv_specific_season() -> None:
@@ -186,6 +188,48 @@ def test_submit_tv_specific_season() -> None:
 
     assert post.call_args.args[1]["serverId"] == 0
     assert post.call_args.args[1]["seasons"] == [3]
+
+
+def test_submit_movie_uses_explicit_movie_server() -> None:
+    provider = make_provider()
+
+    with patch.object(
+        JellyseerrMediaRequestProvider,
+        "_post_json",
+        return_value=response(
+            request_status=1,
+            media_status=2,
+            media_type="movie",
+        ),
+    ) as post:
+        provider.submit(
+            make_request(
+                media_type="movie",
+            )
+        )
+
+    assert post.call_args.args[1]["serverId"] == 10
+
+
+def test_submit_anime_movie_uses_explicit_anime_movie_server() -> None:
+    provider = make_provider()
+
+    with patch.object(
+        JellyseerrMediaRequestProvider,
+        "_post_json",
+        return_value=response(
+            request_status=1,
+            media_status=2,
+            media_type="movie",
+        ),
+    ) as post:
+        provider.submit(
+            make_request(
+                media_type="anime_movie",
+            )
+        )
+
+    assert post.call_args.args[1]["serverId"] == 11
 
 
 def test_submit_anime_tv_uses_explicit_anime_server() -> None:
@@ -226,18 +270,22 @@ def test_submit_tv_all_seasons() -> None:
 @pytest.mark.parametrize(
     ("media_type", "server_field"),
     [
+        ("movie", "movie_server_id"),
         ("tv", "tv_server_id"),
+        ("anime_movie", "anime_movie_server_id"),
         ("anime_tv", "anime_tv_server_id"),
     ],
 )
-def test_submit_tv_requires_explicit_server_route_before_http(
+def test_submit_requires_explicit_server_route_before_http(
     media_type: str,
     server_field: str,
 ) -> None:
     values = {
         "base_url": "http://127.0.0.1:5055",
         "api_key": "secret",
+        "movie_server_id": 10,
         "tv_server_id": 0,
+        "anime_movie_server_id": 11,
         "anime_tv_server_id": 1,
     }
     values[server_field] = None
@@ -257,7 +305,11 @@ def test_submit_tv_requires_explicit_server_route_before_http(
             provider.submit(
                 make_request(
                     media_type=media_type,
-                    season_number=1,
+                    **(
+                        {"season_number": 1}
+                        if media_type in {"tv", "anime_tv"}
+                        else {}
+                    ),
                 )
             )
 
@@ -607,8 +659,16 @@ def test_default_provider_uses_explicit_routing_environment(
         "secret",
     )
     monkeypatch.setenv(
+        "ATLAS_JELLYSEERR_MOVIE_SERVER_ID",
+        "10",
+    )
+    monkeypatch.setenv(
         "ATLAS_JELLYSEERR_TV_SERVER_ID",
         "0",
+    )
+    monkeypatch.setenv(
+        "ATLAS_JELLYSEERR_ANIME_MOVIE_SERVER_ID",
+        "11",
     )
     monkeypatch.setenv(
         "ATLAS_JELLYSEERR_ANIME_TV_SERVER_ID",
@@ -619,7 +679,9 @@ def test_default_provider_uses_explicit_routing_environment(
         default_jellyseerr_media_request_provider()
     )
 
+    assert provider.movie_server_id == 10
     assert provider.tv_server_id == 0
+    assert provider.anime_movie_server_id == 11
     assert provider.anime_tv_server_id == 1
 
 

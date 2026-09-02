@@ -8318,3 +8318,262 @@ Q.6 sustained-use certification is complete for the exact published candidate `1
 The production Scheduler-dispatcher defect that invalidated the first Q.6 attempt is also closed as a release blocker: the committed and published dispatcher/fixed-cadence/terminal-convergence path completed a fresh autonomous 48-hour production certification with zero Scheduler failures.
 
 The ROADMAP gates `Complete sustained-use test` and `Resolve release-blocking defects` may therefore be marked complete. Pilot, stabilization, release-candidate freeze, tagging, and publication remain independent later release gates.
+---
+
+# 2026-08-24
+
+## R.10B RC Production Deployment Attempt and Deployment-Safety Remediation
+
+The first exact `1.0.0-rc.1` production deployment transaction
+`update-20260824T165151Z-3258027` failed closed while starting the newly built
+Atlas API. Maintenance and deployment-lock ownership were preserved and the
+previous verified baseline remained authoritative.
+
+Forensics proved a build-context permission mismatch: Git recorded affected
+first-party source as `100644` while the production checkout exposed 17 tracked
+files as filesystem `0600`, unreadable to the non-root API runtime. D.2 added a
+pre-pull/pre-build permission guard and the 17 files were normalized to
+repository-authoritative `0644` without adding a Git content delta.
+
+Rollback then exposed a second defect: digest-shaped captured image references
+cannot be used as Docker tag destinations. D.3 changed restoration to consume
+the transaction-scoped `atlas-rollback:` aliases preserved in
+`rollback-images.tsv`, verifying exact image identity and restoring with
+`--no-build --pull never`.
+
+Emergency Caddy recovery exposed the third blocker: bind-mounted recovery source
+must outlive the restoring shell. D.4 requires canonical recovery extraction
+beneath the persistent Atlas deployment-record transaction namespace.
+
+Production was recovered to verified baseline
+`baseline-reconciliation-20260824T164541Z-927002`. The failed transaction
+remains historical evidence with terminal `rolled_back` state.
+
+Final remediation certification preserved exactly four engineering files and
+passed 3,446 Core tests plus 104 subtests, all five canonical Sports integration
+suites, 52 focused release-safety tests, zero tracked permission defects,
+18/18 exact rollback alias checks, and 22 running production containers with
+zero unhealthy or restarting containers.
+
+All three discovered deployment-safety blockers are certified. The Roadmap gate
+`Deploy release candidate to production` remains open; a separately authorized
+controlled retry is still required.
+
+## R.10B.5H — RC Ingress Readiness Remediation
+
+The second controlled exact `1.0.0-rc.1` production deployment attempt was
+recorded as `update-20260824T222351Z-3794932`.
+
+The transaction failed closed after deterministic Compose apply because strict
+authoritative ingress verification ran while the recreated ingress containers
+were still in the legitimate transitional state `running + starting`.
+
+This was diagnosed as:
+
+`POST_APPLY_READINESS_RACE`
+
+The authoritative ingress verifier remains correct and strict. It was not
+weakened to accept `starting`.
+
+The remediation adds a bounded, read-only ingress readiness phase for `ingress`
+and `all` update scopes between deterministic Compose apply and authoritative
+post-update verification.
+
+The readiness contract observes:
+
+- `atlas-api`
+- `atlas-portal`
+- `atlas-caddy`
+
+Terminal success requires `running + healthy`.
+
+Only `running + starting` is retryable. Missing containers, Docker inspection
+failure, non-running state, `unhealthy`, missing health metadata, unexpected
+health state, and bounded timeout all fail closed.
+
+The waiter performs Docker inspection only and does not restart, stop, start,
+recreate, pull, build, run Compose, alter maintenance state, alter the
+deployment lock, or alter deployment records.
+
+R.10B.5H.5 engineering certification completed with:
+
+- Full Core: 3,456 tests passed and 104 subtests passed
+- Canonical Sports: PASS
+- Legacy Sports: PASS
+- engineering payload: CERTIFIED
+
+The failed transaction remains immutable evidence:
+
+`update-20260824T222351Z-3794932`
+
+The previous verified production baseline remains authoritative:
+
+`baseline-reconciliation-20260824T164541Z-927002`
+
+Maintenance mode and deployment-lock ownership remain preserved. Production
+runtime health remains stable.
+
+The first failed exact-RC transaction,
+`update-20260824T165151Z-3258027`, remains historical audit evidence and is not rewritten by this
+second remediation.
+
+The controlled exact `1.0.0-rc.1` production retry subsequently completed
+successfully as transaction `update-20260825T232236Z-1274121` with status
+`verified`.
+
+The authoritative post-deployment production baseline is
+`baseline-20260825T232627Z-1296276`, also with status `verified`. Production
+stabilized at 22 running containers with zero unhealthy and zero restarting
+containers, strict ingress verification passed, the deployment lock is absent,
+and maintenance mode is disabled.
+
+The ingress-readiness and rollback-readiness remediations are therefore
+production-proven. No further RC redeployment is required. Final `v1.0.0`
+release authorization remains a separate release gate.
+
+## R.10B.5I — Rollback Readiness Remediation
+
+The second controlled exact `1.0.0-rc.1` deployment transaction,
+`update-20260824T222351Z-3794932`, originally failed closed because immediate post-apply strict
+ingress verification encountered the legitimate transitional state
+`running + starting`. That update-side defect remains recorded as
+`POST_APPLY_READINESS_RACE`.
+
+During explicit recovery of the same failed transaction, canonical rollback
+restored the previous verified runtime and recreated ingress. Immediate
+authoritative verification then encountered `atlas-caddy` in
+`running + starting`, correctly failed closed, and returned before rollback
+transaction finalization.
+
+The restored runtime subsequently settled to healthy state:
+
+- `atlas-api`: running + healthy;
+- `atlas-portal`: running + healthy;
+- `atlas-caddy`: running + healthy;
+- strict live ingress: 29/29 PASS;
+- production runtime: 22 running, zero unhealthy, zero restarting.
+
+The distinct rollback-side root cause is:
+
+`POST_RESTORE_ROLLBACK_READINESS_RACE`
+
+A successful restore command is not equivalent to verified rollback readiness.
+Atlas now performs bounded, inspection-only rollback readiness after ingress
+restore and before authoritative rollback verification.
+
+Success requires `running + healthy`; only `running + starting` is transient.
+Missing containers, inspect failure, non-running state, `unhealthy`, missing
+health metadata, unexpected health states, and timeout fail closed.
+
+The waiter does not mutate runtime, maintenance, deployment records, baseline
+selection, transaction status, or deployment-lock ownership.
+
+Engineering certification:
+
+- focused rollback readiness: 6 passed;
+- deployment recovery: 30 passed;
+- update transaction: 25 passed;
+- release gate: 18 passed;
+- full Core: 3,467 passed plus 104 subtests;
+- Canonical Sports: PASS;
+- `atlas test sports`: PASS;
+- strict live ingress: 29/29 PASS.
+
+Production remains at verified baseline
+`baseline-reconciliation-20260824T164541Z-927002`. Transaction `update-20260824T222351Z-3794932` remains `failed`, maintenance
+remains enabled, and the deployment lock remains owned by that transaction.
+
+Rollback rerun and controlled exact-RC retry #3 remain unauthorized. The
+production RC deployment gate remains open.
+
+
+---
+
+# 2026-08-26
+
+## R.10B.5I.25T.25 — Final v1 Release-State Reconciliation
+
+The controlled exact-RC production retry completed successfully as
+`update-20260825T232236Z-1274121`, with verified baseline
+`baseline-20260825T232627Z-1296276`.
+
+Administrator identity remediation at certified `main`
+`a52d6a24c936f0f99ddbcd5dce452b6a70197edf` was subsequently deployed through
+`update-20260826T035129Z-1615937` and production-accepted.
+
+Historical failed RC attempts and remediation evidence remain immutable.
+`Deploy release candidate to production` is now complete. Broad M-022
+Administration, Observability, and Notification scope is not bulk-closed.
+
+Controlled pilot, final representative User and Administrator Experience
+Certification, stabilization, pilot-defect disposition, release freeze, final
+release notes/certification, version promotion, `v1.0.0` tagging, publication,
+and stable-support activation remain open.
+
+No VERSION, tag, deployment, or production mutation belongs to this
+reconciliation.
+
+# 2026-08-27
+
+## T42-F02 — Identity Mutation Boundary Remediation
+
+Administrator acceptance exposed invitation initialization beneath the public
+API's intentionally RO users mount. The remediation preserves that boundary:
+a private `identity-writer` now owns bounded user/invitation mutations while
+the API retains authentication, RBAC, validation, canonical reads, and public
+semantics.
+
+Hardening: private `atlas-identity` network, no public port, bounded users and
+canonical-invitations RW mounts, read-only root, `no-new-privileges`, dedicated
+required token, and writer health verification.
+
+Certified before documentation reconciliation: 37 focused T42-F02 tests;
+3,495 Core + 104 subtests; 423 API + 15 subtests; compile, Compose, diff check,
+and direct-write guard PASS. Pre-commit security review passed; final v1.0.0
+tag remains absent.
+
+No commit, deployment, VERSION promotion, tag creation, or production mutation
+occurred at this checkpoint. T.42S remains blocked pending merge and controlled
+deployment.
+
+## T42S — Identity Writer Runtime Permission Remediation
+
+Post-deployment T42S verification found that the T42-F02 private
+identity-writer topology was healthy and correctly isolated, but host
+filesystem authority was incomplete. The writer's `/users` and canonical
+invitation mounts were declared read-write in Compose while the backing
+directories remained unwritable to its effective supplemental groups.
+
+The corrective implementation adds a deployment-owned runtime permission
+provisioner and integrates it into ingress apply after audit-runtime
+provisioning and before Compose apply. The bounded directory-root contract is:
+
+- users: UID `0`, GID `20000`, mode `2770`;
+- canonical invitations: UID `0`, GID `20001`, mode `2770`.
+
+The provisioner is idempotent and non-recursive. Behavioral tests verify exact
+ownership/modes, environment path overrides, rejection of invalid path
+targets, drift detection, and preservation of existing child ownership and
+modes. Update-transaction coverage uses an isolated test double and verifies
+that provisioning failure aborts before ingress Compose apply and does not
+disable maintenance.
+
+Certification completed on the corrective branch:
+
+- focused identity-writer permission suite: 14 passed;
+- update transaction suite after fail-closed coverage: 26 passed;
+- full Core regression: 3493 passed plus 104 subtests;
+- canonical API regression: 439 passed plus 15 subtests;
+- API compile: PASS;
+- ingress Compose configuration: PASS;
+- recursive permission mutation guard: ABSENT.
+
+Production remained unchanged throughout corrective development:
+`/users` remained `2750:0:20000`, canonical invitations remained
+`755:0:0`, effective writer access remained `NO/NO`, all four ingress
+services remained healthy, and maintenance remained disabled.
+
+No live identity mutation was performed during this corrective phase. T.42S
+Administrator acceptance remains blocked until this corrective branch is
+reviewed, merged, deployed through the canonical ingress update transaction,
+and the resulting live writer authority is verified.

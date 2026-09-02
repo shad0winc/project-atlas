@@ -98,3 +98,28 @@ def test_failure_results_are_bounded() -> None:
     assert len(response.recent_failures) <= (
         PORTAL_RECENT_FAILURE_LIMIT
     )
+
+def test_runtime_scheduler_provider_missing_snapshot_is_unavailable(tmp_path):
+    from atlas_api.services.scheduler_dashboard import RuntimeSchedulerProvider
+    response = SchedulerDashboardService(
+        RuntimeSchedulerProvider(tmp_path / "missing.json")
+    ).read_summary()
+    assert response.status == "unavailable"
+
+def test_runtime_scheduler_provider_valid_empty_snapshot_is_available(tmp_path):
+    import json
+    from atlas_api.services.scheduler_dashboard import RuntimeSchedulerProvider
+    path = tmp_path / "scheduler.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "generated_at": "2026-08-29T12:00:00Z",
+                "tasks": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    response = SchedulerDashboardService(RuntimeSchedulerProvider(path)).read_summary()
+    assert response.status == "available"
+    assert response.registered_count == 0

@@ -151,6 +151,18 @@ Request notifications may include:
 User-specific Discord mentions are intentionally not implemented. They belong
 to the later user notification preference and Discord identity contracts.
 
+### Sports operational and lifecycle routing
+
+Sports provider health events remain durable Atlas Runtime Bus events and are
+always written to the Notifications log. `sports.provider-degraded` and
+`sports.provider-recovered` use the `system` delivery route rather than the
+Sports route because they are administrative health signals.
+
+Until Atlas has persisted per-user Sports notification preferences,
+`sports.game-started` and `sports.game-finished` are log-only. Following a
+team, league, or event does not implicitly opt a user into Discord lifecycle
+notifications.
+
 ## Configuration
 
 Discord routing uses the following environment variables:

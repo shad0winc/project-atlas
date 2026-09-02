@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createSportsEvent, createSportsEventCollection, createSportsSubscription } from "./sports";
+import { createSportsEvent, createSportsEventCollection, createSportsEventSearchCollection, createSportsSearchCollection, createSportsSubscription } from "./sports";
 
 describe("Sports Portal types", () => {
   it("preserves provider and provider-event identity", () => {
@@ -75,5 +75,17 @@ describe("Sports Portal types", () => {
 
     expect(collection).toHaveLength(1);
     expect(collection[0]?.providerEventId).toBe("event-001");
+  });
+
+  it("creates discriminated team and event search results", () => {
+    const teams = createSportsSearchCollection("team", {
+      results: [{ id: "team-001", name: "Detroit Lions", sport: "American Football", league: "NFL" }]
+    });
+    const events = createSportsEventSearchCollection({
+      events: [{ provider: "thesportsdb", provider_event_id: "event-090", name: "Detroit Lions vs New Orleans Saints", sport: "American Football", league: "NFL", start_at: "2026-09-06T17:00:00Z", status: "scheduled", requested: false }]
+    });
+    expect(teams[0]?.kind).toBe("team");
+    expect(events[0]?.kind).toBe("event");
+    expect(events[0]?.id).toBe("event-090");
   });
 });

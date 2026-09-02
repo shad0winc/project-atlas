@@ -36,6 +36,8 @@ fi
 ARI_DATA_DIR="$ATLAS_ARI_DIR"
 ARI_SNAPSHOT_DIR="$ATLAS_ARI_SNAPSHOT_DIR"
 LATEST_FILE="$ATLAS_ARI_LATEST_FILE"
+ARI_API_RUNTIME_DIR="${ATLAS_ARI_API_RUNTIME_DIR:-/mnt/storage/configs/atlas/runtime/ari}"
+ARI_API_RUNTIME_FILE="${ATLAS_ARI_API_RUNTIME_FILE:-$ARI_API_RUNTIME_DIR/latest.json}"
 ARI_HEALTH_STATE_FILE="$ATLAS_ARI_DIR/health-state.json"
 ARI_STORAGE_STATE_FILE="$ATLAS_ARI_DIR/storage-state.json"
 MEDIA_ROOT="$ATLAS_MEDIA_ROOT"
@@ -244,6 +246,7 @@ EOF
   echo "ARI collection complete."
 
   cp "$snapshot_file" "$LATEST_FILE"
+  publish_api_runtime_snapshot "$LATEST_FILE"
 
   ari_publish_event \
     "ari.snapshot-created" \
@@ -1116,6 +1119,50 @@ print_snapshot_comparison() {
   echo "Movies: $previous_movies → $current_movies"
   echo "TV:     $previous_tv → $current_tv"
   echo "Users:  $previous_users → $current_users"
+}
+
+
+publish_api_runtime_snapshot() {
+  local source="${1:-$LATEST_FILE}"
+  local destination="$ARI_API_RUNTIME_FILE"
+  local directory="$ARI_API_RUNTIME_DIR"
+  local temporary=""
+
+  if [[ ! -f "$source" ]]; then
+    echo "ARI API runtime publication source missing: $source" >&2
+    return 1
+  fi
+
+  install -d -o 0 -g 20000 -m 0750 "$directory"
+
+  temporary="$(mktemp "$directory/.latest.json.XXXXXX")" || {
+    echo "Unable to allocate ARI API runtime snapshot" >&2
+    return 1
+  }
+
+  if ! cp -- "$source" "$temporary"; then
+    rm -f -- "$temporary"
+    echo "Unable to copy ARI API runtime snapshot" >&2
+    return 1
+  fi
+
+  if ! chown 0:20000 "$temporary"; then
+    rm -f -- "$temporary"
+    echo "Unable to set ARI API runtime snapshot ownership" >&2
+    return 1
+  fi
+
+  if ! chmod 0640 "$temporary"; then
+    rm -f -- "$temporary"
+    echo "Unable to set ARI API runtime snapshot mode" >&2
+    return 1
+  fi
+
+  if ! mv -f -- "$temporary" "$destination"; then
+    rm -f -- "$temporary"
+    echo "Unable to publish ARI API runtime snapshot" >&2
+    return 1
+  fi
 }
 
 ###############################################################################

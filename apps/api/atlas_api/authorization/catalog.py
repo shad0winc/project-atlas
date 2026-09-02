@@ -11,7 +11,9 @@ from atlas_api.authorization.models import RoleDefinition
 OWNER_ROLE = "owner"
 GLOBAL_ADMIN_ROLE = "global_admin"
 ATLAS_ADMIN_ROLE = "atlas_admin"
+MEDIA_ADMIN_ROLE = "media_admin"
 GAME_SERVER_ADMIN_ROLE = "gameserver_admin"
+SPORTS_ADMIN_ROLE = "sports_admin"
 MONITORING_ADMIN_ROLE = "monitoring_admin"
 OPERATOR_ROLE = "operator"
 CHECK_RUNNER_ROLE = "check_runner"
@@ -50,6 +52,7 @@ _BUILT_IN_ROLES: dict[str, RoleDefinition] = {
                 "atlas.*",
                 "audit.*",
                 "cleanup.*",
+                "downloads.*",
                 "favorites.*",
                 "gameservers.*",
                 "media.*",
@@ -59,6 +62,7 @@ _BUILT_IN_ROLES: dict[str, RoleDefinition] = {
                 "retention.*",
                 "roles.*",
                 "scheduler.*",
+                "sports.*",
                 "system.*",
                 "users.*",
             }
@@ -75,6 +79,7 @@ _BUILT_IN_ROLES: dict[str, RoleDefinition] = {
             {
                 "atlas.*",
                 "cleanup.*",
+                "downloads.*",
                 "favorites.*",
                 "media.*",
                 "modules.read",
@@ -82,6 +87,27 @@ _BUILT_IN_ROLES: dict[str, RoleDefinition] = {
                 "requests.*",
                 "retention.*",
                 "scheduler.*",
+                "system.health.read",
+                "system.logs.read",
+            }
+        ),
+    ),
+    MEDIA_ADMIN_ROLE: RoleDefinition(
+        name=MEDIA_ADMIN_ROLE,
+        display_name="Media Administrator",
+        description=(
+            "Administers Atlas media discovery, requests, downloads, cleanup, "
+            "and retention services."
+        ),
+        permissions=frozenset(
+            {
+                "cleanup.*",
+                "downloads.*",
+                "favorites.*",
+                "media.*",
+                "monitoring.read",
+                "requests.*",
+                "retention.*",
                 "system.health.read",
                 "system.logs.read",
             }
@@ -99,6 +125,20 @@ _BUILT_IN_ROLES: dict[str, RoleDefinition] = {
                 "monitoring.read",
                 "system.health.read",
                 "system.logs.read",
+            }
+        ),
+    ),
+    SPORTS_ADMIN_ROLE: RoleDefinition(
+        name=SPORTS_ADMIN_ROLE,
+        display_name="Sports Administrator",
+        description=(
+            "Administers the currently supported Atlas sports experience."
+        ),
+        permissions=frozenset(
+            {
+                "sports.events.request",
+                "sports.read",
+                "sports.recordings.manage",
             }
         ),
     ),
@@ -127,6 +167,7 @@ _BUILT_IN_ROLES: dict[str, RoleDefinition] = {
         permissions=frozenset(
             {
                 "cleanup.run",
+                "downloads.manage",
                 "gameservers.restart",
                 "gameservers.start",
                 "gameservers.stop",
@@ -179,6 +220,9 @@ _BUILT_IN_ROLES: dict[str, RoleDefinition] = {
                 "requests.cancel",
                 "requests.create",
                 "requests.read",
+                "sports.events.request",
+                "sports.read",
+                "sports.recordings.manage",
                 "users.self.read",
                 "users.self.update",
             }

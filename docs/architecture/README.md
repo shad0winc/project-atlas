@@ -282,3 +282,10 @@ least-privilege boundaries validated by M-023.26.
 
 - [Architecture](SECURITY.md)
 - [ADR 0024 — Security Trust Boundaries](../ADR/0024-security-trust-boundaries.md)
+
+## Identity Mutation Boundary
+Administrator identity mutations cross a dedicated private persistence boundary
+so the public API retains RO user-state access while preserving RBAC.
+
+- [Identity Mutation Boundary](IDENTITY_MUTATION_BOUNDARY.md)
+- [ADR 0025 — Identity Mutation Boundary](../ADR/0025-identity-mutation-boundary.md)

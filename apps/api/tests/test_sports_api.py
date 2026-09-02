@@ -14,6 +14,10 @@ from atlas_api.routes.v1.sports import (
     require_sports_read,
     router,
 )
+from atlas_api.services.sports import (
+    SportsWriterBackedAPIService,
+    SportsWriterTransportError,
+)
 
 
 USER = AuthenticatedUser(
@@ -34,6 +38,8 @@ class FakeSportsService:
         user_id: str,
         provider_name: str,
         provider_event_ids: tuple[str, ...] | None = None,
+        team_ids: tuple[str, ...] | None = None,
+        league_ids: tuple[str, ...] | None = None,
     ) -> list[dict[str, Any]]:
         assert user_id == USER.user_id
         assert provider_name == "thesportsdb"
@@ -222,6 +228,65 @@ def test_duplicate_sports_event_subscription_returns_existing_state() -> None:
     assert response.json()["subscription_id"] == "sub-existing"
 
 
+def test_list_sports_events_maps_private_transport_failure_to_503() -> None:
+    service = FakeSportsService()
+
+    def unavailable(
+        *,
+        user_id: str,
+        provider_name: str,
+        provider_event_ids: tuple[str, ...] | None = None,
+        team_ids: tuple[str, ...] | None = None,
+        league_ids: tuple[str, ...] | None = None,
+    ) -> list[dict[str, Any]]:
+        raise SportsWriterTransportError(
+            "Private Sports service is unavailable."
+        )
+
+    service.list_events_for_user = unavailable  # type: ignore[method-assign]
+    client = build_client(service)
+
+    response = client.get(
+        "/api/v1/sports/events",
+        params={"provider": "thesportsdb"},
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "Private Sports service is unavailable."
+    }
+
+
+def test_create_sports_subscription_maps_private_transport_failure_to_503() -> None:
+    service = FakeSportsService()
+
+    def unavailable(
+        *,
+        user_id: str,
+        provider_name: str,
+        provider_event_id: str,
+    ) -> tuple[dict[str, Any], bool]:
+        raise SportsWriterTransportError(
+            "Private Sports service is unavailable."
+        )
+
+    service.create_event_subscription = unavailable  # type: ignore[method-assign]
+    client = build_client(service)
+
+    response = client.post(
+        "/api/v1/sports/subscriptions",
+        json={
+            "provider": "thesportsdb",
+            "provider_event_id": "event-001",
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "Private Sports service is unavailable."
+    }
+
+
 def test_sports_route_permission_contract_is_frozen() -> None:
     from atlas_api.routes.v1 import sports
 
@@ -230,3 +295,67 @@ def test_sports_route_permission_contract_is_frozen() -> None:
         sports.SPORTS_EVENTS_REQUEST_PERMISSION
         == "sports.events.request"
     )
+
+
+def test_sports_writer_adapter_maps_dropped_connection_to_transport_error(
+    monkeypatch,
+) -> None:
+    import http.client
+
+    import pytest
+
+    service = SportsWriterBackedAPIService(
+        base_url="http://sports-writer:8003",
+        token="test-token",
+        timeout_seconds=1.0,
+    )
+
+    def dropped_connection(*args, **kwargs):
+        raise http.client.RemoteDisconnected(
+            "Remote end closed connection without response"
+        )
+
+    monkeypatch.setattr(
+        "atlas_api.services.sports.urllib.request.urlopen",
+        dropped_connection,
+    )
+
+    with pytest.raises(
+        SportsWriterTransportError,
+        match="Private Sports service is unavailable",
+    ):
+        service.list_events_for_user(
+            user_id="usr-test",
+            provider_name="thesportsdb",
+        )
+
+
+def test_search_sports_events_is_authenticated_user_scoped() -> None:
+    service = FakeSportsService()
+
+    def search_events(*, user_id: str, provider_name: str, query: str):
+        assert user_id == USER.user_id
+        assert provider_name == "thesportsdb"
+        assert query == "Lions"
+        return [
+            {
+                "provider": "thesportsdb",
+                "provider_event_id": "event-090",
+                "name": "Detroit Lions vs New Orleans Saints",
+                "sport": "American Football",
+                "league": "NFL",
+                "start_at": "2026-09-06T17:00:00Z",
+                "status": "scheduled",
+                "requested": True,
+            }
+        ]
+
+    service.search_events = search_events  # type: ignore[attr-defined]
+    client = build_client(service)
+    response = client.get(
+        "/api/v1/sports/search/events",
+        params={"provider": "thesportsdb", "query": "Lions"},
+    )
+    assert response.status_code == 200
+    assert response.json()["events"][0]["provider_event_id"] == "event-090"
+    assert response.json()["events"][0]["requested"] is True

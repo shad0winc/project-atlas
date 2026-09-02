@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 
-import type { SportsEvent, SportsSubscription } from "../types/sports";
+import type {
+  SportsEvent,
+  SportsFollow,
+  SportsSearchResult,
+  SportsSearchType,
+  SportsSubscription
+} from "../types/sports";
 
 export type SportsRequestInput = Readonly<{
   provider: string;
@@ -11,117 +17,436 @@ export type SportsRequestInput = Readonly<{
 
 export type SportsRequestViewProps = Readonly<{
   events: readonly SportsEvent[];
+  follows: readonly SportsFollow[];
+  searchResults: readonly SportsSearchResult[];
+  searchType: SportsSearchType;
+  onSearch: (type: SportsSearchType, query: string) => Promise<void>;
+  onFollow: (type: "team" | "league", providerId: string) => Promise<void>;
+  onUnfollow: (subscriptionId: string) => Promise<void>;
+  onBrowse: (type: "team" | "league", providerId: string) => Promise<void>;
   onRequestEvent: (input: SportsRequestInput) => Promise<SportsSubscription>;
+  onSetRecording: (
+    event: Pick<SportsEvent, "provider" | "providerEventId">,
+    record: boolean
+  ) => Promise<void>;
 }>;
 
 export function SportsRequestView({
   events,
-  onRequestEvent
+  follows,
+  searchResults,
+  searchType,
+  onSearch,
+  onFollow,
+  onUnfollow,
+  onBrowse,
+  onRequestEvent,
+  onSetRecording
 }: SportsRequestViewProps): React.ReactElement {
-  const [requestedEventIds, setRequestedEventIds] = useState<ReadonlySet<string>>(
-    () =>
-      new Set(
-        events
-          .filter((event) => event.requested)
-          .map((event) => `${event.provider}:${event.providerEventId}`)
-      )
-  );
+  const [query, setQuery] = useState("");
+  const [kind, setKind] = useState<SportsSearchType>("team");
+  const [pending, setPending] = useState<string | null>(null);
+  const [error, setError] = useState<Readonly<{
+    identity: string;
+    message: string;
+  }> | null>(null);
 
-  const [pendingEventIds, setPendingEventIds] = useState<ReadonlySet<string>>(() => new Set());
-
-  const [error, setError] = useState<string | null>(null);
-
-  async function requestEvent(event: SportsEvent): Promise<void> {
-    const identity = `${event.provider}:${event.providerEventId}`;
-
-    if (requestedEventIds.has(identity) || pendingEventIds.has(identity)) {
+  async function mutate(
+    identity: string,
+    action: () => Promise<unknown>
+  ): Promise<void> {
+    if (pending) {
       return;
     }
 
+    setPending(identity);
     setError(null);
 
-    setPendingEventIds((current) => {
-      const next = new Set(current);
-      next.add(identity);
-      return next;
-    });
-
     try {
-      await onRequestEvent({
-        provider: event.provider,
-        providerEventId: event.providerEventId
+      await action();
+    } catch (mutationError) {
+      setError({
+        identity,
+        message:
+          mutationError instanceof Error
+            ? mutationError.message
+            : "Atlas could not update Sports."
       });
-
-      setRequestedEventIds((current) => {
-        const next = new Set(current);
-        next.add(identity);
-        return next;
-      });
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Atlas could not request this Sports event."
-      );
     } finally {
-      setPendingEventIds((current) => {
-        const next = new Set(current);
-        next.delete(identity);
-        return next;
-      });
+      setPending(null);
     }
   }
 
   return (
-    <section aria-labelledby="sports-events-title" className="requests-view">
+    <section aria-label="Sports discovery and following" className="requests-view">
       <div className="media-discovery-results-header">
         <div>
-          <p className="portal-page-eyebrow">Upcoming events</p>
-
-          <h2 id="sports-events-title">Sports</h2>
-
-          <p>Request one supported sporting event through Atlas.</p>
+          <p className="portal-page-eyebrow">Discover</p>
+          <h2>Find your Sports</h2>
+          <p>Search teams, leagues, or upcoming events. Following, requesting, and recording remain separate.</p>
         </div>
       </div>
 
-      {error ? (
-        <section aria-live="polite" className="requests-mutation-error">
-          <strong>Sports request failed</strong>
+      <form
+        className="requests-search"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void mutate("search", () => onSearch(kind, query));
+        }}
+      >
+        <label>
+          Search type
+          <select
+            aria-label="Search type"
+            onChange={(event) => setKind(event.target.value as SportsSearchType)}
+            value={kind}
+          >
+            <option value="team">Teams</option>
+            <option value="league">Leagues</option>
+            <option value="event">Events</option>
+          </select>
+        </label>
 
-          <p>{error}</p>
+        <label>
+          Search Sports
+          <input
+            aria-label="Search Sports"
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={
+              kind === "team"
+                ? "Search teams"
+                : kind === "league"
+                  ? "Search leagues"
+                  : "Search events"
+            }
+            value={query}
+          />
+        </label>
+
+        <button
+          className="requests-refresh-button"
+          disabled={!query.trim() || pending === "search"}
+          type="submit"
+        >
+          {pending === "search" ? "Searching..." : "Search"}
+        </button>
+      </form>
+
+      {error && !error.identity.startsWith("browse:") ? (
+        <section aria-live="polite" className="requests-mutation-error">
+          <strong>Sports action failed</strong>
+          <p>{error.message}</p>
         </section>
       ) : null}
 
-      {events.length === 0 ? (
-        <section className="requests-message-panel">
-          <p className="portal-page-eyebrow">No upcoming events</p>
+      {searchResults.length > 0 ? (
+        <section
+          aria-label={`Sports ${searchType} search results`}
+          className="requests-grid"
+        >
+          {searchResults.map((result) => {
+            const identity = `${searchType}:${result.id}`;
 
-          <h3>Atlas has no supported Sports events to show right now</h3>
+            if (result.kind === "event") {
+              const eventFollow = follows.find(
+                (follow) =>
+                  follow.type === "event" &&
+                  follow.provider === result.provider &&
+                  follow.providerId === result.id
+              );
+              const recording = Boolean(eventFollow?.record);
+              const requestIdentity = `event:${result.provider}:${result.id}`;
+              const recordingIdentity = `recording:${result.provider}:${result.id}`;
+              const event: SportsEvent = {
+                provider: result.provider,
+                providerEventId: result.id,
+                name: result.name,
+                sport: result.sport,
+                league: result.league,
+                startAt: result.startAt,
+                status: result.status,
+                requested: result.requested
+              };
 
-          <p>Check again after the configured Sports provider discovers new events.</p>
-        </section>
-      ) : (
-        <section aria-label="Upcoming Sports events" className="requests-grid">
-          {events.map((event) => {
-            const identity = `${event.provider}:${event.providerEventId}`;
+              return (
+                <article className="request-card" key={identity}>
+                  <div className="request-card-header">
+                    <div>
+                      <p className="request-card-kind">
+                        {result.sport} - {result.league}
+                      </p>
+                      <h3>{result.name}</h3>
+                    </div>
+                    <span className="request-status">{result.status}</span>
+                  </div>
 
-            const requested = event.requested || requestedEventIds.has(identity);
+                  <dl className="request-card-details">
+                    <div>
+                      <dt>Starts</dt>
+                      <dd>{new Date(result.startAt).toLocaleString()}</dd>
+                    </div>
+                    <div>
+                      <dt>Provider</dt>
+                      <dd>{result.provider}</dd>
+                    </div>
+                  </dl>
 
-            const pending = pendingEventIds.has(identity);
+                  <button
+                    className="requests-refresh-button"
+                    disabled={result.requested || pending === requestIdentity}
+                    onClick={() => {
+                      void mutate(
+                        requestIdentity,
+                        () =>
+                          onRequestEvent({
+                            provider: result.provider,
+                            providerEventId: result.id
+                          })
+                      );
+                    }}
+                    type="button"
+                  >
+                    {result.requested
+                      ? "Requested"
+                      : pending === requestIdentity
+                        ? "Requesting..."
+                        : "Request event"}
+                  </button>
+
+                  <button
+                    className="requests-refresh-button"
+                    disabled={pending === recordingIdentity}
+                    onClick={() => {
+                      void mutate(
+                        recordingIdentity,
+                        () => onSetRecording(event, !recording)
+                      );
+                    }}
+                    type="button"
+                  >
+                    {pending === recordingIdentity
+                      ? "Updating recording..."
+                      : recording
+                        ? "Cancel recording"
+                        : "Record event"}
+                  </button>
+                </article>
+              );
+            }
+
+            const existing = follows.find(
+              (item) => item.type === searchType && item.providerId === result.id
+            );
 
             return (
               <article className="request-card" key={identity}>
                 <div className="request-card-header">
                   <div>
                     <p className="request-card-kind">
-                      {event.sport}
-                      {" · "}
-                      {event.league}
+                      {result.sport || "Sports"}
+                      {result.league ? ` - ${result.league}` : ""}
                     </p>
+                    <h3>{result.name}</h3>
+                  </div>
+                </div>
 
+                <button
+                  className="requests-refresh-button"
+                  disabled={pending === `browse:${identity}`}
+                  onClick={() => {
+                    void mutate(
+                      `browse:${identity}`,
+                      () => onBrowse(result.kind, result.id)
+                    );
+                  }}
+                  type="button"
+                >
+                  {pending === `browse:${identity}`
+                    ? "Loading upcoming..."
+                    : "View upcoming"}
+                </button>
+
+                {error?.identity === `browse:${identity}` ? (
+                  <section
+                    aria-live="polite"
+                    className="requests-mutation-error"
+                  >
+                    <strong>Could not load upcoming events</strong>
+                    <p>{error.message}</p>
+                  </section>
+                ) : null}
+
+                <button
+                  className="requests-refresh-button"
+                  disabled={pending === identity}
+                  onClick={() => {
+                    void mutate(
+                      identity,
+                      async () => {
+                        if (existing) {
+                          await onUnfollow(existing.subscriptionId);
+                          return;
+                        }
+
+                        await onFollow(result.kind, result.id);
+                        setQuery("");
+                      }
+                    );
+                  }}
+                  type="button"
+                >
+                  {pending === identity ? "Updating..." : existing ? "Unfollow" : "Follow"}
+                </button>
+              </article>
+            );
+          })}
+        </section>
+      ) : null}
+
+      <div className="media-discovery-results-header">
+        <div>
+          <p className="portal-page-eyebrow">Following</p>
+          <h2>My Sports</h2>
+          <p>Following keeps teams, leagues, and events handy. It does not automatically record events.</p>
+        </div>
+      </div>
+
+      {follows.length === 0 ? (
+        <section className="requests-message-panel">
+          <h3>You are not following any Sports yet</h3>
+          <p>Use Discover above to follow a team or league.</p>
+        </section>
+      ) : (
+        <section aria-label="Followed Sports" className="requests-grid">
+          {follows.map((follow) => (
+            <article className="request-card" key={follow.subscriptionId}>
+              <div className="request-card-header">
+                <div>
+                  <p className="request-card-kind">{follow.type}</p>
+                  <h3>{follow.name}</h3>
+                </div>
+                <span className="request-status">Following</span>
+              </div>
+
+              {follow.type === "event" ? (
+                <button
+                  className="requests-refresh-button"
+                  disabled={pending === `record:${follow.subscriptionId}`}
+                  onClick={() => {
+                    void mutate(
+                      `record:${follow.subscriptionId}`,
+                      () =>
+                        onSetRecording(
+                          {
+                            provider: follow.provider,
+                            providerEventId: follow.providerId
+                          },
+                          !follow.record
+                        )
+                    );
+                  }}
+                  type="button"
+                >
+                  {pending === `record:${follow.subscriptionId}`
+                    ? "Updating recording..."
+                    : follow.record
+                      ? "Cancel recording"
+                      : "Record event"}
+                </button>
+              ) : null}
+
+              {follow.type === "team" || follow.type === "league" ? (
+                <>
+                  <button
+                    className="requests-refresh-button"
+                    disabled={pending === `browse:${follow.subscriptionId}`}
+                    onClick={() => {
+                      const browseType: "team" | "league" =
+                        follow.type === "team"
+                          ? "team"
+                          : "league";
+
+                      void mutate(
+                        `browse:${follow.subscriptionId}`,
+                        () => onBrowse(browseType, follow.providerId)
+                      );
+                    }}
+                    type="button"
+                  >
+                    {pending === `browse:${follow.subscriptionId}`
+                      ? "Loading upcoming..."
+                      : "View upcoming"}
+                  </button>
+
+                  {error?.identity === `browse:${follow.subscriptionId}` ? (
+                    <section
+                      aria-live="polite"
+                      className="requests-mutation-error"
+                    >
+                      <strong>Could not load upcoming events</strong>
+                      <p>{error.message}</p>
+                    </section>
+                  ) : null}
+                </>
+              ) : null}
+
+              <button
+                className="requests-refresh-button"
+                onClick={() => {
+                  void mutate(
+                    follow.subscriptionId,
+                    () => onUnfollow(follow.subscriptionId)
+                  );
+                }}
+                type="button"
+              >
+                Unfollow
+              </button>
+            </article>
+          ))}
+        </section>
+      )}
+
+      <div
+        className="media-discovery-results-header"
+        id="sports-upcoming-events"
+      >
+        <div>
+          <p className="portal-page-eyebrow">Upcoming events</p>
+          <h2>Sports</h2>
+          <p>Request a supported event through Atlas. Following and recording remain separate.</p>
+        </div>
+      </div>
+
+      {events.length === 0 ? (
+        <section className="requests-message-panel">
+          <p className="portal-page-eyebrow">No upcoming events</p>
+          <h3>Atlas has no supported Sports events to show right now</h3>
+          <p>Search for a team, league, or event above, or check again as new events are discovered.</p>
+        </section>
+      ) : (
+        <section aria-label="Upcoming Sports events" className="requests-grid">
+          {events.map((event) => {
+            const identity = `${event.provider}:${event.providerEventId}`;
+            const pendingIdentity = `event:${identity}`;
+            const recordingIdentity = `recording:${identity}`;
+            const eventFollow = follows.find(
+              (follow) =>
+                follow.type === "event" &&
+                follow.provider === event.provider &&
+                follow.providerId === event.providerEventId
+            );
+            const recording = Boolean(eventFollow?.record);
+
+            return (
+              <article className="request-card" key={identity}>
+                <div className="request-card-header">
+                  <div>
+                    <p className="request-card-kind">
+                      {event.sport} - {event.league}
+                    </p>
                     <h3>{event.name}</h3>
                   </div>
-
                   <span className="request-status">{event.status}</span>
                 </div>
 
@@ -130,7 +455,6 @@ export function SportsRequestView({
                     <dt>Starts</dt>
                     <dd>{new Date(event.startAt).toLocaleString()}</dd>
                   </div>
-
                   <div>
                     <dt>Provider</dt>
                     <dd>{event.provider}</dd>
@@ -141,13 +465,43 @@ export function SportsRequestView({
                   className="requests-refresh-button"
                   data-provider={event.provider}
                   data-provider-event-id={event.providerEventId}
-                  disabled={requested || pending}
+                  disabled={event.requested || pending === pendingIdentity}
                   onClick={() => {
-                    void requestEvent(event);
+                    void mutate(
+                      pendingIdentity,
+                      () =>
+                        onRequestEvent({
+                          provider: event.provider,
+                          providerEventId: event.providerEventId
+                        })
+                    );
                   }}
                   type="button"
                 >
-                  {requested ? "Requested" : pending ? "Requesting…" : "Request event"}
+                  {event.requested
+                    ? "Requested"
+                    : pending === pendingIdentity
+                      ? "Requesting..."
+                      : "Request event"}
+                </button>
+
+
+                <button
+                  className="requests-refresh-button"
+                  disabled={pending === recordingIdentity}
+                  onClick={() => {
+                    void mutate(
+                      recordingIdentity,
+                      () => onSetRecording(event, !recording)
+                    );
+                  }}
+                  type="button"
+                >
+                  {pending === recordingIdentity
+                    ? "Updating recording..."
+                    : recording
+                      ? "Cancel recording"
+                      : "Record event"}
                 </button>
               </article>
             );

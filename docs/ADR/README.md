@@ -75,3 +75,4 @@ The simplified numeric format is the project standard for all future ADRs.
 - [ADR 0022 — Production Deployment Safety Boundaries](0022-production-deployment-safety-boundaries.md)
 - [ADR 0023 — Backup and Restore Recovery Boundaries](0023-backup-restore-recovery-boundaries.md)
 - [ADR 0024 — Security Trust Boundaries](0024-security-trust-boundaries.md)
+- [ADR 0025 — Identity Mutation Boundary](0025-identity-mutation-boundary.md)

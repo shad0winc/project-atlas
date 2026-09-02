@@ -6,11 +6,15 @@ from functools import lru_cache
 import os
 from pathlib import Path
 
+from atlas.downloads import DownloadsService
+
 from atlas.service_lifecycle import (
-    DockerComposeProvider,
     ServiceLifecycleService,
     ServiceMaintenanceHistoryService,
     ServiceUpdateService,
+)
+from atlas.service_lifecycle.providers import (
+    RuntimeSnapshotProvider,
 )
 
 from fastapi import Depends, HTTPException, status
@@ -45,6 +49,7 @@ from atlas_api.services import (
     PortalDashboardService,
     SchedulerDashboardService,
 )
+from atlas_api.services.identity_writer import IdentityWriterClient
 
 
 _bearer_scheme = HTTPBearer(auto_error=False)
@@ -76,6 +81,36 @@ def get_user_profile_store() -> UserProfileStore:
     ).expanduser().resolve()
 
     return UserProfileStore(root)
+
+
+@lru_cache(maxsize=1)
+def get_identity_writer_client() -> IdentityWriterClient:
+    """Return the private identity-mutation client."""
+
+    url = os.getenv(
+        "ATLAS_IDENTITY_WRITER_URL",
+        "",
+    ).strip()
+
+    token = os.getenv(
+        "ATLAS_IDENTITY_WRITER_TOKEN",
+        "",
+    ).strip()
+
+    if not url:
+        raise RuntimeError(
+            "ATLAS_IDENTITY_WRITER_URL is required."
+        )
+
+    if not token:
+        raise RuntimeError(
+            "ATLAS_IDENTITY_WRITER_TOKEN is required."
+        )
+
+    return IdentityWriterClient(
+        url,
+        token,
+    )
 
 
 @lru_cache(maxsize=1)
@@ -113,6 +148,17 @@ def get_login_attempt_limiter() -> LoginAttemptLimiter:
 
 
 @lru_cache(maxsize=1)
+def get_downloads_writer_client():
+    """Return the private Downloads mutation client."""
+    from atlas_api.services.downloads_writer import DownloadsWriterClient
+
+    return DownloadsWriterClient(
+        os.environ.get("ATLAS_DOWNLOADS_WRITER_URL", "http://downloads-writer:8002"),
+        os.environ.get("ATLAS_DOWNLOADS_WRITER_TOKEN", ""),
+    )
+
+
+@lru_cache(maxsize=1)
 def get_security_audit_writer():
     """Return the process-wide credential-safe security audit writer."""
 
@@ -143,7 +189,19 @@ def get_authentication_service() -> AuthenticationService:
 def get_dashboard_summary_service() -> DashboardSummaryService:
     """Return the process-wide operational dashboard service."""
 
-    return DashboardSummaryService()
+    snapshot_path = os.getenv(
+        "ATLAS_DASHBOARD_HEALTH_SNAPSHOT_PATH",
+        "/mnt/storage/configs/atlas/runtime/dashboard/health.json",
+    ).strip()
+
+    if not snapshot_path:
+        raise ValueError(
+            "ATLAS_DASHBOARD_HEALTH_SNAPSHOT_PATH cannot be empty"
+        )
+
+    return DashboardSummaryService(
+        snapshot_path=Path(snapshot_path),
+    )
 
 
 @lru_cache(maxsize=1)
@@ -169,22 +227,9 @@ def get_dashboard_media_summary_service(
 
 
 @lru_cache(maxsize=1)
-def get_scheduler_dashboard_service() -> SchedulerDashboardService:
-    """Return the process-wide scheduler dashboard adapter."""
-
-    from atlas.scheduler import TaskScheduler
-
-    return SchedulerDashboardService(
-        TaskScheduler(),
-    )
-
-
-@lru_cache(maxsize=1)
 def get_task_scheduler():
     """Return the Atlas scheduler runtime reader."""
-
     from atlas.scheduler import TaskScheduler
-
     return TaskScheduler(
         Path(
             os.getenv(
@@ -198,10 +243,33 @@ def get_task_scheduler():
 @lru_cache(maxsize=1)
 def get_scheduler_dashboard_service() -> SchedulerDashboardService:
     """Return the Portal scheduler widget adapter."""
-
+    from atlas_api.services.scheduler_dashboard import RuntimeSchedulerProvider
+    snapshot_path = os.getenv(
+        "ATLAS_DASHBOARD_SCHEDULER_SNAPSHOT_PATH",
+        "/mnt/storage/configs/atlas/runtime/dashboard/scheduler.json",
+    ).strip()
+    if not snapshot_path:
+        raise ValueError("ATLAS_DASHBOARD_SCHEDULER_SNAPSHOT_PATH cannot be empty")
     return SchedulerDashboardService(
-        get_task_scheduler(),
+        RuntimeSchedulerProvider(Path(snapshot_path))
     )
+
+
+@lru_cache(maxsize=1)
+def get_portal_operations_repository() -> FileOperationsRepository:
+    """Return the bounded Operations repository used by the Portal dashboard."""
+
+    configured_root = os.getenv(
+        "ATLAS_DASHBOARD_OPERATIONS_DIRECTORY",
+        "/mnt/storage/configs/atlas/runtime/dashboard/operations/current",
+    ).strip()
+
+    if not configured_root:
+        raise ValueError(
+            "ATLAS_DASHBOARD_OPERATIONS_DIRECTORY cannot be empty"
+        )
+
+    return FileOperationsRepository(Path(configured_root))
 
 
 @lru_cache(maxsize=1)
@@ -211,7 +279,7 @@ def get_portal_dashboard_service() -> PortalDashboardService:
     return PortalDashboardService(
         get_dashboard_summary_service(),
         get_dashboard_media_summary_service(),
-        get_operations_repository(),
+        get_portal_operations_repository(),
         get_scheduler_dashboard_service(),
         get_operations_comparison_service(),
     )
@@ -262,37 +330,33 @@ def get_operations_repository() -> OperationsRepository:
 
 
 @lru_cache(maxsize=1)
+def get_downloads_service() -> DownloadsService:
+    """Return the process-wide read-only Downloads service."""
+    snapshot_path = Path(
+        os.environ.get(
+            "ATLAS_DOWNLOADS_SNAPSHOT_PATH",
+            "/mnt/storage/configs/atlas/runtime/downloads/latest.json",
+        )
+    )
+    return DownloadsService(snapshot_path)
+
+
+@lru_cache(maxsize=1)
 def get_service_lifecycle_service() -> ServiceLifecycleService:
     """Return the process-wide read-only Service Lifecycle service."""
 
-    project_root = Path(
+    snapshot_path = Path(
         os.environ.get(
-            "ATLAS_PROJECT_ROOT",
-            "/opt/project-atlas",
+            "ATLAS_SERVICE_LIFECYCLE_SNAPSHOT_PATH",
+            (
+                "/mnt/storage/configs/atlas/runtime/"
+                "services/latest.json"
+            ),
         )
     )
 
-    compose_file = Path(
-        os.environ.get(
-            "ATLAS_SERVICE_LIFECYCLE_COMPOSE_FILE",
-            str(project_root / "docker-compose.yml"),
-        )
-    )
-
-    project_directory_value = os.environ.get(
-        "ATLAS_SERVICE_LIFECYCLE_PROJECT_DIRECTORY"
-    )
-
-    project_directory = (
-        Path(project_directory_value)
-        if project_directory_value
-        else compose_file.parent
-    )
-
-    provider = DockerComposeProvider(
-        compose_file=compose_file,
-        project_directory=project_directory,
-        environment=os.environ,
+    provider = RuntimeSnapshotProvider(
+        snapshot_path
     )
 
     return ServiceLifecycleService(provider)
@@ -445,6 +509,7 @@ def clear_dependency_caches() -> None:
     get_authentication_service.cache_clear()
     get_refresh_session_registry.cache_clear()
     get_login_attempt_limiter.cache_clear()
+    get_downloads_writer_client.cache_clear()
     get_security_audit_writer.cache_clear()
     get_dashboard_media_summary_service.cache_clear()
     get_dashboard_summary_service.cache_clear()

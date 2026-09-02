@@ -2,7 +2,43 @@
 
 All notable changes to Project Atlas are documented in this file.
 
+## T42S — Identity Writer Runtime Permission Remediation
+
+- Reconciles the post-deployment filesystem-authority gap discovered after
+  T42-F02: the private writer topology was healthy, but its two writable bind
+  mounts were not writable by the writer's effective supplemental groups.
+- Adds deployment-time provisioning and verification for only the required
+  directory roots:
+  - users: `root:20000`, mode `2770`;
+  - canonical invitations: `root:20001`, mode `2770`.
+- Keeps permission mutation non-recursive and preserves existing child
+  ownership and modes.
+- Fails ingress deployment closed before Compose apply when the runtime
+  permission prerequisite cannot be established.
+- Corrective branch certification includes focused permission contracts,
+  behavioral provisioning contracts, transaction fail-closed coverage, full
+  Core regression, canonical API regression, API compile, and Compose config.
+- Production has not yet received this corrective permission change. Live
+  Administrator mutation acceptance remains blocked until the corrective
+  branch is reviewed, merged, and deployed through the canonical ingress
+  transaction.
+
 ## [Unreleased]
+
+## T42-F02 — Administrator Identity Mutation Boundary
+
+- Added private least-privilege `identity-writer` runtime for administrator
+  user and invitation mutations.
+- Kept public API user state RO and canonicalized invitations at
+  `ATLAS_IDENTITY_DIR/invitations`.
+- Preserved API authentication, RBAC, validation, response/error semantics
+  while delegating bounded mutations with dedicated service authentication.
+- Added isolation, bounded RW mounts, writer health, and direct-write contracts.
+- Reconciled administrator API fixtures with the new boundary.
+- Certified 37 focused contracts, 3,495 Core + 104 subtests, and 423 API + 15
+  subtests.
+- Still uncommitted/undeployed; T.42S remains blocked pending merge, deployment,
+  and live acceptance.
 
 - Added M-018.29 guarded lifecycle planning contracts: immutable
   `ServiceUpdatePlan`, `ServiceUpdateResult`, and `ServiceUpdateOutcome`
@@ -183,6 +219,49 @@ All notable changes to Project Atlas are documented in this file.
   `init: true`, existing configuration path, and current dependency topology.
 
 ### Fixed
+
+- Reconciled the second controlled exact `1.0.0-rc.1` production attempt,
+  `update-20260824T222351Z-3794932`, which failed closed at the immediate post-Compose ingress
+  verification boundary while the ingress health state was still legitimately
+  `starting`.
+- Certified rollback-side post-restore ingress readiness after recovery of
+  failed exact-RC transaction `update-20260824T222351Z-3794932` exposed the distinct
+  `POST_RESTORE_ROLLBACK_READINESS_RACE`.
+- Added a bounded, inspection-only rollback readiness boundary after ingress
+  restore and before authoritative rollback verification/finalization.
+- Rollback readiness requires `running + healthy`, permits only
+  `running + starting` as a bounded transient state, and otherwise fails closed.
+- Certified the rollback-readiness remediation with 6 focused readiness tests,
+  30 deployment-recovery tests, 25 update-transaction tests, 18 release-gate
+  tests, 3,467 Core tests plus 104 subtests, Canonical Sports PASS,
+  `atlas test sports` PASS, and strict live ingress at 29/29.
+- Preserved authoritative production baseline `baseline-reconciliation-20260824T164541Z-927002` while transaction
+  `update-20260824T222351Z-3794932` remains `failed`, maintenance remains enabled, and its
+  deployment lock remains held. Rollback rerun and controlled retry #3 remain
+  unauthorized.
+- Added a bounded, read-only ingress readiness phase for `ingress` and `all`
+  update scopes between deterministic Compose apply and authoritative
+  post-update verification. The readiness phase accepts only `running +
+  starting` as transient, requires `running + healthy` for success, and fails
+  closed on missing, unhealthy, non-running, uninspectable, or unexpected
+  states.
+- Preserved the strict authoritative ingress verifier, maintenance ownership,
+  deployment-lock ownership, previous verified production baseline, and both
+  failed exact-RC transactions as immutable deployment evidence.
+
+- Hardened the v1.0 RC production deployment path after the first exact
+  `1.0.0-rc.1` deployment attempt failed closed.
+- Added pre-pull/pre-build validation for tracked first-party ingress build
+  inputs so unreadable files or untraversable parent directories fail closed.
+- Hardened rollback to consume exact-ID-verified transaction-scoped
+  `atlas-rollback:` aliases instead of retagging digest-shaped references.
+- Required rollback recovery source to remain beneath the persistent Atlas
+  deployment-record namespace for long-lived bind-mount safety.
+- Reconciled exactly 17 tracked checkout files from filesystem `0600` to
+  repository-authoritative `0644` without a Git content-mode delta.
+- Preserved failed transaction `update-20260824T165151Z-3258027` and recovered
+  baseline `baseline-reconciliation-20260824T164541Z-927002`; the exact RC
+  production-deployment gate remains open pending a controlled retry.
 
 - Added the repository-owned production Scheduler dispatcher contract discovered
   as missing during the first Q.6 sustained-use attempt. The dispatcher uses

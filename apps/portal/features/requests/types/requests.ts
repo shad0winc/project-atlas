@@ -208,11 +208,30 @@ export function createMediaRequest(request: MediaRequest): MediaRequest {
   }
 
   const createdAt = normalizeTimestamp(request.createdAt, "request.createdAt");
-  const updatedAt = normalizeTimestamp(request.updatedAt, "request.updatedAt");
-  const availableAt = normalizeOptionalTimestamp(request.availableAt, "request.availableAt");
+  let updatedAt = normalizeTimestamp(request.updatedAt, "request.updatedAt");
+  let availableAt = normalizeOptionalTimestamp(request.availableAt, "request.availableAt");
 
-  if (new Date(updatedAt).getTime() < new Date(createdAt).getTime()) {
-    throw new Error("request.updatedAt cannot be earlier than request.createdAt.");
+  const createdAtTime = new Date(createdAt).getTime();
+  const updatedAtTime = new Date(updatedAt).getTime();
+
+  if (updatedAtTime < createdAtTime) {
+    if (createdAtTime - updatedAtTime < 1_000) {
+      updatedAt = createdAt;
+    } else {
+      throw new Error("request.updatedAt cannot be earlier than request.createdAt.");
+    }
+  }
+
+  if (availableAt !== undefined) {
+    const availableAtTime = new Date(availableAt).getTime();
+
+    if (availableAtTime < createdAtTime) {
+      if (createdAtTime - availableAtTime < 1_000) {
+        availableAt = createdAt;
+      } else {
+        throw new Error("request.availableAt cannot be earlier than request.createdAt.");
+      }
+    }
   }
 
   const expectedTerminal = TERMINAL_STATUSES.has(status);

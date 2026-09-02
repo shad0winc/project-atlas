@@ -28,6 +28,13 @@ from atlas.media.mutations import (
     MediaMutationDispatchError,
     MediaMutationMode,
 )
+from atlas.media.playback import (
+    PlaybackAction,
+    PlaybackActionKind,
+    PlaybackSession,
+    PlaybackSourceType,
+    PlaybackTrack,
+)
 from atlas.media.provider import (
     MediaItem,
     MediaProvider,
@@ -42,6 +49,11 @@ from atlas.media.recording import (
 
 __all__ = [
     "JellyfinProvider",
+    "PlaybackAction",
+    "PlaybackActionKind",
+    "PlaybackSession",
+    "PlaybackSourceType",
+    "PlaybackTrack",
     "MEDIA_LIBRARY_IDS",
     "MediaLibraryDetail",
     "MediaLibraryDetailStatus",

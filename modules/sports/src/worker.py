@@ -185,6 +185,23 @@ def write_provider_health(
     )
 
 
+def publish_provider_health_event(
+    event_name: str,
+    payload: dict[str, Any],
+) -> None:
+    try:
+        publish_event(
+            "sports",
+            event_name,
+            payload,
+        )
+    except Exception as exc:
+        print(
+            f"Unable to publish {event_name}: {exc}",
+            file=sys.stderr,
+        )
+
+
 def mark_provider_healthy(
     health: dict[str, dict[str, Any]],
     provider_name: str,
@@ -214,8 +231,7 @@ def mark_provider_healthy(
     }
 
     if previous_status == "degraded":
-        publish_event(
-            "sports",
+        publish_provider_health_event(
             "sports.provider-recovered",
             {
                 "provider": provider_name,
@@ -265,8 +281,7 @@ def mark_provider_degraded(
     }
 
     if previous_status != "degraded":
-        publish_event(
-            "sports",
+        publish_provider_health_event(
             "sports.provider-degraded",
             {
                 "provider": provider_name,
@@ -386,12 +401,38 @@ def run_provider_pipeline() -> dict[str, Any] | None:
     }
 
 
+def _recording_enabled_games(
+    subscribed_games: list[dict[str, Any]],
+    subscriptions: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return subscribed games with at least one recording-enabled match."""
+    recording_subscriptions = [
+        subscription
+        for subscription in subscriptions
+        if bool(subscription.get("record", False))
+    ]
+
+    if not recording_subscriptions:
+        return []
+
+    return resolve_subscribed_games(
+        subscribed_games,
+        recording_subscriptions,
+    )
+
+
 def run_recording_pipeline(
     subscribed_games: list[dict[str, Any]],
+    subscriptions: list[dict[str, Any]] | None = None,
 ) -> dict[str, dict[str, Any]]:
-    """Plan recordings and reconcile recorder state."""
+    """Plan only explicitly requested recordings and reconcile state."""
+    recording_games = _recording_enabled_games(
+        subscribed_games,
+        subscriptions if subscriptions is not None else active_subscriptions(),
+    )
+
     plan_recordings(
-        subscribed_games
+        recording_games
     )
 
     return update_recording_statuses()

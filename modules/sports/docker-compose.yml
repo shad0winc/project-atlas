@@ -55,6 +55,7 @@ services:
       SPORTS_CONTROLLER_INTERVAL_SECONDS: "${SPORTS_CONTROLLER_INTERVAL_SECONDS:-30}"
       SPORTS_CONTROLLER_HEARTBEAT_FILE: "${SPORTS_CONTROLLER_HEARTBEAT_FILE:-/mnt/storage/configs/sportyfin/state/controller-heartbeat}"
       SPORTS_PROVIDER_HEALTH_FILE: "${SPORTS_PROVIDER_HEALTH_FILE:-/mnt/storage/configs/sportyfin/state/provider-health.json}"
+      SPORTS_PROVIDER_REQUEST_BUDGET_FILE: "${SPORTS_PROVIDER_REQUEST_BUDGET_FILE:-/mnt/storage/configs/sportyfin/state/provider-request-budget.json}"
       SPORTS_HEALTH_FILE: "${SPORTS_HEALTH_FILE:-/mnt/storage/configs/sportyfin/state/health.json}"
       SPORTS_SUBSCRIPTIONS_FILE: "${SPORTS_SUBSCRIPTIONS_FILE:-/mnt/storage/configs/sportyfin/state/subscriptions.json}"
       SPORTS_RECORDINGS_FILE: "${SPORTS_RECORDINGS_FILE:-/mnt/storage/configs/sportyfin/recordings/recordings.json}"
@@ -78,6 +79,10 @@ services:
       - /opt/project-atlas:/opt/project-atlas:ro
       - /mnt/storage/configs/sportyfin:/mnt/storage/configs/sportyfin
       - /mnt/storage/media/Sports:/mnt/storage/media/Sports
+      - /mnt/storage/configs/atlas/runtime/events.jsonl:/mnt/storage/configs/atlas/runtime/events.jsonl
+
+    group_add:
+      - "20000"
 
     security_opt:
       - no-new-privileges:true

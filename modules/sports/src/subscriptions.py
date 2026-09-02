@@ -102,6 +102,7 @@ def create_subscription(
             "name": name,
             "user": user,
             "enabled": True,
+            "record": False,
         }
     )
 
@@ -171,6 +172,51 @@ def remove_subscription(
 
     return True
 
+def update_subscription_recording(
+    atlas_subscription_id: str,
+    user_id: str,
+    record: bool,
+) -> dict[str, Any] | None:
+    subscriptions = load_subscriptions()
+    updated_subscription: dict[str, Any] | None = None
+    updated_records: list[dict[str, Any]] = []
+
+    for raw in subscriptions:
+        if not isinstance(raw, dict):
+            updated_records.append(raw)
+            continue
+
+        try:
+            normalized = normalize_subscription(raw)
+        except ValueError:
+            updated_records.append(raw)
+            continue
+
+        if (
+            str(normalized.get("subscription_id", "")).strip()
+            == atlas_subscription_id
+            and str(normalized.get("user", "")).strip()
+            == user_id
+        ):
+            if str(normalized.get("type", "")).strip().lower() != "event":
+                raise ValueError(
+                    "Recording intent is only supported for event subscriptions."
+                )
+
+            normalized["record"] = bool(record)
+            updated_subscription = normalized
+            updated_records.append(normalized)
+        else:
+            updated_records.append(raw)
+
+    if updated_subscription is None:
+        return None
+
+    write_subscriptions(updated_records)
+    return updated_subscription
+
+
+
 def normalize_subscription(
     subscription: dict[str, Any],
 ) -> dict[str, Any]:
@@ -236,6 +282,15 @@ def normalize_subscription(
             subscription.get(
                 "enabled",
                 True,
+            )
+        ),
+        # Recording is explicit opt-in. Legacy subscriptions that predate
+        # this field normalize to False so following/requesting content can
+        # never silently become recording intent after an upgrade.
+        "record": bool(
+            subscription.get(
+                "record",
+                False,
             )
         ),
         "created_at": subscription.get(

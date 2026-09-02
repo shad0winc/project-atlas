@@ -220,6 +220,15 @@ Docker-socket owner for this boundary, Docker API POST mutation through it is
 denied with HTTP 403, and its image was certified at zero HIGH and zero CRITICAL
 scan findings.
 
+The Atlas API Service Lifecycle surface also remains outside the Docker control
+plane. Host-side collection uses the authoritative Docker Compose provider and
+atomically publishes a normalized runtime projection under
+`/mnt/storage/configs/atlas/runtime/services`. The API mounts only that bounded
+directory read-only and consumes `latest.json` through
+`RuntimeSnapshotProvider`. The API receives no Docker socket, Docker CLI,
+Compose project tree, `DOCKER_HOST`, or membership in the private Docker API
+network for Service Lifecycle inspection.
+
 The Notifications runtime ownership transition has been completed and
 validated in production under the controlled deployment path. The final
 security certification also preserved the corrected Anime TV route, refreshed

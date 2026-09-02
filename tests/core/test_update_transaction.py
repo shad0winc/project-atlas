@@ -32,6 +32,28 @@ def prepare_runtime(tmp_path: Path, *, branch: str = "main") -> dict[str, str]:
     (project / "docker-compose.yml").write_text("services: {}\n", encoding="utf-8")
     (project / "stack" / "ingress.yml").write_text("services: {}\n", encoding="utf-8")
 
+    tracked_build_files = (
+        project / "apps" / "api" / "pyproject.toml",
+        project / "apps" / "api" / "atlas_api" / "main.py",
+        project / "atlas" / "example.py",
+        project / "apps" / "portal" / "package.json",
+    )
+
+    for tracked in tracked_build_files:
+        tracked.parent.mkdir(parents=True, exist_ok=True)
+        tracked.write_text("fixture\n", encoding="utf-8")
+        tracked.chmod(0o644)
+
+    write_executable(
+        project / "scripts" / "atlas-dashboard-runtime.sh",
+        """
+        #!/usr/bin/env bash
+        set -euo pipefail
+        echo "dashboard-runtime:${1:-}" >> "$ATLAS_TEST_EVENTS"
+        exit "${ATLAS_TEST_DASHBOARD_RUNTIME_STATUS:-0}"
+        """,
+    )
+
     write_executable(
         project / "scripts" / "verify-ingress.sh",
         """
@@ -53,6 +75,28 @@ def prepare_runtime(tmp_path: Path, *, branch: str = "main") -> dict[str, str]:
     )
 
     write_executable(
+        project / "scripts" / "lib" / "identity-writer-runtime.sh",
+        """
+        #!/usr/bin/env bash
+        atlas_identity_writer_runtime_provision() {
+          echo identity-writer-runtime:provision >> "$ATLAS_TEST_EVENTS"
+          return "${ATLAS_TEST_IDENTITY_WRITER_RUNTIME_STATUS:-0}"
+        }
+        """,
+    )
+
+    write_executable(
+        project / "scripts" / "lib" / "favorites-runtime.sh",
+        """
+        #!/usr/bin/env bash
+        atlas_favorites_runtime_provision() {
+          echo favorites-runtime:provision >> "$ATLAS_TEST_EVENTS"
+          return "${ATLAS_TEST_FAVORITES_RUNTIME_STATUS:-0}"
+        }
+        """,
+    )
+
+    write_executable(
         bin_dir / "git",
         f"""
         #!/usr/bin/env bash
@@ -66,6 +110,12 @@ def prepare_runtime(tmp_path: Path, *, branch: str = "main") -> dict[str, str]:
           printf '%s\\n' "${{ATLAS_TEST_ORIGIN_MAIN:-abc123}}"
         elif [[ "$args" == *" rev-parse HEAD "* ]]; then
           printf '%s\\n' "${{ATLAS_TEST_HEAD:-abc123}}"
+        elif [[ "$args" == *" ls-files -z "* ]]; then
+          printf '%s\\0' \
+            'apps/api/pyproject.toml' \
+            'apps/api/atlas_api/main.py' \
+            'atlas/example.py' \
+            'apps/portal/package.json'
         else
           exit 1
         fi
@@ -175,6 +225,43 @@ def run_update(
       return "${ATLAS_TEST_BACKUP_STATUS:-0}"
     }
 
+    atlas_update_ingress_container_state() {
+      local container="$1"
+      local status="running"
+      local health="healthy"
+
+      if [[ -n "${ATLAS_TEST_READINESS_FAIL_CONTAINER:-}" ]] &&
+         [[ "$container" == "$ATLAS_TEST_READINESS_FAIL_CONTAINER" ]]
+      then
+        status="${ATLAS_TEST_READINESS_FAIL_STATUS:-running}"
+        health="${ATLAS_TEST_READINESS_FAIL_HEALTH:-healthy}"
+      fi
+
+      if [[ "$container" == "atlas-caddy" ]] &&
+         [[ "${ATLAS_TEST_CADDY_STARTING_ONCE:-0}" == "1" ]]
+      then
+        if [[ ! -e "$ATLAS_TEST_CADDY_READY_MARKER" ]]; then
+          touch "$ATLAS_TEST_CADDY_READY_MARKER"
+          health="starting"
+        fi
+      fi
+
+      if [[ "$container" == "atlas-caddy" ]] &&
+         [[ "${ATLAS_TEST_CADDY_ALWAYS_STARTING:-0}" == "1" ]]
+      then
+        health="starting"
+      fi
+
+      echo "readiness-probe:$container:$status:$health" \
+        >> "$ATLAS_TEST_EVENTS"
+
+      printf '%s|%s\n' "$status" "$health"
+    }
+
+    atlas_update_readiness_sleep() {
+      echo "readiness-sleep:${1:-}" >> "$ATLAS_TEST_EVENTS"
+    }
+
     atlas_deployment_archive_source() {
       cp "$ATLAS_TEST_ARCHIVE" "$2"
     }
@@ -251,6 +338,82 @@ def test_diverged_main_is_rejected_before_runtime_mutation(tmp_path: Path) -> No
     assert result.returncode != 0
     assert event_lines(environment) == []
     assert not lock_path(environment).exists()
+
+
+def test_ingress_unreadable_tracked_file_fails_before_network_or_maintenance(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+
+    project = Path(environment["ATLAS_PROJECT_DIR"])
+    blocked = project / "atlas" / "example.py"
+    blocked.chmod(0o600)
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode != 0
+
+    events = event_lines(environment)
+
+    assert events == [
+        "preserve-rollback-images",
+        "doctor",
+    ]
+    assert "maintenance:enable" not in events
+    assert "backup" not in events
+    assert not any(
+        event.startswith("docker compose")
+        for event in events
+    )
+    assert not lock_path(environment).exists()
+
+    assert (
+        "tracked build-context file is not readable by "
+        "container runtime user: atlas/example.py (mode=600)"
+        in result.stderr
+    )
+    assert (
+        "ingress build-context permission validation failed"
+        in result.stderr
+    )
+
+
+def test_ingress_untraversable_tracked_directory_fails_before_network_or_maintenance(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+
+    project = Path(environment["ATLAS_PROJECT_DIR"])
+    blocked = project / "atlas"
+    blocked.chmod(0o700)
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode != 0
+
+    events = event_lines(environment)
+
+    assert events == [
+        "preserve-rollback-images",
+        "doctor",
+    ]
+    assert "maintenance:enable" not in events
+    assert "backup" not in events
+    assert not any(
+        event.startswith("docker compose")
+        for event in events
+    )
+    assert not lock_path(environment).exists()
+
+    assert (
+        "tracked build-context directory is not traversable by "
+        "container runtime user: atlas (mode=700)"
+        in result.stderr
+    )
+    assert (
+        "ingress build-context permission validation failed"
+        in result.stderr
+    )
 
 
 def test_core_update_preflights_artifacts_before_maintenance_and_reopens_on_success(
@@ -354,7 +517,7 @@ def test_ingress_scope_prepares_builds_and_applies_without_network_in_maintenanc
         index for index, event in enumerate(events) if "pull caddy" in event
     )
     build = next(
-        index for index, event in enumerate(events) if "build portal api" in event
+        index for index, event in enumerate(events) if "build portal api sports-writer" in event
     )
     render = next(
         index for index, event in enumerate(events) if "config --images" in event
@@ -390,6 +553,23 @@ def test_update_preserves_rollback_images_before_runtime_mutation(tmp_path: Path
         index for index, event in enumerate(events) if event.startswith("docker compose")
     )
     assert preserve < first_compose
+
+
+def test_dashboard_runtime_publication_failure_keeps_maintenance_and_lock(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_DASHBOARD_RUNTIME_STATUS"] = "1"
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode != 0
+    events = event_lines(environment)
+
+    assert "dashboard-runtime:publish-all" in events
+    assert "maintenance:enable" in events
+    assert "maintenance:disable" not in events
+    assert "Dashboard runtime publication failed." in result.stderr
 
 
 def test_failed_public_reopen_reenables_maintenance_and_keeps_lock(tmp_path: Path) -> None:
@@ -472,3 +652,315 @@ def test_missing_target_image_aborts_before_maintenance_or_apply(
         "target image completeness verification failed before maintenance"
         in result.stderr
     )
+
+
+def readiness_events(environment: dict[str, str]) -> list[str]:
+    return [
+        event
+        for event in event_lines(environment)
+        if event.startswith("readiness-")
+    ]
+
+
+def test_readiness_already_healthy_succeeds_immediately(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_CADDY_READY_MARKER"] = str(
+        tmp_path / "caddy-ready"
+    )
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode == 0, result.stderr
+
+    events = readiness_events(environment)
+
+    assert events == [
+        "readiness-probe:atlas-api:running:healthy",
+        "readiness-probe:atlas-portal:running:healthy",
+        "readiness-probe:atlas-caddy:running:healthy",
+        "readiness-probe:atlas-api:running:healthy",
+        "readiness-probe:atlas-portal:running:healthy",
+        "readiness-probe:atlas-caddy:running:healthy",
+    ]
+
+    assert not any(
+        event.startswith("readiness-sleep:")
+        for event in events
+    )
+
+
+def test_readiness_starting_then_healthy_retries_and_succeeds(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_CADDY_STARTING_ONCE"] = "1"
+    environment["ATLAS_TEST_CADDY_READY_MARKER"] = str(
+        tmp_path / "caddy-ready"
+    )
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode == 0, result.stderr
+
+    events = readiness_events(environment)
+
+    first_caddy = events.index(
+        "readiness-probe:atlas-caddy:running:starting"
+    )
+    sleep = next(
+        index
+        for index, event in enumerate(events)
+        if event.startswith("readiness-sleep:")
+    )
+    healthy_caddy = events.index(
+        "readiness-probe:atlas-caddy:running:healthy",
+        sleep + 1,
+    )
+
+    assert first_caddy < sleep < healthy_caddy
+
+
+def test_readiness_unhealthy_fails_immediately(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_CADDY_READY_MARKER"] = str(
+        tmp_path / "caddy-ready"
+    )
+    environment["ATLAS_TEST_READINESS_FAIL_CONTAINER"] = "atlas-caddy"
+    environment["ATLAS_TEST_READINESS_FAIL_HEALTH"] = "unhealthy"
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode != 0
+
+    events = readiness_events(environment)
+
+    assert (
+        "readiness-probe:atlas-caddy:running:unhealthy"
+        in events
+    )
+
+    assert not any(
+        event.startswith("readiness-sleep:")
+        for event in events
+    )
+
+    assert "maintenance:enable" in event_lines(environment)
+    assert "maintenance:disable" not in event_lines(environment)
+    assert lock_path(environment).is_dir()
+
+    assert "ingress readiness failed" in result.stderr.lower()
+
+
+def test_readiness_non_running_container_fails_immediately(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_CADDY_READY_MARKER"] = str(
+        tmp_path / "caddy-ready"
+    )
+    environment["ATLAS_TEST_READINESS_FAIL_CONTAINER"] = "atlas-portal"
+    environment["ATLAS_TEST_READINESS_FAIL_STATUS"] = "exited"
+    environment["ATLAS_TEST_READINESS_FAIL_HEALTH"] = "healthy"
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode != 0
+
+    assert (
+        "readiness-probe:atlas-portal:exited:healthy"
+        in readiness_events(environment)
+    )
+
+    assert "maintenance:disable" not in event_lines(environment)
+    assert lock_path(environment).is_dir()
+
+
+def test_readiness_missing_health_contract_fails_immediately(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_CADDY_READY_MARKER"] = str(
+        tmp_path / "caddy-ready"
+    )
+    environment["ATLAS_TEST_READINESS_FAIL_CONTAINER"] = "atlas-api"
+    environment["ATLAS_TEST_READINESS_FAIL_HEALTH"] = "missing"
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode != 0
+
+    assert (
+        "readiness-probe:atlas-api:running:missing"
+        in readiness_events(environment)
+    )
+
+    assert "maintenance:disable" not in event_lines(environment)
+    assert lock_path(environment).is_dir()
+
+
+def test_readiness_starting_timeout_fails_closed(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_CADDY_ALWAYS_STARTING"] = "1"
+    environment["ATLAS_TEST_CADDY_READY_MARKER"] = str(
+        tmp_path / "caddy-ready"
+    )
+    environment["ATLAS_UPDATE_READINESS_ATTEMPTS"] = "3"
+    environment["ATLAS_UPDATE_READINESS_INTERVAL_SECONDS"] = "0"
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode != 0
+
+    events = readiness_events(environment)
+
+    caddy_starting = [
+        event
+        for event in events
+        if event == "readiness-probe:atlas-caddy:running:starting"
+    ]
+
+    assert len(caddy_starting) == 3
+    assert "maintenance:disable" not in event_lines(environment)
+    assert lock_path(environment).is_dir()
+
+    assert "readiness timed out" in result.stderr.lower()
+
+
+def test_core_scope_does_not_invoke_ingress_readiness(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_CADDY_READY_MARKER"] = str(
+        tmp_path / "caddy-ready"
+    )
+
+    result = run_update(environment, "core")
+
+    assert result.returncode == 0, result.stderr
+    assert readiness_events(environment) == []
+
+
+def test_ingress_readiness_occurs_after_apply_before_verification(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_CADDY_READY_MARKER"] = str(
+        tmp_path / "caddy-ready"
+    )
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode == 0, result.stderr
+
+    events = event_lines(environment)
+
+    apply = next(
+        index
+        for index, event in enumerate(events)
+        if event.startswith("docker compose")
+        and "up -d" in event
+        and "--no-build" in event
+        and "--pull never" in event
+    )
+
+    readiness = events.index(
+        "readiness-probe:atlas-api:running:healthy"
+    )
+
+    doctor_after_apply = events.index("doctor", apply + 1)
+
+    assert apply < readiness < doctor_after_apply
+
+
+def test_readiness_failure_preserves_maintenance_and_lock(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_CADDY_READY_MARKER"] = str(
+        tmp_path / "caddy-ready"
+    )
+    environment["ATLAS_TEST_READINESS_FAIL_CONTAINER"] = "atlas-caddy"
+    environment["ATLAS_TEST_READINESS_FAIL_HEALTH"] = "unhealthy"
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode != 0
+
+    events = event_lines(environment)
+
+    assert "maintenance:enable" in events
+    assert "maintenance:disable" not in events
+    assert lock_path(environment).is_dir()
+    assert "Recovery command: atlas deployment rollback" in result.stderr
+
+
+def test_readiness_waiter_is_inspection_only() -> None:
+    content = UPDATE.read_text(encoding="utf-8")
+
+    assert "atlas_update_wait_for_ingress_readiness() {" in content
+
+    section = content.split(
+        "atlas_update_wait_for_ingress_readiness() {",
+        1,
+    )[1].split(
+        "atlas_update_core_apply() {",
+        1,
+    )[0]
+
+    assert "docker inspect" in section
+
+    forbidden = (
+        "docker restart",
+        "docker stop",
+        "docker start",
+        "docker compose",
+        " up -d",
+        "docker pull",
+        "docker build",
+        "maintenance",
+        "deployment_set_status",
+        "release_lock",
+    )
+
+    for item in forbidden:
+        assert item not in section
+
+
+def test_identity_writer_runtime_provisioning_failure_aborts_before_ingress_apply(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_IDENTITY_WRITER_RUNTIME_STATUS"] = "1"
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode != 0
+    assert "identity writer runtime provisioning failed" in result.stderr
+
+    events = event_lines(environment)
+
+    assert "audit-runtime:provision" in events
+    assert "identity-writer-runtime:provision" in events
+
+    identity_provision = events.index(
+        "identity-writer-runtime:provision"
+    )
+
+    compose_up_events = [
+        event
+        for event in events
+        if event.startswith("docker compose ")
+        and " up " in f" {event} "
+    ]
+
+    assert compose_up_events == []
+    assert "maintenance:disable" not in events
+
+    audit_provision = events.index("audit-runtime:provision")
+    assert audit_provision < identity_provision

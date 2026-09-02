@@ -9,6 +9,7 @@ MAINTENANCE_DIR="${ATLAS_MAINTENANCE_DIR:-$RUNTIME_CONFIG_DIR/maintenance}"
 MAINTENANCE_FLAG="$MAINTENANCE_DIR/enabled"
 
 source "$PROJECT_DIR/scripts/lib/audit-runtime.sh"
+source "$PROJECT_DIR/scripts/lib/favorites-runtime.sh"
 
 EXPECTED_CADDY_MEMORY=536870912
 EXPECTED_CADDY_CPUS=1000000000
@@ -73,6 +74,43 @@ if atlas_audit_runtime_verify >/dev/null 2>&1; then
   pass "Security audit journal ownership / mode contract"
 else
   fail "Security audit journal ownership / mode contract"
+fi
+
+if atlas_favorites_runtime_verify >/dev/null 2>&1; then
+  pass "Favorites runtime ownership / access contract"
+else
+  fail "Favorites runtime ownership / access contract"
+fi
+
+if docker inspect atlas-api >/dev/null 2>&1; then
+  if docker exec atlas-api sh -lc '
+    set -eu
+
+    favorites=/mnt/storage/configs/atlas/identity/favorites
+    records="$favorites/records"
+    registry="$favorites/favorites.json"
+
+    test -d "$favorites"
+    test -r "$favorites"
+    test -w "$favorites"
+    test -x "$favorites"
+
+    test -d "$records"
+    test -r "$records"
+    test -w "$records"
+    test -x "$records"
+
+    if [ -e "$registry" ]; then
+      test -r "$registry"
+    fi
+  '
+  then
+    pass "Atlas API Favorites persistence access"
+  else
+    fail "Atlas API Favorites persistence access"
+  fi
+else
+  fail "Atlas API Favorites persistence access"
 fi
 
 if docker inspect atlas-api >/dev/null 2>&1; then

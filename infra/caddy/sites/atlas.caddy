@@ -42,3 +42,62 @@ atlas.shadowinc.co {
                 }
         }
 }
+
+# Dedicated Atlas Theater media transport.
+playback.shadowinc.co {
+        encode zstd gzip
+
+        header Access-Control-Allow-Origin "https://atlas.shadowinc.co"
+        header Access-Control-Allow-Credentials "true"
+        header Vary "Origin"
+
+        @playback_bootstrap_options {
+                method OPTIONS
+                path /_atlas/playback/bootstrap
+        }
+
+        handle @playback_bootstrap_options {
+                header Access-Control-Allow-Headers "Authorization, Content-Type"
+                header Access-Control-Allow-Methods "POST, OPTIONS"
+                respond "" 204
+        }
+
+        handle /_atlas/playback/bootstrap {
+                reverse_proxy atlas-api:8000
+        }
+
+        @playback_media path /videos/*
+
+        handle @playback_media {
+                forward_auth atlas-api:8000 {
+                        uri /_atlas/playback/authorize
+                        copy_headers X-Atlas-Jellyfin-Token
+                }
+
+                reverse_proxy jellyfin:8096 {
+                        header_up X-Emby-Token {http.request.header.X-Atlas-Jellyfin-Token}
+                        header_up -X-Atlas-Jellyfin-Token
+
+                        # Atlas owns browser CORS on the dedicated playback
+                        # origin. Do not expose Jellyfin's wildcard CORS
+                        # response alongside Atlas's credentialed origin.
+                        header_down -Access-Control-Allow-Origin
+                        header_down -Access-Control-Allow-Credentials
+                }
+        }
+
+        handle {
+                respond "Not Found" 404
+        }
+}
+
+# Jellyfin is the playback/transcoding backend behind Atlas Theater.
+# End users enter playback through /portal/theater; this hostname exists as
+# the HTTPS transport destination for Jellyfin web/native clients.
+jellyfin.shadowinc.co {
+        import atlas_access_log
+
+        encode zstd gzip
+
+        reverse_proxy jellyfin:8096
+}

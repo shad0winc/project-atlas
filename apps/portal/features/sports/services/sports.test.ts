@@ -8,7 +8,7 @@ vi.mock("../../../lib/services/authenticated", () => ({
   authenticatedAtlasApiRequest: mocks.authenticatedAtlasApiRequest
 }));
 
-import { loadSportsEvents, requestSportsEvent } from "./sports";
+import { loadSportsEvents, requestSportsEvent, searchSports } from "./sports";
 
 describe("Sports Portal service", () => {
   beforeEach(() => {
@@ -93,5 +93,35 @@ describe("Sports Portal service", () => {
     expect(input).not.toHaveProperty("subscriptionId");
     expect(input).not.toHaveProperty("name");
     expect(input).not.toHaveProperty("type");
+  });
+  it("searches upcoming Sports events through the event contract", async () => {
+    mocks.authenticatedAtlasApiRequest.mockResolvedValue({
+      events: [
+        {
+          provider: "thesportsdb",
+          provider_event_id: "event-090",
+          name: "Detroit Lions vs New Orleans Saints",
+          sport: "American Football",
+          league: "NFL",
+          start_at: "2026-09-06T17:00:00Z",
+          status: "scheduled",
+          requested: false
+        }
+      ]
+    });
+
+    const results = await searchSports("event", "Lions");
+
+    expect(mocks.authenticatedAtlasApiRequest).toHaveBeenCalledWith(
+      "/sports/search/events?provider=thesportsdb&query=Lions",
+      expect.objectContaining({ method: "GET", cache: "no-store" })
+    );
+    expect(results[0]).toMatchObject({
+      kind: "event",
+      id: "event-090",
+      name: "Detroit Lions vs New Orleans Saints",
+      status: "scheduled",
+      requested: false
+    });
   });
 });

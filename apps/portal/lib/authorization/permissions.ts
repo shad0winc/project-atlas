@@ -12,13 +12,18 @@ export const ATLAS_PERMISSIONS = {
   favoritesWrite: "favorites.write",
   mediaRead: "media.read",
   monitoringRead: "monitoring.read",
+  downloadsManage: "downloads.manage",
   requestsCancel: "requests.cancel",
   requestsCreate: "requests.create",
   requestsRead: "requests.read",
   sportsEventsRequest: "sports.events.request",
+  sportsRecordingsManage: "sports.recordings.manage",
   sportsRead: "sports.read",
   systemHealthRead: "system.health.read",
+  usersCreate: "users.create",
   usersRead: "users.read",
+  usersUpdate: "users.update",
+  rolesAssign: "roles.assign",
   usersSelfRead: "users.self.read",
   usersSelfUpdate: "users.self.update"
 } as const;

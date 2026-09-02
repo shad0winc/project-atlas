@@ -106,7 +106,7 @@ export function ServiceOverview({
       <section aria-label="Service Lifecycle summary" className="dashboard-metric-grid">
         <ServiceHealthCard health={snapshot.health} />
 
-        <Card>
+        <Card className="service-lifecycle-card">
           <p>Managed services</p>
           <h3>{snapshot.summary.totalServices}</h3>
           <p>Provider: {snapshot.summary.provider}</p>
@@ -119,7 +119,7 @@ export function ServiceOverview({
           </p>
         </Card>
 
-        <Card>
+        <Card className="service-lifecycle-card">
           <p>Update availability</p>
           <h3>
             {snapshot.updates.updateAvailable === 1
@@ -132,7 +132,7 @@ export function ServiceOverview({
           </p>
         </Card>
 
-        <Card>
+        <Card className="service-lifecycle-card">
           <p>Maintenance history</p>
           <h3>
             {snapshot.history.totalRecords === 1
@@ -151,14 +151,14 @@ export function ServiceOverview({
         <p>Select a service to inspect its normalized read-only details.</p>
 
         {snapshot.services.length === 0 ? (
-          <Card>
+          <Card className="service-lifecycle-card">
             <h3>No managed services were returned</h3>
             <p>Atlas did not report any configured managed-service identities.</p>
           </Card>
         ) : (
           <div className="dashboard-metric-grid">
             {snapshot.services.map((service) => (
-              <Card key={service.identifier}>
+              <Card className="service-lifecycle-card" key={service.identifier}>
                 <p>{service.provider}</p>
                 <h3>{service.name}</h3>
                 <p>Identifier: {service.identifier}</p>
@@ -187,7 +187,7 @@ export function ServiceOverview({
         <p>Read-only maintenance observations reported by the Service Lifecycle provider.</p>
 
         {snapshot.history.records.length === 0 ? (
-          <Card>
+          <Card className="service-lifecycle-card">
             <h3>No maintenance history recorded</h3>
             <p>
               Atlas has not received persisted Service Lifecycle maintenance records from{" "}
@@ -197,7 +197,10 @@ export function ServiceOverview({
         ) : (
           <div className="dashboard-metric-grid">
             {snapshot.history.records.map((record, index) => (
-              <Card key={`${record.serviceIdentifier}-${record.startedAt ?? "unknown"}-${index}`}>
+              <Card
+                className="service-lifecycle-card"
+                key={`${record.serviceIdentifier}-${record.startedAt ?? "unknown"}-${index}`}
+              >
                 <p>{record.provider}</p>
                 <h3>{record.serviceName}</h3>
                 <p>Action: {record.action}</p>
@@ -221,7 +224,7 @@ export function ServiceOverview({
           </div>
 
           {detailLoading ? (
-            <Card>
+            <Card className="service-lifecycle-card">
               <p aria-live="polite">Loading service details…</p>
             </Card>
           ) : null}
@@ -236,7 +239,7 @@ export function ServiceOverview({
           ) : null}
 
           {detail ? (
-            <Card>
+            <Card className="service-lifecycle-card">
               <p>Runtime: {detail.service.runtimeStatus}</p>
               <p>Health: {detail.service.healthStatus}</p>
               <dl>

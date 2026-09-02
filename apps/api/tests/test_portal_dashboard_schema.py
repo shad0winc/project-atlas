@@ -88,6 +88,7 @@ def report_summary() -> PortalOperationsReportSummaryResponse:
         score=75,
         attention_count=1,
         generated_at=GENERATED_AT,
+        currentness="historical",
     )
 
 
@@ -245,6 +246,7 @@ def test_available_operations_section_is_stable() -> None:
             "score": 75,
             "attention_count": 1,
             "generated_at": GENERATED_AT,
+            "currentness": "historical",
         },
         "comparison": available_comparison().model_dump(),
         "recent_attention": [
@@ -381,6 +383,7 @@ def test_portal_dashboard_serialization_is_stable() -> None:
         "score": 75,
         "attention_count": 1,
         "generated_at": GENERATED_AT,
+        "currentness": "historical",
     }
     assert serialized["operations"]["comparison"][
         "difference_count"

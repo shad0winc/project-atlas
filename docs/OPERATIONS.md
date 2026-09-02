@@ -541,6 +541,29 @@ This preserves one canonical transport contract for:
 
 Existing CLI behavior remains unchanged.
 
+### Portal Dashboard Operations authority
+
+The Portal Dashboard intentionally presents two different classes of operational
+evidence and must not conflate their authority:
+
+- the Dashboard operational health metrics are collected through the live
+  operational-health path and represent current system health at Dashboard read
+  time;
+- the Dashboard Operations summary is derived from the latest validated
+  persisted Operations report and is historical evidence, not a current-health
+  assertion;
+- persisted Operations reports remain immutable historical observations and
+  retain their explicit generation timestamps;
+- the Dashboard Operations summary exposes `currentness="historical"` so
+  consumers can render that distinction explicitly;
+- `GET /api/v1/operations/report` remains the separate fresh, non-persisted
+  Operations collection path.
+
+Historical currentness is source semantics, not an elapsed-time threshold.
+Atlas does not classify a persisted Operations report as stale merely because
+it is old, and Dashboard presentation must not imply that intentionally frozen
+persisted evidence describes the current machine state.
+
 ## Current boundaries
 
 Operations reporting, persisted history, comparison, authenticated HTTP access,

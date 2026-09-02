@@ -52,23 +52,130 @@ class JellyfinProviderTests(unittest.TestCase):
         )
 
     def test_normalizes_movie_metadata_and_library(self):
-        responses=[Response({"Name":"The Matrix","Type":"Movie","ProductionYear":1999,"Path":"/media/Movies/The Matrix.mkv"}),Response([{"Name":"Movies","Type":"CollectionFolder"}])]
-        with patch("atlas.media.jellyfin.urlopen",side_effect=responses) as request:
-            item=JellyfinProvider("http://jellyfin:8096","secret").get_item("abc")
-        self.assertEqual("movie",item.media_type); self.assertEqual("Movies",item.metadata["library"]); self.assertEqual(2,request.call_count)
-        self.assertEqual("secret",request.call_args_list[0].args[0].headers["X-emby-token"])
+        responses = [
+            Response(
+                {
+                    "Items": [
+                        {
+                            "Id": "abc",
+                            "Name": "The Matrix",
+                            "Type": "Movie",
+                            "ProductionYear": 1999,
+                            "Path": "/media/Movies/The Matrix.mkv",
+                        }
+                    ],
+                    "StartIndex": 0,
+                    "TotalRecordCount": 1,
+                }
+            ),
+            Response([{"Name": "Movies", "Type": "Folder"}]),
+        ]
+        with patch(
+            "atlas.media.jellyfin.urlopen",
+            side_effect=responses,
+        ) as request:
+            item = JellyfinProvider(
+                "http://jellyfin:8096",
+                "secret",
+            ).get_item("abc")
+
+        self.assertEqual("movie", item.media_type)
+        self.assertEqual("Movies", item.metadata["library"])
+        self.assertEqual(2, request.call_count)
+        self.assertEqual(
+            "secret",
+            request.call_args_list[0].args[0].headers["X-emby-token"],
+        )
+        self.assertEqual(
+            "http://jellyfin:8096/Items?Ids=abc&Recursive=true&Limit=1",
+            request.call_args_list[0].args[0].full_url,
+        )
     def test_series_maps_to_tv_and_ancestor_failure_is_nonfatal(self):
-        error=HTTPError("url",500,"bad",{},io.BytesIO())
-        with patch("atlas.media.jellyfin.urlopen",side_effect=[Response({"Name":"Show","Type":"Series"}),error]):
-            item=JellyfinProvider("http://jellyfin:8096","secret").get_item("series")
-        self.assertEqual("tv",item.media_type); self.assertNotIn("library",item.metadata)
+        error = HTTPError("url", 500, "bad", {}, io.BytesIO())
+        with patch(
+            "atlas.media.jellyfin.urlopen",
+            side_effect=[
+                Response(
+                    {
+                        "Items": [
+                            {
+                                "Id": "series",
+                                "Name": "Show",
+                                "Type": "Series",
+                            }
+                        ],
+                        "StartIndex": 0,
+                        "TotalRecordCount": 1,
+                    }
+                ),
+                error,
+            ],
+        ):
+            item = JellyfinProvider(
+                "http://jellyfin:8096",
+                "secret",
+            ).get_item("series")
+
+        self.assertEqual("tv", item.media_type)
+        self.assertNotIn("library", item.metadata)
     def test_missing_key_and_not_found_are_clear(self):
         with self.assertRaisesRegex(MediaProviderError,"API_KEY"):
             JellyfinProvider("http://jellyfin:8096","").get_item("abc")
-        error=HTTPError("url",404,"missing",{},io.BytesIO())
-        with patch("atlas.media.jellyfin.urlopen",side_effect=error):
-            with self.assertRaisesRegex(MediaProviderError,"not found"):
-                JellyfinProvider("http://jellyfin:8096","secret").get_item("abc")
+        with patch(
+            "atlas.media.jellyfin.urlopen",
+            return_value=Response(
+                {
+                    "Items": [],
+                    "StartIndex": 0,
+                    "TotalRecordCount": 0,
+                }
+            ),
+        ):
+            with self.assertRaisesRegex(MediaProviderError, "not found"):
+                JellyfinProvider(
+                    "http://jellyfin:8096",
+                    "secret",
+                ).get_item("abc")
+    def test_get_item_rejects_mismatched_collection_result(self):
+        with patch(
+            "atlas.media.jellyfin.urlopen",
+            return_value=Response(
+                {
+                    "Items": [
+                        {
+                            "Id": "different",
+                            "Name": "Wrong item",
+                            "Type": "Movie",
+                        }
+                    ],
+                    "StartIndex": 0,
+                    "TotalRecordCount": 1,
+                }
+            ),
+        ):
+            with self.assertRaisesRegex(
+                MediaProviderError,
+                "mismatched item response",
+            ):
+                JellyfinProvider(
+                    "http://jellyfin:8096",
+                    "secret",
+                ).get_item("abc")
+
+    def test_get_item_rejects_invalid_collection_shape(self):
+        with patch(
+            "atlas.media.jellyfin.urlopen",
+            return_value=Response({"Items": {}}),
+        ):
+            with self.assertRaisesRegex(
+                MediaProviderError,
+                "invalid item response",
+            ):
+                JellyfinProvider(
+                    "http://jellyfin:8096",
+                    "secret",
+                ).get_item("abc")
+
     def test_get_user_returns_normalized_identity(self):
         with patch(
             "atlas.media.jellyfin.urlopen",

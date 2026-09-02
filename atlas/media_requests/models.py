@@ -127,14 +127,18 @@ class MediaRequest:
                 "available_at is only valid when status is available",
             )
 
-        if updated_at is not None and updated_at < created_at:
-            raise MediaRequestError(
-                "updated_at must not be earlier than created_at",
+        if updated_at is not None:
+            updated_at = _ordered_lifecycle_timestamp(
+                created_at,
+                updated_at,
+                field_name="updated_at",
             )
 
-        if available_at is not None and available_at < created_at:
-            raise MediaRequestError(
-                "available_at must not be earlier than created_at",
+        if available_at is not None:
+            available_at = _ordered_lifecycle_timestamp(
+                created_at,
+                available_at,
+                field_name="available_at",
             )
 
         object.__setattr__(self, "request_id", request_id)
@@ -204,6 +208,34 @@ class MediaRequest:
 
 def _now_timestamp() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _timestamp_instant(value: str) -> datetime:
+    candidate = value[:-1] + "+00:00" if value.endswith("Z") else value
+    return datetime.fromisoformat(candidate).astimezone(timezone.utc)
+
+
+def _ordered_lifecycle_timestamp(
+    created_at: str,
+    candidate: str,
+    *,
+    field_name: str,
+) -> str:
+    created_instant = _timestamp_instant(created_at)
+    candidate_instant = _timestamp_instant(candidate)
+
+    if candidate_instant >= created_instant:
+        return candidate
+
+    if (
+        created_instant.replace(microsecond=0)
+        == candidate_instant.replace(microsecond=0)
+    ):
+        return created_at
+
+    raise MediaRequestError(
+        f"{field_name} must not be earlier than created_at",
+    )
 
 
 def _required_text(value: object, field_name: str) -> str:

@@ -24,6 +24,14 @@ class NotificationRouter:
         ]
 
     def deliver(self, notification: dict[str, Any]) -> bool:
+        event_name = str(notification.get("event", ""))
+
+        if event_name in {
+            "sports.game-started",
+            "sports.game-finished",
+        }:
+            return True
+
         failed = False
 
         for adapter in self.enabled_adapters():

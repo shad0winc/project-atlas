@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
 import json
 import os
 from dataclasses import dataclass, field
@@ -115,13 +117,46 @@ class JellyfinProvider:
         """Return normalized metadata for one Jellyfin item."""
 
         normalized_id = _required(item_id, "item_id")
-        item = self._get_json(
-            f"/Items/{quote(normalized_id, safe='')}"
+        query = urlencode(
+            {
+                "Ids": normalized_id,
+                "Recursive": "true",
+                "Limit": 1,
+            }
         )
+        payload = self._get_json(f"/Items?{query}")
 
-        if not isinstance(item, dict):
+        if not isinstance(payload, dict):
             raise MediaProviderError(
                 "Jellyfin returned an invalid item response"
+            )
+
+        items = payload.get("Items")
+
+        if not isinstance(items, list):
+            raise MediaProviderError(
+                "Jellyfin returned an invalid item response"
+            )
+
+        if not items:
+            raise _JellyfinResourceNotFoundError(
+                "Jellyfin resource not found"
+            )
+
+        if len(items) != 1 or not isinstance(items[0], dict):
+            raise MediaProviderError(
+                "Jellyfin returned an invalid item response"
+            )
+
+        item = items[0]
+        returned_id = _required(
+            item.get("Id"),
+            "Jellyfin item ID",
+        )
+
+        if returned_id.lower() != normalized_id.lower():
+            raise MediaProviderError(
+                "Jellyfin returned a mismatched item response"
             )
 
         title = _required(
@@ -165,6 +200,560 @@ class JellyfinProvider:
             title,
             metadata,
         )
+
+    def list_series_episodes(
+        self,
+        series_id: str,
+    ) -> tuple[dict[str, Any], ...]:
+        # Return ordered browser-safe episode identities for a Series.
+
+        normalized_id = _required(series_id, "series_id")
+        query = urlencode(
+            {
+                "ParentId": normalized_id,
+                "Recursive": "true",
+                "IncludeItemTypes": "Episode",
+                "SortBy": "ParentIndexNumber,IndexNumber",
+                "SortOrder": "Ascending",
+                "Fields": (
+                    "SeriesName,ParentIndexNumber,IndexNumber"
+                ),
+            }
+        )
+
+        payload = self._get_json(f"/Items?{query}")
+
+        if not isinstance(payload, dict):
+            raise MediaProviderError(
+                "Jellyfin returned an invalid episode list response"
+            )
+
+        items = payload.get("Items")
+        if not isinstance(items, list):
+            raise MediaProviderError(
+                "Jellyfin episode list is invalid"
+            )
+
+        episodes: list[dict[str, Any]] = []
+
+        for item in items:
+            if not isinstance(item, dict):
+                raise MediaProviderError(
+                    "Jellyfin returned an invalid episode entry"
+                )
+
+            episode_id = _required(
+                item.get("Id"),
+                "Jellyfin episode ID",
+            )
+            title = _required(
+                item.get("Name"),
+                "Jellyfin episode name",
+            )
+
+            season_number = item.get("ParentIndexNumber")
+            if (
+                isinstance(season_number, bool)
+                or not isinstance(season_number, int)
+            ):
+                season_number = None
+
+            episode_number = item.get("IndexNumber")
+            if (
+                isinstance(episode_number, bool)
+                or not isinstance(episode_number, int)
+            ):
+                episode_number = None
+
+            series_name = item.get("SeriesName")
+            if not isinstance(series_name, str):
+                series_name = None
+            elif not series_name.strip():
+                series_name = None
+            else:
+                series_name = series_name.strip()
+
+            episodes.append(
+                {
+                    "id": episode_id,
+                    "title": title,
+                    "series_name": series_name,
+                    "season_number": season_number,
+                    "episode_number": episode_number,
+                }
+            )
+
+        return tuple(episodes)
+
+    def get_retention_state(
+        self,
+        item_id: str,
+        *,
+        user_ids: tuple[str, ...],
+    ) -> dict[str, object]:
+        """Return normalized media-retention state for one item."""
+
+        normalized_id = _required(
+            item_id,
+            "item_id",
+        )
+
+        if not isinstance(user_ids, tuple):
+            raise MediaProviderError(
+                "user_ids must be a tuple"
+            )
+
+        normalized_user_ids: list[str] = []
+        seen_user_ids: set[str] = set()
+
+        for raw_user_id in user_ids:
+            normalized_user_id = _required(
+                raw_user_id,
+                "Jellyfin user ID",
+            )
+
+            normalized_key = normalized_user_id.lower()
+
+            if normalized_key in seen_user_ids:
+                raise MediaProviderError(
+                    "duplicate Jellyfin user ID"
+                )
+
+            seen_user_ids.add(normalized_key)
+            normalized_user_ids.append(
+                normalized_user_id
+            )
+
+        query = urlencode(
+            {
+                "Ids": normalized_id,
+                "Recursive": "true",
+                "Limit": 1,
+            }
+        )
+
+        payload = self._get_json(
+            f"/Items?{query}"
+        )
+
+        if not isinstance(payload, dict):
+            raise MediaProviderError(
+                "Jellyfin returned an invalid item response"
+            )
+
+        items = payload.get("Items")
+
+        if not isinstance(items, list):
+            raise MediaProviderError(
+                "Jellyfin returned an invalid item response"
+            )
+
+        if not items:
+            raise _JellyfinResourceNotFoundError(
+                "Jellyfin resource not found"
+            )
+
+        if (
+            len(items) != 1
+            or not isinstance(items[0], dict)
+        ):
+            raise MediaProviderError(
+                "Jellyfin returned an invalid item response"
+            )
+
+        item = items[0]
+
+        returned_id = _required(
+            item.get("Id"),
+            "Jellyfin item ID",
+        )
+
+        if returned_id.lower() != normalized_id.lower():
+            raise MediaProviderError(
+                "Jellyfin returned a mismatched item response"
+            )
+
+        raw_type = str(
+            item.get("Type") or ""
+        ).strip().lower()
+
+        media_type = _TYPE_MAP.get(
+            raw_type,
+            "other",
+        )
+
+        date_created = item.get("DateCreated")
+
+        if (
+            not isinstance(date_created, str)
+            or not date_created.strip()
+        ):
+            raise MediaProviderError(
+                "Jellyfin DateCreated is invalid"
+            )
+
+        runtime_ticks = item.get("RunTimeTicks")
+
+        if (
+            isinstance(runtime_ticks, bool)
+            or not isinstance(runtime_ticks, int)
+            or runtime_ticks <= 0
+        ):
+            raise MediaProviderError(
+                "Jellyfin RunTimeTicks is invalid"
+            )
+
+        users: list[dict[str, object]] = []
+
+        for jellyfin_user_id in normalized_user_ids:
+            user_payload = self._get_json(
+                "/Users/"
+                f"{quote(jellyfin_user_id, safe='')}"
+                "/Items/"
+                f"{quote(normalized_id, safe='')}"
+            )
+
+            if not isinstance(user_payload, dict):
+                raise MediaProviderError(
+                    "Jellyfin returned invalid user item data"
+                )
+
+            user_item_id = _required(
+                user_payload.get("Id"),
+                "Jellyfin item ID",
+            )
+
+            if (
+                user_item_id.lower()
+                != normalized_id.lower()
+            ):
+                raise MediaProviderError(
+                    "Jellyfin returned a mismatched user item response"
+                )
+
+            user_runtime = user_payload.get(
+                "RunTimeTicks"
+            )
+
+            if (
+                isinstance(user_runtime, bool)
+                or not isinstance(user_runtime, int)
+                or user_runtime <= 0
+            ):
+                raise MediaProviderError(
+                    "Jellyfin user RunTimeTicks is invalid"
+                )
+
+            if user_runtime != runtime_ticks:
+                raise MediaProviderError(
+                    "Jellyfin user runtime does not match item runtime"
+                )
+
+            user_data = user_payload.get(
+                "UserData"
+            )
+
+            if not isinstance(user_data, dict):
+                raise MediaProviderError(
+                    "Jellyfin UserData is invalid"
+                )
+
+            played = user_data.get("Played")
+
+            if not isinstance(played, bool):
+                raise MediaProviderError(
+                    "Jellyfin Played state is invalid"
+                )
+
+            position = user_data.get(
+                "PlaybackPositionTicks"
+            )
+
+            if (
+                isinstance(position, bool)
+                or not isinstance(position, int)
+                or position < 0
+            ):
+                raise MediaProviderError(
+                    "Jellyfin PlaybackPositionTicks is invalid"
+                )
+
+            if position > user_runtime:
+                raise MediaProviderError(
+                    "Jellyfin playback position exceeds runtime"
+                )
+
+            last_played = user_data.get(
+                "LastPlayedDate"
+            )
+
+            if last_played is not None and (
+                not isinstance(last_played, str)
+                or not last_played.strip()
+            ):
+                raise MediaProviderError(
+                    "Jellyfin LastPlayedDate is invalid"
+                )
+
+            users.append(
+                {
+                    "jellyfin_user_id": jellyfin_user_id,
+                    "played": played,
+                    "playback_position_ticks": position,
+                    "runtime_ticks": user_runtime,
+                    "last_played_at": (
+                        last_played.strip()
+                        if isinstance(last_played, str)
+                        else None
+                    ),
+                }
+            )
+
+        return {
+            "media_type": media_type,
+            "date_created": date_created.strip(),
+            "users": tuple(users),
+        }
+
+    def get_playback_info(
+        self,
+        item_id: str,
+        *,
+        user_id: str,
+        subtitle_stream_index: int | None = None,
+    ) -> dict[str, Any]:
+        normalized_id = _required(item_id, "item_id")
+        normalized_user_id = _required(user_id, "user_id")
+
+        if (
+            subtitle_stream_index is not None
+            and (
+                isinstance(subtitle_stream_index, bool)
+                or not isinstance(subtitle_stream_index, int)
+                or subtitle_stream_index < -1
+            )
+        ):
+            raise MediaProviderError(
+                "subtitle_stream_index must be -1 or a non-negative integer"
+            )
+        external_subtitle_profiles = [
+            {"Format": "vtt", "Method": "External"},
+            {"Format": "srt", "Method": "External"},
+            {"Format": "subrip", "Method": "External"},
+            {"Format": "vtt", "Method": "Encode"},
+            {"Format": "srt", "Method": "Encode"},
+            {"Format": "subrip", "Method": "Encode"},
+            {"Format": "ass", "Method": "Encode"},
+            {"Format": "ssa", "Method": "Encode"},
+            {"Format": "pgs", "Method": "Encode"},
+            {"Format": "pgssub", "Method": "Encode"},
+            {"Format": "dvdsub", "Method": "Encode"},
+        ]
+
+        encode_subtitle_profiles = [
+            {"Format": "vtt", "Method": "Encode"},
+            {"Format": "srt", "Method": "Encode"},
+            {"Format": "subrip", "Method": "Encode"},
+            {"Format": "ass", "Method": "Encode"},
+            {"Format": "ssa", "Method": "Encode"},
+            {"Format": "pgs", "Method": "Encode"},
+            {"Format": "pgssub", "Method": "Encode"},
+            {"Format": "dvdsub", "Method": "Encode"},
+        ]
+
+        playback_payload: dict[str, Any] = {
+            "UserId": normalized_user_id,
+            "EnableDirectPlay": True,
+            "EnableDirectStream": True,
+            "EnableTranscoding": True,
+            "AllowVideoStreamCopy": True,
+            "AllowAudioStreamCopy": True,
+            "DeviceProfile": {
+                "Name": "Atlas Theater Browser",
+                "MaxStreamingBitrate": 120000000,
+                "DirectPlayProfiles": [
+                    {
+                        "Container": "mp4,m4v",
+                        "Type": "Video",
+                        "VideoCodec": "h264",
+                        "AudioCodec": "aac,mp3,ac3,eac3",
+                    }
+                ],
+                "TranscodingProfiles": [
+                    {
+                        "Container": "ts",
+                        "Type": "Video",
+                        "Protocol": "hls",
+                        "VideoCodec": "h264",
+                        "AudioCodec": "aac",
+                        "Context": "Streaming",
+                        "EnableMpegtsM2TsMode": True,
+                    }
+                ],
+                "CodecProfiles": [],
+                "SubtitleProfiles": external_subtitle_profiles,
+            },
+        }
+
+        playback_path = (
+            f"/Items/{quote(normalized_id, safe='')}/PlaybackInfo"
+        )
+
+        def first_media_source(
+            response: Any,
+        ) -> dict[str, Any]:
+            if not isinstance(response, dict):
+                raise MediaProviderError(
+                    "Jellyfin returned invalid playback info"
+                )
+
+            response_sources = response.get("MediaSources")
+
+            if not isinstance(response_sources, list) or not response_sources:
+                raise MediaProviderError(
+                    "Jellyfin returned no playable media source"
+                )
+
+            response_source = next(
+                (
+                    entry
+                    for entry in response_sources
+                    if isinstance(entry, dict)
+                ),
+                None,
+            )
+
+            if response_source is None:
+                raise MediaProviderError(
+                    "Jellyfin returned no playable media source"
+                )
+
+            return response_source
+
+        payload = self._request_json(
+            playback_path,
+            method="POST",
+            payload=playback_payload,
+        )
+
+        source = first_media_source(payload)
+
+        media_source_id = str(
+            source.get("Id") or ""
+        ).strip()
+
+        if not media_source_id:
+            raise MediaProviderError(
+                "Jellyfin playback source has no ID"
+            )
+
+        if subtitle_stream_index is not None:
+            selected_profile = {
+                **playback_payload["DeviceProfile"],
+                "SubtitleProfiles": (
+                    encode_subtitle_profiles
+                    if subtitle_stream_index >= 0
+                    else external_subtitle_profiles
+                ),
+            }
+
+            selected_payload: dict[str, Any] = {
+                **playback_payload,
+                "MediaSourceId": media_source_id,
+                "SubtitleStreamIndex": subtitle_stream_index,
+                "DeviceProfile": selected_profile,
+            }
+
+            if subtitle_stream_index >= 0:
+                selected_payload[
+                    "AlwaysBurnInSubtitleWhenTranscoding"
+                ] = True
+
+            payload = self._request_json(
+                playback_path,
+                method="POST",
+                payload=selected_payload,
+            )
+
+            source = first_media_source(payload)
+
+            selected_media_source_id = str(
+                source.get("Id") or ""
+            ).strip()
+
+            if not selected_media_source_id:
+                raise MediaProviderError(
+                    "Jellyfin playback source has no ID"
+                )
+
+            if selected_media_source_id != media_source_id:
+                raise MediaProviderError(
+                    "Jellyfin changed media source during subtitle selection"
+                )
+
+            media_source_id = selected_media_source_id
+
+        runtime = source.get("RunTimeTicks")
+        duration_ticks = runtime if isinstance(runtime, int) and runtime >= 0 else None
+        supports_direct_play = bool(source.get("SupportsDirectPlay"))
+        supports_direct_stream = bool(source.get("SupportsDirectStream"))
+        supports_transcoding = bool(source.get("SupportsTranscoding"))
+
+        raw_stream_url = source.get("TranscodingUrl") or source.get("DirectStreamUrl")
+        if not isinstance(raw_stream_url, str) or not raw_stream_url.strip():
+            raise MediaProviderError("Jellyfin did not return a browser stream URL")
+        stream_path = _safe_playback_stream_path(raw_stream_url, normalized_id)
+
+        tracks: list[dict[str, Any]] = []
+        streams = source.get("MediaStreams")
+        if isinstance(streams, list):
+            for stream in streams:
+                if not isinstance(stream, dict):
+                    continue
+                kind = str(stream.get("Type") or "").strip().lower()
+                if kind not in {"audio", "subtitle"}:
+                    continue
+                index = stream.get("Index")
+                if not isinstance(index, int):
+                    continue
+                language = stream.get("Language")
+                codec = stream.get("Codec")
+                tracks.append(
+                    {
+                        "index": index,
+                        "kind": kind,
+                        "label": str(
+                            stream.get("DisplayTitle")
+                            or stream.get("Title")
+                            or ("Audio" if kind == "audio" else "Subtitle")
+                        ).strip(),
+                        "language": (
+                            str(language).strip()
+                            if language is not None and str(language).strip()
+                            else None
+                        ),
+                        "codec": (
+                            str(codec).strip()
+                            if codec is not None and str(codec).strip()
+                            else None
+                        ),
+                        "default": bool(stream.get("IsDefault")),
+                        "forced": bool(stream.get("IsForced")),
+                    }
+                )
+
+        return {
+            "media_source_id": media_source_id,
+            "duration_ticks": duration_ticks,
+            "can_seek": bool(
+                supports_direct_play or supports_direct_stream or supports_transcoding
+            ),
+            "supports_direct_play": supports_direct_play,
+            "supports_direct_stream": supports_direct_stream,
+            "supports_transcoding": supports_transcoding,
+            "tracks": tuple(tracks),
+            "stream_path": stream_path,
+        }
 
     def preview_delete_item(
         self,
@@ -323,7 +912,10 @@ class JellyfinProvider:
                 isinstance(ancestor, dict)
                 and str(
                     ancestor.get("Type") or ""
-                ).lower() == "collectionfolder"
+                ).lower() in {
+                    "collectionfolder",
+                    "folder",
+                }
             ):
                 name = ancestor.get("Name")
 
@@ -332,36 +924,45 @@ class JellyfinProvider:
 
         return None
 
-    def _get_json(self, path: str) -> Any:
-        """Perform an authenticated Jellyfin JSON request."""
-
+    def _request_json(
+        self,
+        path: str,
+        *,
+        method: str = "GET",
+        payload: dict[str, Any] | None = None,
+    ) -> Any:
         if not self.api_key.strip():
             raise MediaProviderError(
                 "ATLAS_JELLYFIN_API_KEY is required"
             )
 
+        body = None
+        headers = {
+            "Accept": "application/json",
+            "X-Emby-Token": self.api_key.strip(),
+        }
+        if payload is not None:
+            body = json.dumps(payload).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+
         request = Request(
             f"{self.base_url.rstrip('/')}{path}",
-            headers={
-                "Accept": "application/json",
-                "X-Emby-Token": self.api_key.strip(),
-            },
+            data=body,
+            headers=headers,
+            method=method,
         )
 
         try:
-            with urlopen(
-                request,
-                timeout=self.timeout,
-            ) as response:
-                return json.loads(
-                    response.read().decode("utf-8")
-                )
+            with urlopen(request, timeout=self.timeout) as response:
+                raw = response.read()
+                if not raw:
+                    return None
+                return json.loads(raw.decode("utf-8"))
         except HTTPError as exc:
             if exc.code == 404:
                 raise _JellyfinResourceNotFoundError(
                     "Jellyfin resource not found"
                 ) from exc
-
             raise MediaProviderError(
                 f"Jellyfin request failed with HTTP {exc.code}"
             ) from exc
@@ -369,14 +970,32 @@ class JellyfinProvider:
             raise MediaProviderError(
                 f"Jellyfin is unreachable: {exc}"
             ) from exc
-        except (
-            UnicodeDecodeError,
-            json.JSONDecodeError,
-        ) as exc:
-            raise MediaProviderError(
-                "Jellyfin returned invalid JSON"
-            ) from exc
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise MediaProviderError("Jellyfin returned invalid JSON") from exc
 
+    def _get_json(self, path: str) -> Any:
+        return self._request_json(path)
+
+
+
+def _safe_playback_stream_path(raw_url: str, expected_item_id: str) -> str:
+    parsed = urlsplit(raw_url.strip())
+    if parsed.scheme or parsed.netloc or parsed.fragment:
+        raise MediaProviderError("Jellyfin returned a non-relative playback URL")
+    components = [part for part in parsed.path.split("/") if part]
+    if len(components) < 3 or components[0].lower() != "videos":
+        raise MediaProviderError("Jellyfin returned an unexpected playback path")
+    if components[1].replace("-", "").lower() != expected_item_id.replace("-", "").lower():
+        raise MediaProviderError(
+            "Jellyfin playback path did not match the playable item"
+        )
+    forbidden = {"apikey", "api_key", "token", "x-emby-token"}
+    safe_query = [
+        (name, value)
+        for name, value in parse_qsl(parsed.query, keep_blank_values=True)
+        if name.lower() not in forbidden
+    ]
+    return urlunsplit(("", "", parsed.path, urlencode(safe_query), ""))
 
 def default_jellyfin_provider() -> JellyfinProvider:
     """Build the configured Jellyfin provider."""

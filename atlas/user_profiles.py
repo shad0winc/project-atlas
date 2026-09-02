@@ -21,6 +21,11 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from atlas.custom_roles import (
+    CustomRoleError,
+    default_custom_role_store,
+)
+
 
 REGISTRY_SCHEMA_VERSION = 1
 PROFILE_SCHEMA_VERSION = 2
@@ -36,7 +41,9 @@ VALID_ROLES = frozenset(
         "owner",
         "global_admin",
         "atlas_admin",
+        "media_admin",
         "gameserver_admin",
+        "sports_admin",
         "monitoring_admin",
         "operator",
         "check_runner",
@@ -51,6 +58,21 @@ ROLE_ALIASES = {
     "games_admin": "gameserver_admin",
     "readonly": "read_only",
 }
+
+
+def _is_valid_profile_role(role_name: str) -> bool:
+    """Return whether one normalized role is built-in or persistently defined."""
+
+    if role_name in VALID_ROLES:
+        return True
+
+    try:
+        store = default_custom_role_store(reserved_names=VALID_ROLES)
+        return store.get(role_name) is not None
+    except CustomRoleError as error:
+        raise UserProfileError(
+            "custom role catalog is unavailable"
+        ) from error
 
 VALID_STATUSES = frozenset({"active", "disabled"})
 
@@ -69,6 +91,7 @@ class UserProfileStore:
     """Durable Atlas user-profile store."""
 
     root: Path
+    profile_directory_mode: int = 0o2750
 
     @property
     def registry_file(self) -> Path:
@@ -170,10 +193,11 @@ class UserProfileStore:
         profile_file.parent.mkdir(
             parents=True,
             exist_ok=False,
-            mode=0o2750,
+            mode=self.profile_directory_mode,
         )
 
         try:
+            profile_file.parent.chmod(self.profile_directory_mode)
             _atomic_write_json(profile_file, profile)
 
             registry["users"][user_id] = {
@@ -666,7 +690,7 @@ def normalize_profile_role(value: str) -> str:
 
     role = ROLE_ALIASES.get(role, role)
 
-    if role not in VALID_ROLES:
+    if not _is_valid_profile_role(role):
         raise UserProfileError(
             "profile role must be one of: "
             + ", ".join(sorted(VALID_ROLES))
@@ -946,7 +970,10 @@ def default_store() -> UserProfileStore:
         )
     ).expanduser()
 
-    return UserProfileStore(root.resolve())
+    return UserProfileStore(
+        root.resolve(),
+        profile_directory_mode=0o2770,
+    )
 
 
 def _roles_from_create_arguments(

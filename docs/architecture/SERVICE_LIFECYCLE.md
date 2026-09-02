@@ -294,9 +294,39 @@ The endpoints adapt the existing normalized managed-service,
 the existing `system.health.read` authorization permission and return
 non-leaking HTTP errors when the Service Lifecycle provider is unavailable.
 
-The API does not call Docker Compose directly. Default dependency construction
-creates `DockerComposeProvider` behind `ServiceLifecycleService`, preserving the
-same provider-independent orchestration boundary used by the CLI.
+The API does not call Docker Compose directly. Production dependency
+construction uses `RuntimeSnapshotProvider` behind `ServiceLifecycleService`.
+The host-authoritative publication path uses `DockerComposeProvider` to collect
+and normalize Service Lifecycle observations, then atomically publishes the
+bounded runtime projection at
+`/mnt/storage/configs/atlas/runtime/services/latest.json`.
+
+The API receives only that Service Lifecycle runtime directory as a read-only
+mount. It does not receive the Compose project, Docker CLI, Docker socket,
+`DOCKER_HOST`, or access to the private Docker API network. This preserves the
+provider-independent Service Lifecycle orchestration boundary while keeping
+Docker control-plane capability outside the public API runtime.
+
+The runtime flow is therefore:
+
+```text
+Host Docker / Compose state
+        |
+        v
+DockerComposeProvider
+        |
+        v
+ServiceLifecycleService
+        |
+        v
+normalized atomic runtime snapshot
+        |
+        v
+RuntimeSnapshotProvider
+        |
+        v
+Atlas API -> Administration Portal
+```
 
 M-018.30 introduces no POST, PUT, PATCH, or DELETE Service Lifecycle operations.
 Restart, update, rollback, operation locking, maintenance writes, audit-event

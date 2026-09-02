@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from feed import generate_feed
+from atlas.events import publish_event
 
 from lifecycle import (
     lifecycle_state,
@@ -152,6 +153,7 @@ def process_games(
             current_state,
         ):
             publish_event(
+                "sports",
                 "sports.game-started",
                 {
                     "game_id": game_id,
@@ -184,6 +186,7 @@ def process_games(
             current_state,
         ):
             publish_event(
+                "sports",
                 "sports.game-finished",
                 {
                     "game_id": game_id,

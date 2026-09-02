@@ -204,6 +204,97 @@ Portal and API paths again before publishing the candidate as the current
 verified baseline or releasing the deployment lock. A failure after reopening
 re-enables maintenance and leaves the previous verified baseline authoritative.
 
+## v1.0 RC Deployment Evidence and Clarification
+
+The first exact `1.0.0-rc.1` production deployment attempt on 2026-08-24
+added three clarifications to this accepted decision.
+
+> Production build paths must validate effective readability and traversal of
+> tracked first-party build inputs before pull or build mutation begins.
+
+> Rollback must restore from transaction-scoped aliases created and
+> identity-verified before mutation; it must not recreate prior availability by
+> retagging a captured digest-shaped image reference.
+
+> Recovery source used by recreated services must live beneath the persistent
+> Atlas deployment-record transaction namespace and remain present after the
+> restore command returns.
+
+These clarifications harden the existing fail-closed transaction and recovery
+model rather than creating a new lifecycle abstraction.
+
+The failed transaction `update-20260824T165151Z-3258027` remains immutable
+audit evidence. Production recovery restored verified baseline
+`baseline-reconciliation-20260824T164541Z-927002`. The exact RC production
+deployment gate remains open until a controlled retry succeeds.
+
+## Post-Restore Rollback Readiness Invariant
+
+Recovery of failed exact-RC transaction `update-20260824T222351Z-3794932` established a separate
+rollback-side invariant from the previously documented
+`POST_APPLY_READINESS_RACE`.
+
+The restored runtime could legitimately remain `running + starting` briefly
+after restore. Immediate authoritative verification therefore exposed the
+distinct:
+
+`POST_RESTORE_ROLLBACK_READINESS_RACE`
+
+A restore command returning successfully is not equivalent to rollback
+readiness.
+
+For rollback scopes that restore ingress, Atlas requires bounded,
+inspection-only readiness before authoritative rollback verification and before
+state finalization.
+
+`running + healthy` is success. `running + starting` is the only retryable
+state. Missing containers, inspection failure, non-running state, `unhealthy`,
+missing health metadata, unexpected health state, and timeout fail closed.
+
+This readiness boundary is not a second health authority and does not weaken
+strict ingress verification.
+
+Failure preserves the failed transaction, maintenance mode, deployment-lock
+ownership, and previous verified baseline `baseline-reconciliation-20260824T164541Z-927002` until explicit recovery
+completes.
+
+This decision does not authorize manual finalization, lock deletion, automatic
+recovery, rollback replay, or another production deployment attempt.
+
+## Second Exact-RC Attempt: Post-Apply Readiness Invariant
+
+The second controlled exact `1.0.0-rc.1` production attempt,
+`update-20260824T222351Z-3794932`, established an additional deployment-safety invariant.
+
+A successful Compose apply is not equivalent to verified readiness.
+
+Ingress services recreated by an approved update may legitimately report
+`running + starting` for a bounded interval after Compose returns. Atlas may
+observe and retry that transitional state before authoritative verification.
+
+The readiness observation is bounded and read-only:
+
+- `running + healthy` is terminal success;
+- `running + starting` is the only retryable state;
+- missing containers, inspection failure, non-running state, `unhealthy`,
+  missing health metadata, unexpected health state, and timeout fail closed.
+
+The readiness phase does not replace authoritative verification. Strict ingress
+verification continues to require `running + healthy`.
+
+A readiness failure after maintenance begins enters the existing failed
+transaction path. Maintenance remains enabled, deployment-lock ownership
+remains held, and the previous verified baseline remains authoritative until
+explicit recovery or a separately authorized safe continuation.
+
+The failed transaction `update-20260824T222351Z-3794932` remains immutable audit evidence.
+The authoritative production baseline remains
+`baseline-reconciliation-20260824T164541Z-927002`.
+
+This clarification extends the existing deployment transaction and verification
+boundary; it does not create a new lifecycle abstraction and does not authorize
+another production retry.
+
 ## Consequences
 
 Positive consequences:
