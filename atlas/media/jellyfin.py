@@ -285,6 +285,236 @@ class JellyfinProvider:
 
         return tuple(episodes)
 
+    def get_retention_state(
+        self,
+        item_id: str,
+        *,
+        user_ids: tuple[str, ...],
+    ) -> dict[str, object]:
+        """Return normalized media-retention state for one item."""
+
+        normalized_id = _required(
+            item_id,
+            "item_id",
+        )
+
+        if not isinstance(user_ids, tuple):
+            raise MediaProviderError(
+                "user_ids must be a tuple"
+            )
+
+        normalized_user_ids: list[str] = []
+        seen_user_ids: set[str] = set()
+
+        for raw_user_id in user_ids:
+            normalized_user_id = _required(
+                raw_user_id,
+                "Jellyfin user ID",
+            )
+
+            normalized_key = normalized_user_id.lower()
+
+            if normalized_key in seen_user_ids:
+                raise MediaProviderError(
+                    "duplicate Jellyfin user ID"
+                )
+
+            seen_user_ids.add(normalized_key)
+            normalized_user_ids.append(
+                normalized_user_id
+            )
+
+        query = urlencode(
+            {
+                "Ids": normalized_id,
+                "Recursive": "true",
+                "Limit": 1,
+            }
+        )
+
+        payload = self._get_json(
+            f"/Items?{query}"
+        )
+
+        if not isinstance(payload, dict):
+            raise MediaProviderError(
+                "Jellyfin returned an invalid item response"
+            )
+
+        items = payload.get("Items")
+
+        if not isinstance(items, list):
+            raise MediaProviderError(
+                "Jellyfin returned an invalid item response"
+            )
+
+        if not items:
+            raise _JellyfinResourceNotFoundError(
+                "Jellyfin resource not found"
+            )
+
+        if (
+            len(items) != 1
+            or not isinstance(items[0], dict)
+        ):
+            raise MediaProviderError(
+                "Jellyfin returned an invalid item response"
+            )
+
+        item = items[0]
+
+        returned_id = _required(
+            item.get("Id"),
+            "Jellyfin item ID",
+        )
+
+        if returned_id.lower() != normalized_id.lower():
+            raise MediaProviderError(
+                "Jellyfin returned a mismatched item response"
+            )
+
+        raw_type = str(
+            item.get("Type") or ""
+        ).strip().lower()
+
+        media_type = _TYPE_MAP.get(
+            raw_type,
+            "other",
+        )
+
+        date_created = item.get("DateCreated")
+
+        if (
+            not isinstance(date_created, str)
+            or not date_created.strip()
+        ):
+            raise MediaProviderError(
+                "Jellyfin DateCreated is invalid"
+            )
+
+        runtime_ticks = item.get("RunTimeTicks")
+
+        if (
+            isinstance(runtime_ticks, bool)
+            or not isinstance(runtime_ticks, int)
+            or runtime_ticks <= 0
+        ):
+            raise MediaProviderError(
+                "Jellyfin RunTimeTicks is invalid"
+            )
+
+        users: list[dict[str, object]] = []
+
+        for jellyfin_user_id in normalized_user_ids:
+            user_payload = self._get_json(
+                "/Users/"
+                f"{quote(jellyfin_user_id, safe='')}"
+                "/Items/"
+                f"{quote(normalized_id, safe='')}"
+            )
+
+            if not isinstance(user_payload, dict):
+                raise MediaProviderError(
+                    "Jellyfin returned invalid user item data"
+                )
+
+            user_item_id = _required(
+                user_payload.get("Id"),
+                "Jellyfin item ID",
+            )
+
+            if (
+                user_item_id.lower()
+                != normalized_id.lower()
+            ):
+                raise MediaProviderError(
+                    "Jellyfin returned a mismatched user item response"
+                )
+
+            user_runtime = user_payload.get(
+                "RunTimeTicks"
+            )
+
+            if (
+                isinstance(user_runtime, bool)
+                or not isinstance(user_runtime, int)
+                or user_runtime <= 0
+            ):
+                raise MediaProviderError(
+                    "Jellyfin user RunTimeTicks is invalid"
+                )
+
+            if user_runtime != runtime_ticks:
+                raise MediaProviderError(
+                    "Jellyfin user runtime does not match item runtime"
+                )
+
+            user_data = user_payload.get(
+                "UserData"
+            )
+
+            if not isinstance(user_data, dict):
+                raise MediaProviderError(
+                    "Jellyfin UserData is invalid"
+                )
+
+            played = user_data.get("Played")
+
+            if not isinstance(played, bool):
+                raise MediaProviderError(
+                    "Jellyfin Played state is invalid"
+                )
+
+            position = user_data.get(
+                "PlaybackPositionTicks"
+            )
+
+            if (
+                isinstance(position, bool)
+                or not isinstance(position, int)
+                or position < 0
+            ):
+                raise MediaProviderError(
+                    "Jellyfin PlaybackPositionTicks is invalid"
+                )
+
+            if position > user_runtime:
+                raise MediaProviderError(
+                    "Jellyfin playback position exceeds runtime"
+                )
+
+            last_played = user_data.get(
+                "LastPlayedDate"
+            )
+
+            if last_played is not None and (
+                not isinstance(last_played, str)
+                or not last_played.strip()
+            ):
+                raise MediaProviderError(
+                    "Jellyfin LastPlayedDate is invalid"
+                )
+
+            users.append(
+                {
+                    "jellyfin_user_id": jellyfin_user_id,
+                    "played": played,
+                    "playback_position_ticks": position,
+                    "runtime_ticks": user_runtime,
+                    "last_played_at": (
+                        last_played.strip()
+                        if isinstance(last_played, str)
+                        else None
+                    ),
+                }
+            )
+
+        return {
+            "media_type": media_type,
+            "date_created": date_created.strip(),
+            "users": tuple(users),
+        }
+
     def get_playback_info(
         self,
         item_id: str,

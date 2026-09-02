@@ -8,7 +8,11 @@ import sys
 from collections.abc import Sequence
 
 from atlas.policies import PolicyError
-from atlas.retention import RetentionError, RetentionService
+from atlas.retention import (
+    RetentionError,
+    RetentionService,
+    default_retention_service,
+)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -90,7 +94,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         if args.action == "evaluate":
-            decision = RetentionService().evaluate(
+            decision = default_retention_service().evaluate(
                 args.provider,
                 args.item_id,
             )
