@@ -6,7 +6,10 @@ from atlas.cleanup.models import (
     CleanupAction,
     CleanupDecision,
 )
-from atlas.retention.service import RetentionService
+from atlas.retention.service import (
+    RetentionService,
+    default_retention_service,
+)
 
 
 class CleanupService:
@@ -19,7 +22,7 @@ class CleanupService:
         self._retention_service = (
             retention_service
             if retention_service is not None
-            else RetentionService()
+            else default_retention_service()
         )
 
     def evaluate(
