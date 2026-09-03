@@ -90,22 +90,6 @@ function UserDetail({
   const [roles, setRoles] = useState<readonly string[]>(user.roles);
   const [newPassword, setNewPassword] = useState("");
 
-  useEffect(() => {
-    setDisplayName(user.displayName);
-    setFirstName(user.firstName ?? "");
-    setLastName(user.lastName ?? "");
-    setEmail(user.email ?? "");
-    setDiscordAccount(user.discordAccount ?? "");
-    setEmailNotificationsEnabled(
-      user.emailNotificationsEnabled
-    );
-    setDiscordNotificationsEnabled(
-      user.discordNotificationsEnabled
-    );
-    setRoles(user.roles);
-    setNewPassword("");
-  }, [user]);
-
   const nextStatus =
     user.status === "active" ? "disabled" : "active";
 
