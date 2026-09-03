@@ -163,6 +163,126 @@ class PlaybackService:
             next_target_id=next_target_id,
         )
 
+    def resolve_live_session(
+        self,
+        *,
+        provider: str,
+        item_id: str,
+        jellyfin_user_id: str,
+        subtitle_stream_index: int | None = None,
+    ) -> PlaybackSession:
+        """Resolve one Jellyfin Live TV item through the Atlas gateway."""
+
+        normalized_provider = provider.strip().lower()
+        if normalized_provider != "jellyfin":
+            raise PlaybackNotFoundError(
+                "unsupported playback provider"
+            )
+
+        normalized_item_id = item_id.strip()
+        if not normalized_item_id:
+            raise PlaybackNotFoundError(
+                "playback item is required"
+            )
+
+        normalized_jellyfin_user_id = jellyfin_user_id.strip()
+        if not normalized_jellyfin_user_id:
+            raise PlaybackUnavailableError(
+                "Atlas user is not linked to Jellyfin"
+            )
+
+        if (
+            subtitle_stream_index is not None
+            and (
+                isinstance(subtitle_stream_index, bool)
+                or not isinstance(subtitle_stream_index, int)
+                or subtitle_stream_index < -1
+            )
+        ):
+            raise PlaybackUnavailableError(
+                "subtitle selection is invalid"
+            )
+
+        try:
+            item = self._jellyfin.get_item(
+                normalized_item_id
+            )
+            jellyfin_type = str(
+                item.metadata.get("jellyfin_type") or ""
+            ).strip().lower()
+
+            if jellyfin_type not in {
+                "tvchannel",
+                "livetvchannel",
+                "channel",
+            }:
+                raise PlaybackNotFoundError(
+                    "playback item is not a Jellyfin "
+                    "Live TV channel"
+                )
+
+            playback = self._jellyfin.get_playback_info(
+                normalized_item_id,
+                user_id=normalized_jellyfin_user_id,
+                **(
+                    {
+                        "subtitle_stream_index":
+                            subtitle_stream_index
+                    }
+                    if subtitle_stream_index is not None
+                    else {}
+                ),
+            )
+
+        except PlaybackNotFoundError:
+            raise
+        except MediaProviderError as exc:
+            raise PlaybackNotFoundError(
+                "live playback item was not found "
+                "or is not playable"
+            ) from exc
+
+        tracks = tuple(
+            PlaybackTrack(
+                index=track["index"],
+                kind=track["kind"],
+                label=track["label"],
+                language=track["language"],
+                codec=track["codec"],
+                default=track["default"],
+                forced=track["forced"],
+            )
+            for track in playback["tracks"]
+        )
+
+        return PlaybackSession(
+            available=True,
+            action=PlaybackActionKind.WATCH_LIVE,
+            label="Watch Live",
+            backend="jellyfin",
+            source_type=PlaybackSourceType.LIVE,
+            provider="jellyfin",
+            requested_target_id=normalized_item_id,
+            playable_target_id=normalized_item_id,
+            title=item.title,
+            media_type=item.media_type,
+            duration_ticks=playback["duration_ticks"],
+            can_seek=playback["can_seek"],
+            stream_path=playback["stream_path"],
+            audio_tracks=tuple(
+                track
+                for track in tracks
+                if track.kind == "audio"
+            ),
+            subtitle_tracks=tuple(
+                track
+                for track in tracks
+                if track.kind == "subtitle"
+            ),
+            previous_target_id=None,
+            next_target_id=None,
+        )
+
     def resolve_library_item(
         self,
         *,
