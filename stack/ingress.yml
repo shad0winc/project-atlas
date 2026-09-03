@@ -52,6 +52,7 @@ services:
     volumes:
       - /mnt/storage/configs/atlas/users:/mnt/storage/configs/atlas/users:ro
       - /mnt/storage/configs/atlas/identity/invitations:/mnt/storage/configs/atlas/identity/invitations:ro
+      - /mnt/storage/configs/atlas/identity/password-recovery:/mnt/storage/configs/atlas/identity/password-recovery:rw
       - /mnt/storage/configs/atlas/identity/custom_roles:/mnt/storage/configs/atlas/identity/custom_roles:ro
       - /mnt/storage/configs/atlas/identity/favorites:/mnt/storage/configs/atlas/identity/favorites:rw
       - /mnt/storage/configs/atlas/runtime/requests:/mnt/storage/configs/atlas/runtime/requests:rw
@@ -96,6 +97,14 @@ services:
       ATLAS_JWT_AUDIENCE: "${ATLAS_JWT_AUDIENCE:-atlas-portal}"
       ATLAS_ACCESS_TOKEN_MINUTES: "${ATLAS_ACCESS_TOKEN_MINUTES:-15}"
       ATLAS_REFRESH_TOKEN_DAYS: "${ATLAS_REFRESH_TOKEN_DAYS:-30}"
+      ATLAS_BASE_URL: "${ATLAS_BASE_URL:?ATLAS_BASE_URL is required}"
+      ATLAS_PASSWORD_RECOVERY_MINUTES: "${ATLAS_PASSWORD_RECOVERY_MINUTES:-60}"
+      ATLAS_SMTP_HOST: "${ATLAS_SMTP_HOST:-}"
+      ATLAS_SMTP_PORT: "${ATLAS_SMTP_PORT:-587}"
+      ATLAS_SMTP_SENDER: "${ATLAS_SMTP_SENDER:-}"
+      ATLAS_SMTP_USERNAME: "${ATLAS_SMTP_USERNAME:-}"
+      ATLAS_SMTP_PASSWORD: "${ATLAS_SMTP_PASSWORD:-}"
+      ATLAS_SMTP_SECURITY: "${ATLAS_SMTP_SECURITY:-starttls}"
 
     security_opt:
       - no-new-privileges:true

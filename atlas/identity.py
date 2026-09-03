@@ -14,6 +14,26 @@ class IdentityPaths:
     root: Path
 
     @property
+    def password_recovery_root(self) -> Path:
+        return self.root / "password-recovery"
+
+    @property
+    def password_recovery_registry(self) -> Path:
+        return self.password_recovery_root / "password-recovery.json"
+
+    @property
+    def active_password_recoveries(self) -> Path:
+        return self.password_recovery_root / "active"
+
+    @property
+    def completed_password_recoveries(self) -> Path:
+        return self.password_recovery_root / "completed"
+
+    @property
+    def revoked_password_recoveries(self) -> Path:
+        return self.password_recovery_root / "revoked"
+
+    @property
     def invitations_root(self) -> Path:
         return self.root / "invitations"
 
@@ -39,6 +59,9 @@ class IdentityPaths:
             self.active_invitations,
             self.completed_invitations,
             self.revoked_invitations,
+            self.active_password_recoveries,
+            self.completed_password_recoveries,
+            self.revoked_password_recoveries,
         ):
             directory.mkdir(parents=True, exist_ok=True)
 

@@ -17,6 +17,8 @@ INTENTIONALLY_PUBLIC_ROUTES = frozenset(
         ("auth.py", "POST", "/login"),
         ("auth.py", "POST", "/refresh"),
         ("auth.py", "POST", "/logout"),
+        ("auth.py", "POST", "/password-recovery/request"),
+        ("auth.py", "POST", "/password-recovery/reset"),
         ("health.py", "GET", "/health"),
     }
 )
@@ -119,4 +121,4 @@ def test_public_routes_never_expand_implicitly() -> None:
     identities = {route.identity for route in routes}
 
     assert INTENTIONALLY_PUBLIC_ROUTES <= identities
-    assert len(INTENTIONALLY_PUBLIC_ROUTES) == 4
+    assert len(INTENTIONALLY_PUBLIC_ROUTES) == 6

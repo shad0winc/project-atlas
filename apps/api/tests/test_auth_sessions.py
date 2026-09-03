@@ -96,6 +96,41 @@ class RefreshSessionRegistryTests(unittest.TestCase):
             registry.register(claims)
 
 
+    def test_revoke_subject_removes_all_matching_sessions(self) -> None:
+        registry = RefreshSessionRegistry(clock=lambda: 1000)
+        first = refresh_claims("refresh-subject-1")
+        second = refresh_claims("refresh-subject-2")
+
+        other = TokenClaims(
+            subject="other-user",
+            username="friend",
+            roles=("member",),
+            token_type=TokenType.REFRESH,
+            token_id="refresh-other",
+            issued_at=900,
+            expires_at=2000,
+        )
+
+        registry.register(first)
+        registry.register(second)
+        registry.register(other)
+
+        self.assertEqual(
+            registry.revoke_subject("user-123"),
+            2,
+        )
+        self.assertEqual(registry.active_count, 1)
+        self.assertFalse(registry.consume(first))
+        self.assertFalse(registry.consume(second))
+        self.assertTrue(registry.consume(other))
+
+    def test_revoke_subject_rejects_blank_subject(self) -> None:
+        registry = RefreshSessionRegistry(clock=lambda: 1000)
+
+        with self.assertRaisesRegex(ValueError, "subject"):
+            registry.revoke_subject("   ")
+
+
 class RefreshSessionAuthenticationTests(unittest.TestCase):
     def setUp(self) -> None:
         self.provider = AuthenticationProviderDouble()

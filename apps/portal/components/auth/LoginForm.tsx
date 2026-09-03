@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
@@ -102,6 +103,12 @@ export function LoginForm(): React.ReactElement {
       <button className="auth-submit" disabled={isSubmitting} type="submit">
         {isSubmitting ? "Signing in…" : "Sign in"}
       </button>
+
+      <p className="auth-secondary-action">
+        <Link href="/forgot-password">
+          Forgot password?
+        </Link>
+      </p>
     </form>
   );
 }
