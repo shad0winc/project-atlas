@@ -126,3 +126,43 @@ def test_expired_token_is_rejected(
         match="expired",
     ):
         store.verify_token(issue.token)
+
+
+def test_recovery_state_files_use_private_group_readable_mode(
+    tmp_path: Path,
+) -> None:
+    import stat
+
+    now = datetime(
+        2026,
+        9,
+        3,
+        12,
+        0,
+        tzinfo=timezone.utc,
+    )
+    store = _store(tmp_path, now)
+
+    issue = store.create(user_id="user-1")
+    recovery_id = issue.recovery["recovery_id"]
+
+    registry = store.paths.password_recovery_registry
+    active = (
+        store.paths.active_password_recoveries
+        / f"{recovery_id}.json"
+    )
+
+    assert stat.S_IMODE(registry.stat().st_mode) == 0o640
+    assert stat.S_IMODE(active.stat().st_mode) == 0o640
+
+    verified = store.verify_token(issue.token)
+    store.complete(verified["recovery_id"])
+
+    completed = (
+        store.paths.completed_password_recoveries
+        / f"{recovery_id}.json"
+    )
+
+    assert not active.exists()
+    assert stat.S_IMODE(registry.stat().st_mode) == 0o640
+    assert stat.S_IMODE(completed.stat().st_mode) == 0o640
