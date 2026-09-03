@@ -117,6 +117,7 @@ export function AdminIdentityView(): React.ReactElement {
     inspectUser,
     clearSelectedUser,
     mutateUser,
+    createUser,
     createInvitation,
     revokeInvitation,
     mutationError,
@@ -124,6 +125,15 @@ export function AdminIdentityView(): React.ReactElement {
     clearCreatedToken,
     busyKey
   } = useAdminIdentity();
+
+  const [showUserForm, setShowUserForm] = useState(false);
+  const [newUsername, setNewUsername] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newDisplayName, setNewDisplayName] = useState("");
+  const [newFirstName, setNewFirstName] = useState("");
+  const [newLastName, setNewLastName] = useState("");
+  const [newUserRole, setNewUserRole] = useState("member");
 
   const [showInvitationForm, setShowInvitationForm] = useState(false);
   const [email, setEmail] = useState("");
@@ -144,6 +154,12 @@ export function AdminIdentityView(): React.ReactElement {
         setAssignableRoles(roles);
         if (roles.length) {
           setRole((currentRole) =>
+            roles.some((item) => item.name === currentRole)
+              ? currentRole
+              : roles[0].name
+          );
+
+          setNewUserRole((currentRole) =>
             roles.some((item) => item.name === currentRole)
               ? currentRole
               : roles[0].name
@@ -178,7 +194,152 @@ export function AdminIdentityView(): React.ReactElement {
       ) : null}
 
       <section aria-labelledby="user-accounts-title">
-        <h3 id="user-accounts-title">User accounts</h3>
+        <div>
+          <h3 id="user-accounts-title">User accounts</h3>
+
+          {canCreate && canAssignRoles ? (
+            <button
+              disabled={busyKey === "user:create"}
+              onClick={() => setShowUserForm((visible) => !visible)}
+              type="button"
+            >
+              {showUserForm ? "Cancel user creation" : "Create user"}
+            </button>
+          ) : null}
+        </div>
+
+        {showUserForm && canCreate && canAssignRoles ? (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+
+              const passwordForSubmission = newPassword;
+
+              // Credentials must not remain in component state while the
+              // network mutation is in flight or after it completes.
+              setNewPassword("");
+
+              void createUser({
+                username: newUsername,
+                email: newEmail,
+                password: passwordForSubmission,
+                roles: [newUserRole],
+                ...(newDisplayName.trim()
+                  ? { displayName: newDisplayName }
+                  : {}),
+                ...(newFirstName.trim()
+                  ? { firstName: newFirstName }
+                  : {}),
+                ...(newLastName.trim()
+                  ? { lastName: newLastName }
+                  : {})
+              }).then((created) => {
+                if (!created) return;
+
+                setNewUsername("");
+                setNewEmail("");
+                setNewDisplayName("");
+                setNewFirstName("");
+                setNewLastName("");
+                setShowUserForm(false);
+              });
+            }}
+          >
+            <h4>Create Atlas user</h4>
+
+            <label>
+              Username
+              <input
+                autoComplete="username"
+                onChange={(event) => setNewUsername(event.target.value)}
+                required
+                value={newUsername}
+              />
+            </label>
+
+            <label>
+              Email
+              <input
+                autoComplete="email"
+                onChange={(event) => setNewEmail(event.target.value)}
+                required
+                type="email"
+                value={newEmail}
+              />
+            </label>
+
+            <label>
+              Initial password
+              <input
+                autoComplete="new-password"
+                onChange={(event) => setNewPassword(event.target.value)}
+                required
+                type="password"
+                value={newPassword}
+              />
+            </label>
+
+            <label>
+              Display name
+              <input
+                onChange={(event) => setNewDisplayName(event.target.value)}
+                value={newDisplayName}
+              />
+            </label>
+
+            <label>
+              First name
+              <input
+                autoComplete="given-name"
+                onChange={(event) => setNewFirstName(event.target.value)}
+                value={newFirstName}
+              />
+            </label>
+
+            <label>
+              Last name
+              <input
+                autoComplete="family-name"
+                onChange={(event) => setNewLastName(event.target.value)}
+                value={newLastName}
+              />
+            </label>
+
+            <label>
+              Initial role
+              <select
+                onChange={(event) => setNewUserRole(event.target.value)}
+                required
+                value={newUserRole}
+              >
+                {assignableRoles.map((assignableRole) => (
+                  <option
+                    key={assignableRole.name}
+                    value={assignableRole.name}
+                  >
+                    {assignableRole.displayName}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <button
+              disabled={
+                busyKey === "user:create" ||
+                !newUsername.trim() ||
+                !newEmail.trim() ||
+                !newPassword ||
+                !newUserRole
+              }
+              type="submit"
+            >
+              {busyKey === "user:create"
+                ? "Creating user…"
+                : "Create Atlas user"}
+            </button>
+          </form>
+        ) : null}
+
         {state.users.length ? (
           <div>
             {state.users.map((user) => {

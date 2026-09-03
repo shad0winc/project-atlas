@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../../lib/auth/use-auth";
-import { createAdminInvitation, loadAdminInvitations, loadAdminUser, loadAdminUsers, revokeAdminInvitation, updateAdminUser, type AdminInvitation, type AdminUser, type InvitationCreateInput } from "../api/admin-identity";
+import { createAdminInvitation, createAdminUser, loadAdminInvitations, loadAdminUser, loadAdminUsers, revokeAdminInvitation, updateAdminUser, type AdminInvitation, type AdminUser, type AdminUserCreateInput, type InvitationCreateInput } from "../api/admin-identity";
 
 export type AdminIdentityState =
   | Readonly<{ status: "loading" }>
@@ -42,6 +42,37 @@ export function useAdminIdentity() {
     finally { setDetailLoading(false); }
   }, []);
 
+  const createUser = useCallback(async (input: AdminUserCreateInput): Promise<boolean> => {
+    setBusyKey("user:create");
+    setMutationError(null);
+
+    try {
+      const created = await createAdminUser(input);
+
+      setSelectedUser(created);
+      setState((current) =>
+        current.status !== "ready"
+          ? current
+          : {
+              ...current,
+              users: [
+                created,
+                ...current.users.filter((user) => user.userId !== created.userId)
+              ]
+            }
+      );
+
+      return true;
+    } catch (error: unknown) {
+      setMutationError(
+        normalizeError(error, "Unable to create this Atlas user.")
+      );
+      return false;
+    } finally {
+      setBusyKey(null);
+    }
+  }, []);
+
   const mutateUser = useCallback(async (identifier: string, updates: Readonly<{ status?: string; roles?: readonly string[] }>): Promise<boolean> => {
     setBusyKey(`user:${identifier}`); setMutationError(null);
     try {
@@ -75,5 +106,5 @@ export function useAdminIdentity() {
   }, []);
 
   return { state, refresh, selectedUser, detailLoading, inspectUser, clearSelectedUser: () => setSelectedUser(null),
-    mutateUser, createInvitation, revokeInvitation, mutationError, createdToken, clearCreatedToken: () => setCreatedToken(null), busyKey };
+    createUser, mutateUser, createInvitation, revokeInvitation, mutationError, createdToken, clearCreatedToken: () => setCreatedToken(null), busyKey };
 }
