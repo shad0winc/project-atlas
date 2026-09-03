@@ -10,6 +10,7 @@ MAINTENANCE_FLAG="$MAINTENANCE_DIR/enabled"
 
 source "$PROJECT_DIR/scripts/lib/audit-runtime.sh"
 source "$PROJECT_DIR/scripts/lib/favorites-runtime.sh"
+source "$PROJECT_DIR/scripts/lib/password-recovery-runtime.sh"
 
 EXPECTED_CADDY_MEMORY=536870912
 EXPECTED_CADDY_CPUS=1000000000
@@ -82,6 +83,12 @@ else
   fail "Favorites runtime ownership / access contract"
 fi
 
+if atlas_password_recovery_runtime_verify >/dev/null 2>&1; then
+  pass "Password recovery runtime ownership / access contract"
+else
+  fail "Password recovery runtime ownership / access contract"
+fi
+
 if docker inspect atlas-api >/dev/null 2>&1; then
   if docker exec atlas-api sh -lc '
     set -eu
@@ -111,6 +118,39 @@ if docker inspect atlas-api >/dev/null 2>&1; then
   fi
 else
   fail "Atlas API Favorites persistence access"
+fi
+
+if docker inspect atlas-api >/dev/null 2>&1; then
+  if docker exec atlas-api sh -lc '
+    set -eu
+
+    recovery=/mnt/storage/configs/atlas/identity/password-recovery
+    registry="$recovery/password-recovery.json"
+
+    test -d "$recovery"
+    test -r "$recovery"
+    test -w "$recovery"
+    test -x "$recovery"
+
+    for state in active completed revoked; do
+      test -d "$recovery/$state"
+      test -r "$recovery/$state"
+      test -w "$recovery/$state"
+      test -x "$recovery/$state"
+    done
+
+    if [ -e "$registry" ]; then
+      test -r "$registry"
+      test -w "$registry"
+    fi
+  '
+  then
+    pass "Atlas API Password Recovery persistence access"
+  else
+    fail "Atlas API Password Recovery persistence access"
+  fi
+else
+  fail "Atlas API Password Recovery persistence access"
 fi
 
 if docker inspect atlas-api >/dev/null 2>&1; then

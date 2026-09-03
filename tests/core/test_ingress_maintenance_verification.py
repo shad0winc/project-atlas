@@ -56,6 +56,12 @@ def _write_fake_docker(path: Path) -> None:
             fi
 
             if [[ "${1:-} ${2:-} ${3:-}" == "exec atlas-api sh" ]]; then
+              args=" $* "
+
+              if [[ "$args" == *"password-recovery"* ]]; then
+                exit "${ATLAS_TEST_PASSWORD_RECOVERY_ACCESS_STATUS:-0}"
+              fi
+
               exit "${ATLAS_TEST_FAVORITES_ACCESS_STATUS:-0}"
             fi
 
@@ -101,6 +107,8 @@ def _run_verifier(
     public_status: str = "503",
     favorites_runtime_status: str = "0",
     favorites_access_status: str = "0",
+    password_recovery_runtime_status: str = "0",
+    password_recovery_access_status: str = "0",
 ) -> subprocess.CompletedProcess[str]:
     project = tmp_path / "project"
     runtime = tmp_path / "runtime"
@@ -146,6 +154,25 @@ def _run_verifier(
     )
     favorites_runtime.chmod(0o755)
 
+    password_recovery_runtime = (
+        project
+        / "scripts"
+        / "lib"
+        / "password-recovery-runtime.sh"
+    )
+    password_recovery_runtime.write_text(
+        textwrap.dedent(
+            """
+            #!/usr/bin/env bash
+            atlas_password_recovery_runtime_verify() {
+              return "${ATLAS_TEST_PASSWORD_RECOVERY_RUNTIME_STATUS:-0}"
+            }
+            """
+        ).lstrip(),
+        encoding="utf-8",
+    )
+    password_recovery_runtime.chmod(0o755)
+
     if maintenance:
         maintenance_dir = runtime / "maintenance"
         maintenance_dir.mkdir()
@@ -160,6 +187,12 @@ def _run_verifier(
             "ATLAS_TEST_PUBLIC_STATUS": public_status,
             "ATLAS_TEST_FAVORITES_RUNTIME_STATUS": favorites_runtime_status,
             "ATLAS_TEST_FAVORITES_ACCESS_STATUS": favorites_access_status,
+            "ATLAS_TEST_PASSWORD_RECOVERY_RUNTIME_STATUS": (
+                password_recovery_runtime_status
+            ),
+            "ATLAS_TEST_PASSWORD_RECOVERY_ACCESS_STATUS": (
+                password_recovery_access_status
+            ),
         }
     )
     return subprocess.run(
@@ -228,4 +261,35 @@ def test_normal_mode_fails_if_api_cannot_access_favorites_persistence(
 
     assert result.returncode != 0
     assert "Atlas API Favorites persistence access" in result.stderr
+    assert "Atlas Ingress Status: FAIL" in result.stderr
+
+
+def test_normal_mode_fails_if_password_recovery_runtime_contract_is_invalid(
+    tmp_path: Path,
+) -> None:
+    result = _run_verifier(
+        tmp_path,
+        maintenance=False,
+        password_recovery_runtime_status="1",
+    )
+
+    assert result.returncode != 0
+    assert (
+        "Password recovery runtime ownership / access contract"
+        in result.stderr
+    )
+    assert "Atlas Ingress Status: FAIL" in result.stderr
+
+
+def test_normal_mode_fails_if_api_cannot_access_password_recovery_persistence(
+    tmp_path: Path,
+) -> None:
+    result = _run_verifier(
+        tmp_path,
+        maintenance=False,
+        password_recovery_access_status="1",
+    )
+
+    assert result.returncode != 0
+    assert "Atlas API Password Recovery persistence access" in result.stderr
     assert "Atlas Ingress Status: FAIL" in result.stderr

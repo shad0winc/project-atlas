@@ -97,6 +97,17 @@ def prepare_runtime(tmp_path: Path, *, branch: str = "main") -> dict[str, str]:
     )
 
     write_executable(
+        project / "scripts" / "lib" / "password-recovery-runtime.sh",
+        """
+        #!/usr/bin/env bash
+        atlas_password_recovery_runtime_provision() {
+          echo password-recovery-runtime:provision >> "$ATLAS_TEST_EVENTS"
+          return "${ATLAS_TEST_PASSWORD_RECOVERY_RUNTIME_STATUS:-0}"
+        }
+        """,
+    )
+
+    write_executable(
         bin_dir / "git",
         f"""
         #!/usr/bin/env bash
