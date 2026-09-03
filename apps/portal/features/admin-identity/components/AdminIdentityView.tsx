@@ -134,7 +134,7 @@ function UserDetail({
           </label>
 
           <label>
-            Display Name <span aria-hidden="true">*</span>
+            <span>Display Name <span aria-hidden="true">*</span></span>
             <input
               disabled={!canUpdate || profileBusy}
               onChange={(event) =>
@@ -146,7 +146,7 @@ function UserDetail({
           </label>
 
           <label>
-            Email Address <span aria-hidden="true">*</span>
+            <span>Email Address <span aria-hidden="true">*</span></span>
             <input
               autoComplete="email"
               disabled={!canUpdate || profileBusy}
@@ -560,7 +560,7 @@ export function AdminIdentityView(): React.ReactElement {
 
             <div className="admin-identity-field-grid">
             <label>
-              Username <span aria-hidden="true">*</span>
+              <span>Username <span aria-hidden="true">*</span></span>
               <input
                 autoComplete="username"
                 onChange={(event) => setNewUsername(event.target.value)}
@@ -570,7 +570,7 @@ export function AdminIdentityView(): React.ReactElement {
             </label>
 
             <label>
-              Email Address <span aria-hidden="true">*</span>
+              <span>Email Address <span aria-hidden="true">*</span></span>
               <input
                 autoComplete="email"
                 onChange={(event) => setNewEmail(event.target.value)}
@@ -581,7 +581,7 @@ export function AdminIdentityView(): React.ReactElement {
             </label>
 
             <label>
-              Password <span aria-hidden="true">*</span>
+              <span>Password <span aria-hidden="true">*</span></span>
               <input
                 autoComplete="new-password"
                 onChange={(event) => setNewPassword(event.target.value)}
@@ -592,7 +592,7 @@ export function AdminIdentityView(): React.ReactElement {
             </label>
 
             <label>
-              Display Name <span aria-hidden="true">*</span>
+              <span>Display Name <span aria-hidden="true">*</span></span>
               <input
                 onChange={(event) =>
                   setNewDisplayName(event.target.value)

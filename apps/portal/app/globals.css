@@ -2776,3 +2776,52 @@ section[aria-labelledby="service-detail-title"] dd {
   color: var(--text-muted, #94a3b8);
   font-size: 0.875rem;
 }
+
+/* PR107 UAT follow-up — self-service profile and notification layout */
+.settings-profile-card {
+  min-width: 0;
+}
+
+.settings-field-grid {
+  display: grid;
+  gap: 0.9rem 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+}
+
+.settings-field--wide {
+  grid-column: 1 / -1;
+}
+
+.settings-notifications {
+  display: grid;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.settings-checkbox-row {
+  align-items: center;
+  display: flex;
+  gap: 0.55rem;
+  width: fit-content;
+}
+
+.settings-checkbox-row input {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.settings-required-note {
+  color: var(--muted);
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .settings-field-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-field--wide {
+    grid-column: auto;
+  }
+}

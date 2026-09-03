@@ -20,10 +20,10 @@ describe("Portal landing contract", () => {
       "const { can } = usePermission();"
     );
     expect(source).toContain(
-      "const canViewDashboard = can(dashboardRoute.permission);"
+      "authorizationReady && can(dashboardRoute.permission);"
     );
     expect(source).toContain(
-      "const canViewMedia = can(mediaRoute.permission);"
+      "authorizationReady && can(mediaRoute.permission);"
     );
 
     expect(source).not.toContain(
@@ -34,9 +34,21 @@ describe("Portal landing contract", () => {
     );
   });
 
+  it("waits for the authenticated user before evaluating landing permissions", () => {
+    expect(source).toContain(
+      "const authorizationReady = user !== null;"
+    );
+    expect(source).toContain(
+      "if (!authorizationReady) {"
+    );
+    expect(source).toContain(
+      "<p>Loading Atlas…</p>"
+    );
+  });
+
   it("opens Media when dashboard access is unavailable", () => {
     expect(source).toContain(
-      "const shouldOpenMedia = !canViewDashboard && canViewMedia;"
+      "authorizationReady && !canViewDashboard && canViewMedia;"
     );
     expect(source).toContain(
       "router.replace(mediaRoute.path);"

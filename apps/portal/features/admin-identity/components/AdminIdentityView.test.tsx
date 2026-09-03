@@ -145,10 +145,10 @@ describe("PR107 user lifecycle controls", () => {
   );
 
   it("marks the required create-user identity fields", () => {
-    expect(source).toContain("Username <span aria-hidden=\"true\">*</span>");
-    expect(source).toContain("Display Name <span aria-hidden=\"true\">*</span>");
-    expect(source).toContain("Email Address <span aria-hidden=\"true\">*</span>");
-    expect(source).toContain("Password <span aria-hidden=\"true\">*</span>");
+    expect(source).toContain("<span>Username <span aria-hidden=\"true\">*</span></span>");
+    expect(source).toContain("<span>Display Name <span aria-hidden=\"true\">*</span></span>");
+    expect(source).toContain("<span>Email Address <span aria-hidden=\"true\">*</span></span>");
+    expect(source).toContain("<span>Password <span aria-hidden=\"true\">*</span></span>");
   });
 
   it("exposes contact and notification controls", () => {

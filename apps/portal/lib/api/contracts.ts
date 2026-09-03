@@ -28,6 +28,12 @@ export interface AtlasCurrentUserResponse {
   readonly user_id: string;
   readonly username: string;
   readonly display_name: string;
+  readonly first_name: string | null;
+  readonly last_name: string | null;
+  readonly email: string | null;
+  readonly discord_account: string | null;
+  readonly email_notifications_enabled: boolean;
+  readonly discord_notifications_enabled: boolean;
   readonly roles: readonly string[];
   readonly provider: string;
   readonly granted_permission_patterns: readonly string[];

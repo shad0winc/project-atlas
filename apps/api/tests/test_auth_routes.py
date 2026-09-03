@@ -214,6 +214,12 @@ class AuthenticationRouteTests(unittest.TestCase):
                 "user_id": "usr_123",
                 "username": "michael",
                 "display_name": "Michael",
+                "first_name": None,
+                "last_name": None,
+                "email": None,
+                "discord_account": None,
+                "email_notifications_enabled": False,
+                "discord_notifications_enabled": False,
                 "roles": ["global_admin"],
                 "provider": "jellyfin",
                 "granted_permission_patterns": sorted(

@@ -34,6 +34,12 @@ class UpdateCurrentUserRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     display_name: str | None = Field(default=None, max_length=100)
+    first_name: str | None = Field(default=None, max_length=100)
+    last_name: str | None = Field(default=None, max_length=100)
+    email: str | None = Field(default=None, max_length=320)
+    discord_account: str | None = Field(default=None, max_length=200)
+    email_notifications_enabled: bool | None = None
+    discord_notifications_enabled: bool | None = None
 
 
 class CurrentUserResponse(BaseModel):
@@ -42,6 +48,12 @@ class CurrentUserResponse(BaseModel):
     user_id: str
     username: str
     display_name: str
+    first_name: str | None = None
+    last_name: str | None = None
+    email: str | None = None
+    discord_account: str | None = None
+    email_notifications_enabled: bool = False
+    discord_notifications_enabled: bool = False
     roles: list[str]
     provider: str
     granted_permission_patterns: list[str]
