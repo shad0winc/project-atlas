@@ -112,6 +112,33 @@ class IdentityWriterClient:
 
         return result
 
+    def create_user(
+        self,
+        *,
+        username: str,
+        email: str,
+        password: str,
+        roles: list[str],
+        display_name: str | None = None,
+        first_name: str | None = None,
+        last_name: str | None = None,
+    ) -> dict[str, Any]:
+        """Request privileged Atlas/Jellyfin user provisioning."""
+
+        return self._request(
+            "POST",
+            "/internal/v1/users",
+            {
+                "username": username,
+                "email": email,
+                "password": password,
+                "roles": roles,
+                "display_name": display_name,
+                "first_name": first_name,
+                "last_name": last_name,
+            },
+        )
+
     def update_user(
         self,
         identifier: str,

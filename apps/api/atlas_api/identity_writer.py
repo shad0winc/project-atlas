@@ -27,6 +27,15 @@ from atlas.user_profiles import (
     VALID_ROLES,
     default_store,
 )
+from atlas_api.services.jellyfin_identity import (
+    JellyfinIdentityClient,
+)
+from atlas_api.services.user_provisioning import (
+    UserProvisioningCompensationError,
+    UserProvisioningConflictError,
+    UserProvisioningError,
+    UserProvisioningService,
+)
 
 
 def _required_environment(name: str) -> str:
@@ -47,6 +56,50 @@ SERVICE_TOKEN = _required_environment(
 
 def _user_store() -> UserProfileStore:
     return default_store()
+
+
+def _user_provisioning_service() -> UserProvisioningService:
+    """Return the privileged Atlas/Jellyfin provisioning service.
+
+    Jellyfin administrator credentials are resolved only inside the private
+    identity-writer process rather than the public Atlas API process.
+    """
+
+    base_url = _required_environment(
+        "ATLAS_JELLYFIN_URL"
+    )
+
+    api_key = _required_environment(
+        "ATLAS_JELLYFIN_API_KEY"
+    )
+
+    raw_timeout = os.getenv(
+        "ATLAS_JELLYFIN_TIMEOUT_SECONDS",
+        "10",
+    ).strip()
+
+    try:
+        timeout_seconds = float(raw_timeout)
+    except ValueError as error:
+        raise RuntimeError(
+            "ATLAS_JELLYFIN_TIMEOUT_SECONDS must be numeric."
+        ) from error
+
+    if timeout_seconds <= 0:
+        raise RuntimeError(
+            "ATLAS_JELLYFIN_TIMEOUT_SECONDS must be greater than zero."
+        )
+
+    jellyfin = JellyfinIdentityClient(
+        base_url,
+        api_key,
+        timeout_seconds=timeout_seconds,
+    )
+
+    return UserProvisioningService(
+        _user_store(),
+        jellyfin,
+    )
 
 
 def _invitation_store() -> InvitationStore:
@@ -84,6 +137,20 @@ def _require_service_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Valid service authentication is required.",
         )
+
+
+class UserCreateRequest(BaseModel):
+    """Bounded Atlas/Jellyfin user-provisioning request."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    username: str
+    email: str
+    password: str
+    roles: list[str]
+    display_name: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
 
 
 class UserUpdateRequest(BaseModel):
@@ -201,6 +268,24 @@ def _assert_new_roles_assignable(requested_roles: list[str], existing_roles: obj
             _assert_role_assignable(normalized)
 
 
+def _safe_user_response(
+    profile: dict[str, Any],
+) -> dict[str, Any]:
+    """Return only non-secret identity fields from the private writer."""
+
+    return {
+        "user_id": profile["user_id"],
+        "username": profile["username"],
+        "display_name": profile["display_name"],
+        "first_name": profile.get("first_name"),
+        "last_name": profile.get("last_name"),
+        "email": profile.get("email"),
+        "roles": list(profile["roles"]),
+        "status": profile["status"],
+        "jellyfin_user_id": profile.get("jellyfin_user_id"),
+    }
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     """Return process liveness without disclosing identity state."""
@@ -208,6 +293,63 @@ def health() -> dict[str, str]:
     return {
         "status": "healthy",
     }
+
+
+@app.post(
+    "/internal/v1/users",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(_require_service_token)],
+)
+def create_user(
+    request: UserCreateRequest,
+) -> dict[str, Any]:
+    """Provision one linked Atlas and Jellyfin identity."""
+
+    try:
+        for role in request.roles:
+            _assert_role_assignable(role)
+
+        profile = _user_provisioning_service().provision_user(
+            username=request.username,
+            email=request.email,
+            password=request.password,
+            roles=request.roles,
+            display_name=request.display_name,
+            first_name=request.first_name,
+            last_name=request.last_name,
+        )
+
+        return _safe_user_response(profile)
+
+    except UserProvisioningConflictError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(error),
+        ) from error
+
+    except UserProvisioningCompensationError as error:
+        # Deliberately do not expose the orphaned Jellyfin identifier through
+        # the HTTP response. The later audit integration can record it on the
+        # trusted server side.
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "User provisioning failed and requires "
+                "administrator recovery."
+            ),
+        ) from error
+
+    except UserProvisioningError as error:
+        raise HTTPException(
+            status_code=error.status_code,
+            detail=str(error),
+        ) from error
+
+    except (CustomRoleError, UserProfileError, ValueError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
 
 
 @app.patch(

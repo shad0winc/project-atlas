@@ -4,8 +4,20 @@ export type AdminUser = Readonly<{
   userId: string;
   username: string;
   displayName: string;
+  email: string | null;
   roles: readonly string[];
   status: string;
+  jellyfinUserId: string | null;
+}>;
+
+export type AdminUserCreateInput = Readonly<{
+  username: string;
+  email: string;
+  password: string;
+  roles: readonly string[];
+  displayName?: string;
+  firstName?: string;
+  lastName?: string;
 }>;
 
 export type AdminInvitation = Readonly<{
@@ -28,8 +40,10 @@ type AdminUserTransport = Readonly<{
   user_id: string;
   username: string;
   display_name: string;
+  email?: string | null;
   roles: readonly string[];
   status: string;
+  jellyfin_user_id?: string | null;
 }>;
 
 type AdminUserListTransport = Readonly<{
@@ -68,8 +82,10 @@ function mapUser(response: AdminUserTransport): AdminUser {
     userId: requiredString(response.user_id, "user_id"),
     username: requiredString(response.username, "username"),
     displayName: requiredString(response.display_name, "display_name"),
+    email: optionalString(response.email),
     roles: response.roles.map((role) => requiredString(role, "role")),
-    status: requiredString(response.status, "status")
+    status: requiredString(response.status, "status"),
+    jellyfinUserId: optionalString(response.jellyfin_user_id)
   };
 }
 
@@ -127,6 +143,35 @@ export async function loadAdminUser(
 
   return mapUser(response);
 }
+
+export async function createAdminUser(
+  input: AdminUserCreateInput
+): Promise<AdminUser> {
+  const response = await authenticatedAtlasApiRequest<AdminUserTransport>(
+    "/admin/users",
+    {
+      method: "POST",
+      ...mutationOptions({
+        username: requiredString(input.username, "username"),
+        email: requiredString(input.email, "email"),
+        password: requiredString(input.password, "password"),
+        roles: [...input.roles],
+        ...(input.displayName?.trim()
+          ? { display_name: input.displayName.trim() }
+          : {}),
+        ...(input.firstName?.trim()
+          ? { first_name: input.firstName.trim() }
+          : {}),
+        ...(input.lastName?.trim()
+          ? { last_name: input.lastName.trim() }
+          : {})
+      })
+    }
+  );
+
+  return mapUser(response);
+}
+
 
 export async function updateAdminUser(
   identifier: string,

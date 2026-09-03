@@ -380,6 +380,57 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
+    if (request.method === "POST" && url.pathname === "/api/v1/admin/users") {
+      if (!authorized(request)) { sendJson(response, 401, { detail: "Authentication credentials were not provided." }); return; }
+
+      const payload = await readRequestJsonBody(request);
+
+      if (
+        typeof payload.username !== "string" ||
+        typeof payload.email !== "string" ||
+        typeof payload.password !== "string" ||
+        !Array.isArray(payload.roles) ||
+        payload.roles.length === 0
+      ) {
+        sendJson(response, 422, { detail: "Invalid user provisioning payload." });
+        return;
+      }
+
+      sendJson(response, 201, {
+        user_id: "atlas-e2e-created-user",
+        username: payload.username,
+        display_name: payload.display_name ?? payload.username,
+        email: payload.email.toLowerCase(),
+        roles: payload.roles,
+        status: "active",
+        jellyfin_user_id: "jellyfin-e2e-created-user"
+      });
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/v1/admin/roles/assignable") {
+      if (!authorized(request)) {
+        sendJson(response, 401, {
+          detail: "Authentication credentials were not provided."
+        });
+        return;
+      }
+
+      sendJson(response, 200, {
+        roles: [
+          {
+            name: "member",
+            display_name: "Member"
+          },
+          {
+            name: "user",
+            display_name: "User"
+          }
+        ]
+      });
+      return;
+    }
+
     if (request.method === "GET" && url.pathname === "/api/v1/admin/users") {
       if (!authorized(request)) { sendJson(response, 401, { detail: "Authentication credentials were not provided." }); return; }
       sendJson(response, 200, { users: [

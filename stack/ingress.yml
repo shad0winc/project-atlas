@@ -252,6 +252,9 @@ services:
       ATLAS_IDENTITY_DIR: "/mnt/storage/configs/atlas/identity"
       ATLAS_CUSTOM_ROLES_PATH: "/mnt/storage/configs/atlas/identity/custom_roles/custom_roles.json"
       ATLAS_IDENTITY_WRITER_TOKEN: "${ATLAS_IDENTITY_WRITER_TOKEN:?ATLAS_IDENTITY_WRITER_TOKEN is required}"
+      ATLAS_JELLYFIN_URL: "http://jellyfin:8096"
+      ATLAS_JELLYFIN_API_KEY: "${ATLAS_JELLYFIN_API_KEY:?ATLAS_JELLYFIN_API_KEY is required}"
+      ATLAS_JELLYFIN_TIMEOUT_SECONDS: "${ATLAS_JELLYFIN_TIMEOUT_SECONDS:-10}"
 
     command:
       - python
