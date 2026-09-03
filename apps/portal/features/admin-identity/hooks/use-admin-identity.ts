@@ -2,7 +2,21 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../../lib/auth/use-auth";
-import { createAdminInvitation, createAdminUser, loadAdminInvitations, loadAdminUser, loadAdminUsers, revokeAdminInvitation, updateAdminUser, type AdminInvitation, type AdminUser, type AdminUserCreateInput, type InvitationCreateInput } from "../api/admin-identity";
+import {
+  createAdminInvitation,
+  createAdminUser,
+  loadAdminInvitations,
+  loadAdminUser,
+  loadAdminUsers,
+  revokeAdminInvitation,
+  setAdminUserPassword,
+  updateAdminUser,
+  type AdminInvitation,
+  type AdminUser,
+  type AdminUserCreateInput,
+  type AdminUserUpdateInput,
+  type InvitationCreateInput
+} from "../api/admin-identity";
 
 export type AdminIdentityState =
   | Readonly<{ status: "loading" }>
@@ -73,16 +87,83 @@ export function useAdminIdentity() {
     }
   }, []);
 
-  const mutateUser = useCallback(async (identifier: string, updates: Readonly<{ status?: string; roles?: readonly string[] }>): Promise<boolean> => {
-    setBusyKey(`user:${identifier}`); setMutationError(null);
-    try {
-      const updated = await updateAdminUser(identifier, updates);
-      setSelectedUser((current) => current?.userId === updated.userId ? updated : current);
-      setState((current) => current.status !== "ready" ? current : { ...current, users: current.users.map((u) => u.userId === updated.userId ? updated : u) });
-      return true;
-    } catch (error: unknown) { setMutationError(normalizeError(error, "Unable to update this Atlas user.")); return false; }
-    finally { setBusyKey(null); }
-  }, []);
+  const mutateUser = useCallback(
+    async (
+      identifier: string,
+      updates: AdminUserUpdateInput
+    ): Promise<boolean> => {
+      setBusyKey(`user:${identifier}`);
+      setMutationError(null);
+
+      try {
+        const updated = await updateAdminUser(
+          identifier,
+          updates
+        );
+
+        setSelectedUser((current) =>
+          current?.userId === updated.userId
+            ? updated
+            : current
+        );
+
+        setState((current) =>
+          current.status !== "ready"
+            ? current
+            : {
+                ...current,
+                users: current.users.map((user) =>
+                  user.userId === updated.userId
+                    ? updated
+                    : user
+                )
+              }
+        );
+
+        return true;
+      } catch (error: unknown) {
+        setMutationError(
+          normalizeError(
+            error,
+            "Unable to update this Atlas user."
+          )
+        );
+        return false;
+      } finally {
+        setBusyKey(null);
+      }
+    },
+    []
+  );
+
+  const setUserPassword = useCallback(
+    async (
+      identifier: string,
+      newPassword: string
+    ): Promise<boolean> => {
+      setBusyKey(`user-password:${identifier}`);
+      setMutationError(null);
+
+      try {
+        await setAdminUserPassword(
+          identifier,
+          newPassword
+        );
+        return true;
+      } catch (error: unknown) {
+        setMutationError(
+          normalizeError(
+            error,
+            "Unable to set this Atlas user's password."
+          )
+        );
+        return false;
+      } finally {
+        setBusyKey(null);
+      }
+    },
+    []
+  );
 
   const createInvitation = useCallback(async (input: InvitationCreateInput): Promise<boolean> => {
     setBusyKey("invitation:create"); setMutationError(null); setCreatedToken(null);
@@ -106,5 +187,14 @@ export function useAdminIdentity() {
   }, []);
 
   return { state, refresh, selectedUser, detailLoading, inspectUser, clearSelectedUser: () => setSelectedUser(null),
-    createUser, mutateUser, createInvitation, revokeInvitation, mutationError, createdToken, clearCreatedToken: () => setCreatedToken(null), busyKey };
+    createUser,
+    mutateUser,
+    setUserPassword,
+    createInvitation,
+    revokeInvitation,
+    mutationError,
+    createdToken,
+    clearCreatedToken: () => setCreatedToken(null),
+    busyKey
+  };
 }

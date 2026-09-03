@@ -4,7 +4,12 @@ export type AdminUser = Readonly<{
   userId: string;
   username: string;
   displayName: string;
+  firstName: string | null;
+  lastName: string | null;
   email: string | null;
+  discordAccount: string | null;
+  emailNotificationsEnabled: boolean;
+  discordNotificationsEnabled: boolean;
   roles: readonly string[];
   status: string;
   jellyfinUserId: string | null;
@@ -12,12 +17,27 @@ export type AdminUser = Readonly<{
 
 export type AdminUserCreateInput = Readonly<{
   username: string;
+  displayName: string;
   email: string;
   password: string;
   roles: readonly string[];
-  displayName?: string;
   firstName?: string;
   lastName?: string;
+  discordAccount?: string;
+  emailNotificationsEnabled?: boolean;
+  discordNotificationsEnabled?: boolean;
+}>;
+
+export type AdminUserUpdateInput = Readonly<{
+  displayName?: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string;
+  discordAccount?: string | null;
+  emailNotificationsEnabled?: boolean;
+  discordNotificationsEnabled?: boolean;
+  status?: string;
+  roles?: readonly string[];
 }>;
 
 export type AdminInvitation = Readonly<{
@@ -40,7 +60,12 @@ type AdminUserTransport = Readonly<{
   user_id: string;
   username: string;
   display_name: string;
+  first_name?: string | null;
+  last_name?: string | null;
   email?: string | null;
+  discord_account?: string | null;
+  email_notifications_enabled?: boolean;
+  discord_notifications_enabled?: boolean;
   roles: readonly string[];
   status: string;
   jellyfin_user_id?: string | null;
@@ -82,7 +107,12 @@ function mapUser(response: AdminUserTransport): AdminUser {
     userId: requiredString(response.user_id, "user_id"),
     username: requiredString(response.username, "username"),
     displayName: requiredString(response.display_name, "display_name"),
+    firstName: optionalString(response.first_name),
+    lastName: optionalString(response.last_name),
     email: optionalString(response.email),
+    discordAccount: optionalString(response.discord_account),
+    emailNotificationsEnabled: response.email_notifications_enabled === true,
+    discordNotificationsEnabled: response.discord_notifications_enabled === true,
     roles: response.roles.map((role) => requiredString(role, "role")),
     status: requiredString(response.status, "status"),
     jellyfinUserId: optionalString(response.jellyfin_user_id)
@@ -153,18 +183,23 @@ export async function createAdminUser(
       method: "POST",
       ...mutationOptions({
         username: requiredString(input.username, "username"),
+        display_name: requiredString(input.displayName, "display name"),
         email: requiredString(input.email, "email"),
         password: requiredString(input.password, "password"),
         roles: [...input.roles],
-        ...(input.displayName?.trim()
-          ? { display_name: input.displayName.trim() }
-          : {}),
         ...(input.firstName?.trim()
           ? { first_name: input.firstName.trim() }
           : {}),
         ...(input.lastName?.trim()
           ? { last_name: input.lastName.trim() }
-          : {})
+          : {}),
+        ...(input.discordAccount?.trim()
+          ? { discord_account: input.discordAccount.trim() }
+          : {}),
+        email_notifications_enabled:
+          input.emailNotificationsEnabled === true,
+        discord_notifications_enabled:
+          input.discordNotificationsEnabled === true
       })
     }
   );
@@ -175,19 +210,81 @@ export async function createAdminUser(
 
 export async function updateAdminUser(
   identifier: string,
-  updates: Readonly<{ status?: string; roles?: readonly string[] }>
+  updates: AdminUserUpdateInput
 ): Promise<AdminUser> {
   const normalized = requiredString(identifier, "user identifier");
+
+  const body: Record<string, unknown> = {};
+
+  if (updates.displayName !== undefined) {
+    body.display_name = requiredString(
+      updates.displayName,
+      "display name"
+    );
+  }
+
+  if (updates.firstName !== undefined) {
+    body.first_name = updates.firstName?.trim() || null;
+  }
+
+  if (updates.lastName !== undefined) {
+    body.last_name = updates.lastName?.trim() || null;
+  }
+
+  if (updates.email !== undefined) {
+    body.email = requiredString(updates.email, "email");
+  }
+
+  if (updates.discordAccount !== undefined) {
+    body.discord_account =
+      updates.discordAccount?.trim() || null;
+  }
+
+  if (updates.emailNotificationsEnabled !== undefined) {
+    body.email_notifications_enabled =
+      updates.emailNotificationsEnabled;
+  }
+
+  if (updates.discordNotificationsEnabled !== undefined) {
+    body.discord_notifications_enabled =
+      updates.discordNotificationsEnabled;
+  }
+
+  if (updates.status !== undefined) {
+    body.status = updates.status;
+  }
+
+  if (updates.roles !== undefined) {
+    body.roles = [...updates.roles];
+  }
 
   const response = await authenticatedAtlasApiRequest<AdminUserTransport>(
     `/admin/users/${encodeURIComponent(normalized)}`,
     {
       method: "PATCH",
-      ...mutationOptions(updates)
+      ...mutationOptions(body)
     }
   );
 
   return mapUser(response);
+}
+
+export async function setAdminUserPassword(
+  identifier: string,
+  newPassword: string
+): Promise<void> {
+  const normalized = requiredString(identifier, "user identifier");
+  const password = requiredString(newPassword, "new password");
+
+  await authenticatedAtlasApiRequest<{ status: string }>(
+    `/admin/users/${encodeURIComponent(normalized)}/password`,
+    {
+      method: "POST",
+      ...mutationOptions({
+        new_password: password
+      })
+    }
+  );
 }
 
 export async function loadAdminInvitations(

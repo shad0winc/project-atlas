@@ -134,3 +134,39 @@ describe("AdminIdentityView surface spacing", () => {
   });
 
 });
+
+describe("PR107 user lifecycle controls", () => {
+  const source = readFileSync(
+    join(
+      process.cwd(),
+      "features/admin-identity/components/AdminIdentityView.tsx"
+    ),
+    "utf8"
+  );
+
+  it("marks the required create-user identity fields", () => {
+    expect(source).toContain("Username <span aria-hidden=\"true\">*</span>");
+    expect(source).toContain("Display Name <span aria-hidden=\"true\">*</span>");
+    expect(source).toContain("Email Address <span aria-hidden=\"true\">*</span>");
+    expect(source).toContain("Password <span aria-hidden=\"true\">*</span>");
+  });
+
+  it("exposes contact and notification controls", () => {
+    expect(source).toContain("Discord Account");
+    expect(source).toContain("Email notifications");
+    expect(source).toContain("Discord notifications");
+  });
+
+  it("keeps username read-only while allowing profile edits", () => {
+    expect(source).toContain("readOnly");
+    expect(source).toContain("Save account");
+    expect(source).toContain("First Name");
+    expect(source).toContain("Last Name");
+  });
+
+  it("provides a dedicated password action", () => {
+    expect(source).toContain("Set New Password");
+    expect(source).toContain("setUserPassword");
+    expect(source).toContain("Atlas does not store the password");
+  });
+});

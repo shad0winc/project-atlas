@@ -122,6 +122,9 @@ class IdentityWriterClient:
         display_name: str | None = None,
         first_name: str | None = None,
         last_name: str | None = None,
+        discord_account: str | None = None,
+        email_notifications_enabled: bool = False,
+        discord_notifications_enabled: bool = False,
     ) -> dict[str, Any]:
         """Request privileged Atlas/Jellyfin user provisioning."""
 
@@ -136,6 +139,13 @@ class IdentityWriterClient:
                 "display_name": display_name,
                 "first_name": first_name,
                 "last_name": last_name,
+                "discord_account": discord_account,
+                "email_notifications_enabled": (
+                    email_notifications_enabled
+                ),
+                "discord_notifications_enabled": (
+                    discord_notifications_enabled
+                ),
             },
         )
 
@@ -153,6 +163,21 @@ class IdentityWriterClient:
             "PATCH",
             f"/internal/v1/users/{identifier}",
             updates,
+        )
+
+    def set_user_password(
+        self,
+        identifier: str,
+        new_password: str,
+    ) -> dict[str, Any]:
+        identifier = quote(identifier, safe="")
+
+        return self._request(
+            "POST",
+            f"/internal/v1/users/{identifier}/password",
+            {
+                "new_password": new_password,
+            },
         )
 
     def create_custom_role(self, payload: dict[str, Any]) -> dict[str, Any]:

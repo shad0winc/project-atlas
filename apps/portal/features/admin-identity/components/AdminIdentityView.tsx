@@ -41,68 +41,370 @@ function UserDetail({
   user,
   canUpdate,
   canAssignRoles,
-  busy,
+  profileBusy,
+  passwordBusy,
   onClose,
   onUpdate,
+  onSetPassword,
   assignableRoles
 }: Readonly<{
   user: AdminUser;
   canUpdate: boolean;
   canAssignRoles: boolean;
-  busy: boolean;
+  profileBusy: boolean;
+  passwordBusy: boolean;
   assignableRoles: readonly AssignableRole[];
   onClose: () => void;
   onUpdate: (
-    updates: Readonly<{ status?: string; roles?: readonly string[] }>
+    updates: Readonly<{
+      displayName?: string;
+      firstName?: string | null;
+      lastName?: string | null;
+      email?: string;
+      discordAccount?: string | null;
+      emailNotificationsEnabled?: boolean;
+      discordNotificationsEnabled?: boolean;
+      status?: string;
+      roles?: readonly string[];
+    }>
+  ) => Promise<boolean>;
+  onSetPassword: (
+    newPassword: string
   ) => Promise<boolean>;
 }>): React.ReactElement {
+  const [displayName, setDisplayName] = useState(user.displayName);
+  const [firstName, setFirstName] = useState(user.firstName ?? "");
+  const [lastName, setLastName] = useState(user.lastName ?? "");
+  const [email, setEmail] = useState(user.email ?? "");
+  const [discordAccount, setDiscordAccount] = useState(
+    user.discordAccount ?? ""
+  );
+  const [
+    emailNotificationsEnabled,
+    setEmailNotificationsEnabled
+  ] = useState(user.emailNotificationsEnabled);
+  const [
+    discordNotificationsEnabled,
+    setDiscordNotificationsEnabled
+  ] = useState(user.discordNotificationsEnabled);
   const [roles, setRoles] = useState<readonly string[]>(user.roles);
+  const [newPassword, setNewPassword] = useState("");
 
-  const nextStatus = user.status === "active" ? "disabled" : "active";
+  useEffect(() => {
+    setDisplayName(user.displayName);
+    setFirstName(user.firstName ?? "");
+    setLastName(user.lastName ?? "");
+    setEmail(user.email ?? "");
+    setDiscordAccount(user.discordAccount ?? "");
+    setEmailNotificationsEnabled(
+      user.emailNotificationsEnabled
+    );
+    setDiscordNotificationsEnabled(
+      user.discordNotificationsEnabled
+    );
+    setRoles(user.roles);
+    setNewPassword("");
+  }, [user]);
+
+  const nextStatus =
+    user.status === "active" ? "disabled" : "active";
+
+  const profileValid =
+    Boolean(displayName.trim()) &&
+    Boolean(email.trim()) &&
+    (
+      !discordNotificationsEnabled ||
+      Boolean(discordAccount.trim())
+    );
 
   return (
-    <section aria-label={`User detail for ${user.displayName}`} className="admin-identity-inline-detail">
-      <p className="portal-page-eyebrow">User detail</p>
-      <h3>{user.displayName}</h3>
-      <p>Username: {user.username}</p>
-      <p>Status: {user.status}</p>
-      <p>Roles: {rolesLabel(user)}</p>
+    <section
+      aria-label={`User detail for ${user.displayName}`}
+      className="admin-identity-inline-detail"
+    >
+      <div className="admin-identity-detail-header">
+        <div>
+          <p className="portal-page-eyebrow">User detail</p>
+          <h3>{user.displayName}</h3>
+          <p>Status: {user.status}</p>
+        </div>
+
+        <button onClick={onClose} type="button">
+          Close user detail
+        </button>
+      </div>
+
+      <section
+        aria-labelledby={`account-${user.userId}`}
+        className="admin-identity-section"
+      >
+        <h4 id={`account-${user.userId}`}>Account</h4>
+
+        <div className="admin-identity-field-grid">
+          <label>
+            Username
+            <input
+              readOnly
+              value={user.username}
+            />
+          </label>
+
+          <label>
+            Display Name <span aria-hidden="true">*</span>
+            <input
+              disabled={!canUpdate || profileBusy}
+              onChange={(event) =>
+                setDisplayName(event.target.value)
+              }
+              required
+              value={displayName}
+            />
+          </label>
+
+          <label>
+            Email Address <span aria-hidden="true">*</span>
+            <input
+              autoComplete="email"
+              disabled={!canUpdate || profileBusy}
+              onChange={(event) =>
+                setEmail(event.target.value)
+              }
+              required
+              type="email"
+              value={email}
+            />
+          </label>
+
+          <label>
+            First Name
+            <input
+              autoComplete="given-name"
+              disabled={!canUpdate || profileBusy}
+              onChange={(event) =>
+                setFirstName(event.target.value)
+              }
+              value={firstName}
+            />
+          </label>
+
+          <label>
+            Last Name
+            <input
+              autoComplete="family-name"
+              disabled={!canUpdate || profileBusy}
+              onChange={(event) =>
+                setLastName(event.target.value)
+              }
+              value={lastName}
+            />
+          </label>
+
+          <label>
+            Discord Account
+            <input
+              disabled={!canUpdate || profileBusy}
+              onChange={(event) =>
+                setDiscordAccount(event.target.value)
+              }
+              value={discordAccount}
+            />
+          </label>
+        </div>
+
+        {canUpdate ? (
+          <button
+            disabled={profileBusy || !profileValid}
+            onClick={() =>
+              void onUpdate({
+                displayName: displayName.trim(),
+                firstName: firstName.trim() || null,
+                lastName: lastName.trim() || null,
+                email: email.trim(),
+                discordAccount:
+                  discordAccount.trim() || null,
+                emailNotificationsEnabled,
+                discordNotificationsEnabled
+              })
+            }
+            type="button"
+          >
+            {profileBusy ? "Saving account…" : "Save account"}
+          </button>
+        ) : null}
+      </section>
+
+      <section
+        aria-labelledby={`notifications-${user.userId}`}
+        className="admin-identity-section"
+      >
+        <h4 id={`notifications-${user.userId}`}>
+          Notifications
+        </h4>
+
+        <label className="admin-identity-checkbox-row">
+          <input
+            checked={emailNotificationsEnabled}
+            disabled={!canUpdate || profileBusy}
+            onChange={(event) =>
+              setEmailNotificationsEnabled(
+                event.target.checked
+              )
+            }
+            type="checkbox"
+          />
+          Email notifications
+        </label>
+
+        <label className="admin-identity-checkbox-row">
+          <input
+            checked={discordNotificationsEnabled}
+            disabled={!canUpdate || profileBusy}
+            onChange={(event) =>
+              setDiscordNotificationsEnabled(
+                event.target.checked
+              )
+            }
+            type="checkbox"
+          />
+          Discord notifications
+        </label>
+
+        {discordNotificationsEnabled &&
+        !discordAccount.trim() ? (
+          <p role="alert">
+            Add a Discord Account before enabling Discord
+            notifications.
+          </p>
+        ) : null}
+      </section>
+
+      <section
+        aria-labelledby={`access-${user.userId}`}
+        className="admin-identity-section"
+      >
+        <h4 id={`access-${user.userId}`}>Access</h4>
+
+        <p>Roles: {rolesLabel(user)}</p>
+
+        {canUpdate ? (
+          <button
+            disabled={profileBusy}
+            onClick={() =>
+              void onUpdate({
+                status: nextStatus
+              })
+            }
+            type="button"
+          >
+            {nextStatus === "disabled"
+              ? "Disable user"
+              : "Enable user"}
+          </button>
+        ) : null}
+
+        {canAssignRoles ? (
+          <div>
+            <fieldset disabled={profileBusy}>
+              <legend>Roles</legend>
+
+              {roles
+                .filter(
+                  (name) =>
+                    !assignableRoles.some(
+                      (role) => role.name === name
+                    )
+                )
+                .map((name) => (
+                  <p key={name}>
+                    Retained protected/nonassignable role:{" "}
+                    {name}
+                  </p>
+                ))}
+
+              {assignableRoles.map((role) => (
+                <label key={role.name}>
+                  <input
+                    checked={roles.includes(role.name)}
+                    onChange={(event) =>
+                      setRoles(
+                        event.target.checked
+                          ? [...roles, role.name]
+                          : roles.filter(
+                              (name) =>
+                                name !== role.name
+                            )
+                      )
+                    }
+                    type="checkbox"
+                  />
+                  {role.displayName}
+                </label>
+              ))}
+            </fieldset>
+
+            <button
+              disabled={profileBusy}
+              onClick={() =>
+                void onUpdate({
+                  roles
+                })
+              }
+              type="button"
+            >
+              Save roles
+            </button>
+          </div>
+        ) : null}
+      </section>
 
       {canUpdate ? (
-        <button
-          disabled={busy}
-          onClick={() => void onUpdate({ status: nextStatus })}
-          type="button"
+        <section
+          aria-labelledby={`security-${user.userId}`}
+          className="admin-identity-section"
         >
-          {nextStatus === "disabled" ? "Disable user" : "Enable user"}
-        </button>
-      ) : null}
+          <h4 id={`security-${user.userId}`}>
+            Security
+          </h4>
 
-      {canAssignRoles ? (
-        <div>
-          <fieldset disabled={busy}>
-            <legend>Roles</legend>
-            {roles.filter((name) => !assignableRoles.some((role) => role.name === name)).map((name) => (
-              <p key={name}>Retained protected/nonassignable role: {name}</p>
-            ))}
-            {assignableRoles.map((role) => (
-              <label key={role.name}>
-                <input
-                  checked={roles.includes(role.name)}
-                  onChange={(event) => setRoles(event.target.checked
-                    ? [...roles, role.name]
-                    : roles.filter((name) => name !== role.name))}
-                  type="checkbox"
-                />
-                {role.displayName}
-              </label>
-            ))}
-          </fieldset>
-          <button disabled={busy} onClick={() => void onUpdate({ roles })} type="button">Save roles</button>
-        </div>
-      ) : null}
+          <label>
+            New Password
+            <input
+              autoComplete="new-password"
+              disabled={passwordBusy}
+              onChange={(event) =>
+                setNewPassword(event.target.value)
+              }
+              type="password"
+              value={newPassword}
+            />
+          </label>
 
-      <button onClick={onClose} type="button">Close user detail</button>
+          <button
+            disabled={
+              passwordBusy ||
+              !newPassword
+            }
+            onClick={() => {
+              const passwordForSubmission = newPassword;
+              setNewPassword("");
+
+              void onSetPassword(
+                passwordForSubmission
+              );
+            }}
+            type="button"
+          >
+            {passwordBusy
+              ? "Setting password…"
+              : "Set New Password"}
+          </button>
+
+          <p>
+            Password changes are applied through the linked
+            Jellyfin identity. Atlas does not store the password.
+          </p>
+        </section>
+      ) : null}
     </section>
   );
 }
@@ -118,6 +420,7 @@ export function AdminIdentityView(): React.ReactElement {
     clearSelectedUser,
     mutateUser,
     createUser,
+    setUserPassword,
     createInvitation,
     revokeInvitation,
     mutationError,
@@ -133,6 +436,15 @@ export function AdminIdentityView(): React.ReactElement {
   const [newDisplayName, setNewDisplayName] = useState("");
   const [newFirstName, setNewFirstName] = useState("");
   const [newLastName, setNewLastName] = useState("");
+  const [newDiscordAccount, setNewDiscordAccount] = useState("");
+  const [
+    newEmailNotificationsEnabled,
+    setNewEmailNotificationsEnabled
+  ] = useState(false);
+  const [
+    newDiscordNotificationsEnabled,
+    setNewDiscordNotificationsEnabled
+  ] = useState(false);
   const [newUserRole, setNewUserRole] = useState("member");
 
   const [showInvitationForm, setShowInvitationForm] = useState(false);
@@ -221,18 +533,26 @@ export function AdminIdentityView(): React.ReactElement {
 
               void createUser({
                 username: newUsername,
+                displayName: newDisplayName,
                 email: newEmail,
                 password: passwordForSubmission,
                 roles: [newUserRole],
-                ...(newDisplayName.trim()
-                  ? { displayName: newDisplayName }
-                  : {}),
                 ...(newFirstName.trim()
                   ? { firstName: newFirstName }
                   : {}),
                 ...(newLastName.trim()
                   ? { lastName: newLastName }
-                  : {})
+                  : {}),
+                ...(newDiscordAccount.trim()
+                  ? {
+                      discordAccount:
+                        newDiscordAccount
+                    }
+                  : {}),
+                emailNotificationsEnabled:
+                  newEmailNotificationsEnabled,
+                discordNotificationsEnabled:
+                  newDiscordNotificationsEnabled
               }).then((created) => {
                 if (!created) return;
 
@@ -241,14 +561,22 @@ export function AdminIdentityView(): React.ReactElement {
                 setNewDisplayName("");
                 setNewFirstName("");
                 setNewLastName("");
+                setNewDiscordAccount("");
+                setNewEmailNotificationsEnabled(false);
+                setNewDiscordNotificationsEnabled(false);
                 setShowUserForm(false);
               });
             }}
           >
             <h4>Create Atlas user</h4>
 
+            <p>
+              Fields marked with <span aria-hidden="true">*</span> are required.
+            </p>
+
+            <div className="admin-identity-field-grid">
             <label>
-              Username
+              Username <span aria-hidden="true">*</span>
               <input
                 autoComplete="username"
                 onChange={(event) => setNewUsername(event.target.value)}
@@ -258,7 +586,7 @@ export function AdminIdentityView(): React.ReactElement {
             </label>
 
             <label>
-              Email
+              Email Address <span aria-hidden="true">*</span>
               <input
                 autoComplete="email"
                 onChange={(event) => setNewEmail(event.target.value)}
@@ -269,7 +597,7 @@ export function AdminIdentityView(): React.ReactElement {
             </label>
 
             <label>
-              Initial password
+              Password <span aria-hidden="true">*</span>
               <input
                 autoComplete="new-password"
                 onChange={(event) => setNewPassword(event.target.value)}
@@ -280,9 +608,12 @@ export function AdminIdentityView(): React.ReactElement {
             </label>
 
             <label>
-              Display name
+              Display Name <span aria-hidden="true">*</span>
               <input
-                onChange={(event) => setNewDisplayName(event.target.value)}
+                onChange={(event) =>
+                  setNewDisplayName(event.target.value)
+                }
+                required
                 value={newDisplayName}
               />
             </label>
@@ -306,6 +637,18 @@ export function AdminIdentityView(): React.ReactElement {
             </label>
 
             <label>
+              Discord Account
+              <input
+                onChange={(event) =>
+                  setNewDiscordAccount(
+                    event.target.value
+                  )
+                }
+                value={newDiscordAccount}
+              />
+            </label>
+
+            <label>
               Initial role
               <select
                 onChange={(event) => setNewUserRole(event.target.value)}
@@ -322,14 +665,58 @@ export function AdminIdentityView(): React.ReactElement {
                 ))}
               </select>
             </label>
+            </div>
+
+            <fieldset>
+              <legend>Notifications</legend>
+
+              <label className="admin-identity-checkbox-row">
+                <input
+                  checked={newEmailNotificationsEnabled}
+                  onChange={(event) =>
+                    setNewEmailNotificationsEnabled(
+                      event.target.checked
+                    )
+                  }
+                  type="checkbox"
+                />
+                Email notifications
+              </label>
+
+              <label className="admin-identity-checkbox-row">
+                <input
+                  checked={newDiscordNotificationsEnabled}
+                  onChange={(event) =>
+                    setNewDiscordNotificationsEnabled(
+                      event.target.checked
+                    )
+                  }
+                  type="checkbox"
+                />
+                Discord notifications
+              </label>
+            </fieldset>
+
+            {newDiscordNotificationsEnabled &&
+            !newDiscordAccount.trim() ? (
+              <p role="alert">
+                Add a Discord Account before enabling Discord
+                notifications.
+              </p>
+            ) : null}
 
             <button
               disabled={
                 busyKey === "user:create" ||
                 !newUsername.trim() ||
+                !newDisplayName.trim() ||
                 !newEmail.trim() ||
                 !newPassword ||
-                !newUserRole
+                !newUserRole ||
+                (
+                  newDiscordNotificationsEnabled &&
+                  !newDiscordAccount.trim()
+                )
               }
               type="submit"
             >
@@ -355,11 +742,29 @@ export function AdminIdentityView(): React.ReactElement {
                   {isSelected && selectedUser ? (
                     <UserDetail
                       assignableRoles={assignableRoles}
-                      busy={busyKey === `user:${selectedUser.userId}`}
                       canAssignRoles={canAssignRoles}
                       canUpdate={canUpdate}
                       onClose={clearSelectedUser}
-                      onUpdate={(updates) => mutateUser(selectedUser.userId, updates)}
+                      onSetPassword={(newPassword) =>
+                        setUserPassword(
+                          selectedUser.userId,
+                          newPassword
+                        )
+                      }
+                      onUpdate={(updates) =>
+                        mutateUser(
+                          selectedUser.userId,
+                          updates
+                        )
+                      }
+                      passwordBusy={
+                        busyKey ===
+                        `user-password:${selectedUser.userId}`
+                      }
+                      profileBusy={
+                        busyKey ===
+                        `user:${selectedUser.userId}`
+                      }
                       user={selectedUser}
                     />
                   ) : (

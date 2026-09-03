@@ -31,6 +31,9 @@ class UserProfileWriter(Protocol):
         first_name: str | None = None,
         last_name: str | None = None,
         email: str | None = None,
+        discord_account: str | None = None,
+        email_notifications_enabled: bool = False,
+        discord_notifications_enabled: bool = False,
         roles: Sequence[str] | None = None,
         status: str = "active",
         jellyfin_user_id: str | None = None,
@@ -105,6 +108,9 @@ class UserProvisioningService:
         display_name: str | None = None,
         first_name: str | None = None,
         last_name: str | None = None,
+        discord_account: str | None = None,
+        email_notifications_enabled: bool = False,
+        discord_notifications_enabled: bool = False,
     ) -> dict[str, Any]:
         """Create a Jellyfin user and linked Atlas profile.
 
@@ -168,6 +174,13 @@ class UserProvisioningService:
                 first_name=first_name,
                 last_name=last_name,
                 email=normalized_email,
+                discord_account=discord_account,
+                email_notifications_enabled=(
+                    email_notifications_enabled
+                ),
+                discord_notifications_enabled=(
+                    discord_notifications_enabled
+                ),
                 roles=normalized_roles,
                 status="active",
                 jellyfin_user_id=jellyfin_user_id,
