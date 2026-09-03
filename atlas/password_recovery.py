@@ -4,22 +4,72 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import secrets
+import tempfile
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
-from atlas.atomic import write_json_atomic
 from atlas.identity import IdentityPaths, default_identity_paths
 from atlas.time import format_timestamp, parse_timestamp, utc_now
 
 SCHEMA_VERSION = 1
 REGISTRY_SCHEMA_VERSION = 1
 TOKEN_PREFIX = "atlas_reset_"
+PASSWORD_RECOVERY_FILE_MODE = 0o640
 VALID_STATUSES = frozenset({"pending", "completed", "revoked", "expired"})
 _ARCHIVE_STATUSES = frozenset({"completed", "revoked", "expired"})
+
+
+def _write_password_recovery_json_atomic(
+    path: Path,
+    value: Any,
+) -> None:
+    """Write password-recovery JSON atomically with private group-readable mode."""
+    path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    content = (
+        json.dumps(
+            value,
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n"
+    )
+
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        dir=path.parent,
+    )
+    temporary_path = Path(temporary_name)
+
+    try:
+        with os.fdopen(
+            descriptor,
+            "w",
+            encoding="utf-8",
+        ) as stream:
+            os.fchmod(
+                stream.fileno(),
+                PASSWORD_RECOVERY_FILE_MODE,
+            )
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+
+        os.replace(
+            temporary_path,
+            path,
+        )
+    finally:
+        if temporary_path.exists():
+            temporary_path.unlink()
 
 
 class PasswordRecoveryError(ValueError):
@@ -44,7 +94,7 @@ class PasswordRecoveryStore:
     def initialize(self) -> None:
         self.paths.initialize()
         if not self.paths.password_recovery_registry.exists():
-            write_json_atomic(
+            _write_password_recovery_json_atomic(
                 self.paths.password_recovery_registry,
                 {
                     "schema_version": REGISTRY_SCHEMA_VERSION,
@@ -87,14 +137,14 @@ class PasswordRecoveryStore:
 
         registry = self._load_registry()
         path = self._record_path(recovery_id, "pending")
-        write_json_atomic(path, record)
+        _write_password_recovery_json_atomic(path, record)
         registry["recoveries"][recovery_id] = self._registry_entry(
             record,
             path,
         )
 
         try:
-            write_json_atomic(
+            _write_password_recovery_json_atomic(
                 self.paths.password_recovery_registry,
                 registry,
             )
@@ -222,13 +272,13 @@ class PasswordRecoveryStore:
             status,
         )
 
-        write_json_atomic(destination, record)
+        _write_password_recovery_json_atomic(destination, record)
         source.unlink(missing_ok=True)
 
         registry["recoveries"][recovery_id] = (
             self._registry_entry(record, destination)
         )
-        write_json_atomic(
+        _write_password_recovery_json_atomic(
             self.paths.password_recovery_registry,
             registry,
         )

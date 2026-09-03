@@ -173,7 +173,6 @@ atlas_password_recovery_runtime_verify_file_access() {
 
   local actual_gid
   local actual_mode
-  local group_digit
 
   if [[ ! -e "$path" ]]; then
     return 0
@@ -198,19 +197,20 @@ atlas_password_recovery_runtime_verify_file_access() {
     return 1
   }
 
-  group_digit="${actual_mode: -2:1}"
+  local expected_mode
 
-  case "$group_digit" in
-    4|5|6|7)
-      ;;
-    *)
-      printf \
-        'ERROR: password recovery runtime file is not group-readable: %s (mode=%s).\n' \
-        "$path" \
-        "$actual_mode" >&2
-      return 1
-      ;;
-  esac
+  expected_mode="$(
+    printf '%o\n'       "$((8#$ATLAS_PASSWORD_RECOVERY_RUNTIME_FILE_MODE))"
+  )"
+
+  [[ "$actual_mode" == "$expected_mode" ]] || {
+    printf \
+      'ERROR: password recovery runtime file mode mismatch for %s: expected %s, got %s.\n' \
+      "$path" \
+      "$expected_mode" \
+      "$actual_mode" >&2
+    return 1
+  }
 }
 
 atlas_password_recovery_runtime_verify_state_files() {
