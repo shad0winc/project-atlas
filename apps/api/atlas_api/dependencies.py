@@ -31,6 +31,10 @@ from atlas.operations.collectors import (
     DockerCollector,
     SystemCollector,
 )
+from atlas.password_recovery import (
+    PasswordRecoveryStore,
+    default_store as default_password_recovery_store,
+)
 from atlas.user_profiles import UserProfileError, UserProfileStore
 from atlas_api.auth.exceptions import TokenError
 from atlas_api.auth.jwt import JWTService
@@ -41,7 +45,10 @@ from atlas_api.auth.provider import (
 )
 from atlas_api.auth.service import AuthenticationService
 from atlas_api.auth.sessions import RefreshSessionRegistry
-from atlas_api.auth.throttling import LoginAttemptLimiter
+from atlas_api.auth.throttling import (
+    LoginAttemptLimiter,
+    PasswordRecoveryRequestLimiter,
+)
 from atlas_api.core.settings import AtlasAPISettings
 from atlas_api.services import (
     DashboardMediaSummaryService,
@@ -49,7 +56,9 @@ from atlas_api.services import (
     PortalDashboardService,
     SchedulerDashboardService,
 )
+from atlas_api.services.email_sender import SMTPEmailSender
 from atlas_api.services.identity_writer import IdentityWriterClient
+from atlas_api.services.password_recovery import PasswordRecoveryService
 
 
 _bearer_scheme = HTTPBearer(auto_error=False)
@@ -110,6 +119,61 @@ def get_identity_writer_client() -> IdentityWriterClient:
     return IdentityWriterClient(
         url,
         token,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_password_recovery_store() -> PasswordRecoveryStore:
+    """Return durable Atlas password-recovery state."""
+
+    return default_password_recovery_store()
+
+
+@lru_cache(maxsize=1)
+def get_password_recovery_email_sender() -> SMTPEmailSender:
+    """Return configured SMTP transport for account recovery."""
+
+    settings = get_settings()
+
+    if not settings.smtp_host:
+        raise RuntimeError("ATLAS_SMTP_HOST is required.")
+
+    if not settings.smtp_sender:
+        raise RuntimeError("ATLAS_SMTP_SENDER is required.")
+
+    return SMTPEmailSender(
+        host=settings.smtp_host,
+        port=settings.smtp_port,
+        sender=settings.smtp_sender,
+        username=settings.smtp_username or None,
+        password=settings.smtp_password or None,
+        security=settings.smtp_security,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_password_recovery_request_limiter() -> PasswordRecoveryRequestLimiter:
+    """Return process-local password-recovery request state."""
+
+    return PasswordRecoveryRequestLimiter()
+
+
+@lru_cache(maxsize=1)
+def get_password_recovery_service() -> PasswordRecoveryService:
+    """Return the fully composed password-recovery service."""
+
+    settings = get_settings()
+
+    return PasswordRecoveryService(
+        users=get_user_profile_store(),
+        recoveries=get_password_recovery_store(),
+        identity_writer=get_identity_writer_client(),
+        email_sender=get_password_recovery_email_sender(),
+        base_url=settings.base_url,
+        expires_minutes=settings.password_recovery_minutes,
+        audit_publisher=get_security_audit_writer().publish,
+        request_limiter=get_password_recovery_request_limiter(),
+        refresh_sessions=get_refresh_session_registry(),
     )
 
 
@@ -507,6 +571,10 @@ def clear_dependency_caches() -> None:
     """Clear cached dependencies for tests and controlled reconfiguration."""
 
     get_authentication_service.cache_clear()
+    get_password_recovery_service.cache_clear()
+    get_password_recovery_store.cache_clear()
+    get_password_recovery_email_sender.cache_clear()
+    get_password_recovery_request_limiter.cache_clear()
     get_refresh_session_registry.cache_clear()
     get_login_attempt_limiter.cache_clear()
     get_downloads_writer_client.cache_clear()

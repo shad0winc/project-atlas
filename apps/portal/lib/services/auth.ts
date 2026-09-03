@@ -61,3 +61,62 @@ export async function readCurrentAtlasUser(accessToken: string): Promise<AtlasCu
     cache: "no-store"
   });
 }
+
+export type AtlasPasswordRecoveryResponse = {
+  status: "accepted";
+  message: string;
+};
+
+export type AtlasPasswordResetResponse = {
+  status: "password-reset";
+};
+
+export async function requestAtlasPasswordRecovery(
+  email: string
+): Promise<AtlasPasswordRecoveryResponse> {
+  const normalizedEmail = email.trim();
+
+  if (!normalizedEmail) {
+    throw new Error("Email cannot be empty.");
+  }
+
+  return atlasApiRequest<AtlasPasswordRecoveryResponse>(
+    "/auth/password-recovery/request",
+    {
+      method: "POST",
+      body: {
+        email: normalizedEmail
+      },
+      cache: "no-store",
+      retryAuthentication: false
+    }
+  );
+}
+
+export async function resetAtlasPassword(input: {
+  token: string;
+  newPassword: string;
+}): Promise<AtlasPasswordResetResponse> {
+  const token = input.token.trim();
+
+  if (!token) {
+    throw new Error("Password recovery token cannot be empty.");
+  }
+
+  if (!input.newPassword) {
+    throw new Error("New password cannot be empty.");
+  }
+
+  return atlasApiRequest<AtlasPasswordResetResponse>(
+    "/auth/password-recovery/reset",
+    {
+      method: "POST",
+      body: {
+        token,
+        new_password: input.newPassword
+      },
+      cache: "no-store",
+      retryAuthentication: false
+    }
+  );
+}

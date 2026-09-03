@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import BackgroundTasks, APIRouter, Depends, HTTPException, Response, status
 
 from atlas_api.auth.exceptions import (
     AuthenticationProviderError,
@@ -18,6 +18,8 @@ from atlas_api.auth.schemas import (
     RefreshRequest,
     TokenResponse,
     UpdateCurrentUserRequest,
+    PasswordRecoveryRequest,
+    PasswordRecoveryResetRequest,
 )
 from atlas_api.auth.service import AuthenticationService
 from atlas_api.dependencies import (
@@ -27,12 +29,15 @@ from atlas_api.dependencies import (
     get_security_audit_writer,
     get_user_profile_store,
     resolve_refresh_user,
+    get_password_recovery_service,
 )
 from atlas_api.security import require_permission
 from atlas_api.services.identity_writer import IdentityWriterClient, IdentityWriterError
 from atlas_api.security.dependencies import get_authorization_service
 from atlas_api.security.permissions import build_authorization_subject
 
+
+from atlas_api.services.password_recovery import PasswordRecoveryService, PasswordRecoveryServiceError
 
 router = APIRouter(
     prefix="/auth",
@@ -307,3 +312,54 @@ def update_current_user(
             effective.denied_permissions
         ),
     )
+
+@router.post(
+    "/password-recovery/request",
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def request_password_recovery(
+    request: PasswordRecoveryRequest,
+    background_tasks: BackgroundTasks,
+    service: PasswordRecoveryService = Depends(
+        get_password_recovery_service
+    ),
+) -> dict[str, str]:
+    """Request recovery without disclosing account existence."""
+
+    background_tasks.add_task(
+        service.request_reset,
+        request.email,
+    )
+
+    return {
+        "status": "accepted",
+        "message": (
+            "If an Atlas account exists for that email, "
+            "a password reset link has been sent."
+        ),
+    }
+
+
+@router.post(
+    "/password-recovery/reset",
+)
+def reset_password_recovery(
+    request: PasswordRecoveryResetRequest,
+    service: PasswordRecoveryService = Depends(
+        get_password_recovery_service
+    ),
+) -> dict[str, str]:
+    """Consume one password-recovery token."""
+
+    try:
+        service.reset_password(
+            token=request.token,
+            new_password=request.new_password,
+        )
+    except PasswordRecoveryServiceError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
+    return {"status": "password-reset"}

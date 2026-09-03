@@ -58,3 +58,19 @@ class CurrentUserResponse(BaseModel):
     provider: str
     granted_permission_patterns: list[str]
     denied_permission_patterns: list[str]
+
+class PasswordRecoveryRequest(BaseModel):
+    """Unauthenticated password-recovery request."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    email: str = Field(min_length=1, max_length=254)
+
+
+class PasswordRecoveryResetRequest(BaseModel):
+    """Consume one password-recovery token."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    token: str = Field(min_length=1, max_length=1024)
+    new_password: str = Field(min_length=1, max_length=1024)

@@ -75,6 +75,28 @@ class RefreshSessionRegistry:
             claims.expires_at,
         )
 
+    def revoke_subject(self, subject: str) -> int:
+        """Revoke every active refresh session for one Atlas subject."""
+
+        normalized_subject = subject.strip()
+
+        if not normalized_subject:
+            raise ValueError("Refresh-session subject cannot be empty.")
+
+        with self._lock:
+            self._prune_expired(self._clock())
+
+            token_ids = [
+                token_id
+                for token_id, (session_subject, _) in self._sessions.items()
+                if session_subject == normalized_subject
+            ]
+
+            for token_id in token_ids:
+                self._sessions.pop(token_id, None)
+
+        return len(token_ids)
+
     @property
     def active_count(self) -> int:
         """Return the number of unexpired active refresh sessions."""
