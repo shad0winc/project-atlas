@@ -190,6 +190,16 @@ def read_current_user(
         user_id=user.user_id,
         username=str(profile["username"]),
         display_name=str(profile["display_name"]),
+        first_name=profile.get("first_name") or None,
+        last_name=profile.get("last_name") or None,
+        email=profile.get("email") or None,
+        discord_account=profile.get("discord_account") or None,
+        email_notifications_enabled=bool(
+            profile.get("email_notifications_enabled", False)
+        ),
+        discord_notifications_enabled=bool(
+            profile.get("discord_notifications_enabled", False)
+        ),
         roles=list(effective.roles),
         provider=user.provider,
         granted_permission_patterns=sorted(
@@ -215,24 +225,54 @@ def update_current_user(
 ) -> CurrentUserResponse:
     """Update only the authenticated user's supported self-service fields."""
 
-    if request.display_name is None:
+    updates = request.model_dump(exclude_unset=True)
+
+    if not updates:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="At least one supported account setting is required.",
         )
 
-    display_name = request.display_name.strip()
+    if "display_name" in updates:
+        display_name = updates["display_name"]
+        if not isinstance(display_name, str) or not display_name.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Display name cannot be empty.",
+            )
+        updates["display_name"] = display_name.strip()
 
-    if not display_name:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Display name cannot be empty.",
-        )
+    if "email" in updates:
+        email = updates["email"]
+        if not isinstance(email, str) or not email.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email address cannot be empty.",
+            )
+        updates["email"] = email.strip()
+
+    for optional_text_field in (
+        "first_name",
+        "last_name",
+        "discord_account",
+    ):
+        if optional_text_field in updates:
+            value = updates[optional_text_field]
+            if value is not None and not isinstance(value, str):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"{optional_text_field} must be text or null.",
+                )
+            updates[optional_text_field] = (
+                value.strip()
+                if isinstance(value, str) and value.strip()
+                else None
+            )
 
     try:
         profile = writer.update_user(
             user.user_id,
-            {"display_name": display_name},
+            updates,
         )
     except IdentityWriterError as error:
         raise HTTPException(
@@ -248,6 +288,16 @@ def update_current_user(
         user_id=user.user_id,
         username=str(profile["username"]),
         display_name=str(profile["display_name"]),
+        first_name=profile.get("first_name") or None,
+        last_name=profile.get("last_name") or None,
+        email=profile.get("email") or None,
+        discord_account=profile.get("discord_account") or None,
+        email_notifications_enabled=bool(
+            profile.get("email_notifications_enabled", False)
+        ),
+        discord_notifications_enabled=bool(
+            profile.get("discord_notifications_enabled", False)
+        ),
         roles=list(effective.roles),
         provider=user.provider,
         granted_permission_patterns=sorted(

@@ -17,15 +17,27 @@ export default function PortalPageRoute(): React.ReactElement {
   const { user } = useAuth();
   const { can } = usePermission();
 
-  const canViewDashboard = can(dashboardRoute.permission);
-  const canViewMedia = can(mediaRoute.permission);
-  const shouldOpenMedia = !canViewDashboard && canViewMedia;
+  const authorizationReady = user !== null;
+  const canViewDashboard =
+    authorizationReady && can(dashboardRoute.permission);
+  const canViewMedia =
+    authorizationReady && can(mediaRoute.permission);
+  const shouldOpenMedia =
+    authorizationReady && !canViewDashboard && canViewMedia;
 
   useEffect(() => {
     if (shouldOpenMedia) {
       router.replace(mediaRoute.path);
     }
   }, [router, shouldOpenMedia]);
+
+  if (!authorizationReady) {
+    return (
+      <section aria-busy="true">
+        <p>Loading Atlas…</p>
+      </section>
+    );
+  }
 
   const displayName =
     user?.display_name.trim() ||

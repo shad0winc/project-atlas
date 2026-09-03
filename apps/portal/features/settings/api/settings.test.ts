@@ -1,22 +1,41 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi
+} from "vitest";
 
 const { authenticatedAtlasApiRequestMock } = vi.hoisted(() => ({
   authenticatedAtlasApiRequestMock: vi.fn()
 }));
 
 vi.mock("../../../lib/services/authenticated", () => ({
-  authenticatedAtlasApiRequest: authenticatedAtlasApiRequestMock
+  authenticatedAtlasApiRequest:
+    authenticatedAtlasApiRequestMock
 }));
 
-import { readSettingsProfile, updateSettingsDisplayName } from "./settings";
+import {
+  readSettingsProfile,
+  updateSettingsProfile
+} from "./settings";
 
 const profile = {
   user_id: "usr_123",
   username: "michael",
   display_name: "Michael",
+  first_name: "Michael",
+  last_name: "Atlas",
+  email: "michael@example.com",
+  discord_account: null,
+  email_notifications_enabled: false,
+  discord_notifications_enabled: false,
   roles: ["member"],
   provider: "jellyfin",
-  granted_permission_patterns: ["users.self.read", "users.self.update"],
+  granted_permission_patterns: [
+    "users.self.read",
+    "users.self.update"
+  ],
   denied_permission_patterns: []
 };
 
@@ -26,30 +45,54 @@ beforeEach(() => {
 
 describe("Settings API boundary", () => {
   it("reads the authenticated profile from auth/me", async () => {
-    authenticatedAtlasApiRequestMock.mockResolvedValueOnce(profile);
+    authenticatedAtlasApiRequestMock.mockResolvedValueOnce(
+      profile
+    );
 
-    await expect(readSettingsProfile()).resolves.toEqual(profile);
-    expect(authenticatedAtlasApiRequestMock).toHaveBeenCalledWith("/auth/me", {
+    await expect(readSettingsProfile()).resolves.toEqual(
+      profile
+    );
+
+    expect(
+      authenticatedAtlasApiRequestMock
+    ).toHaveBeenCalledWith("/auth/me", {
       method: "GET",
       cache: "no-store"
     });
   });
 
-  it("updates only display_name and disables mutation retries", async () => {
+  it("updates only supported self-service profile fields", async () => {
     authenticatedAtlasApiRequestMock.mockResolvedValueOnce({
       ...profile,
-      display_name: "Atlas User"
+      display_name: "Atlas User",
+      discord_account: "atlas-user"
     });
 
-    await updateSettingsDisplayName("  Atlas User  ");
+    await updateSettingsProfile({
+      displayName: "  Atlas User  ",
+      firstName: " Michael ",
+      lastName: " Atlas ",
+      email: " michael@example.com ",
+      discordAccount: " atlas-user ",
+      emailNotificationsEnabled: true,
+      discordNotificationsEnabled: true
+    });
 
-    expect(authenticatedAtlasApiRequestMock).toHaveBeenCalledWith(
+    expect(
+      authenticatedAtlasApiRequestMock
+    ).toHaveBeenCalledWith(
       "/auth/me",
       expect.objectContaining({
         method: "PATCH",
         cache: "no-store",
         body: {
-          display_name: "Atlas User"
+          display_name: "Atlas User",
+          first_name: "Michael",
+          last_name: "Atlas",
+          email: "michael@example.com",
+          discord_account: "atlas-user",
+          email_notifications_enabled: true,
+          discord_notifications_enabled: true
         },
         retryPolicy: expect.objectContaining({
           maxRetries: 0
@@ -58,8 +101,41 @@ describe("Settings API boundary", () => {
     );
   });
 
-  it("rejects a blank display name before transport", async () => {
-    await expect(updateSettingsDisplayName("   ")).rejects.toThrow("Display name cannot be empty.");
-    expect(authenticatedAtlasApiRequestMock).not.toHaveBeenCalled();
+  it("rejects required blank fields before transport", async () => {
+    await expect(
+      updateSettingsProfile({
+        displayName: "   ",
+        firstName: "",
+        lastName: "",
+        email: "michael@example.com",
+        discordAccount: "",
+        emailNotificationsEnabled: false,
+        discordNotificationsEnabled: false
+      })
+    ).rejects.toThrow("Display name cannot be empty.");
+
+    expect(
+      authenticatedAtlasApiRequestMock
+    ).not.toHaveBeenCalled();
+  });
+
+  it("rejects Discord notifications without an account", async () => {
+    await expect(
+      updateSettingsProfile({
+        displayName: "Michael",
+        firstName: "",
+        lastName: "",
+        email: "michael@example.com",
+        discordAccount: " ",
+        emailNotificationsEnabled: false,
+        discordNotificationsEnabled: true
+      })
+    ).rejects.toThrow(
+      "Add a Discord account before enabling Discord notifications."
+    );
+
+    expect(
+      authenticatedAtlasApiRequestMock
+    ).not.toHaveBeenCalled();
   });
 });
