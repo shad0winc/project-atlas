@@ -292,6 +292,46 @@ class AuthenticationRouteTests(unittest.TestCase):
             [],
         )
 
+    def test_me_member_excludes_operational_dashboard(self) -> None:
+        user = AuthenticatedUser(
+            user_id="usr_123",
+            username="michael",
+            display_name="Michael",
+            roles=("member",),
+            provider="jellyfin",
+        )
+        profiles = ProfileStoreDouble(
+            authorization_profile()
+        )
+
+        self.application.dependency_overrides[
+            require_current_user_read
+        ] = lambda: user
+        self.application.dependency_overrides[
+            get_user_profile_store
+        ] = lambda: profiles
+
+        response = self.client.get("/api/v1/auth/me")
+
+        self.assertEqual(response.status_code, 200)
+
+        granted = response.json()[
+            "granted_permission_patterns"
+        ]
+
+        self.assertNotIn(
+            "atlas.dashboard.read",
+            granted,
+        )
+        self.assertNotIn(
+            "system.health.read",
+            granted,
+        )
+        self.assertIn(
+            "media.read",
+            granted,
+        )
+
     def test_me_exposes_direct_grant_for_member(self) -> None:
         user = AuthenticatedUser(
             user_id="usr_123",

@@ -125,7 +125,6 @@ describe("Portal navigation authorization", () => {
     expect(
       visibleLabels(
         authorization([
-          "atlas.dashboard.read",
           "media.read",
           "favorites.read",
           "requests.read",
@@ -133,7 +132,6 @@ describe("Portal navigation authorization", () => {
         ])
       )
     ).toEqual([
-      "Dashboard",
       "Media",
       "Library",
       "Favorites",
@@ -145,7 +143,6 @@ describe("Portal navigation authorization", () => {
   it("hides management navigation without effective grants", () => {
     const labels = visibleLabels(
       authorization([
-        "atlas.dashboard.read",
         "media.read",
         "favorites.read",
         "requests.read",

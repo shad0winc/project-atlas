@@ -213,7 +213,6 @@ _BUILT_IN_ROLES: dict[str, RoleDefinition] = {
         ),
         permissions=frozenset(
             {
-                "atlas.dashboard.read",
                 "favorites.read",
                 "favorites.write",
                 "media.read",
