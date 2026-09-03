@@ -113,6 +113,9 @@ def test_global_admin_can_provision_linked_user() -> None:
                 "display_name": "New User",
                 "first_name": None,
                 "last_name": None,
+                "discord_account": None,
+                "email_notifications_enabled": False,
+                "discord_notifications_enabled": False,
             }
         ]
 
@@ -240,6 +243,7 @@ def test_successful_provisioning_emits_safe_audit_event() -> None:
                 "email": "audited@example.test",
                 "password": "do-not-audit-this",
                 "roles": ["member"],
+                "display_name": "Audited User",
             },
         )
 
@@ -309,6 +313,7 @@ def test_recovery_required_failure_emits_safe_audit_event() -> None:
                 "email": "orphan@example.test",
                 "password": "never-audit-this",
                 "roles": ["member"],
+                "display_name": "Orphan Candidate",
             },
         )
 

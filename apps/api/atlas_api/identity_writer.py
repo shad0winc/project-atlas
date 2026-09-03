@@ -102,6 +102,39 @@ def _user_provisioning_service() -> UserProvisioningService:
     )
 
 
+def _jellyfin_identity_client() -> JellyfinIdentityClient:
+    """Return the privileged Jellyfin identity lifecycle client."""
+
+    base_url = _required_environment(
+        "ATLAS_JELLYFIN_URL"
+    )
+    api_key = _required_environment(
+        "ATLAS_JELLYFIN_API_KEY"
+    )
+    raw_timeout = os.getenv(
+        "ATLAS_JELLYFIN_TIMEOUT_SECONDS",
+        "10",
+    ).strip()
+
+    try:
+        timeout_seconds = float(raw_timeout)
+    except ValueError as error:
+        raise RuntimeError(
+            "ATLAS_JELLYFIN_TIMEOUT_SECONDS must be numeric."
+        ) from error
+
+    if timeout_seconds <= 0:
+        raise RuntimeError(
+            "ATLAS_JELLYFIN_TIMEOUT_SECONDS must be greater than zero."
+        )
+
+    return JellyfinIdentityClient(
+        base_url,
+        api_key,
+        timeout_seconds=timeout_seconds,
+    )
+
+
 def _invitation_store() -> InvitationStore:
     store = InvitationStore(
         default_identity_paths()
@@ -148,9 +181,12 @@ class UserCreateRequest(BaseModel):
     email: str
     password: str
     roles: list[str]
-    display_name: str | None = None
+    display_name: str
     first_name: str | None = None
     last_name: str | None = None
+    discord_account: str | None = None
+    email_notifications_enabled: bool = False
+    discord_notifications_enabled: bool = False
 
 
 class UserUpdateRequest(BaseModel):
@@ -159,9 +195,22 @@ class UserUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     display_name: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
     email: str | None = None
+    discord_account: str | None = None
+    email_notifications_enabled: bool | None = None
+    discord_notifications_enabled: bool | None = None
     status: str | None = None
     roles: list[str] | None = None
+
+
+class UserPasswordRequest(BaseModel):
+    """Dedicated credential mutation accepted from Atlas API."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    new_password: str
 
 
 class InvitationCreateRequest(BaseModel):
@@ -317,6 +366,13 @@ def create_user(
             display_name=request.display_name,
             first_name=request.first_name,
             last_name=request.last_name,
+            discord_account=request.discord_account,
+            email_notifications_enabled=(
+                request.email_notifications_enabled
+            ),
+            discord_notifications_enabled=(
+                request.discord_notifications_enabled
+            ),
         )
 
         return _safe_user_response(profile)
@@ -396,6 +452,60 @@ def update_user(
             status_code=code,
             detail=message,
         ) from error
+
+
+@app.post(
+    "/internal/v1/users/{identifier}/password",
+    dependencies=[Depends(_require_service_token)],
+)
+def set_user_password(
+    identifier: str,
+    request: UserPasswordRequest,
+) -> dict[str, str]:
+    """Set a user's Jellyfin password without persisting it in Atlas."""
+
+    if not request.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="New password is required.",
+        )
+
+    try:
+        profile = _user_store().get_user(identifier)
+    except UserProfileError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found.",
+        ) from error
+
+    jellyfin_user_id = str(
+        profile.get("jellyfin_user_id") or ""
+    ).strip()
+
+    if not jellyfin_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Atlas user is not linked to Jellyfin.",
+        )
+
+    try:
+        _jellyfin_identity_client().set_password(
+            jellyfin_user_id,
+            request.new_password,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+    except Exception as error:
+        status_code = getattr(error, "status_code", 502)
+        raise HTTPException(
+            status_code=status_code,
+            detail=str(error),
+        ) from error
+
+    return {"status": "password-set"}
 
 
 @app.post(

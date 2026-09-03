@@ -130,6 +130,9 @@ class UserProfileStore:
         first_name: str | None = None,
         last_name: str | None = None,
         email: str | None = None,
+        discord_account: str | None = None,
+        email_notifications_enabled: bool = False,
+        discord_notifications_enabled: bool = False,
         birthday: str | None = None,
         role: str | None = None,
         roles: Sequence[str] | None = None,
@@ -175,6 +178,13 @@ class UserProfileStore:
                 "first_name": _clean_optional(first_name),
                 "last_name": _clean_optional(last_name),
                 "email": normalized_email,
+                "discord_account": _clean_optional(discord_account),
+                "email_notifications_enabled": bool(
+                    email_notifications_enabled
+                ),
+                "discord_notifications_enabled": bool(
+                    discord_notifications_enabled
+                ),
                 "birthday": normalize_birthday(birthday),
                 "roles": list(normalized_roles),
                 "permission_overrides": normalize_permission_overrides(
@@ -276,6 +286,9 @@ class UserProfileStore:
             "first_name",
             "last_name",
             "email",
+            "discord_account",
+            "email_notifications_enabled",
+            "discord_notifications_enabled",
             "birthday",
             "role",
             "roles",
@@ -328,6 +341,29 @@ class UserProfileStore:
                 registry,
                 updated["email"],
                 exclude_user_id=user_id,
+            )
+
+        if "discord_account" in changes:
+            updated["discord_account"] = _clean_optional(
+                changes["discord_account"]
+            )
+
+        if "email_notifications_enabled" in changes:
+            updated["email_notifications_enabled"] = bool(
+                changes["email_notifications_enabled"]
+            )
+
+        if "discord_notifications_enabled" in changes:
+            updated["discord_notifications_enabled"] = bool(
+                changes["discord_notifications_enabled"]
+            )
+
+        if (
+            updated.get("discord_notifications_enabled")
+            and not updated.get("discord_account")
+        ):
+            raise UserProfileError(
+                "Discord notifications require a Discord account."
             )
 
         if "birthday" in changes:
@@ -930,6 +966,23 @@ def validate_profile(
     normalized["first_name"] = _clean_optional(
         profile["first_name"]
     )
+    normalized["discord_account"] = _clean_optional(
+        profile.get("discord_account")
+    )
+    normalized["email_notifications_enabled"] = bool(
+        profile.get("email_notifications_enabled", False)
+    )
+    normalized["discord_notifications_enabled"] = bool(
+        profile.get("discord_notifications_enabled", False)
+    )
+
+    if (
+        normalized["discord_notifications_enabled"]
+        and not normalized["discord_account"]
+    ):
+        raise UserProfileError(
+            "Discord notifications require a Discord account."
+        )
     normalized["last_name"] = _clean_optional(
         profile["last_name"]
     )

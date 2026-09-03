@@ -2527,6 +2527,90 @@ section[aria-labelledby="service-detail-title"] dd {
   padding-top: 1rem;
 }
 
+/* PR107 — Atlas user lifecycle administration layout */
+.admin-identity-detail-header {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.admin-identity-detail-header > div {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.admin-identity-detail-header h3,
+.admin-identity-detail-header p,
+.admin-identity-section h4,
+.admin-identity-section p {
+  margin: 0;
+}
+
+.admin-identity-section {
+  display: grid;
+  gap: 0.85rem;
+  min-width: 0;
+  padding: 1rem 0;
+}
+
+.admin-identity-section + .admin-identity-section {
+  border-top: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.admin-identity-field-grid {
+  display: grid;
+  gap: 0.9rem 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+}
+
+.admin-identity-field-grid label {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.admin-identity-field-grid input,
+.admin-identity-field-grid select {
+  min-width: 0;
+  width: 100%;
+}
+
+.admin-identity-checkbox-row {
+  align-items: center;
+  display: flex;
+  gap: 0.55rem;
+  width: fit-content;
+}
+
+.admin-identity-checkbox-row input {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.admin-identity-section fieldset {
+  display: grid;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .admin-identity-detail-header {
+    align-items: stretch;
+  }
+
+  .admin-identity-detail-header > button {
+    width: 100%;
+  }
+
+  .admin-identity-field-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* PR64 — Settings self-service surface */
 .settings-grid {
   display: grid;

@@ -177,6 +177,9 @@ def test_create_delegates_to_provisioning_service_and_sanitizes_response(
             "display_name": "Michael",
             "first_name": "Michael",
             "last_name": "Atlas",
+            "discord_account": None,
+            "email_notifications_enabled": False,
+            "discord_notifications_enabled": False,
         }
     ]
 

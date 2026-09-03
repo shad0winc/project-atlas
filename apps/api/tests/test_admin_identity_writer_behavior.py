@@ -196,6 +196,8 @@ def test_user_status_update_delegates_exact_payload(
         "display_name": "Target User",
         "roles": ["member"],
         "status": "disabled",
+        "email_notifications_enabled": False,
+        "discord_notifications_enabled": False,
     }
 
 

@@ -46,9 +46,12 @@ class AdminUserCreateRequest(BaseModel):
     roles: list[str] = Field(
         default_factory=lambda: ["member"]
     )
-    display_name: str | None = None
+    display_name: str
     first_name: str | None = None
     last_name: str | None = None
+    discord_account: str | None = None
+    email_notifications_enabled: bool = False
+    discord_notifications_enabled: bool = False
 
 
 class AdminUserUpdateRequest(BaseModel):
@@ -56,8 +59,23 @@ class AdminUserUpdateRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    display_name: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
+    email: str | None = None
+    discord_account: str | None = None
+    email_notifications_enabled: bool | None = None
+    discord_notifications_enabled: bool | None = None
     roles: list[str] | None = None
     status: str | None = None
+
+
+class AdminUserPasswordRequest(BaseModel):
+    """Dedicated administrator password mutation contract."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    new_password: str
 
 
 def _public_user(profile: dict[str, Any]) -> dict[str, Any]:
@@ -74,6 +92,22 @@ def _public_user(profile: dict[str, Any]) -> dict[str, Any]:
     email = profile.get("email")
     if email is not None:
         result["email"] = email
+
+    for optional_field in (
+        "first_name",
+        "last_name",
+        "discord_account",
+    ):
+        value = profile.get(optional_field)
+        if value is not None:
+            result[optional_field] = value
+
+    result["email_notifications_enabled"] = bool(
+        profile.get("email_notifications_enabled", False)
+    )
+    result["discord_notifications_enabled"] = bool(
+        profile.get("discord_notifications_enabled", False)
+    )
 
     jellyfin_user_id = profile.get("jellyfin_user_id")
     if jellyfin_user_id is not None:
@@ -97,6 +131,41 @@ def create_admin_user(
     authorization=Depends(get_authorization_service),
 ) -> dict[str, Any]:
     """Provision one linked Atlas/Jellyfin user."""
+
+    if not request.username.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Username is required.",
+        )
+
+    if not request.display_name.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Display Name is required.",
+        )
+
+    if not request.email.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Email Address is required.",
+        )
+
+    if not request.password:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Password is required.",
+        )
+
+    if (
+        request.discord_notifications_enabled
+        and not (request.discord_account or "").strip()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Discord notifications require a Discord account."
+            ),
+        )
 
     try:
         actor_profile = profiles.get_user(
@@ -129,6 +198,13 @@ def create_admin_user(
             display_name=request.display_name,
             first_name=request.first_name,
             last_name=request.last_name,
+            discord_account=request.discord_account,
+            email_notifications_enabled=(
+                request.email_notifications_enabled
+            ),
+            discord_notifications_enabled=(
+                request.discord_notifications_enabled
+            ),
         )
     except IdentityWriterError as error:
         if (
@@ -210,21 +286,52 @@ def update_admin_user(
 
     updates = request.model_dump(exclude_unset=True)
 
+    if "display_name" in updates:
+        if not isinstance(updates["display_name"], str) or not updates["display_name"].strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Display Name is required.",
+            )
+        updates["display_name"] = updates["display_name"].strip()
+
+    if "email" in updates:
+        if not isinstance(updates["email"], str) or not updates["email"].strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Email Address is required.",
+            )
+        updates["email"] = updates["email"].strip()
+
     if not updates:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="At least one user update field is required.",
         )
 
-    # Give a missing target normal resource semantics before attempting
-    # domain mutation.
+    # Give a missing target normal resource semantics before performing
+    # validation that depends on current profile state.
     try:
-        profiles.get_user(identifier)
+        target = profiles.get_user(identifier)
     except UserProfileError as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found.",
         ) from error
+
+    if (
+        updates.get("discord_notifications_enabled") is True
+        and not (
+            updates.get("discord_account")
+            or target.get("discord_account")
+            or ""
+        ).strip()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Discord notifications require a Discord account."
+            ),
+        )
 
     # Role assignment is a distinct authorization capability from ordinary
     # profile mutation.
@@ -261,3 +368,57 @@ def update_admin_user(
         ) from error
 
     return _public_user(updated)
+
+@router.post("/{identifier}/password")
+def set_admin_user_password(
+    identifier: str,
+    request: AdminUserPasswordRequest,
+    current_user: AuthenticatedUser = Depends(require_users_update),
+    profiles: UserProfileStore = Depends(get_user_profile_store),
+    writer: IdentityWriterClient = Depends(
+        get_identity_writer_client
+    ),
+    audit_writer=Depends(get_security_audit_writer),
+) -> dict[str, str]:
+    """Set a new Jellyfin-backed password for an Atlas user."""
+
+    if not request.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="New password is required.",
+        )
+
+    try:
+        target = profiles.get_user(identifier)
+    except UserProfileError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found.",
+        ) from error
+
+    if not target.get("jellyfin_user_id"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Atlas user is not linked to Jellyfin.",
+        )
+
+    try:
+        writer.set_user_password(
+            identifier,
+            request.new_password,
+        )
+    except IdentityWriterError as error:
+        raise HTTPException(
+            status_code=error.status_code,
+            detail=str(error),
+        ) from error
+
+    audit_writer.publish(
+        "security.identity.user_password_set",
+        {
+            "actor_user_id": current_user.user_id,
+            "target_user_id": target["user_id"],
+        },
+    )
+
+    return {"status": "password-set"}
