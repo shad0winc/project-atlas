@@ -52,7 +52,11 @@ _PROVIDER_BUDGET_FILE = Path(
 
 
 def _cache_ttl_seconds(endpoint: str) -> int:
-    if endpoint == "searchteams.php":
+    if endpoint in {
+        "searchteams.php",
+        "search_all_teams.php",
+        "searchevents.php",
+    }:
         return _SEARCH_CACHE_TTL_SECONDS
     return _DISCOVERY_CACHE_TTL_SECONDS
 
@@ -381,88 +385,127 @@ class TheSportsDBProvider(SportsProvider):
         self,
         query: str,
     ) -> list[dict[str, Any]]:
-        normalized_query = query.strip().lower()
+        normalized_query = query.strip()
 
         if not normalized_query:
             return []
 
-        results: list[dict[str, Any]] = []
+        response = self.request_json(
+            "search_all_teams.php",
+            {
+                "l": normalized_query,
+            },
+        )
 
-        for league_id in self.league_ids:
-            response = self.request_json(
-                "lookupleague.php",
+        teams = response.get("teams") or []
+        results_by_id: dict[str, dict[str, Any]] = {}
+
+        for team in teams:
+            if not isinstance(team, dict):
+                continue
+
+            league_id = str(
+                team.get("idLeague") or ""
+            ).strip()
+            name = str(
+                team.get("strLeague") or ""
+            ).strip()
+
+            if not league_id or not name:
+                continue
+
+            results_by_id.setdefault(
+                league_id,
                 {
+                    "provider": self.name,
                     "id": league_id,
+                    "name": name,
+                    "sport": team.get("strSport"),
+                    "country": team.get("strCountry"),
                 },
             )
 
-            leagues = response.get(
-                "leagues"
-            ) or []
-
-            for league in leagues:
-                name = str(
-                    league.get(
-                        "strLeague",
-                        "",
-                    )
-                ).strip()
-
-                if normalized_query not in name.lower():
-                    continue
-
-                results.append(
-                    {
-                        "provider": self.name,
-                        "id": str(
-                            league.get(
-                                "idLeague",
-                                league_id,
-                            )
-                        ),
-                        "name": name,
-                        "sport": league.get(
-                            "strSport"
-                        ),
-                        "country": league.get(
-                            "strCountry"
-                        ),
-                    }
-                )
-
-        return results
+        return list(results_by_id.values())
 
     def search_events(
         self,
         query: str,
     ) -> list[dict[str, Any]]:
-        normalized_query = query.strip().casefold()
+        normalized_query = query.strip()
 
         if not normalized_query:
             return []
 
-        events = self.fetch_games(
-            league_ids=self.league_ids,
+        events_by_id: dict[str, dict[str, Any]] = {}
+
+        direct = self.request_json(
+            "searchevents.php",
+            {
+                "e": normalized_query,
+            },
         )
 
-        results: list[dict[str, Any]] = []
+        direct_events = (
+            direct.get("event")
+            or direct.get("events")
+            or []
+        )
+        if isinstance(direct_events, dict):
+            direct_events = [direct_events]
 
-        for event in events:
-            searchable = (
-                event.get("name"),
-                event.get("sport"),
-                event.get("league"),
-                event.get("home_team"),
-                event.get("away_team"),
-            )
+        for raw_event in direct_events:
+            if not isinstance(raw_event, dict):
+                continue
+            normalized = self.normalize_event(raw_event)
+            if self._is_current_or_future_search_event(normalized):
+                events_by_id[normalized["provider_event_id"]] = normalized
 
-            if any(
-                normalized_query in str(value or "").casefold()
-                for value in searchable
+        for team in self.search_teams(normalized_query):
+            team_id = str(team.get("id") or "").strip()
+            if not team_id:
+                continue
+            for raw_event in self.fetch_team_events(team_id):
+                if not isinstance(raw_event, dict):
+                    continue
+                normalized = self.normalize_event(raw_event)
+                if self._is_current_or_future_search_event(normalized):
+                    events_by_id[normalized["provider_event_id"]] = normalized
+
+        for league in self.search_leagues(normalized_query):
+            league_id = str(league.get("id") or "").strip()
+            if not league_id:
+                continue
+            for normalized in self.fetch_games(
+                league_ids=[league_id],
             ):
-                results.append(event)
+                if self._is_current_or_future_search_event(normalized):
+                    events_by_id[normalized["provider_event_id"]] = normalized
 
-        return results
+        return list(events_by_id.values())
+
+    def _is_current_or_future_search_event(
+        self,
+        event: dict[str, Any],
+    ) -> bool:
+        status = str(event.get("status") or "").strip().casefold()
+        if status == "live":
+            return True
+
+        start_at = event.get("start_at")
+        if not isinstance(start_at, str) or not start_at.strip():
+            return False
+
+        try:
+            start = datetime.fromisoformat(
+                start_at.replace("Z", "+00:00")
+            )
+        except ValueError:
+            return False
+
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=timezone.utc)
+
+        return start >= datetime.now(timezone.utc)
 
     def upcoming_team_games(
         self,

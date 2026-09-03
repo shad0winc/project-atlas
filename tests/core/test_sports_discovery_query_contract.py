@@ -89,7 +89,7 @@ def test_public_events_route_exposes_team_and_league_filters() -> None:
     assert "league_ids=(" in source
 
 
-def test_event_search_reuses_bounded_configured_league_discovery() -> None:
+def test_user_search_is_not_bounded_by_background_league_ids() -> None:
     provider = Path(
         "modules/sports/src/providers/thesportsdb.py"
     ).read_text(encoding="utf-8")
@@ -97,10 +97,17 @@ def test_event_search_reuses_bounded_configured_league_discovery() -> None:
         "modules/sports/src/private_api.py"
     ).read_text(encoding="utf-8")
 
-    assert "def search_events(" in provider
-    assert "league_ids=self.league_ids" in provider
-    assert 'event.get("name")' in provider
-    assert 'event.get("home_team")' in provider
-    assert 'event.get("away_team")' in provider
+    assert '"search_all_teams.php"' in provider
+    assert '"searchevents.php"' in provider
+    search_events = provider.split(
+        "    def search_events(",
+        1,
+    )[1].split(
+        "    def upcoming_team_games(",
+        1,
+    )[0]
+    assert "league_ids=self.league_ids" not in search_events
+    assert "self.search_teams(normalized_query)" in search_events
+    assert "self.search_leagues(normalized_query)" in search_events
     assert '"/internal/v1/search/events"' in private_api
     assert 'results.append(self._safe_event(event))' in private_api

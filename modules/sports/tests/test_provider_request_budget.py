@@ -181,3 +181,148 @@ def test_shared_cooldown_ignores_expired_state(
     monkeypatch.setattr(thesportsdb.time, "time", lambda: 1_000.0)
     thesportsdb._write_shared_rate_limit_until(990.0)
     assert thesportsdb._shared_retry_after_seconds() == 0
+
+
+def test_search_endpoints_use_short_cache_ttl() -> None:
+    assert (
+        thesportsdb._cache_ttl_seconds("searchteams.php")
+        == thesportsdb._SEARCH_CACHE_TTL_SECONDS
+    )
+    assert (
+        thesportsdb._cache_ttl_seconds("search_all_teams.php")
+        == thesportsdb._SEARCH_CACHE_TTL_SECONDS
+    )
+    assert (
+        thesportsdb._cache_ttl_seconds("searchevents.php")
+        == thesportsdb._SEARCH_CACHE_TTL_SECONDS
+    )
+
+
+def test_search_leagues_deduplicates_provider_league_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_request(
+        self: thesportsdb.TheSportsDBProvider,
+        endpoint: str,
+        parameters: dict[str, str],
+    ) -> dict[str, object]:
+        assert endpoint == "search_all_teams.php"
+        assert parameters == {"l": "MLB"}
+        return {
+            "teams": [
+                {
+                    "idLeague": "4424",
+                    "strLeague": "MLB",
+                    "strSport": "Baseball",
+                    "strCountry": "United States",
+                },
+                {
+                    "idLeague": "4424",
+                    "strLeague": "MLB",
+                    "strSport": "Baseball",
+                    "strCountry": "United States",
+                },
+            ]
+        }
+
+    monkeypatch.setattr(
+        thesportsdb.TheSportsDBProvider,
+        "request_json",
+        fake_request,
+    )
+
+    provider = thesportsdb.TheSportsDBProvider()
+
+    assert provider.search_leagues("MLB") == [
+        {
+            "provider": "thesportsdb",
+            "id": "4424",
+            "name": "MLB",
+            "sport": "Baseball",
+            "country": "United States",
+        }
+    ]
+
+
+def test_search_events_merges_team_results(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = thesportsdb.TheSportsDBProvider()
+
+    monkeypatch.setattr(
+        provider,
+        "request_json",
+        lambda endpoint, parameters: (
+            {"event": []}
+            if endpoint == "searchevents.php"
+            else {}
+        ),
+    )
+    monkeypatch.setattr(
+        provider,
+        "search_teams",
+        lambda query: [
+            {
+                "id": "135260",
+                "name": "New York Yankees",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        provider,
+        "search_leagues",
+        lambda query: [],
+    )
+    monkeypatch.setattr(
+        provider,
+        "fetch_team_events",
+        lambda team_id: [
+            {
+                "idEvent": "2599999",
+                "strEvent": "New York Yankees vs Boston Red Sox",
+                "strSport": "Baseball",
+                "strLeague": "MLB",
+                "idLeague": "4424",
+                "strHomeTeam": "New York Yankees",
+                "strAwayTeam": "Boston Red Sox",
+                "idHomeTeam": "135260",
+                "idAwayTeam": "135252",
+                "strTimestamp": "2099-09-10T00:07:00",
+                "strStatus": "Not Started",
+            }
+        ],
+    )
+
+    results = provider.search_events("New York Yankees")
+
+    assert len(results) == 1
+    assert results[0]["provider_event_id"] == "2599999"
+    assert results[0]["league"] == "MLB"
+
+
+def test_search_events_excludes_stale_direct_provider_match(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = thesportsdb.TheSportsDBProvider()
+
+    monkeypatch.setattr(
+        provider,
+        "request_json",
+        lambda endpoint, parameters: {
+            "event": [
+                {
+                    "idEvent": "old-event",
+                    "strEvent": "New York Yankees vs Boston Red Sox",
+                    "strSport": "Baseball",
+                    "strLeague": "MLB",
+                    "idLeague": "4424",
+                    "strTimestamp": "2018-10-10T00:07:00",
+                    "strStatus": "Match Finished",
+                }
+            ]
+        },
+    )
+    monkeypatch.setattr(provider, "search_teams", lambda query: [])
+    monkeypatch.setattr(provider, "search_leagues", lambda query: [])
+
+    assert provider.search_events("New York Yankees") == []
