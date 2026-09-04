@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Card } from "../../../components/ui/Card";
 import { usePermission } from "../../../lib/authorization";
 import { PORTAL_ROUTES } from "../../../lib/navigation/portal";
+import { LiveSessionManagement } from "./LiveSessionManagement";
 import { RoleManagement } from "./RoleManagement";
 
 const administrationDestinations = [
@@ -73,6 +74,7 @@ export function AdministrationView(): React.ReactElement {
         ))}
       </div>
 
+      <LiveSessionManagement />
       <RoleManagement />
     </section>
   );

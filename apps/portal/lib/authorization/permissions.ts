@@ -8,6 +8,7 @@
 
 export const ATLAS_PERMISSIONS = {
   dashboardRead: "atlas.dashboard.read",
+  liveSessionsManage: "atlas.live_sessions.manage",
   favoritesRead: "favorites.read",
   favoritesWrite: "favorites.write",
   mediaRead: "media.read",

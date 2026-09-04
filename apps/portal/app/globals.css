@@ -2869,3 +2869,70 @@ section[aria-labelledby="service-detail-title"] dd {
   filter: brightness(1.08);
   transform: translateY(-1px);
 }
+
+/* PR127: Live-session administration controls. */
+.live-session-management {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.live-session-policy-card,
+.live-session-user-card {
+  min-width: 0;
+  padding: 1.15rem;
+}
+
+.live-session-limit-form,
+.live-session-user-controls {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.live-session-limit-form label,
+.live-session-user-controls label {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.live-session-limit-form input,
+.live-session-user-controls input {
+  width: 8rem;
+}
+
+.live-session-user-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+}
+
+.live-session-user-heading {
+  align-items: start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.live-session-user-heading h4,
+.live-session-user-heading p,
+.live-session-user-card > p {
+  margin: 0;
+}
+
+.live-session-detail-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.live-session-detail-list li {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.live-session-detail-list span {
+  color: var(--muted);
+}

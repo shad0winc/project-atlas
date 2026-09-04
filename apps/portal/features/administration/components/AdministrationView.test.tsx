@@ -18,6 +18,10 @@ vi.mock("../../../lib/authorization", async (importOriginal) => {
   };
 });
 
+vi.mock("./LiveSessionManagement", () => ({
+  LiveSessionManagement: () => <section data-testid="live-session-management">Live-session management</section>
+}));
+
 vi.mock("./RoleManagement", () => ({
   RoleManagement: () => <section data-testid="role-management">Role management</section>
 }));
@@ -34,6 +38,7 @@ describe("AdministrationView", () => {
     const markup = renderToStaticMarkup(<AdministrationView />);
 
     expect(markup).toContain("Management surfaces");
+    expect(markup).toContain("Live-session management");
     expect(markup).toContain('href="/portal/users"');
     expect(markup).toContain('href="/portal/services"');
     expect(markup).toContain('href="/portal/administration/downloads"');
