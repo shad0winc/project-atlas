@@ -209,6 +209,55 @@ def _load_sports_modules(project_root: Path, subscriptions: Path, recordings: Pa
     return sports_subscriptions, sports_recordings
 
 
+
+def _validate_sports_live_tv_bindings(path: Path) -> str:
+    import json
+
+    if not path.is_file() or path.is_symlink():
+        raise ValueError("Sports Live TV binding state is unavailable")
+
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("Sports Live TV binding state is invalid JSON") from exc
+
+    if not isinstance(document, dict):
+        raise ValueError("Sports Live TV binding state root must be an object")
+    if document.get("version") != 1:
+        raise ValueError("Sports Live TV binding state version is invalid")
+
+    bindings = document.get("bindings")
+    if not isinstance(bindings, dict):
+        raise ValueError("Sports Live TV bindings must be an object")
+
+    seen_jellyfin_ids: set[str] = set()
+    for atlas_channel_id, entry in bindings.items():
+        if (
+            not isinstance(atlas_channel_id, str)
+            or not atlas_channel_id.strip()
+            or len(atlas_channel_id.strip()) > 256
+        ):
+            raise ValueError("Sports Live TV binding channel identity is invalid")
+        if not isinstance(entry, dict):
+            raise ValueError("Sports Live TV binding entry must be an object")
+        if set(entry) != {"jellyfin_item_id"}:
+            raise ValueError("Sports Live TV binding entry fields are invalid")
+
+        jellyfin_item_id = entry.get("jellyfin_item_id")
+        if (
+            not isinstance(jellyfin_item_id, str)
+            or not jellyfin_item_id.strip()
+            or len(jellyfin_item_id.strip()) > 256
+        ):
+            raise ValueError("Sports Live TV Jellyfin identity is invalid")
+        normalized = jellyfin_item_id.strip()
+        if normalized in seen_jellyfin_ids:
+            raise ValueError("Sports Live TV Jellyfin identity is duplicated")
+        seen_jellyfin_ids.add(normalized)
+
+    return f"{len(bindings)} bindings"
+
+
 def validate(root: Path, project_root: Path) -> list[tuple[str, str, str]]:
     _require(root.is_dir() and not root.is_symlink(), "staged recovery root is invalid")
     policies = _policies(root)
@@ -249,6 +298,15 @@ def validate(root: Path, project_root: Path) -> list[tuple[str, str, str]]:
     loaded_subscriptions = sports_subscriptions.load_subscriptions()
     _require(loaded_subscriptions == raw_subscriptions, "Sports subscription loader changed staged state")
     results.append(("sports-subscriptions", "PASS", f"{len(raw_subscriptions)} subscriptions"))
+    results.append(
+        (
+            "sports-live-tv-bindings",
+            "PASS",
+            _validate_sports_live_tv_bindings(
+                state / "sports/live-tv-bindings.json"
+            ),
+        )
+    )
 
     recording_document = _json_object(recordings_path)
     _require(all(isinstance(item, dict) for item in recording_document.values()), "Sports recording entries must be objects")

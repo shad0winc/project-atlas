@@ -23,6 +23,7 @@ SURFACES = (
     ("runtime-subscribers", "state/runtime/subscribers", "required", "directory", True),
     ("retention", "state/retention", "required", "directory", True),
     ("sports-subscriptions", "state/sports/subscriptions.json", "required", "file", True),
+    ("sports-live-tv-bindings", "state/sports/live-tv-bindings.json", "required", "file", True),
     ("sports-recordings", "state/sports/recordings.json", "required", "file", True),
     ("sports-scheduler", "state/sports/scheduler.json", "required", "file", True),
 )
@@ -69,6 +70,7 @@ def _build_archive(tmp_path: Path) -> tuple[Path, dict[str, str]]:
         "state/sports/subscriptions.json": "subscriptions-v1\n",
         "state/sports/recordings.json": "recordings-v1\n",
         "state/sports/scheduler.json": "sports-scheduler-v1\n",
+        "state/sports/live-tv-bindings.json": '{"version":1,"bindings":{}}\n',
     }
     for relative, value in files.items():
         target = stage / relative
@@ -328,7 +330,7 @@ def test_restore_plan_maps_only_declared_surfaces(tmp_path: Path) -> None:
 
         assert result.returncode == 0, result.stderr
         rows = [line.split("\t") for line in result.stdout.splitlines() if line]
-        assert len(rows) == 11
+        assert len(rows) == 12
         by_surface = {row[0]: row for row in rows}
         assert set(by_surface) == {surface for surface, *_ in SURFACES}
         assert by_surface["users"][1] == "replace"
@@ -338,6 +340,7 @@ def test_restore_plan_maps_only_declared_surfaces(tmp_path: Path) -> None:
         assert by_surface["runtime-events"][3] == "runtime-events"
         assert by_surface["runtime-subscribers"][3] == "runtime-events"
         assert by_surface["sports-recordings"][3] == "sports"
+        assert by_surface["sports-live-tv-bindings"][3] == "sports"
         assert by_surface["users"][5] == env["ATLAS_USERS_DIR"]
         assert by_surface["scheduler"][5] == env["ATLAS_SCHEDULER_STATE_FILE"]
         assert all(row[5].startswith(env["ATLAS_CONFIG_ROOT"] + "/") for row in rows)
