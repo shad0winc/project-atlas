@@ -16,6 +16,7 @@ RUN test -n "${PUID}" \
 WORKDIR /srv/sports
 
 COPY modules/sports/src/private_api.py /srv/sports/private_api.py
+COPY modules/sports/src/live_tv_bindings.py /srv/sports/live_tv_bindings.py
 COPY modules/sports/src/subscriptions.py /srv/sports/subscriptions.py
 COPY modules/sports/src/providers /srv/sports/providers
 
