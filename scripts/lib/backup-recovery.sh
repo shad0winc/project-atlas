@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/sports-backend-recovery.sh"
+
 # Canonical M-023.25 recovery-state registry.
 #
 # Columns:
@@ -550,7 +552,8 @@ atlas_backup_recovery_validate_archive() {
     return 1
   }
 
-  [[ "$recovery_format" == '1' ]] || {
+  [[ "$recovery_format" == '1' ||
+     "$recovery_format" == '2' ]] || {
     echo 'ERROR: unsupported recovery archive format.' >&2
     return 1
   }
@@ -759,6 +762,11 @@ atlas_backup_recovery_validate_archive() {
       }
     fi
   done
+  if [[ "$recovery_format" == '2' ]]; then
+    atlas_sports_backend_recovery_validate_archive \
+      "$archive" || return 1
+  fi
+
 }
 
 # M-023.25.5 isolated staged restore support.
@@ -802,6 +810,30 @@ except (OSError, tarfile.TarError) as exc:
     raise SystemExit(f"ERROR: unable to inspect recovery archive members: {exc}")
 
 with archive:
+    # Safe-member validation is intentionally usable on malformed/minimal
+    # archives independently from the full archive-contract validator.
+    #
+    # Missing RECOVERY_FORMAT therefore defaults to the historical format-1
+    # member allowlist here. Full archive validation is responsible for
+    # requiring and validating RECOVERY_FORMAT before staging.
+    recovery_format = "1"
+
+    try:
+        format_info = archive.getmember("RECOVERY_FORMAT")
+    except KeyError:
+        format_info = None
+
+    if format_info is not None and format_info.isfile():
+        format_member = archive.extractfile(format_info)
+
+        if format_member is not None:
+            recovery_format = (
+                format_member
+                .read()
+                .decode("utf-8", errors="strict")
+                .strip()
+            )
+
     for member in archive.getmembers():
         name = member.name
         raw = name[:-1] if name.endswith("/") else name
@@ -822,6 +854,15 @@ with archive:
             raise SystemExit(f"ERROR: unsafe recovery archive member path: {name!r}")
 
         if pieces[0] not in allowed_roots:
+            if (
+                recovery_format == "2"
+                and (
+                    name == "backend-recovery"
+                    or name.startswith("backend-recovery/")
+                )
+            ):
+                continue
+
             raise SystemExit(f"ERROR: undeclared recovery archive member: {name}")
 
         if raw in seen:
@@ -882,7 +923,12 @@ atlas_backup_recovery_validate_staged_restore() {
     }
   done
 
-  [[ "$(<"$root/RECOVERY_FORMAT")" == '1' ]] || {
+  local recovery_format
+
+  recovery_format="$(<"$root/RECOVERY_FORMAT")"
+
+  [[ "$recovery_format" == '1' ||
+     "$recovery_format" == '2' ]] || {
     echo 'ERROR: staged restore recovery format is unsupported.' >&2
     return 1
   }
@@ -957,6 +1003,11 @@ atlas_backup_recovery_validate_staged_restore() {
     echo 'ERROR: staged recovery checksum verification failed.' >&2
     return 1
   }
+  if [[ "$recovery_format" == '2' ]]; then
+    atlas_sports_backend_recovery_validate_staged \
+      "$root" || return 1
+  fi
+
 }
 
 atlas_backup_recovery_stage_archive() {
@@ -1113,6 +1164,12 @@ atlas_backup_recovery_restore_plan() {
   declare -A policy_by_surface=()
 
   atlas_backup_recovery_validate_staged_restore "$root" || return 1
+
+  if [[ "$(<"$root/RECOVERY_FORMAT")" == '2' ]]; then
+    echo 'ERROR: recovery format 2 contains native Sports backend state; live restore is not implemented.' >&2
+    return 1
+  fi
+
 
   while IFS=$'\t' read -r surface archive_path requirement policy extra; do
     [[ "$surface" == 'surface' ]] && continue

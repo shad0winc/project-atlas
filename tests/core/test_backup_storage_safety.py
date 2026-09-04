@@ -316,7 +316,7 @@ def test_successful_backup_is_owner_only_and_declares_recovery_metadata(
         check=True,
     ).stdout
 
-    assert recovery_format == "1\n"
+    assert recovery_format == "2\n"
 
     recovery_manifest = subprocess.run(
         ["tar", "-xOzf", str(archive), "RECOVERY_MANIFEST.tsv"],
@@ -343,7 +343,7 @@ def test_successful_backup_is_owner_only_and_declares_recovery_metadata(
         check=True,
     ).stdout
 
-    assert "Recovery format: 1" in backup_info
+    assert "Recovery format: 2" in backup_info
     assert "Recovery state: state-complete" in backup_info
     assert "Recovery capability: restore-unverified" in backup_info
     assert "Format 1 (state-complete; restore-unverified)" in result.stdout

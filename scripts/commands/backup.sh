@@ -138,7 +138,7 @@ Created: $(date)
 Version: $(cat "$ATLAS_PROJECT_DIR/VERSION")
 Branch: $(git -C "$ATLAS_PROJECT_DIR" branch --show-current)
 Commit: $(git -C "$ATLAS_PROJECT_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)
-Recovery format: 1
+Recovery format: 2
 Recovery state: state-complete
 Recovery capability: restore-unverified
 
@@ -147,7 +147,7 @@ ${notes:-None}
 
 EOF_MANIFEST
 
-  printf '%s\n' '1' > "$recovery_format"
+  printf '%s\n' '2' > "$recovery_format"
 
   printf '%s\t%s\t%s\t%s\n' \
     'surface' 'archive_path' 'requirement' 'policy' \
@@ -161,6 +161,14 @@ EOF_MANIFEST
     >> "$recovery_manifest"
   then
     echo 'ERROR: authoritative recovery-state snapshot failed.' >&2
+    return 1
+  fi
+
+  echo 'Capturing application-consistent Sports backend recovery state...'
+
+  if ! atlas_sports_backend_recovery_capture "$snapshot_root"
+  then
+    echo 'ERROR: Sports backend recovery-state capture failed.' >&2
     return 1
   fi
 
@@ -211,7 +219,8 @@ EOF_MANIFEST
     .atlas-backup-recovery-manifest.tmp \
     .atlas-backup-recovery-checksums.tmp \
     -C "$snapshot_root" \
-    state
+    state \
+    backend-recovery
   then
     echo 'ERROR: backup archive creation failed; partial artifact removed.' >&2
     return 1
