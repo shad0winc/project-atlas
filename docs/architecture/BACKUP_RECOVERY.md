@@ -45,6 +45,8 @@ state exists outside the project tree.
 | Sports recordings | configured Sports recordings file | authoritative |
 | Sports task scheduler | Atlas runtime scheduler state | authoritative |
 | Sports health/heartbeat/output | Sports runtime directories | reconstructible |
+| Dispatcharr state | `/mnt/storage/configs/dispatcharr` | authoritative third-party backend state |
+| Teamarr state | `/mnt/storage/configs/teamarr` | authoritative third-party backend state |
 | Deployment records | Atlas deployment directory | audit evidence |
 | Process locks | runtime lock paths | transient; never restored as ownership |
 | Media libraries | media storage | outside Atlas backup scope |
@@ -106,6 +108,25 @@ recording metadata, and task-scheduler state are recovery-critical. Provider
 health, controller heartbeat, generated M3U/XMLTV output, and routine logs are
 reconstructible and should not become authoritative simply because they share
 the `sportyfin` root.
+
+## Sports Backend State
+
+Teamarr and Dispatcharr are private infrastructure services behind Atlas Sports.
+Their application state is persistent and must not be inferred from generated
+M3U/XMLTV output.
+
+The authoritative runtime roots are:
+
+- `/mnt/storage/configs/dispatcharr`
+- `/mnt/storage/configs/teamarr`
+
+These roots may contain credentials or other sensitive configuration. Backup
+collection must therefore use explicit allowlisted state handling rather than
+incidental recursive capture, and backup diagnostics must never print their
+secret-bearing contents.
+
+Atlas end-user identities are not provisioned in either backend. Atlas remains
+the user authority and retains the permanent Atlas-to-Jellyfin user linkage.
 
 ## Retention State
 
