@@ -282,3 +282,30 @@ certified feature, release merge, and production merge were `02738ee3`,
 Every Backup and Recovery roadmap item is now backed by implementation,
 automated regression, controlled runtime evidence, and an explicit scope
 statement.
+
+## Sports Backend Application-Consistent Recovery
+
+The Teamarr and Dispatcharr databases are not ordinary filesystem replacement
+surfaces.
+
+Atlas Sports backend recovery uses application-consistent artifacts:
+
+- Dispatcharr PostgreSQL state is captured as a PostgreSQL custom-format
+  logical dump using Dispatcharr's pinned backup implementation;
+- Dispatcharr persistent `jwt` identity is captured separately;
+- Teamarr SQLite state is captured through `sqlite3.Connection.backup()`.
+
+Atlas must not archive the live Dispatcharr PostgreSQL cluster or Teamarr
+`-wal` / `-shm` files as its application-consistent database representation.
+
+These artifacts belong to recovery format 2 under `backend-recovery/`. They
+remain separate from the canonical twelve filesystem replacement surfaces.
+
+Recovery format 2 may be verified and staged only until native backend restore
+orchestration is implemented. Live application must fail closed before
+maintenance, writer shutdown, or state mutation unless Teamarr and Dispatcharr
+native restore, quiescing, rollback, restart, and consumer verification are all
+covered by the recovery transaction.
+
+Recovery format 1 remains the historical twelve-surface filesystem recovery
+format and remains supported.
