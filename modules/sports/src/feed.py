@@ -13,6 +13,7 @@ from typing import Any
 from lifecycle import should_surface_game
 from live_sources import (
     LiveSourceCatalog,
+    LiveSourceCatalogError,
     load_live_source_catalog,
 )
 
@@ -294,7 +295,20 @@ def generate_feed() -> int:
     active = active_games(
         load_games()
     )
-    catalog = load_live_source_catalog()
+
+    try:
+        catalog = load_live_source_catalog()
+    except LiveSourceCatalogError:
+        write_atomic(
+            M3U_FILE,
+            render_m3u([]),
+        )
+        write_atomic(
+            XMLTV_FILE,
+            render_xmltv([]),
+        )
+        raise
+
     games = catalog_feed_games(
         active,
         catalog,

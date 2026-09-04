@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-from live_sources import LiveSource, LiveSourceCatalog
+import pytest
+
+import feed
+from live_sources import (
+    LiveSource,
+    LiveSourceCatalog,
+    LiveSourceCatalogError,
+)
 from feed import (
     catalog_feed_games,
     render_m3u,
@@ -138,3 +145,60 @@ def test_event_channel_retains_real_programme_metadata() -> None:
     assert 'stop="20260904030000 +0000"' in xmltv
     assert 'channel="sports-game-1">' in xmltv
     assert "Atlas United vs Atlas City" in xmltv
+
+
+def test_invalid_configured_catalog_clears_stale_feed_and_reraises(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    m3u_file = tmp_path / "sports.m3u"
+    xmltv_file = tmp_path / "sports.xml"
+    catalog_file = tmp_path / "live-sources.json"
+
+    stale_url = "https://stale.invalid/authorized-before-error.m3u8"
+
+    m3u_file.write_text(
+        (
+            '#EXTM3U\n'
+            '#EXTINF:-1 tvg-id="sports-old",Old Authorized Feed\n'
+            f'{stale_url}\n'
+        ),
+        encoding="utf-8",
+    )
+    xmltv_file.write_text(
+        (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<tv generator-info-name="Project Atlas">\n'
+            '  <channel id="sports-old">\n'
+            '    <display-name>Old Authorized Feed</display-name>\n'
+            '  </channel>\n'
+            '</tv>\n'
+        ),
+        encoding="utf-8",
+    )
+    catalog_file.write_text(
+        "{ malformed json",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(feed, "OUTPUT_DIR", tmp_path)
+    monkeypatch.setattr(feed, "M3U_FILE", m3u_file)
+    monkeypatch.setattr(feed, "XMLTV_FILE", xmltv_file)
+    monkeypatch.setattr(feed, "load_games", lambda: {})
+    monkeypatch.setenv(
+        "SPORTS_LIVE_SOURCE_CATALOG_PATH",
+        str(catalog_file),
+    )
+
+    with pytest.raises(LiveSourceCatalogError):
+        feed.generate_feed()
+
+    assert m3u_file.read_text(encoding="utf-8") == "#EXTM3U\n\n"
+
+    xmltv = xmltv_file.read_text(encoding="utf-8")
+    assert xmltv == feed.render_xmltv([])
+    assert "<channel " not in xmltv
+    assert "<programme " not in xmltv
+
+    assert stale_url not in m3u_file.read_text(encoding="utf-8")
+    assert "sports-old" not in xmltv
