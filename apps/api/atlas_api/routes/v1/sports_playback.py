@@ -4,12 +4,25 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
 
 from atlas.user_profiles import UserProfileError, UserProfileStore
+from atlas.live_session_policy import (
+    LiveSessionPolicyError,
+    LiveSessionPolicyStore,
+)
 from atlas_api.auth.models import AuthenticatedUser
-from atlas_api.dependencies import get_user_profile_store
+from atlas_api.dependencies import (
+    get_live_session_policy_store,
+    get_live_session_registry,
+    get_user_profile_store,
+)
 from atlas_api.playback_capabilities import PlaybackCapabilityService
+from atlas_api.live_sessions import (
+    LiveSessionLimitExceeded,
+    LiveSessionNotFound,
+    LiveSessionRegistry,
+)
 from atlas_api.routes.v1.playback import (
     get_playback_capability_service,
     get_playback_service,
@@ -91,6 +104,15 @@ def read_sports_live_session(
         PlaybackCapabilityService,
         Depends(get_playback_capability_service),
     ],
+    live_policy: Annotated[
+        LiveSessionPolicyStore,
+        Depends(get_live_session_policy_store),
+    ],
+    live_sessions: Annotated[
+        LiveSessionRegistry,
+        Depends(get_live_session_registry),
+    ],
+    response: Response,
     atlas_channel_id: Annotated[
         str,
         Path(min_length=1, max_length=256),
@@ -163,10 +185,42 @@ def read_sports_live_session(
             detail="Playback is not configured.",
         ) from exc
 
-    capability = capabilities.create_bootstrap(
-        user_id=current_user.user_id,
-        playable_target_id=session.playable_target_id,
-        stream_path=session.stream_path,
+    try:
+        effective_limit = live_policy.effective_limit(current_user.user_id)
+    except LiveSessionPolicyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Live playback policy is unavailable.",
+        ) from exc
+
+    try:
+        live_session = live_sessions.admit(
+            user_id=current_user.user_id,
+            target_id=atlas_channel_id,
+            limit=effective_limit,
+        )
+    except LiveSessionLimitExceeded as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Live session limit reached.",
+        ) from exc
+
+    try:
+        capability = capabilities.create_bootstrap(
+            user_id=current_user.user_id,
+            playable_target_id=session.playable_target_id,
+            stream_path=session.stream_path,
+        )
+    except Exception:
+        live_sessions.release(
+            session_id=live_session.session_id,
+            user_id=current_user.user_id,
+        )
+        raise
+
+    response.headers["X-Atlas-Live-Session-ID"] = live_session.session_id
+    response.headers["X-Atlas-Live-Session-TTL"] = str(
+        live_sessions.ttl_seconds
     )
 
     return PlaybackSessionResponse.from_domain(
@@ -176,3 +230,73 @@ def read_sports_live_session(
         ),
         playback_capability=capability,
     )
+
+
+@router.post(
+    "/sessions/{session_id}/heartbeat",
+    status_code=status.HTTP_200_OK,
+    summary="Heartbeat one authenticated-user Live session",
+)
+def heartbeat_sports_live_session(
+    current_user: Annotated[
+        AuthenticatedUser,
+        Depends(require_sports_read),
+    ],
+    live_sessions: Annotated[
+        LiveSessionRegistry,
+        Depends(get_live_session_registry),
+    ],
+    session_id: Annotated[
+        str,
+        Path(min_length=1, max_length=256),
+    ],
+) -> dict[str, object]:
+    try:
+        record = live_sessions.heartbeat(
+            session_id=session_id,
+            user_id=current_user.user_id,
+        )
+    except LiveSessionNotFound as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Live session was not found.",
+        ) from exc
+
+    return {
+        "session_id": record.session_id,
+        "active": True,
+        "ttl_seconds": live_sessions.ttl_seconds,
+    }
+
+
+@router.delete(
+    "/sessions/{session_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Release one authenticated-user Live session",
+)
+def release_sports_live_session(
+    current_user: Annotated[
+        AuthenticatedUser,
+        Depends(require_sports_read),
+    ],
+    live_sessions: Annotated[
+        LiveSessionRegistry,
+        Depends(get_live_session_registry),
+    ],
+    session_id: Annotated[
+        str,
+        Path(min_length=1, max_length=256),
+    ],
+) -> Response:
+    released = live_sessions.release(
+        session_id=session_id,
+        user_id=current_user.user_id,
+    )
+
+    if not released:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Live session was not found.",
+        )
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

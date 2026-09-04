@@ -36,6 +36,10 @@ from atlas.password_recovery import (
     default_store as default_password_recovery_store,
 )
 from atlas.user_profiles import UserProfileError, UserProfileStore
+from atlas.live_session_policy import (
+    LiveSessionPolicyStore,
+    default_live_session_policy_store,
+)
 from atlas_api.auth.exceptions import TokenError
 from atlas_api.auth.jwt import JWTService
 from atlas_api.auth.models import AuthenticatedUser, TokenType
@@ -45,6 +49,10 @@ from atlas_api.auth.provider import (
 )
 from atlas_api.auth.service import AuthenticationService
 from atlas_api.auth.sessions import RefreshSessionRegistry
+from atlas_api.live_sessions import (
+    LiveSessionRegistry,
+    live_session_registry_from_environment,
+)
 from atlas_api.auth.throttling import (
     LoginAttemptLimiter,
     PasswordRecoveryRequestLimiter,
@@ -209,6 +217,22 @@ def get_login_attempt_limiter() -> LoginAttemptLimiter:
     """Return process-local account login-attempt state."""
 
     return LoginAttemptLimiter()
+
+
+@lru_cache(maxsize=1)
+def get_live_session_policy_store() -> LiveSessionPolicyStore:
+    """Return durable per-user Live playback concurrency policy."""
+
+    store = default_live_session_policy_store()
+    store.initialize()
+    return store
+
+
+@lru_cache(maxsize=1)
+def get_live_session_registry() -> LiveSessionRegistry:
+    """Return process-local heartbeat state for active Live playback."""
+
+    return live_session_registry_from_environment()
 
 
 @lru_cache(maxsize=1)
