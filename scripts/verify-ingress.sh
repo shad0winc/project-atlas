@@ -187,7 +187,8 @@ fi
 for container in \
   atlas-caddy \
   atlas-api \
-  atlas-portal
+  atlas-portal \
+  atlas-sports-writer
 do
   if docker inspect "$container" >/dev/null 2>&1; then
     pass "$container container present"

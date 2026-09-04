@@ -691,9 +691,11 @@ def test_readiness_already_healthy_succeeds_immediately(
         "readiness-probe:atlas-api:running:healthy",
         "readiness-probe:atlas-portal:running:healthy",
         "readiness-probe:atlas-caddy:running:healthy",
+        "readiness-probe:atlas-sports-writer:running:healthy",
         "readiness-probe:atlas-api:running:healthy",
         "readiness-probe:atlas-portal:running:healthy",
         "readiness-probe:atlas-caddy:running:healthy",
+        "readiness-probe:atlas-sports-writer:running:healthy",
     ]
 
     assert not any(
@@ -975,3 +977,56 @@ def test_identity_writer_runtime_provisioning_failure_aborts_before_ingress_appl
 
     audit_provision = events.index("audit-runtime:provision")
     assert audit_provision < identity_provision
+
+
+
+def test_sports_writer_unhealthy_blocks_ingress_verification(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_CADDY_READY_MARKER"] = str(
+        tmp_path / "caddy-ready"
+    )
+    environment["ATLAS_TEST_READINESS_FAIL_CONTAINER"] = (
+        "atlas-sports-writer"
+    )
+    environment["ATLAS_TEST_READINESS_FAIL_HEALTH"] = "unhealthy"
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode != 0
+
+    events = readiness_events(environment)
+
+    assert (
+        "readiness-probe:atlas-sports-writer:running:unhealthy"
+        in events
+    )
+    assert "maintenance:disable" not in event_lines(environment)
+    assert lock_path(environment).is_dir()
+
+
+def test_sports_writer_not_running_blocks_ingress_verification(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_CADDY_READY_MARKER"] = str(
+        tmp_path / "caddy-ready"
+    )
+    environment["ATLAS_TEST_READINESS_FAIL_CONTAINER"] = (
+        "atlas-sports-writer"
+    )
+    environment["ATLAS_TEST_READINESS_FAIL_STATUS"] = "exited"
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode != 0
+
+    events = readiness_events(environment)
+
+    assert (
+        "readiness-probe:atlas-sports-writer:exited:healthy"
+        in events
+    )
+    assert "maintenance:disable" not in event_lines(environment)
+    assert lock_path(environment).is_dir()
