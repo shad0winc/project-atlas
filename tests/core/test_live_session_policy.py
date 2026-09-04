@@ -80,3 +80,35 @@ def test_default_policy_lives_inside_existing_users_recovery_surface(
     store = default_live_session_policy_store()
 
     assert store.path == users / "live-session-policy.json"
+
+
+def test_missing_policy_is_read_only_default_without_creating_file(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "live-session-policy.json"
+    store = LiveSessionPolicyStore(path)
+
+    assert not path.exists()
+    assert store.snapshot() == {
+        "version": 1,
+        "default_limit": 5,
+        "overrides": {},
+    }
+    assert store.effective_limit("usr-a") == 5
+    assert not path.exists()
+
+
+def test_mutation_can_create_policy_from_implicit_default(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "live-session-policy.json"
+    store = LiveSessionPolicyStore(path)
+
+    store.set_override("usr-a", 2)
+
+    assert path.is_file()
+    assert store.snapshot() == {
+        "version": 1,
+        "default_limit": 5,
+        "overrides": {"usr-a": 2},
+    }

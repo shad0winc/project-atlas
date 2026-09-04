@@ -221,11 +221,9 @@ def get_login_attempt_limiter() -> LoginAttemptLimiter:
 
 @lru_cache(maxsize=1)
 def get_live_session_policy_store() -> LiveSessionPolicyStore:
-    """Return durable per-user Live playback concurrency policy."""
+    """Return read-only access to durable Live playback concurrency policy."""
 
-    store = default_live_session_policy_store()
-    store.initialize()
-    return store
+    return default_live_session_policy_store()
 
 
 @lru_cache(maxsize=1)

@@ -83,7 +83,11 @@ class LiveSessionPolicyStore:
 
     def _read(self) -> dict[str, Any]:
         if not self.path.exists():
-            raise LiveSessionPolicyError("Live-session policy is unavailable.")
+            return {
+                "version": POLICY_VERSION,
+                "default_limit": DEFAULT_LIVE_SESSION_LIMIT,
+                "overrides": {},
+            }
         try:
             payload = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
