@@ -24,6 +24,11 @@ do
         fail "Required persistent directory is missing: $path"
 done
 
+# Reconcile only the Dispatcharr bind root. Its internal database ownership is
+# managed by the pinned Dispatcharr image and must not be recursively changed
+# by Atlas.
+chown 1000:1000 /mnt/storage/configs/dispatcharr
+
 docker compose \
     --env-file "$MODULE_ENV_FILE" \
     -f "$COMPOSE_FILE" \
