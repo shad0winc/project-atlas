@@ -77,6 +77,7 @@ class IdentityWriterClient:
         return self._request(
             "DELETE",
             f"/internal/v1/live-session-policy/users/{user_id}",
+            {},
         )
 
     def _request(
