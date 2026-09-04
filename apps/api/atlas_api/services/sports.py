@@ -245,6 +245,10 @@ class SportsWriterTransportError(SportsError):
     """Private Sports service could not satisfy an API request."""
 
 
+class SportsLiveTvBindingNotFoundError(LookupError):
+    """Raised when an Atlas Sports channel has no exact Live TV binding."""
+
+
 class SportsWriterBackedAPIService:
     """Authenticated API adapter backed by the private Sports service."""
 
@@ -440,6 +444,11 @@ class SportsWriterBackedAPIService:
                 "Private Sports service returned an incomplete "
                 "Live TV binding."
             )
+        if atlas_id != atlas_channel_id.strip():
+            raise SportsWriterTransportError(
+                "Private Sports service returned a mismatched "
+                "Live TV binding."
+            )
         return {
             "atlas_channel_id": atlas_id,
             "jellyfin_item_id": jellyfin_id,
@@ -583,6 +592,8 @@ class SportsWriterBackedAPIService:
                     "Private Sports service request failed.",
                 )
             ).strip()
+            if code == "sports_live_tv_binding_not_found":
+                raise SportsLiveTvBindingNotFoundError(message) from exc
             if code == "provider_not_found":
                 raise SportsProviderNotFoundError(message) from exc
             if code == "event_not_found":
