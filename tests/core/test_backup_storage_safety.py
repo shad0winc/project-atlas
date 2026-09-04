@@ -346,7 +346,7 @@ def test_successful_backup_is_owner_only_and_declares_recovery_metadata(
     assert "Recovery format: 2" in backup_info
     assert "Recovery state: state-complete" in backup_info
     assert "Recovery capability: restore-unverified" in backup_info
-    assert "Format 1 (state-complete; restore-unverified)" in result.stdout
+    assert "Format 2 (state-complete; restore-unverified)" in result.stdout
 
     for temporary in (
         ".atlas-backup-manifest.tmp",

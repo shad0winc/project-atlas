@@ -261,7 +261,7 @@ EOF_MANIFEST
   echo "  $(du -h "$backup_file" | awk '{print $1}')"
   echo
   echo 'Recovery:'
-  echo '  Format 1 (state-complete; restore-unverified)'
+  echo '  Format 2 (state-complete; restore-unverified)'
   echo
   echo 'Retention:'
   echo '  Keeping newest 10 backups'
