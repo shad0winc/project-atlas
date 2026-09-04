@@ -28,6 +28,10 @@ class LiveSource:
             return None
         return (self.provider, self.provider_event_id)
 
+    @property
+    def atlas_channel_id(self) -> str:
+        return f"sports-live-{self.source_id}"
+
 
 def _required(value: object, field: str) -> str:
     if not isinstance(value, str) or not value.strip():

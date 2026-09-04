@@ -110,6 +110,7 @@ def catalog_feed_games(
         mapped = dict(game)
         mapped["stream_url"] = source.stream_url
         mapped["_atlas_live_source_id"] = source.source_id
+        mapped["_atlas_channel_id"] = source.atlas_channel_id
         feed_games.append(mapped)
 
     for source in catalog.standalone_sources():
@@ -119,6 +120,7 @@ def catalog_feed_games(
                 "name": source.name,
                 "stream_url": source.stream_url,
                 "_atlas_live_source_id": source.source_id,
+                "_atlas_channel_id": source.atlas_channel_id,
                 "_atlas_standalone_live_source": True,
             }
         )
@@ -204,7 +206,10 @@ def render_m3u(
         if not url:
             continue
 
-        channel_id = f"sports-{game['id']}"
+        channel_id = str(
+            game.get("_atlas_channel_id")
+            or f"sports-{game['id']}"
+        )
         name = game_name(game)
 
         lines.append(
@@ -228,7 +233,10 @@ def render_xmltv(
     ]
 
     for game in games:
-        channel_id = f"sports-{game['id']}"
+        channel_id = str(
+            game.get("_atlas_channel_id")
+            or f"sports-{game['id']}"
+        )
         name = html.escape(game_name(game))
 
         lines.extend(
@@ -243,7 +251,10 @@ def render_xmltv(
         if bool(game.get("_atlas_standalone_live_source")):
             continue
 
-        channel_id = f"sports-{game['id']}"
+        channel_id = str(
+            game.get("_atlas_channel_id")
+            or f"sports-{game['id']}"
+        )
         name = html.escape(game_name(game))
 
         start = xmltv_timestamp(

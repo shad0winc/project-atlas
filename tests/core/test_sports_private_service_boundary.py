@@ -65,6 +65,10 @@ def test_private_sports_image_packages_only_runtime_source() -> None:
         in content
     )
     assert (
+        "COPY modules/sports/src/live_sources.py /srv/sports/live_sources.py"
+        in content
+    )
+    assert (
         "COPY modules/sports/src/subscriptions.py /srv/sports/subscriptions.py"
         in content
     )
@@ -97,6 +101,14 @@ def _load_private_sports_api_for_failure_test(monkeypatch):
     live_tv_bindings_module.LiveTvBindingError = LiveTvBindingError
     live_tv_bindings_module.default_live_tv_binding_registry = lambda: None
 
+    live_sources_module = types.ModuleType("live_sources")
+
+    class LiveSourceCatalogError(Exception):
+        pass
+
+    live_sources_module.LiveSourceCatalogError = LiveSourceCatalogError
+    live_sources_module.load_live_source_catalog = lambda: None
+
     subscriptions_module = types.ModuleType("subscriptions")
     subscriptions_module.load_subscriptions = lambda: []
     subscriptions_module.create_subscription = lambda *args, **kwargs: ({}, True)
@@ -107,6 +119,7 @@ def _load_private_sports_api_for_failure_test(monkeypatch):
     monkeypatch.setitem(sys.modules, "providers", providers_package)
     monkeypatch.setitem(sys.modules, "providers.registry", registry_module)
     monkeypatch.setitem(sys.modules, "live_tv_bindings", live_tv_bindings_module)
+    monkeypatch.setitem(sys.modules, "live_sources", live_sources_module)
     monkeypatch.setitem(sys.modules, "subscriptions", subscriptions_module)
 
     source = (
@@ -247,6 +260,10 @@ def test_private_sports_image_is_minimal_and_runtime_root_is_read_only() -> None
     assert "COPY modules/sports/src/*.py" not in dockerfile
     assert (
         "COPY modules/sports/src/private_api.py /srv/sports/private_api.py"
+        in dockerfile
+    )
+    assert (
+        "COPY modules/sports/src/live_sources.py /srv/sports/live_sources.py"
         in dockerfile
     )
     assert (
