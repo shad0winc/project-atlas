@@ -377,6 +377,17 @@ def _recovery_environment(project: Path) -> dict[str, str]:
 def _write_recovery_state(project: Path) -> None:
     env = _recovery_environment(project)
 
+    live_tv_bindings = (
+        Path(env["SPORTS_CONFIG_DIR"])
+        / "state"
+        / "live-tv-bindings.json"
+    )
+    live_tv_bindings.parent.mkdir(parents=True, exist_ok=True)
+    live_tv_bindings.write_text(
+        '{"version":1,"bindings":{}}\n',
+        encoding="utf-8",
+    )
+
     files = {
         Path(env["ATLAS_USERS_DIR"]) / "users.json": '{"users": []}\n',
         Path(env["ATLAS_IDENTITY_DIR"]) / "favorites" / "favorites.json": '{}\n',

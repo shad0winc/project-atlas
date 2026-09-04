@@ -22,6 +22,7 @@ SURFACES = (
     ("runtime-subscribers", "state/runtime/subscribers", "required", "captured"),
     ("retention", "state/retention", "required", "captured"),
     ("sports-subscriptions", "state/sports/subscriptions.json", "required", "captured"),
+    ("sports-live-tv-bindings", "state/sports/live-tv-bindings.json", "required", "captured"),
     ("sports-recordings", "state/sports/recordings.json", "required", "captured"),
     ("sports-scheduler", "state/sports/scheduler.json", "required", "captured"),
 )
@@ -58,6 +59,7 @@ def _staged_root(tmp_path: Path) -> Path:
     (subscribers / "test.filter").write_text("*\n", encoding="utf-8")
     (root / "state/retention").mkdir(parents=True)
     _write_json(root / "state/sports/subscriptions.json", {"subscriptions": []})
+    _write_json(root / "state/sports/live-tv-bindings.json", {"version": 1, "bindings": {}})
     _write_json(root / "state/sports/recordings.json", {})
     _write_json(root / "state/sports/scheduler.json", {})
     return root
@@ -102,6 +104,7 @@ def test_consumer_validation_accepts_structurally_valid_state(tmp_path: Path) ->
     assert "PASS runtime" in result.stdout
     assert "PASS retention" in result.stdout
     assert "PASS sports-subscriptions" in result.stdout
+    assert "PASS sports-live-tv-bindings" in result.stdout
     assert "PASS sports-recordings" in result.stdout
     assert "PASS sports-scheduler" in result.stdout
     assert "SKIP identity-invitations" in result.stdout

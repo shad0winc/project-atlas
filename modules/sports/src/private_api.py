@@ -10,6 +10,10 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
+from live_tv_bindings import (
+    LiveTvBindingError,
+    default_live_tv_binding_registry,
+)
 from providers.registry import enabled_providers
 from subscriptions import (
     create_subscription,
@@ -191,6 +195,55 @@ class Handler(BaseHTTPRequestHandler):
         user_id = str(params.get("user_id", [""])[0]).strip()
         provider_name = str(params.get("provider", ["thesportsdb"])[0]).strip()
 
+        if parsed.path == "/internal/v1/live-tv/bindings":
+            registry = default_live_tv_binding_registry()
+            atlas_channel_id = str(
+                params.get("atlas_channel_id", [""])[0]
+            ).strip()
+            try:
+                if atlas_channel_id:
+                    jellyfin_item_id = registry.resolve(
+                        atlas_channel_id
+                    )
+                    if jellyfin_item_id is None:
+                        self._json(
+                            HTTPStatus.NOT_FOUND,
+                            {
+                                "code": "sports_live_tv_binding_not_found",
+                                "error": "Live TV binding was not found.",
+                            },
+                        )
+                        return
+                    self._json(
+                        HTTPStatus.OK,
+                        {
+                            "binding": {
+                                "atlas_channel_id": atlas_channel_id,
+                                "jellyfin_item_id": jellyfin_item_id,
+                            }
+                        },
+                    )
+                    return
+
+                self._json(
+                    HTTPStatus.OK,
+                    {
+                        "bindings": [
+                            binding.safe_dict()
+                            for binding in registry.list_bindings()
+                        ]
+                    },
+                )
+            except LiveTvBindingError:
+                self._json(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    {
+                        "code": "sports_live_tv_binding_state_invalid",
+                        "error": "Live TV binding state is invalid.",
+                    },
+                )
+            return
+
         if parsed.path == "/internal/v1/subscriptions":
             if not user_id:
                 self._json(HTTPStatus.BAD_REQUEST, {"error": "user_id is required."})
@@ -302,7 +355,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urllib.parse.urlsplit(self.path)
-        if parsed.path not in {"/internal/v1/events/request", "/internal/v1/subscriptions"}:
+        if parsed.path not in {
+            "/internal/v1/events/request",
+            "/internal/v1/subscriptions",
+            "/internal/v1/live-tv/bindings",
+        }:
             self._json(HTTPStatus.NOT_FOUND, {"error": "Not found."})
             return
         if not self._require_auth():
@@ -310,6 +367,45 @@ class Handler(BaseHTTPRequestHandler):
         payload = self._read_payload()
         if payload is None:
             return
+
+        if parsed.path == "/internal/v1/live-tv/bindings":
+            atlas_channel_id = str(
+                payload.get("atlas_channel_id", "")
+            ).strip()
+            jellyfin_item_id = str(
+                payload.get("jellyfin_item_id", "")
+            ).strip()
+            if not atlas_channel_id or not jellyfin_item_id:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {
+                        "error": (
+                            "atlas_channel_id and jellyfin_item_id "
+                            "are required."
+                        )
+                    },
+                )
+                return
+            try:
+                binding = default_live_tv_binding_registry().set(
+                    atlas_channel_id,
+                    jellyfin_item_id,
+                )
+            except LiveTvBindingError:
+                self._json(
+                    HTTPStatus.UNPROCESSABLE_ENTITY,
+                    {
+                        "code": "sports_live_tv_binding_invalid",
+                        "error": "Live TV binding is invalid.",
+                    },
+                )
+                return
+            self._json(
+                HTTPStatus.OK,
+                {"binding": binding.safe_dict()},
+            )
+            return
+
         user_id = str(payload.get("user_id", "")).strip()
         provider_name = str(payload.get("provider", "")).strip()
         if parsed.path == "/internal/v1/events/request":
@@ -443,6 +539,45 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_DELETE(self) -> None:
         parsed = urllib.parse.urlsplit(self.path)
+
+        binding_prefix = "/internal/v1/live-tv/bindings/"
+        if parsed.path.startswith(binding_prefix):
+            if not self._require_auth():
+                return
+            atlas_channel_id = urllib.parse.unquote(
+                parsed.path[len(binding_prefix):]
+            ).strip()
+            if not atlas_channel_id:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {"error": "atlas_channel_id is required."},
+                )
+                return
+            try:
+                removed = default_live_tv_binding_registry().delete(
+                    atlas_channel_id
+                )
+            except LiveTvBindingError:
+                self._json(
+                    HTTPStatus.UNPROCESSABLE_ENTITY,
+                    {
+                        "code": "sports_live_tv_binding_invalid",
+                        "error": "Live TV binding is invalid.",
+                    },
+                )
+                return
+            if not removed:
+                self._json(
+                    HTTPStatus.NOT_FOUND,
+                    {
+                        "code": "sports_live_tv_binding_not_found",
+                        "error": "Live TV binding was not found.",
+                    },
+                )
+                return
+            self._json(HTTPStatus.OK, {"removed": True})
+            return
+
         prefix = "/internal/v1/subscriptions/"
         if not parsed.path.startswith(prefix):
             self._json(HTTPStatus.NOT_FOUND, {"error": "Not found."})
@@ -486,6 +621,8 @@ def main() -> int:
         raise SystemExit(
             "ATLAS_SPORTS_WRITER_TOKEN is required"
         )
+
+    default_live_tv_binding_registry().ensure()
 
     server = ThreadingHTTPServer(
         (args.host, args.port),

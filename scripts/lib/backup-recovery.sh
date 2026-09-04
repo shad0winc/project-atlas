@@ -94,6 +94,14 @@ atlas_backup_recovery_surface_rows() {
     'sports'
 
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+    'sports-live-tv-bindings' \
+    "$sports_root/state/live-tv-bindings.json" \
+    'state/sports/live-tv-bindings.json' \
+    'required' \
+    'file' \
+    'sports'
+
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
     'sports-recordings' \
     "$sports_root/recordings/recordings.json" \
     'state/sports/recordings.json' \
@@ -174,8 +182,8 @@ atlas_backup_recovery_validate_registry() {
     count=$((count + 1))
   done < <(atlas_backup_recovery_surface_rows)
 
-  [[ "$count" -eq 11 ]] || {
-    printf 'ERROR: expected 11 recovery surfaces, found %s.\n' "$count" >&2
+  [[ "$count" -eq 12 ]] || {
+    printf 'ERROR: expected 12 recovery surfaces, found %s.\n' "$count" >&2
     return 1
   }
 }
@@ -653,7 +661,7 @@ atlas_backup_recovery_validate_archive() {
     seen_surface["$surface"]=1
   done <<< "$body"
 
-  [[ "$project_rows" -eq 1 && "$row_count" -eq 12 ]] || {
+  [[ "$project_rows" -eq 1 && "$row_count" -eq 13 ]] || {
     echo 'ERROR: recovery manifest row count is invalid.' >&2
     return 1
   }
@@ -1148,8 +1156,8 @@ atlas_backup_recovery_restore_plan() {
     row_count=$((row_count + 1))
   done < <(atlas_backup_recovery_surface_rows)
 
-  [[ "$row_count" -eq 11 ]] || {
-    printf 'ERROR: restore plan expected 11 surfaces, found %s.\n' \
+  [[ "$row_count" -eq 12 ]] || {
+    printf 'ERROR: restore plan expected 12 surfaces, found %s.\n' \
       "$row_count" >&2
     return 1
   }
@@ -1186,8 +1194,8 @@ for raw in plan_file.read_text(encoding="utf-8").splitlines():
     destination = Path(destination_text).resolve(strict=False)
     rows.append((surface, destination))
 
-if len(rows) != 11:
-    raise SystemExit("ERROR: restore apply plan must contain 11 surfaces")
+if len(rows) != 12:
+    raise SystemExit("ERROR: restore apply plan must contain 12 surfaces")
 
 for index, (surface, destination) in enumerate(rows):
     if transaction == destination or transaction in destination.parents:
@@ -1411,7 +1419,7 @@ atlas_backup_recovery_apply_staged_state() {
     fi
   done <<< "$plan"
 
-  [[ "$index" -eq 11 ]] || {
+  [[ "$index" -eq 12 ]] || {
     echo 'ERROR: restore application did not apply all declared surfaces.' >&2
     atlas_backup_recovery_revert_applied_state "$transaction_root" || true
     return 1

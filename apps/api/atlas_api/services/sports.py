@@ -245,6 +245,10 @@ class SportsWriterTransportError(SportsError):
     """Private Sports service could not satisfy an API request."""
 
 
+class SportsLiveTvBindingNotFoundError(LookupError):
+    """Raised when an Atlas Sports channel has no exact Live TV binding."""
+
+
 class SportsWriterBackedAPIService:
     """Authenticated API adapter backed by the private Sports service."""
 
@@ -411,6 +415,142 @@ class SportsWriterBackedAPIService:
         return dict(subscription)
 
 
+    def get_live_tv_binding(
+        self,
+        *,
+        atlas_channel_id: str,
+    ) -> dict[str, str]:
+        payload = self._request(
+            "GET",
+            "/internal/v1/live-tv/bindings?"
+            + urllib.parse.urlencode(
+                {"atlas_channel_id": atlas_channel_id}
+            ),
+        )
+        binding = payload.get("binding")
+        if not isinstance(binding, dict):
+            raise SportsWriterTransportError(
+                "Private Sports service returned an invalid "
+                "Live TV binding payload."
+            )
+        atlas_id = str(
+            binding.get("atlas_channel_id", "")
+        ).strip()
+        jellyfin_id = str(
+            binding.get("jellyfin_item_id", "")
+        ).strip()
+        if not atlas_id or not jellyfin_id:
+            raise SportsWriterTransportError(
+                "Private Sports service returned an incomplete "
+                "Live TV binding."
+            )
+        if atlas_id != atlas_channel_id.strip():
+            raise SportsWriterTransportError(
+                "Private Sports service returned a mismatched "
+                "Live TV binding."
+            )
+        return {
+            "atlas_channel_id": atlas_id,
+            "jellyfin_item_id": jellyfin_id,
+        }
+
+    def list_live_tv_bindings(
+        self,
+    ) -> list[dict[str, str]]:
+        payload = self._request(
+            "GET",
+            "/internal/v1/live-tv/bindings",
+        )
+        bindings = payload.get("bindings")
+        if not isinstance(bindings, list):
+            raise SportsWriterTransportError(
+                "Private Sports service returned an invalid "
+                "Live TV bindings payload."
+            )
+
+        result: list[dict[str, str]] = []
+        for binding in bindings:
+            if not isinstance(binding, dict):
+                raise SportsWriterTransportError(
+                    "Private Sports service returned an invalid "
+                    "Live TV binding entry."
+                )
+            atlas_id = str(
+                binding.get("atlas_channel_id", "")
+            ).strip()
+            jellyfin_id = str(
+                binding.get("jellyfin_item_id", "")
+            ).strip()
+            if not atlas_id or not jellyfin_id:
+                raise SportsWriterTransportError(
+                    "Private Sports service returned an incomplete "
+                    "Live TV binding entry."
+                )
+            result.append(
+                {
+                    "atlas_channel_id": atlas_id,
+                    "jellyfin_item_id": jellyfin_id,
+                }
+            )
+        return result
+
+    def set_live_tv_binding(
+        self,
+        *,
+        atlas_channel_id: str,
+        jellyfin_item_id: str,
+    ) -> dict[str, str]:
+        payload = self._request(
+            "POST",
+            "/internal/v1/live-tv/bindings",
+            {
+                "atlas_channel_id": atlas_channel_id,
+                "jellyfin_item_id": jellyfin_item_id,
+            },
+        )
+        binding = payload.get("binding")
+        if not isinstance(binding, dict):
+            raise SportsWriterTransportError(
+                "Private Sports service returned an invalid "
+                "Live TV binding payload."
+            )
+        atlas_id = str(
+            binding.get("atlas_channel_id", "")
+        ).strip()
+        jellyfin_id = str(
+            binding.get("jellyfin_item_id", "")
+        ).strip()
+        if not atlas_id or not jellyfin_id:
+            raise SportsWriterTransportError(
+                "Private Sports service returned an incomplete "
+                "Live TV binding."
+            )
+        return {
+            "atlas_channel_id": atlas_id,
+            "jellyfin_item_id": jellyfin_id,
+        }
+
+    def remove_live_tv_binding(
+        self,
+        *,
+        atlas_channel_id: str,
+    ) -> bool:
+        payload = self._request(
+            "DELETE",
+            "/internal/v1/live-tv/bindings/"
+            + urllib.parse.quote(
+                atlas_channel_id,
+                safe="",
+            ),
+        )
+        removed = payload.get("removed")
+        if not isinstance(removed, bool):
+            raise SportsWriterTransportError(
+                "Private Sports service returned an invalid "
+                "Live TV binding removal payload."
+            )
+        return removed
+
     def _request(
         self,
         method: str,
@@ -452,6 +592,8 @@ class SportsWriterBackedAPIService:
                     "Private Sports service request failed.",
                 )
             ).strip()
+            if code == "sports_live_tv_binding_not_found":
+                raise SportsLiveTvBindingNotFoundError(message) from exc
             if code == "provider_not_found":
                 raise SportsProviderNotFoundError(message) from exc
             if code == "event_not_found":

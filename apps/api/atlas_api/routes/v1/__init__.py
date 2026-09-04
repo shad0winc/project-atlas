@@ -21,6 +21,7 @@ from .requests import router as requests_router
 from .health import router as health_router
 from .services import router as services_router
 from .sports import router as sports_router
+from .sports_playback import router as sports_playback_router
 
 
 router = APIRouter(
@@ -46,6 +47,7 @@ router.include_router(playback_router)
 router.include_router(requests_router)
 router.include_router(services_router)
 router.include_router(sports_router)
+router.include_router(sports_playback_router)
 
 __all__ = [
     "router",
