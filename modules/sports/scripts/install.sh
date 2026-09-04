@@ -55,6 +55,26 @@ required_writable_paths=(
 
 chown "$puid:$pgid" "${required_writable_paths[@]}"
 
+source_lifecycle_file="$ATLAS_CONFIG_ROOT/sportyfin/state/source-lifecycle.json"
+
+if [[ -L "$source_lifecycle_file" ]]; then
+  echo "ERROR: Sports source lifecycle state must not be a symbolic link." >&2
+  exit 1
+fi
+
+if [[ -e "$source_lifecycle_file" && ! -f "$source_lifecycle_file" ]]; then
+  echo "ERROR: Sports source lifecycle state must be a regular file." >&2
+  exit 1
+fi
+
+if [[ ! -e "$source_lifecycle_file" ]]; then
+  umask 077
+  printf '%s\n' '{"version":1,"sources":[]}' >"$source_lifecycle_file"
+fi
+
+chown "$puid:$pgid" "$source_lifecycle_file"
+chmod 0600 "$source_lifecycle_file"
+
 chmod 755 \
   "$ATLAS_CONFIG_ROOT/sportyfin" \
   "${required_writable_paths[@]}"

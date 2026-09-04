@@ -396,6 +396,7 @@ def _write_recovery_state(project: Path) -> None:
         Path(env["ATLAS_RUNTIME_CONFIG_DIR"]) / "runtime" / "subscribers" / "test.cursor": "0\n",
         Path(env["ATLAS_ARI_DIR"]) / "state.json": '{}\n',
         Path(env["SPORTS_CONFIG_DIR"]) / "state" / "subscriptions.json": '[]\n',
+        Path(env["SPORTS_CONFIG_DIR"]) / "state" / "source-lifecycle.json": '{"version":1,"sources":[]}\n',
         Path(env["SPORTS_CONFIG_DIR"]) / "recordings" / "recordings.json": '[]\n',
         Path(env["ATLAS_RUNTIME_CONFIG_DIR"]) / "runtime" / "scheduler" / "sports.json": '{}\n',
     }

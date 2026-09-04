@@ -48,6 +48,7 @@ def _write_state(tmp_path: Path) -> dict[str, str]:
         "cursor": Path(env["ATLAS_RUNTIME_CONFIG_DIR"]) / "runtime" / "subscribers" / "user.cursor",
         "retention": Path(env["ATLAS_ARI_DIR"]) / "state.json",
         "subscriptions": Path(env["SPORTS_CONFIG_DIR"]) / "state" / "subscriptions.json",
+        "source_lifecycle": Path(env["SPORTS_CONFIG_DIR"]) / "state" / "source-lifecycle.json",
         "recordings": Path(env["SPORTS_CONFIG_DIR"]) / "recordings" / "recordings.json",
         "sports_scheduler": Path(env["ATLAS_RUNTIME_CONFIG_DIR"]) / "runtime" / "scheduler" / "sports.json",
     }
@@ -101,6 +102,7 @@ def test_snapshot_captures_every_required_surface(tmp_path: Path) -> None:
         "state/retention/state.json",
         "state/sports/subscriptions.json",
         "state/sports/live-tv-bindings.json",
+        "state/sports/source-lifecycle.json",
         "state/sports/recordings.json",
         "state/sports/scheduler.json",
     )

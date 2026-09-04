@@ -19,6 +19,7 @@ COPY modules/sports/src/private_api.py /srv/sports/private_api.py
 COPY modules/sports/src/live_tv_bindings.py /srv/sports/live_tv_bindings.py
 COPY modules/sports/src/live_sources.py /srv/sports/live_sources.py
 COPY modules/sports/src/subscriptions.py /srv/sports/subscriptions.py
+COPY modules/sports/src/source_lifecycle.py /srv/sports/source_lifecycle.py
 COPY modules/sports/src/providers /srv/sports/providers
 
 ENV PYTHONDONTWRITEBYTECODE="1" \

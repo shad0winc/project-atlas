@@ -35,6 +35,45 @@ required_writable_paths=(
   /mnt/storage/media/Sports
 )
 
+source_lifecycle_file="/mnt/storage/configs/sportyfin/state/source-lifecycle.json"
+
+if [[ -L "$source_lifecycle_file" ]]; then
+  echo "ERROR: Sports source lifecycle state must not be a symbolic link." >&2
+  exit 1
+fi
+
+if [[ -e "$source_lifecycle_file" && ! -f "$source_lifecycle_file" ]]; then
+  echo "ERROR: Sports source lifecycle state must be a regular file." >&2
+  exit 1
+fi
+
+if [[ ! -e "$source_lifecycle_file" ]]; then
+  umask 077
+  printf '%s\n' '{"version":1,"sources":[]}' >"$source_lifecycle_file"
+  chown "$puid:$pgid" "$source_lifecycle_file"
+  chmod 0600 "$source_lifecycle_file"
+fi
+
+actual_source_uid="$(
+  stat -c '%u' "$source_lifecycle_file"
+)"
+actual_source_gid="$(
+  stat -c '%g' "$source_lifecycle_file"
+)"
+actual_source_mode="$(
+  stat -c '%a' "$source_lifecycle_file"
+)"
+
+if [[ "$actual_source_uid" != "$puid" || "$actual_source_gid" != "$pgid" ]]; then
+  echo "ERROR: Sports source lifecycle ownership precondition failed." >&2
+  exit 1
+fi
+
+if [[ "$actual_source_mode" != "600" ]]; then
+  echo "ERROR: Sports source lifecycle mode must be 0600." >&2
+  exit 1
+fi
+
 for path in "${required_writable_paths[@]}"; do
   if [[ ! -d "$path" ]]; then
     echo "ERROR: Required Sports writable directory is missing: $path" >&2
