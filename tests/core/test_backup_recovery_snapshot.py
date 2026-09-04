@@ -28,6 +28,18 @@ def _environment(tmp_path: Path) -> dict[str, str]:
 
 def _write_state(tmp_path: Path) -> dict[str, str]:
     env = _environment(tmp_path)
+
+    live_tv_bindings = (
+        Path(env["SPORTS_CONFIG_DIR"])
+        / "state"
+        / "live-tv-bindings.json"
+    )
+    live_tv_bindings.parent.mkdir(parents=True, exist_ok=True)
+    live_tv_bindings.write_text(
+        '{"version":1,"bindings":{}}\n',
+        encoding="utf-8",
+    )
+
     paths = {
         "users": Path(env["ATLAS_USERS_DIR"]) / "users.json",
         "favorites": Path(env["ATLAS_IDENTITY_DIR"]) / "favorites" / "favorites.json",
@@ -88,6 +100,7 @@ def test_snapshot_captures_every_required_surface(tmp_path: Path) -> None:
         "state/runtime/subscribers/user.cursor",
         "state/retention/state.json",
         "state/sports/subscriptions.json",
+        "state/sports/live-tv-bindings.json",
         "state/sports/recordings.json",
         "state/sports/scheduler.json",
     )
