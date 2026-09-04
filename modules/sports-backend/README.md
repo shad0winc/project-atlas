@@ -61,3 +61,18 @@ Installing this module does not configure:
 - Sports recording cutover.
 
 Those are separate, evidence-gated changes.
+
+## Dispatcharr state ownership
+
+The pinned Dispatcharr AIO image defaults its application identity to UID/GID
+`1000:1000`. Atlas therefore ensures that the bind-mounted Dispatcharr state
+root is owned by `1000:1000` before first startup.
+
+Atlas changes only the root ownership. Dispatcharr remains responsible for
+ownership and permissions below `/data`, including its PostgreSQL data
+directory.
+
+Dispatcharr may add execute permission to the `/data` root during startup.
+Verification therefore enforces the security properties of the directory
+rather than one exact mode: the owner must have read/write/execute access and
+group/other must not have write access.

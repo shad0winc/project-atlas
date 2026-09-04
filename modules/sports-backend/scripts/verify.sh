@@ -95,11 +95,30 @@ for path in \
 do
     test -d "$path" ||
         fail "Persistent directory missing: $path"
-
-    mode="$(stat -c '%a' "$path")"
-    [[ "$mode" == "750" ]] ||
-        fail "Persistent directory has unexpected mode: $path ($mode)"
 done
+
+dispatch_uid="$(stat -c '%u' /mnt/storage/configs/dispatcharr)"
+dispatch_gid="$(stat -c '%g' /mnt/storage/configs/dispatcharr)"
+dispatch_mode="$(stat -c '%a' /mnt/storage/configs/dispatcharr)"
+
+[[ "$dispatch_uid" == "1000" ]] ||
+    fail "Dispatcharr state root has unexpected UID: $dispatch_uid"
+
+[[ "$dispatch_gid" == "1000" ]] ||
+    fail "Dispatcharr state root has unexpected GID: $dispatch_gid"
+
+# Owner must have rwx. Group/other must not have write permission.
+# The pinned image may add execute to /data during startup (for example,
+# Atlas-created 0750 becomes 0751), so exact mode equality is inappropriate.
+[[ "$dispatch_mode" =~ ^7[0145][0145]$ ]] ||
+    fail "Dispatcharr state root has unsafe mode: $dispatch_mode"
+
+teamarr_mode="$(
+    stat -c '%a' /mnt/storage/configs/teamarr
+)"
+
+[[ "$teamarr_mode" == "750" ]] ||
+    fail "Teamarr state root has unexpected mode: $teamarr_mode"
 
 for container in atlas-dispatcharr atlas-teamarr; do
     state="$(

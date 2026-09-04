@@ -132,3 +132,62 @@ def test_sports_backend_install_preserves_private_boundary() -> None:
 
     assert "rm -rf" not in uninstall
     assert "docker volume rm" not in uninstall
+
+
+def test_sports_backend_install_prepares_dispatcharr_identity() -> None:
+    install = (
+        MODULE / "scripts" / "install.sh"
+    ).read_text(encoding="utf-8")
+
+    assert (
+        "chown 1000:1000 "
+        "/mnt/storage/configs/dispatcharr"
+    ) in install
+
+    assert (
+        "chown -R 1000:1000 "
+        "/mnt/storage/configs/dispatcharr"
+    ) not in install
+
+
+def test_sports_backend_update_reconciles_only_dispatcharr_root() -> None:
+    update = (
+        MODULE / "scripts" / "update.sh"
+    ).read_text(encoding="utf-8")
+
+    assert (
+        "chown 1000:1000 "
+        "/mnt/storage/configs/dispatcharr"
+    ) in update
+
+    assert (
+        "chown -R 1000:1000 "
+        "/mnt/storage/configs/dispatcharr"
+    ) not in update
+
+
+def test_sports_backend_verify_checks_dispatcharr_identity_securely() -> None:
+    verify = (
+        MODULE / "scripts" / "verify.sh"
+    ).read_text(encoding="utf-8")
+
+    assert "dispatch_uid" in verify
+    assert "dispatch_gid" in verify
+    assert '"1000"' in verify
+    assert "dispatch_mode" in verify
+    assert "^7[0145][0145]$" in verify
+
+    assert (
+        '[[ "$mode" == "750" ]]'
+        not in verify
+    )
+
+
+def test_sports_backend_readme_documents_dispatcharr_ownership() -> None:
+    readme = (
+        MODULE / "README.md"
+    ).read_text(encoding="utf-8")
+
+    assert "UID/GID" in readme
+    assert "`1000:1000`" in readme
+    assert "group/other must not have write access" in readme

@@ -32,6 +32,11 @@ install -d -m 750 \
     /mnt/storage/configs/dispatcharr \
     /mnt/storage/configs/teamarr
 
+# Dispatcharr AIO initializes PostgreSQL as PUID/PGID 1000 by default.
+# The bind-mounted /data root must therefore be traversable by that identity
+# before the container's own initialization scripts can run.
+chown 1000:1000 /mnt/storage/configs/dispatcharr
+
 docker compose \
     --env-file "$MODULE_ENV_FILE" \
     -f "$COMPOSE_FILE" \
