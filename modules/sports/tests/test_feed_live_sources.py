@@ -140,10 +140,10 @@ def test_event_channel_retains_real_programme_metadata() -> None:
     )
     xmltv = render_xmltv(games)
 
-    assert '<channel id="sports-game-1">' in xmltv
+    assert '<channel id="sports-live-authorized-game">' in xmltv
     assert '<programme start="20260904000000 +0000"' in xmltv
     assert 'stop="20260904030000 +0000"' in xmltv
-    assert 'channel="sports-game-1">' in xmltv
+    assert 'channel="sports-live-authorized-game">' in xmltv
     assert "Atlas United vs Atlas City" in xmltv
 
 

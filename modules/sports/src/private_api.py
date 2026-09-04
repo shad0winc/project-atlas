@@ -14,6 +14,10 @@ from live_tv_bindings import (
     LiveTvBindingError,
     default_live_tv_binding_registry,
 )
+from live_sources import (
+    LiveSourceCatalogError,
+    load_live_source_catalog,
+)
 from providers.registry import enabled_providers
 from subscriptions import (
     create_subscription,
@@ -38,6 +42,36 @@ def _provider(name: str):
             f"Sports provider is unavailable: {normalized}"
         )
     return provider
+
+
+def _live_availability(
+    provider: str,
+    provider_event_id: str,
+) -> dict[str, object]:
+    source = load_live_source_catalog().for_event(
+        provider,
+        provider_event_id,
+    )
+    if source is None:
+        return {
+            "available": False,
+            "atlas_channel_id": None,
+        }
+
+    atlas_channel_id = source.atlas_channel_id
+    jellyfin_item_id = default_live_tv_binding_registry().resolve(
+        atlas_channel_id
+    )
+    if jellyfin_item_id is None:
+        return {
+            "available": False,
+            "atlas_channel_id": None,
+        }
+
+    return {
+        "available": True,
+        "atlas_channel_id": atlas_channel_id,
+    }
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -194,6 +228,40 @@ class Handler(BaseHTTPRequestHandler):
         params = urllib.parse.parse_qs(parsed.query, keep_blank_values=False)
         user_id = str(params.get("user_id", [""])[0]).strip()
         provider_name = str(params.get("provider", ["thesportsdb"])[0]).strip()
+
+        if parsed.path == "/internal/v1/live/availability":
+            provider_event_id = str(
+                params.get("provider_event_id", [""])[0]
+            ).strip()
+            if not provider_name or not provider_event_id:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {
+                        "error": (
+                            "provider and provider_event_id are required."
+                        )
+                    },
+                )
+                return
+            try:
+                availability = _live_availability(
+                    provider_name,
+                    provider_event_id,
+                )
+            except (LiveSourceCatalogError, LiveTvBindingError):
+                self._json(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    {
+                        "code": "sports_live_availability_unavailable",
+                        "error": "Sports live availability is unavailable.",
+                    },
+                )
+                return
+            self._json(
+                HTTPStatus.OK,
+                {"availability": availability},
+            )
+            return
 
         if parsed.path == "/internal/v1/live-tv/bindings":
             registry = default_live_tv_binding_registry()

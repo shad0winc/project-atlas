@@ -415,6 +415,59 @@ class SportsWriterBackedAPIService:
         return dict(subscription)
 
 
+    def get_live_availability(
+        self,
+        *,
+        provider_name: str,
+        provider_event_id: str,
+    ) -> dict[str, object]:
+        payload = self._request(
+            "GET",
+            "/internal/v1/live/availability?"
+            + urllib.parse.urlencode(
+                {
+                    "provider": provider_name,
+                    "provider_event_id": provider_event_id,
+                }
+            ),
+        )
+        availability = payload.get("availability")
+        if not isinstance(availability, dict):
+            raise SportsWriterTransportError(
+                "Private Sports service returned an invalid "
+                "Live availability payload."
+            )
+
+        available = availability.get("available")
+        atlas_channel_id = availability.get("atlas_channel_id")
+        if not isinstance(available, bool):
+            raise SportsWriterTransportError(
+                "Private Sports service returned invalid "
+                "Live availability state."
+            )
+        if available:
+            atlas_id = str(atlas_channel_id or "").strip()
+            if not atlas_id:
+                raise SportsWriterTransportError(
+                    "Private Sports service returned incomplete "
+                    "Live availability state."
+                )
+            return {
+                "available": True,
+                "atlas_channel_id": atlas_id,
+            }
+
+        if atlas_channel_id is not None:
+            raise SportsWriterTransportError(
+                "Private Sports service returned unsafe "
+                "Live availability state."
+            )
+
+        return {
+            "available": False,
+            "atlas_channel_id": None,
+        }
+
     def get_live_tv_binding(
         self,
         *,

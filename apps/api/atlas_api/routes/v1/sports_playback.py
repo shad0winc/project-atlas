@@ -78,6 +78,47 @@ def _subtitle_stream_index(value: str | None) -> int | None:
 
 
 @router.get(
+    "/availability",
+    status_code=status.HTTP_200_OK,
+    summary="Resolve safe Sports Live availability for one provider event",
+)
+def read_sports_live_availability(
+    current_user: Annotated[
+        AuthenticatedUser,
+        Depends(require_sports_read),
+    ],
+    sports: Annotated[
+        SportsAPIService,
+        Depends(get_sports_api_service),
+    ],
+    provider_event_id: Annotated[
+        str,
+        Query(min_length=1, max_length=256),
+    ],
+    provider: Annotated[
+        str,
+        Query(min_length=1, max_length=64),
+    ] = "thesportsdb",
+) -> dict[str, object]:
+    del current_user
+    try:
+        availability = sports.get_live_availability(
+            provider_name=provider,
+            provider_event_id=provider_event_id,
+        )
+    except SportsWriterTransportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Sports live availability is unavailable.",
+        ) from exc
+
+    return {
+        "available": bool(availability["available"]),
+        "atlas_channel_id": availability["atlas_channel_id"],
+    }
+
+
+@router.get(
     "/{atlas_channel_id}/session",
     response_model=PlaybackSessionResponse,
     status_code=status.HTTP_200_OK,
