@@ -1,0 +1,56 @@
+services:
+  atlas-dispatcharr:
+    image: ghcr.io/dispatcharr/dispatcharr:latest
+    container_name: atlas-dispatcharr
+    restart: unless-stopped
+
+    environment:
+      TZ: "${SPORTS_BACKEND_TIMEZONE:-America/New_York}"
+      DISPATCHARR_ENV: "aio"
+
+    volumes:
+      - "${DISPATCHARR_DATA_DIR:-/mnt/storage/configs/dispatcharr}:/data"
+
+    security_opt:
+      - no-new-privileges:true
+
+    mem_limit: 2g
+    cpus: 2.00
+
+    networks:
+      - atlas
+
+    labels:
+      project-atlas.module: sports-backend
+      project-atlas.service: dispatcharr
+
+  atlas-teamarr:
+    image: ghcr.io/pharaoh-labs/teamarr:latest
+    container_name: atlas-teamarr
+    restart: unless-stopped
+
+    environment:
+      TZ: "${SPORTS_BACKEND_TIMEZONE:-America/New_York}"
+
+    volumes:
+      - "${TEAMARR_DATA_DIR:-/mnt/storage/configs/teamarr}:/app/data"
+
+    security_opt:
+      - no-new-privileges:true
+
+    mem_limit: 1g
+    cpus: 1.00
+
+    networks:
+      - atlas
+
+    depends_on:
+      - atlas-dispatcharr
+
+    labels:
+      project-atlas.module: sports-backend
+      project-atlas.service: teamarr
+
+networks:
+  atlas:
+    external: true
