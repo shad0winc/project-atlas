@@ -58,6 +58,7 @@ services:
       SPORTS_PROVIDER_REQUEST_BUDGET_FILE: "${SPORTS_PROVIDER_REQUEST_BUDGET_FILE:-/mnt/storage/configs/sportyfin/state/provider-request-budget.json}"
       SPORTS_HEALTH_FILE: "${SPORTS_HEALTH_FILE:-/mnt/storage/configs/sportyfin/state/health.json}"
       SPORTS_SUBSCRIPTIONS_FILE: "${SPORTS_SUBSCRIPTIONS_FILE:-/mnt/storage/configs/sportyfin/state/subscriptions.json}"
+      SPORTS_LIVE_SOURCE_CATALOG_PATH: "${SPORTS_LIVE_SOURCE_CATALOG_PATH:-}"
       SPORTS_RECORDINGS_FILE: "${SPORTS_RECORDINGS_FILE:-/mnt/storage/configs/sportyfin/recordings/recordings.json}"
       SPORTS_RECORDING_PREROLL_MINUTES: "${SPORTS_RECORDING_PREROLL_MINUTES:-5}"
       SPORTS_RECORDING_POSTROLL_MINUTES: "${SPORTS_RECORDING_POSTROLL_MINUTES:-15}"

@@ -11,6 +11,10 @@ from pathlib import Path
 from typing import Any
 
 from lifecycle import should_surface_game
+from live_sources import (
+    LiveSourceCatalog,
+    load_live_source_catalog,
+)
 
 PREGAME_WINDOW_MINUTES = int(
     os.getenv(
@@ -70,6 +74,55 @@ def active_games(
             PREGAME_WINDOW_MINUTES,
         )
     ]
+
+
+def catalog_feed_games(
+    games: list[dict[str, Any]],
+    catalog: LiveSourceCatalog,
+) -> list[dict[str, Any]]:
+    """Return only feed entries backed by an authorized live source.
+
+    Raw stream_url values supplied by metadata providers or state are never
+    trusted here. Event playback requires an explicit provider/event mapping
+    in the authorized live-source catalog.
+    """
+
+    feed_games: list[dict[str, Any]] = []
+
+    for game in games:
+        provider = str(game.get("provider") or "").strip().lower()
+        provider_event_id = str(
+            game.get("provider_event_id") or ""
+        ).strip()
+
+        if not provider or not provider_event_id:
+            continue
+
+        source = catalog.for_event(
+            provider,
+            provider_event_id,
+        )
+
+        if source is None:
+            continue
+
+        mapped = dict(game)
+        mapped["stream_url"] = source.stream_url
+        mapped["_atlas_live_source_id"] = source.source_id
+        feed_games.append(mapped)
+
+    for source in catalog.standalone_sources():
+        feed_games.append(
+            {
+                "id": f"live-{source.source_id}",
+                "name": source.name,
+                "stream_url": source.stream_url,
+                "_atlas_live_source_id": source.source_id,
+                "_atlas_standalone_live_source": True,
+            }
+        )
+
+    return feed_games
 
 
 def game_name(game: dict[str, Any]) -> str:
@@ -186,6 +239,9 @@ def render_xmltv(
         )
 
     for game in games:
+        if bool(game.get("_atlas_standalone_live_source")):
+            continue
+
         channel_id = f"sports-{game['id']}"
         name = html.escape(game_name(game))
 
@@ -235,8 +291,13 @@ def generate_feed() -> int:
         exist_ok=True,
     )
 
-    games = active_games(
+    active = active_games(
         load_games()
+    )
+    catalog = load_live_source_catalog()
+    games = catalog_feed_games(
+        active,
+        catalog,
     )
 
     write_atomic(
@@ -251,7 +312,8 @@ def generate_feed() -> int:
 
     print(
         f"Sports feed generated: "
-        f"{len(games)} active game(s)"
+        f"{len(active)} active game(s), "
+        f"{len(games)} authorized live channel(s)"
     )
 
     return 0
