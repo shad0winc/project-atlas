@@ -10,9 +10,11 @@ from pydantic import BaseModel, ConfigDict
 from atlas.live_session_policy import LiveSessionPolicyError, LiveSessionPolicyStore
 from atlas.user_profiles import UserProfileError, UserProfileStore
 from atlas_api.auth.models import AuthenticatedUser
+from atlas_api.live_sessions import LiveSessionRegistry
 from atlas_api.dependencies import (
     get_identity_writer_client,
     get_live_session_policy_store,
+    get_live_session_registry,
     get_security_audit_writer,
     get_user_profile_store,
 )
@@ -43,9 +45,20 @@ def _validated_limit(value: object) -> int:
 def _policy_response(
     policy: LiveSessionPolicyStore,
     profiles: UserProfileStore,
+    live_sessions: LiveSessionRegistry,
 ) -> dict[str, Any]:
     snapshot = policy.snapshot()
     overrides = snapshot["overrides"]
+    active_by_user: dict[str, list[dict[str, Any]]] = {}
+    for session in live_sessions.snapshot_active():
+        active_by_user.setdefault(session.user_id, []).append(
+            {
+                "session_id": session.session_id,
+                "target_id": session.target_id,
+                "age_seconds": session.age_seconds,
+                "heartbeat_age_seconds": session.heartbeat_age_seconds,
+            }
+        )
     users = []
     for profile in profiles.list_users():
         user_id = str(profile["user_id"])
@@ -59,6 +72,8 @@ def _policy_response(
                 "effective_limit": (
                     override if override is not None else snapshot["default_limit"]
                 ),
+                "active_count": len(active_by_user.get(user_id, [])),
+                "sessions": active_by_user.get(user_id, []),
             }
         )
     users.sort(
@@ -71,6 +86,7 @@ def _policy_response(
     return {
         "version": snapshot["version"],
         "default_limit": snapshot["default_limit"],
+        "ttl_seconds": live_sessions.ttl_seconds,
         "users": users,
     }
 
@@ -80,10 +96,11 @@ def read_admin_live_session_policy(
     _user: AuthenticatedUser = Depends(require_live_sessions_manage),
     policy: LiveSessionPolicyStore = Depends(get_live_session_policy_store),
     profiles: UserProfileStore = Depends(get_user_profile_store),
+    live_sessions: LiveSessionRegistry = Depends(get_live_session_registry),
 ) -> dict[str, Any]:
-    """Return administrator-safe Live-session policy state."""
+    """Return administrator-safe Live-session policy and active-session state."""
     try:
-        return _policy_response(policy, profiles)
+        return _policy_response(policy, profiles, live_sessions)
     except (LiveSessionPolicyError, UserProfileError) as error:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

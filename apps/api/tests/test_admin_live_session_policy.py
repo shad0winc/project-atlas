@@ -12,9 +12,11 @@ from atlas_api.dependencies import (
     get_current_user,
     get_identity_writer_client,
     get_live_session_policy_store,
+    get_live_session_registry,
     get_security_audit_writer,
     get_user_profile_store,
 )
+from atlas_api.live_sessions import LiveSessionRegistry
 from atlas_api.main import create_app
 
 
@@ -56,7 +58,12 @@ def _authenticated(profile: dict[str, Any]) -> AuthenticatedUser:
     )
 
 
-def _fixture(tmp_path: Path, *, role: str = "global_admin"):
+def _fixture(
+    tmp_path: Path,
+    *,
+    role: str = "global_admin",
+    live_sessions: LiveSessionRegistry | None = None,
+):
     profiles = UserProfileStore(tmp_path / "users")
     admin = profiles.create_user(
         "atlas-admin",
@@ -73,10 +80,13 @@ def _fixture(tmp_path: Path, *, role: str = "global_admin"):
     policy = LiveSessionPolicyStore(tmp_path / "users" / "live-session-policy.json")
     writer = RecordingWriter()
     audit = RecordingAudit()
+    if live_sessions is None:
+        live_sessions = LiveSessionRegistry(ttl_seconds=90, clock=lambda: 100.0)
     app = create_app()
     app.dependency_overrides[get_current_user] = lambda: _authenticated(admin)
     app.dependency_overrides[get_user_profile_store] = lambda: profiles
     app.dependency_overrides[get_live_session_policy_store] = lambda: policy
+    app.dependency_overrides[get_live_session_registry] = lambda: live_sessions
     app.dependency_overrides[get_identity_writer_client] = lambda: writer
     app.dependency_overrides[get_security_audit_writer] = lambda: audit
     return TestClient(app), policy, writer, audit, admin, target
@@ -193,3 +203,76 @@ def test_invalid_limits_are_rejected_before_writer(tmp_path: Path) -> None:
         )
         assert response.status_code == 422
     assert writer.default_limits == []
+
+
+def test_admin_policy_read_includes_safe_active_session_state(tmp_path: Path) -> None:
+    now = [100.0]
+    ids = iter(("session-1", "session-2"))
+    live_sessions = LiveSessionRegistry(
+        ttl_seconds=90,
+        clock=lambda: now[0],
+        session_id_factory=lambda: next(ids),
+    )
+
+    client, _, _, _, _, target = _fixture(
+        tmp_path,
+        live_sessions=live_sessions,
+    )
+
+    live_sessions.admit(
+        user_id=target["user_id"],
+        target_id="sports-event-001",
+        limit=5,
+    )
+    now[0] = 110.0
+    live_sessions.admit(
+        user_id=target["user_id"],
+        target_id="sports-event-002",
+        limit=5,
+    )
+    now[0] = 125.0
+    live_sessions.heartbeat(
+        session_id="session-1",
+        user_id=target["user_id"],
+    )
+    now[0] = 140.0
+
+    response = client.get("/api/v1/admin/live-sessions")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ttl_seconds"] == 90
+
+    target_row = next(
+        row for row in body["users"]
+        if row["user_id"] == target["user_id"]
+    )
+
+    assert target_row["active_count"] == 2
+    assert target_row["sessions"] == [
+        {
+            "session_id": "session-1",
+            "target_id": "sports-event-001",
+            "age_seconds": 40,
+            "heartbeat_age_seconds": 15,
+        },
+        {
+            "session_id": "session-2",
+            "target_id": "sports-event-002",
+            "age_seconds": 30,
+            "heartbeat_age_seconds": 30,
+        },
+    ]
+
+    response_text = response.text.lower()
+    for forbidden in (
+        "stream_path",
+        "playback_capability",
+        "jellyfin_item_id",
+        "jellyfin_user_id",
+        "access_token",
+        "authorization",
+        "created_at",
+        "last_seen_at",
+    ):
+        assert forbidden not in response_text
