@@ -1,6 +1,6 @@
 services:
   atlas-dispatcharr:
-    image: ghcr.io/dispatcharr/dispatcharr:latest
+    image: ghcr.io/dispatcharr/dispatcharr@sha256:e764cd3fb3a4b14e0c96eeb830cce645b44ef0a2494838e21462c71dde5abeb4
     container_name: atlas-dispatcharr
     restart: unless-stopped
 
@@ -25,7 +25,7 @@ services:
       project-atlas.service: dispatcharr
 
   atlas-teamarr:
-    image: ghcr.io/pharaoh-labs/teamarr:latest
+    image: ghcr.io/pharaoh-labs/teamarr@sha256:d846ec078cde27f68e94f5fc3eec7f1ec29eca11f653b157ac352fef84b73c0c
     container_name: atlas-teamarr
     restart: unless-stopped
 
