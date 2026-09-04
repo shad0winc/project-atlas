@@ -109,6 +109,63 @@ def _load_private_sports_api_for_failure_test(monkeypatch):
     live_sources_module.LiveSourceCatalogError = LiveSourceCatalogError
     live_sources_module.load_live_source_catalog = lambda: None
 
+    source_lifecycle_module = types.ModuleType(
+        "source_lifecycle"
+    )
+
+    class SourceLifecycleError(Exception):
+        pass
+
+    class SourceLifecycleStore:
+        def ensure(self):
+            return ()
+
+        def load(self):
+            return ()
+
+        def write(self, _sources):
+            return None
+
+    class SportsSource:
+        @classmethod
+        def from_mapping(cls, _payload):
+            return cls()
+
+        def to_mapping(self):
+            return {
+                "source_id": "test-source",
+                "display_name": "Test Source",
+                "kind": "official_free",
+                "trust_class": "official",
+                "enabled": True,
+                "priority": 100,
+                "max_connections": 1,
+                "backend_reference": None,
+                "purchased_at": None,
+                "expires_at": None,
+                "renewal_url": None,
+                "renewal_notice_days": [
+                    30,
+                    14,
+                    7,
+                    3,
+                    1,
+                ],
+            }
+
+    source_lifecycle_module.SourceLifecycleError = (
+        SourceLifecycleError
+    )
+    source_lifecycle_module.SourceLifecycleStore = (
+        SourceLifecycleStore
+    )
+    source_lifecycle_module.SportsSource = (
+        SportsSource
+    )
+    source_lifecycle_module.rank_source_candidates = (
+        lambda _sources: ()
+    )
+
     subscriptions_module = types.ModuleType("subscriptions")
     subscriptions_module.load_subscriptions = lambda: []
     subscriptions_module.create_subscription = lambda *args, **kwargs: ({}, True)
@@ -119,8 +176,21 @@ def _load_private_sports_api_for_failure_test(monkeypatch):
     monkeypatch.setitem(sys.modules, "providers", providers_package)
     monkeypatch.setitem(sys.modules, "providers.registry", registry_module)
     monkeypatch.setitem(sys.modules, "live_tv_bindings", live_tv_bindings_module)
-    monkeypatch.setitem(sys.modules, "live_sources", live_sources_module)
-    monkeypatch.setitem(sys.modules, "subscriptions", subscriptions_module)
+    monkeypatch.setitem(
+        sys.modules,
+        "live_sources",
+        live_sources_module,
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "source_lifecycle",
+        source_lifecycle_module,
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "subscriptions",
+        subscriptions_module,
+    )
 
     source = (
         Path(__file__).resolve().parents[2]
@@ -339,3 +409,32 @@ def test_private_sports_missing_follow_target_returns_target_not_found(
         server.server_close()
         thread.join(timeout=2)
 
+
+
+def test_private_sports_image_packages_source_lifecycle() -> None:
+    content = PRIVATE_DOCKERFILE.read_text(
+        encoding="utf-8"
+    )
+
+    assert (
+        "COPY modules/sports/src/source_lifecycle.py "
+        "/srv/sports/source_lifecycle.py"
+        in content
+    )
+
+
+def test_private_sports_writer_declares_source_registry() -> None:
+    content = PRIVATE_API.read_text(
+        encoding="utf-8"
+    )
+
+    assert '"/internal/v1/sources"' in content
+
+    assert (
+        'source_prefix = ('
+        in content
+    )
+
+    assert "SportsSource.from_mapping" in content
+    assert "SourceLifecycleStore" in content
+    assert "rank_source_candidates" in content

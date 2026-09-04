@@ -19,6 +19,12 @@ from live_sources import (
     load_live_source_catalog,
 )
 from providers.registry import enabled_providers
+from source_lifecycle import (
+    SourceLifecycleError,
+    SourceLifecycleStore,
+    SportsSource,
+    rank_source_candidates,
+)
 from subscriptions import (
     create_subscription,
     load_subscriptions,
@@ -199,6 +205,26 @@ class Handler(BaseHTTPRequestHandler):
                 result.append(subscription)
         return result
 
+    @staticmethod
+    def _source_store() -> SourceLifecycleStore:
+        return SourceLifecycleStore()
+
+    @staticmethod
+    def _source_response(
+        sources: tuple[SportsSource, ...],
+    ) -> dict[str, Any]:
+        return {
+            "sources": [
+                source.to_mapping()
+                for source in sources
+            ],
+            "candidates": [
+                candidate.to_mapping()
+                for candidate
+                in rank_source_candidates(sources)
+            ],
+        }
+
     def _read_payload(self) -> dict[str, Any] | None:
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -225,8 +251,29 @@ class Handler(BaseHTTPRequestHandler):
         if not self._require_auth():
             return
 
-        params = urllib.parse.parse_qs(parsed.query, keep_blank_values=False)
-        user_id = str(params.get("user_id", [""])[0]).strip()
+        params = urllib.parse.parse_qs(
+            parsed.query,
+            keep_blank_values=False,
+        )
+
+        if parsed.path == "/internal/v1/sources":
+            try:
+                sources = (
+                    self._source_store().load()
+                )
+            except SourceLifecycleError:
+                self._backend_unavailable()
+                return
+
+            self._json(
+                HTTPStatus.OK,
+                self._source_response(sources),
+            )
+            return
+
+        user_id = str(
+            params.get("user_id", [""])[0]
+        ).strip()
         provider_name = str(params.get("provider", ["thesportsdb"])[0]).strip()
 
         if parsed.path == "/internal/v1/live/availability":
@@ -260,6 +307,66 @@ class Handler(BaseHTTPRequestHandler):
             self._json(
                 HTTPStatus.OK,
                 {"availability": availability},
+            )
+            return
+
+        if parsed.path == "/internal/v1/sources":
+            try:
+                source = SportsSource.from_mapping(
+                    payload
+                )
+
+                store = self._source_store()
+                sources = store.load()
+
+                if any(
+                    item.source_id
+                    == source.source_id
+                    for item in sources
+                ):
+                    self._json(
+                        HTTPStatus.CONFLICT,
+                        {
+                            "code": (
+                                "sports_source_exists"
+                            ),
+                            "error": (
+                                "Sports source "
+                                "already exists."
+                            ),
+                        },
+                    )
+                    return
+
+                updated = (
+                    *sources,
+                    source,
+                )
+
+                store.write(updated)
+
+            except SourceLifecycleError as exc:
+                self._json(
+                    HTTPStatus.UNPROCESSABLE_ENTITY,
+                    {
+                        "code": (
+                            "sports_source_invalid"
+                        ),
+                        "error": str(exc),
+                    },
+                )
+                return
+
+            self._json(
+                HTTPStatus.CREATED,
+                {
+                    "source": (
+                        source.to_mapping()
+                    ),
+                    **self._source_response(
+                        tuple(updated)
+                    ),
+                },
             )
             return
 
@@ -427,6 +534,7 @@ class Handler(BaseHTTPRequestHandler):
             "/internal/v1/events/request",
             "/internal/v1/subscriptions",
             "/internal/v1/live-tv/bindings",
+            "/internal/v1/sources",
         }:
             self._json(HTTPStatus.NOT_FOUND, {"error": "Not found."})
             return
@@ -521,7 +629,134 @@ class Handler(BaseHTTPRequestHandler):
         self._json(HTTPStatus.OK, {"subscription": subscription, "created": created})
 
     def do_PATCH(self) -> None:
-        parsed = urllib.parse.urlsplit(self.path)
+        parsed = urllib.parse.urlsplit(
+            self.path
+        )
+
+        source_prefix = (
+            "/internal/v1/sources/"
+        )
+
+        if parsed.path.startswith(
+            source_prefix
+        ):
+            if not self._require_auth():
+                return
+
+            source_id = urllib.parse.unquote(
+                parsed.path[
+                    len(source_prefix):
+                ]
+            ).strip()
+
+            if not source_id:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {
+                        "error": (
+                            "source_id is required."
+                        )
+                    },
+                )
+                return
+
+            payload = self._read_payload()
+
+            if payload is None:
+                return
+
+            try:
+                store = self._source_store()
+                sources = store.load()
+
+                current = next(
+                    (
+                        item
+                        for item in sources
+                        if item.source_id
+                        == source_id
+                    ),
+                    None,
+                )
+
+                if current is None:
+                    self._json(
+                        HTTPStatus.NOT_FOUND,
+                        {
+                            "code": (
+                                "sports_source_not_found"
+                            ),
+                            "error": (
+                                "Sports source "
+                                "was not found."
+                            ),
+                        },
+                    )
+                    return
+
+                if (
+                    "source_id" in payload
+                    and str(
+                        payload["source_id"]
+                    ).strip()
+                    != source_id
+                ):
+                    raise SourceLifecycleError(
+                        "source_id cannot "
+                        "be changed"
+                    )
+
+                merged = (
+                    current.to_mapping()
+                )
+
+                merged.update(payload)
+                merged["source_id"] = (
+                    source_id
+                )
+
+                updated_source = (
+                    SportsSource.from_mapping(
+                        merged
+                    )
+                )
+
+                updated = tuple(
+                    updated_source
+                    if item.source_id
+                    == source_id
+                    else item
+                    for item in sources
+                )
+
+                store.write(updated)
+
+            except SourceLifecycleError as exc:
+                self._json(
+                    HTTPStatus.UNPROCESSABLE_ENTITY,
+                    {
+                        "code": (
+                            "sports_source_invalid"
+                        ),
+                        "error": str(exc),
+                    },
+                )
+                return
+
+            self._json(
+                HTTPStatus.OK,
+                {
+                    "source": (
+                        updated_source
+                        .to_mapping()
+                    ),
+                    **self._source_response(
+                        updated
+                    ),
+                },
+            )
+            return
+
         prefix = "/internal/v1/subscriptions/"
         suffix = "/recording"
 
@@ -606,9 +841,87 @@ class Handler(BaseHTTPRequestHandler):
         )
 
     def do_DELETE(self) -> None:
-        parsed = urllib.parse.urlsplit(self.path)
+        parsed = urllib.parse.urlsplit(
+            self.path
+        )
 
-        binding_prefix = "/internal/v1/live-tv/bindings/"
+        source_prefix = (
+            "/internal/v1/sources/"
+        )
+
+        if parsed.path.startswith(
+            source_prefix
+        ):
+            if not self._require_auth():
+                return
+
+            source_id = urllib.parse.unquote(
+                parsed.path[
+                    len(source_prefix):
+                ]
+            ).strip()
+
+            if not source_id:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {
+                        "error": (
+                            "source_id is required."
+                        )
+                    },
+                )
+                return
+
+            try:
+                store = self._source_store()
+                sources = store.load()
+
+                updated = tuple(
+                    item
+                    for item in sources
+                    if item.source_id
+                    != source_id
+                )
+
+                if (
+                    len(updated)
+                    == len(sources)
+                ):
+                    self._json(
+                        HTTPStatus.NOT_FOUND,
+                        {
+                            "code": (
+                                "sports_source_not_found"
+                            ),
+                            "error": (
+                                "Sports source "
+                                "was not found."
+                            ),
+                        },
+                    )
+                    return
+
+                store.write(updated)
+
+            except SourceLifecycleError:
+                self._backend_unavailable()
+                return
+
+            self._json(
+                HTTPStatus.OK,
+                {
+                    "removed": True,
+                    "source_id": source_id,
+                    **self._source_response(
+                        updated
+                    ),
+                },
+            )
+            return
+
+        binding_prefix = (
+            "/internal/v1/live-tv/bindings/"
+        )
         if parsed.path.startswith(binding_prefix):
             if not self._require_auth():
                 return
@@ -691,6 +1004,7 @@ def main() -> int:
         )
 
     default_live_tv_binding_registry().ensure()
+    SourceLifecycleStore().ensure()
 
     server = ThreadingHTTPServer(
         (args.host, args.port),

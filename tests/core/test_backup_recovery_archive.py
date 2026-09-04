@@ -38,6 +38,7 @@ SURFACES = (
     ("retention", "state/retention", "required", "directory", True),
     ("sports-subscriptions", "state/sports/subscriptions.json", "required", "file", True),
     ("sports-live-tv-bindings", "state/sports/live-tv-bindings.json", "required", "file", True),
+    ("sports-source-lifecycle", "state/sports/source-lifecycle.json", "required", "file", True),
     ("sports-recordings", "state/sports/recordings.json", "required", "file", True),
     ("sports-scheduler", "state/sports/scheduler.json", "required", "file", True),
 )
@@ -64,6 +65,7 @@ def _build_archive(
         "state/sports/recordings.json": "recordings-v1\n",
         "state/sports/scheduler.json": "sports-scheduler-v1\n",
         "state/sports/live-tv-bindings.json": '{"version":1,"bindings":{}}\n',
+        "state/sports/source-lifecycle.json": '{"version":1,"sources":[]}\n',
     }
 
     if omit_scheduler:

@@ -308,6 +308,44 @@ def validate(root: Path, project_root: Path) -> list[tuple[str, str, str]]:
         )
     )
 
+    source_lifecycle_path = (
+        state / "sports/source-lifecycle.json"
+    )
+    sports_source_root = (
+        project_root / "modules" / "sports" / "src"
+    )
+
+    sys.path.insert(
+        0,
+        str(sports_source_root),
+    )
+
+    try:
+        from source_lifecycle import (
+            SourceLifecycleStore,
+        )
+
+        source_lifecycle = (
+            SourceLifecycleStore(
+                source_lifecycle_path
+            ).load()
+        )
+    finally:
+        try:
+            sys.path.remove(
+                str(sports_source_root)
+            )
+        except ValueError:
+            pass
+
+    results.append(
+        (
+            "sports-source-lifecycle",
+            "PASS",
+            f"{len(source_lifecycle)} sources",
+        )
+    )
+
     recording_document = _json_object(recordings_path)
     _require(all(isinstance(item, dict) for item in recording_document.values()), "Sports recording entries must be objects")
     loaded_recordings = sports_recordings.load_recordings()

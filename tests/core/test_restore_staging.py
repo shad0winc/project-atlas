@@ -24,6 +24,7 @@ SURFACES = (
     ("retention", "state/retention", "required", "directory", True),
     ("sports-subscriptions", "state/sports/subscriptions.json", "required", "file", True),
     ("sports-live-tv-bindings", "state/sports/live-tv-bindings.json", "required", "file", True),
+    ("sports-source-lifecycle", "state/sports/source-lifecycle.json", "required", "file", True),
     ("sports-recordings", "state/sports/recordings.json", "required", "file", True),
     ("sports-scheduler", "state/sports/scheduler.json", "required", "file", True),
 )
@@ -71,6 +72,7 @@ def _build_archive(tmp_path: Path) -> tuple[Path, dict[str, str]]:
         "state/sports/recordings.json": "recordings-v1\n",
         "state/sports/scheduler.json": "sports-scheduler-v1\n",
         "state/sports/live-tv-bindings.json": '{"version":1,"bindings":{}}\n',
+        "state/sports/source-lifecycle.json": '{"version":1,"sources":[]}\n',
     }
     for relative, value in files.items():
         target = stage / relative
@@ -330,7 +332,7 @@ def test_restore_plan_maps_only_declared_surfaces(tmp_path: Path) -> None:
 
         assert result.returncode == 0, result.stderr
         rows = [line.split("\t") for line in result.stdout.splitlines() if line]
-        assert len(rows) == 12
+        assert len(rows) == 13
         by_surface = {row[0]: row for row in rows}
         assert set(by_surface) == {surface for surface, *_ in SURFACES}
         assert by_surface["users"][1] == "replace"
