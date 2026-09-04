@@ -89,3 +89,41 @@ def test_session_ownership_prevents_cross_user_heartbeat_or_release() -> None:
 
     assert registry.release(session_id="session-1", user_id="usr-a") is True
     assert registry.active_count_for_user("usr-a") == 0
+
+
+def test_snapshot_active_returns_relative_safe_state_and_prunes_stale() -> None:
+    now = [100.0]
+    ids = iter(("session-b", "session-a"))
+    registry = LiveSessionRegistry(
+        ttl_seconds=90,
+        clock=lambda: now[0],
+        session_id_factory=lambda: next(ids),
+    )
+
+    registry.admit(user_id="usr-b", target_id="event-b", limit=5)
+    now[0] = 110.0
+    registry.admit(user_id="usr-a", target_id="event-a", limit=5)
+    now[0] = 125.0
+    registry.heartbeat(session_id="session-b", user_id="usr-b")
+    now[0] = 140.0
+
+    snapshot = registry.snapshot_active()
+
+    assert [(item.user_id, item.session_id) for item in snapshot] == [
+        ("usr-a", "session-a"),
+        ("usr-b", "session-b"),
+    ]
+
+    first, second = snapshot
+    assert first.target_id == "event-a"
+    assert first.age_seconds == 30
+    assert first.heartbeat_age_seconds == 30
+    assert second.target_id == "event-b"
+    assert second.age_seconds == 40
+    assert second.heartbeat_age_seconds == 15
+
+    assert not hasattr(first, "created_at")
+    assert not hasattr(first, "last_seen_at")
+
+    now[0] = 231.0
+    assert registry.snapshot_active() == ()

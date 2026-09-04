@@ -34,6 +34,17 @@ class LiveSessionRecord:
     last_seen_at: float
 
 
+@dataclass(frozen=True, slots=True)
+class LiveSessionSnapshot:
+    """Credential-safe relative-time view of one active Live session."""
+
+    session_id: str
+    user_id: str
+    target_id: str
+    age_seconds: int
+    heartbeat_age_seconds: int
+
+
 class LiveSessionRegistry:
     def __init__(
         self,
@@ -162,6 +173,26 @@ class LiveSessionRegistry:
                 )
             )
 
+    def snapshot_active(self) -> tuple[LiveSessionSnapshot, ...]:
+        """Return a pruned, credential-safe snapshot of all active sessions."""
+
+        now = self._clock()
+        with self._lock:
+            self._prune_stale(now)
+            return tuple(
+                LiveSessionSnapshot(
+                    session_id=record.session_id,
+                    user_id=record.user_id,
+                    target_id=record.target_id,
+                    age_seconds=int(max(0.0, now - record.created_at)),
+                    heartbeat_age_seconds=int(max(0.0, now - record.last_seen_at)),
+                )
+                for record in sorted(
+                    self._sessions.values(),
+                    key=lambda record: (record.user_id, record.session_id),
+                )
+            )
+
     def _prune_stale(self, now: float) -> None:
         stale = [
             session_id
@@ -204,5 +235,6 @@ __all__ = [
     "LiveSessionNotFound",
     "LiveSessionRecord",
     "LiveSessionRegistry",
+    "LiveSessionSnapshot",
     "live_session_registry_from_environment",
 ]
