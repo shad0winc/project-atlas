@@ -49,6 +49,36 @@ class IdentityWriterClient:
         self.token = token
         self.timeout_seconds = timeout_seconds
 
+    def set_live_session_default_limit(self, limit: int) -> dict[str, object]:
+        """Persist the global Atlas Live-session concurrency limit."""
+        return self._request(
+            "PATCH",
+            "/internal/v1/live-session-policy/default",
+            {"limit": limit},
+        )
+
+    def set_live_session_user_override(
+        self,
+        user_id: str,
+        limit: int,
+    ) -> dict[str, object]:
+        """Persist one per-user Atlas Live-session concurrency override."""
+        return self._request(
+            "PUT",
+            f"/internal/v1/live-session-policy/users/{user_id}",
+            {"limit": limit},
+        )
+
+    def clear_live_session_user_override(
+        self,
+        user_id: str,
+    ) -> dict[str, object]:
+        """Remove one per-user override so the global default applies."""
+        return self._request(
+            "DELETE",
+            f"/internal/v1/live-session-policy/users/{user_id}",
+        )
+
     def _request(
         self,
         method: str,

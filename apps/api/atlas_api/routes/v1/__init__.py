@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from .admin_downloads import router as admin_downloads_router
 from .admin_invitations import router as admin_invitations_router
 from .admin_roles import router as admin_roles_router
+from .admin_live_sessions import router as admin_live_sessions_router
 from .admin_users import router as admin_users_router
 from .auth import router as auth_router
 from .dashboard import router as dashboard_router
@@ -30,6 +31,7 @@ router = APIRouter(
 
 router.include_router(health_router)
 router.include_router(auth_router)
+router.include_router(admin_live_sessions_router)
 router.include_router(admin_users_router)
 router.include_router(admin_roles_router)
 router.include_router(admin_downloads_router)

@@ -36,6 +36,10 @@ from atlas_api.services.user_provisioning import (
     UserProvisioningError,
     UserProvisioningService,
 )
+from atlas.live_session_policy import (
+    LiveSessionPolicyError,
+    default_live_session_policy_store,
+)
 
 
 def _required_environment(name: str) -> str:
@@ -333,6 +337,13 @@ def _safe_user_response(
         "status": profile["status"],
         "jellyfin_user_id": profile.get("jellyfin_user_id"),
     }
+
+
+class LiveSessionLimitRequest(BaseModel):
+    """Private mutation payload for one Atlas Live-session limit."""
+
+    model_config = ConfigDict(extra="forbid")
+    limit: Any
 
 
 @app.get("/health")
@@ -657,6 +668,62 @@ def revoke_invitation(
             status_code=code,
             detail=message,
         ) from error
+
+
+@app.patch(
+    "/internal/v1/live-session-policy/default",
+    dependencies=[Depends(_require_service_token)],
+)
+def set_live_session_default_limit(
+    request: LiveSessionLimitRequest,
+) -> dict[str, int]:
+    """Persist one already-authorized global Live-session limit."""
+    try:
+        limit = default_live_session_policy_store().set_default_limit(request.limit)
+    except LiveSessionPolicyError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+    return {"default_limit": limit}
+
+
+@app.put(
+    "/internal/v1/live-session-policy/users/{user_id}",
+    dependencies=[Depends(_require_service_token)],
+)
+def set_live_session_user_override(
+    user_id: str,
+    request: LiveSessionLimitRequest,
+) -> dict[str, Any]:
+    """Persist one already-authorized per-user Live-session override."""
+    try:
+        limit = default_live_session_policy_store().set_override(
+            user_id,
+            request.limit,
+        )
+    except LiveSessionPolicyError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+    return {"user_id": user_id.strip(), "override_limit": limit}
+
+
+@app.delete(
+    "/internal/v1/live-session-policy/users/{user_id}",
+    dependencies=[Depends(_require_service_token)],
+)
+def clear_live_session_user_override(user_id: str) -> dict[str, Any]:
+    """Remove one already-authorized per-user Live-session override."""
+    try:
+        default_live_session_policy_store().clear_override(user_id)
+    except LiveSessionPolicyError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+    return {"user_id": user_id.strip(), "override_limit": None}
 
 
 def main() -> None:
