@@ -808,6 +808,128 @@ class JellyfinProvider:
             .replace("+00:00", "Z")
         )
 
+    def list_live_tv_channels(
+        self,
+        *,
+        page_size: int = 200,
+    ) -> tuple[dict[str, str | None], ...]:
+        """Return safe Jellyfin Live TV channel identity metadata."""
+
+        if (
+            isinstance(page_size, bool)
+            or not isinstance(page_size, int)
+            or page_size <= 0
+        ):
+            raise MediaProviderError(
+                "page_size must be a positive integer"
+            )
+
+        channels: list[dict[str, str | None]] = []
+        seen_ids: set[str] = set()
+        start_index = 0
+
+        while True:
+            query = urlencode(
+                {
+                    "StartIndex": start_index,
+                    "Limit": page_size,
+                }
+            )
+            payload = self._get_json(
+                f"/LiveTv/Channels?{query}"
+            )
+
+            if not isinstance(payload, dict):
+                raise MediaProviderError(
+                    "Jellyfin returned an invalid Live TV channel list response"
+                )
+
+            items = payload.get("Items")
+            total = payload.get("TotalRecordCount")
+
+            if not isinstance(items, list):
+                raise MediaProviderError(
+                    "Jellyfin Live TV channel list is invalid"
+                )
+
+            if (
+                isinstance(total, bool)
+                or not isinstance(total, int)
+                or total < 0
+            ):
+                raise MediaProviderError(
+                    "Jellyfin Live TV channel count is invalid"
+                )
+
+            for item in items:
+                if not isinstance(item, dict):
+                    raise MediaProviderError(
+                        "Jellyfin returned an invalid Live TV channel entry"
+                    )
+
+                item_id = _required(
+                    item.get("Id"),
+                    "Jellyfin Live TV channel ID",
+                )
+                normalized_id = item_id.lower()
+
+                if normalized_id in seen_ids:
+                    raise MediaProviderError(
+                        "duplicate Jellyfin Live TV channel ID"
+                    )
+
+                raw_type = _required(
+                    item.get("Type"),
+                    "Jellyfin Live TV channel type",
+                )
+                normalized_type = raw_type.lower()
+
+                if normalized_type not in {
+                    "tvchannel",
+                    "livetvchannel",
+                    "channel",
+                }:
+                    raise MediaProviderError(
+                        "Jellyfin returned a non-Live-TV channel entry"
+                    )
+
+                name = _required(
+                    item.get("Name"),
+                    "Jellyfin Live TV channel name",
+                )
+
+                raw_number = item.get("Number")
+                if raw_number is None:
+                    channel_number = None
+                elif isinstance(raw_number, str):
+                    channel_number = raw_number.strip() or None
+                else:
+                    raise MediaProviderError(
+                        "Jellyfin Live TV channel number is invalid"
+                    )
+
+                seen_ids.add(normalized_id)
+                channels.append(
+                    {
+                        "item_id": item_id,
+                        "name": name,
+                        "channel_number": channel_number,
+                        "type": raw_type,
+                    }
+                )
+
+            start_index += len(items)
+
+            if start_index >= total:
+                break
+
+            if not items:
+                raise MediaProviderError(
+                    "Jellyfin Live TV channel pagination stalled"
+                )
+
+        return tuple(channels)
+
     def list_media_item_ids(
         self,
         *,
