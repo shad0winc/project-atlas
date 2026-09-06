@@ -604,6 +604,442 @@ class SportsWriterBackedAPIService:
             )
         return removed
 
+    @staticmethod
+    def _safe_source_registry_payload(
+        payload: Mapping[str, Any],
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Validate the credential-safe source registry boundary."""
+
+        providers = payload.get("providers")
+        sources = payload.get("sources")
+
+        if not isinstance(providers, list):
+            raise SportsWriterTransportError(
+                "Private Sports service returned "
+                "an invalid providers payload."
+            )
+
+        if not isinstance(sources, list):
+            raise SportsWriterTransportError(
+                "Private Sports service returned "
+                "an invalid sources payload."
+            )
+
+        safe_providers: list[
+            dict[str, Any]
+        ] = []
+
+        safe_sources: list[
+            dict[str, Any]
+        ] = []
+
+        forbidden = {
+            "password",
+            "username",
+            "server_url",
+            "url",
+            "token",
+            "api_key",
+            "apikey",
+            "secret",
+        }
+
+        def assert_safe(
+            value: object,
+        ) -> None:
+            if isinstance(value, dict):
+                for raw_key, child in value.items():
+                    key = (
+                        str(raw_key)
+                        .strip()
+                        .lower()
+                    )
+
+                    if key in forbidden:
+                        raise SportsWriterTransportError(
+                            "Private Sports service returned "
+                            "credential-bearing source metadata."
+                        )
+
+                    assert_safe(child)
+
+            elif isinstance(value, list):
+                for child in value:
+                    assert_safe(child)
+
+        for provider in providers:
+            if not isinstance(
+                provider,
+                dict,
+            ):
+                raise SportsWriterTransportError(
+                    "Private Sports service returned "
+                    "an invalid provider entry."
+                )
+
+            assert_safe(provider)
+
+            safe_providers.append(
+                dict(provider)
+            )
+
+        for source in sources:
+            if not isinstance(
+                source,
+                dict,
+            ):
+                raise SportsWriterTransportError(
+                    "Private Sports service returned "
+                    "an invalid source entry."
+                )
+
+            assert_safe(source)
+
+            safe_sources.append(
+                dict(source)
+            )
+
+        return {
+            "providers": safe_providers,
+            "sources": safe_sources,
+        }
+
+    def get_source_registry(
+        self,
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Return credential-safe Sports provider/account metadata."""
+
+        return self._safe_source_registry_payload(
+            self._request(
+                "GET",
+                "/internal/v1/sources",
+            )
+        )
+
+    def update_provider_display_name(
+        self,
+        *,
+        provider_id: str,
+        display_name: str,
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Rename one provider without changing stable identity."""
+
+        normalized_provider_id = (
+            provider_id.strip()
+        )
+
+        if not normalized_provider_id:
+            raise ValueError(
+                "provider_id is required"
+            )
+
+        normalized_display_name = (
+            display_name.strip()
+        )
+
+        if not normalized_display_name:
+            raise ValueError(
+                "provider display name is required"
+            )
+
+        payload = self._request(
+            "PATCH",
+            "/internal/v1/providers/"
+            + urllib.parse.quote(
+                normalized_provider_id,
+                safe="",
+            ),
+            {
+                "provider_display_name": (
+                    normalized_display_name
+                ),
+            },
+        )
+
+        return self._safe_source_registry_payload(
+            payload
+        )
+
+    def update_source_metadata(
+        self,
+        *,
+        source_id: str,
+        fields: Mapping[str, Any],
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Update only safe editable account metadata."""
+
+        normalized_source_id = (
+            source_id.strip()
+        )
+
+        if not normalized_source_id:
+            raise ValueError(
+                "source_id is required"
+            )
+
+        allowed = {
+            "account_display_name",
+            "enabled",
+            "max_connections",
+        }
+
+        unsupported = (
+            set(fields)
+            - allowed
+        )
+
+        if unsupported:
+            raise ValueError(
+                "unsupported Sports source "
+                "metadata fields"
+            )
+
+        if not fields:
+            raise ValueError(
+                "at least one Sports source "
+                "metadata field is required"
+            )
+
+        payload = self._request(
+            "PATCH",
+            "/internal/v1/sources/"
+            + urllib.parse.quote(
+                normalized_source_id,
+                safe="",
+            ),
+            dict(fields),
+        )
+
+        return self._safe_source_registry_payload(
+            payload
+        )
+
+    def update_dispatcharr_credentials(
+        self,
+        *,
+        source_id: str,
+        server_url: str | None = None,
+        username: str | None = None,
+        password: str | None = None,
+    ) -> dict[str, Any]:
+        """Update only allowlisted provider authentication fields."""
+
+        normalized_source_id = (
+            source_id.strip()
+        )
+
+        if not normalized_source_id:
+            raise ValueError(
+                "source_id is required"
+            )
+
+        body: dict[str, Any] = {}
+
+        if server_url is not None:
+            body[
+                "server_url"
+            ] = server_url
+
+        if username is not None:
+            body[
+                "username"
+            ] = username
+
+        if password is not None:
+            body[
+                "password"
+            ] = password
+
+        if not body:
+            raise ValueError(
+                "At least one connection "
+                "field is required"
+            )
+
+        payload = self._request(
+            "PATCH",
+            "/internal/v1/sources/"
+            + urllib.parse.quote(
+                normalized_source_id,
+                safe="",
+            )
+            + "/credentials",
+            body,
+        )
+
+        account = payload.get(
+            "account"
+        )
+
+        if not isinstance(
+            account,
+            dict,
+        ):
+            raise SportsWriterTransportError(
+                "Private Sports service returned "
+                "an invalid Dispatcharr account."
+            )
+
+        allowed = {
+            "account_id",
+            "name",
+            "account_type",
+            "enabled",
+            "configured_max_connections",
+            "credentials_configured",
+        }
+
+        if set(account) != allowed:
+            raise SportsWriterTransportError(
+                "Private Sports service returned "
+                "an unsafe Dispatcharr account."
+            )
+
+        if not isinstance(
+            account.get(
+                "credentials_configured"
+            ),
+            bool,
+        ):
+            raise SportsWriterTransportError(
+                "Private Sports service returned "
+                "invalid credential status."
+            )
+
+        return dict(account)
+
+    def get_dispatcharr_account(
+        self,
+        *,
+        source_id: str,
+    ) -> dict[str, Any]:
+        """Return only secret-safe Dispatcharr account state."""
+
+        normalized_source_id = (
+            source_id.strip()
+        )
+
+        if not normalized_source_id:
+            raise ValueError(
+                "source_id is required"
+            )
+
+        payload = self._request(
+            "GET",
+            "/internal/v1/sources/"
+            + urllib.parse.quote(
+                normalized_source_id,
+                safe="",
+            )
+            + "/dispatcharr-account",
+        )
+
+        account = payload.get(
+            "account"
+        )
+
+        if not isinstance(
+            account,
+            dict,
+        ):
+            raise SportsWriterTransportError(
+                "Private Sports service returned "
+                "an invalid Dispatcharr account."
+            )
+
+        allowed = {
+            "account_id",
+            "name",
+            "account_type",
+            "enabled",
+            "configured_max_connections",
+            "credentials_configured",
+        }
+
+        if set(account) != allowed:
+            raise SportsWriterTransportError(
+                "Private Sports service returned "
+                "an unsafe Dispatcharr account."
+            )
+
+        if not isinstance(
+            account.get(
+                "credentials_configured"
+            ),
+            bool,
+        ):
+            raise SportsWriterTransportError(
+                "Private Sports service returned "
+                "invalid credential status."
+            )
+
+        return dict(account)
+
+    def test_dispatcharr_connection(
+        self,
+        *,
+        source_id: str,
+    ) -> dict[str, Any]:
+        """Run one secret-safe provider authentication probe."""
+
+        normalized_source_id = (
+            source_id.strip()
+        )
+
+        if not normalized_source_id:
+            raise ValueError(
+                "source_id is required"
+            )
+
+        payload = self._request(
+            "POST",
+            "/internal/v1/sources/"
+            + urllib.parse.quote(
+                normalized_source_id,
+                safe="",
+            )
+            + "/test-connection",
+            {},
+        )
+
+        connection = payload.get(
+            "connection"
+        )
+
+        if not isinstance(
+            connection,
+            dict,
+        ):
+            raise SportsWriterTransportError(
+                "Private Sports service returned "
+                "an invalid connection test."
+            )
+
+        allowed = {
+            "ok",
+            "status",
+            "expires_at",
+            "provider_max_connections",
+            "active_connections",
+        }
+
+        if set(connection) != allowed:
+            raise SportsWriterTransportError(
+                "Private Sports service returned "
+                "an unsafe connection test."
+            )
+
+        if not isinstance(
+            connection.get("ok"),
+            bool,
+        ):
+            raise SportsWriterTransportError(
+                "Private Sports service returned "
+                "invalid connection-test status."
+            )
+
+        return dict(connection)
+
     def _request(
         self,
         method: str,

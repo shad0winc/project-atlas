@@ -54,6 +54,9 @@ fi
 grep -Fq 'DISPATCHARR_ENV: "aio"' "$COMPOSE_FILE" ||
     fail "Dispatcharr AIO mode is not explicit"
 
+grep -Fq 'DISPATCHARR_LOG_LEVEL: "WARNING"' "$COMPOSE_FILE" ||
+    fail "Dispatcharr safe logging level is not explicit"
+
 grep -Fq ':/data' "$COMPOSE_FILE" ||
     fail "Dispatcharr persistent /data mount is missing"
 

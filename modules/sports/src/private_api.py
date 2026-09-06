@@ -23,6 +23,7 @@ from source_lifecycle import (
     SourceLifecycleError,
     SourceLifecycleStore,
     SportsSource,
+    group_source_providers,
     rank_source_candidates,
 )
 from subscriptions import (
@@ -210,18 +211,73 @@ class Handler(BaseHTTPRequestHandler):
         return SourceLifecycleStore()
 
     @staticmethod
+    def _dispatcharr_account_id(
+        source: SportsSource,
+    ) -> int:
+        """Resolve an opaque lifecycle backend reference safely."""
+
+        reference = str(
+            source.backend_reference
+            or ""
+        ).strip()
+
+        prefix = "dispatcharr:m3u:"
+
+        if not reference.startswith(
+            prefix
+        ):
+            raise SourceLifecycleError(
+                "Sports source is not backed "
+                "by a Dispatcharr M3U account."
+            )
+
+        raw_id = reference[
+            len(prefix):
+        ]
+
+        try:
+            account_id = int(
+                raw_id
+            )
+        except ValueError as error:
+            raise SourceLifecycleError(
+                "Sports source Dispatcharr "
+                "reference is invalid."
+            ) from error
+
+        if account_id < 1:
+            raise SourceLifecycleError(
+                "Sports source Dispatcharr "
+                "reference is invalid."
+            )
+
+        return account_id
+
+    @staticmethod
     def _source_response(
-        sources: tuple[SportsSource, ...],
+        sources: tuple[
+            SportsSource,
+            ...,
+        ],
     ) -> dict[str, Any]:
         return {
             "sources": [
                 source.to_mapping()
                 for source in sources
             ],
+            "providers": [
+                provider.to_mapping()
+                for provider
+                in group_source_providers(
+                    sources
+                )
+            ],
             "candidates": [
                 candidate.to_mapping()
                 for candidate
-                in rank_source_candidates(sources)
+                in rank_source_candidates(
+                    sources
+                )
             ],
         }
 
@@ -249,6 +305,155 @@ class Handler(BaseHTTPRequestHandler):
             self._json(HTTPStatus.OK, {"status": "ok"})
             return
         if not self._require_auth():
+            return
+
+        source_dispatcharr_prefix = (
+            "/internal/v1/sources/"
+        )
+        source_dispatcharr_suffix = (
+            "/dispatcharr-account"
+        )
+
+        if (
+            parsed.path.startswith(
+                source_dispatcharr_prefix
+            )
+            and parsed.path.endswith(
+                source_dispatcharr_suffix
+            )
+        ):
+            source_id = urllib.parse.unquote(
+                parsed.path[
+                    len(
+                        source_dispatcharr_prefix
+                    ):
+                    -len(
+                        source_dispatcharr_suffix
+                    )
+                ]
+            ).strip()
+
+            if not source_id:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {
+                        "error": (
+                            "source_id is required."
+                        )
+                    },
+                )
+                return
+
+            try:
+                sources = (
+                    self._source_store()
+                    .load()
+                )
+
+                source = next(
+                    (
+                        item
+                        for item in sources
+                        if (
+                            item.source_id
+                            == source_id
+                        )
+                    ),
+                    None,
+                )
+
+                if source is None:
+                    self._json(
+                        HTTPStatus.NOT_FOUND,
+                        {
+                            "code": (
+                                "sports_source_not_found"
+                            ),
+                            "error": (
+                                "Sports source "
+                                "was not found."
+                            ),
+                        },
+                    )
+                    return
+
+                account_id = (
+                    self._dispatcharr_account_id(
+                        source
+                    )
+                )
+
+                from dispatcharr_admin import (
+                    DispatcharrAccountNotFoundError,
+                    DispatcharrAdminClient,
+                    DispatcharrAdminError,
+                )
+
+                try:
+                    account = (
+                        DispatcharrAdminClient
+                        .from_environment()
+                        .read_account(
+                            account_id
+                        )
+                    )
+                except (
+                    DispatcharrAccountNotFoundError
+                ):
+                    self._json(
+                        HTTPStatus.NOT_FOUND,
+                        {
+                            "code": (
+                                "dispatcharr_account_"
+                                "not_found"
+                            ),
+                            "error": (
+                                "Dispatcharr account "
+                                "was not found."
+                            ),
+                        },
+                    )
+                    return
+                except DispatcharrAdminError:
+                    self._json(
+                        HTTPStatus.SERVICE_UNAVAILABLE,
+                        {
+                            "code": (
+                                "dispatcharr_admin_"
+                                "unavailable"
+                            ),
+                            "error": (
+                                "Dispatcharr "
+                                "administration is "
+                                "unavailable."
+                            ),
+                        },
+                    )
+                    return
+
+            except SourceLifecycleError:
+                self._json(
+                    HTTPStatus.UNPROCESSABLE_ENTITY,
+                    {
+                        "code": (
+                            "sports_source_invalid"
+                        ),
+                        "error": (
+                            "Sports source backend "
+                            "configuration is invalid."
+                        ),
+                    },
+                )
+                return
+
+            self._json(
+                HTTPStatus.OK,
+                {
+                    "account": (
+                        account.to_mapping()
+                    )
+                },
+            )
             return
 
         params = urllib.parse.parse_qs(
@@ -530,6 +735,140 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urllib.parse.urlsplit(self.path)
+
+        source_test_prefix = (
+            "/internal/v1/sources/"
+        )
+        source_test_suffix = (
+            "/test-connection"
+        )
+
+        if (
+            parsed.path.startswith(
+                source_test_prefix
+            )
+            and parsed.path.endswith(
+                source_test_suffix
+            )
+        ):
+            if not self._require_auth():
+                return
+
+            source_id = urllib.parse.unquote(
+                parsed.path[
+                    len(
+                        source_test_prefix
+                    ):
+                    -len(
+                        source_test_suffix
+                    )
+                ]
+            ).strip()
+
+            if not source_id:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {
+                        "error": (
+                            "source_id is required."
+                        )
+                    },
+                )
+                return
+
+            try:
+                sources = (
+                    self._source_store()
+                    .load()
+                )
+
+                source = next(
+                    (
+                        item
+                        for item in sources
+                        if (
+                            item.source_id
+                            == source_id
+                        )
+                    ),
+                    None,
+                )
+
+                if source is None:
+                    self._json(
+                        HTTPStatus.NOT_FOUND,
+                        {
+                            "code": (
+                                "sports_source_not_found"
+                            ),
+                            "error": (
+                                "Sports source "
+                                "was not found."
+                            ),
+                        },
+                    )
+                    return
+
+                account_id = (
+                    self._dispatcharr_account_id(
+                        source
+                    )
+                )
+
+                from dispatcharr_admin import (
+                    DispatcharrAdminClient,
+                    DispatcharrAdminError,
+                )
+
+                try:
+                    result = (
+                        DispatcharrAdminClient
+                        .from_environment()
+                        .test_connection(
+                            account_id=account_id
+                        )
+                    )
+                except DispatcharrAdminError:
+                    self._json(
+                        HTTPStatus.SERVICE_UNAVAILABLE,
+                        {
+                            "code": (
+                                "dispatcharr_test_"
+                                "unavailable"
+                            ),
+                            "error": (
+                                "Provider connection "
+                                "test is unavailable."
+                            ),
+                        },
+                    )
+                    return
+
+            except SourceLifecycleError:
+                self._json(
+                    HTTPStatus.UNPROCESSABLE_ENTITY,
+                    {
+                        "code": (
+                            "sports_source_invalid"
+                        ),
+                        "error": (
+                            "Sports source backend "
+                            "configuration is invalid."
+                        ),
+                    },
+                )
+                return
+
+            self._json(
+                HTTPStatus.OK,
+                {
+                    "connection": (
+                        result.to_mapping()
+                    )
+                },
+            )
+            return
+
         if parsed.path not in {
             "/internal/v1/events/request",
             "/internal/v1/subscriptions",
@@ -633,6 +972,353 @@ class Handler(BaseHTTPRequestHandler):
             self.path
         )
 
+        provider_prefix = (
+            "/internal/v1/providers/"
+        )
+
+        if parsed.path.startswith(
+            provider_prefix
+        ):
+            if not self._require_auth():
+                return
+
+            provider_id = urllib.parse.unquote(
+                parsed.path[
+                    len(provider_prefix):
+                ]
+            ).strip()
+
+            if not provider_id:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {
+                        "error": (
+                            "provider_id is required."
+                        )
+                    },
+                )
+                return
+
+            payload = self._read_payload()
+
+            if payload is None:
+                return
+
+            try:
+                allowed_fields = {
+                    "provider_display_name",
+                }
+
+                unsupported = (
+                    set(payload)
+                    - allowed_fields
+                )
+
+                if unsupported:
+                    raise SourceLifecycleError(
+                        "unsupported provider fields: "
+                        + ", ".join(
+                            sorted(unsupported)
+                        )
+                    )
+
+                if (
+                    "provider_display_name"
+                    not in payload
+                ):
+                    raise SourceLifecycleError(
+                        "provider_display_name "
+                        "is required"
+                    )
+
+                store = self._source_store()
+                sources = store.load()
+
+                matching = tuple(
+                    item
+                    for item in sources
+                    if (
+                        item.provider_id
+                        == provider_id
+                    )
+                )
+
+                if not matching:
+                    self._json(
+                        HTTPStatus.NOT_FOUND,
+                        {
+                            "code": (
+                                "sports_source_provider_"
+                                "not_found"
+                            ),
+                            "error": (
+                                "Sports source provider "
+                                "was not found."
+                            ),
+                        },
+                    )
+                    return
+
+                updated = tuple(
+                    SportsSource.from_mapping(
+                        {
+                            **item.to_mapping(),
+                            "provider_display_name": (
+                                payload[
+                                    "provider_display_name"
+                                ]
+                            ),
+                        }
+                    )
+                    if (
+                        item.provider_id
+                        == provider_id
+                    )
+                    else item
+                    for item in sources
+                )
+
+                # Validate the complete provider/account
+                # aggregate before one atomic write.
+                store.write(updated)
+
+            except SourceLifecycleError as exc:
+                self._json(
+                    HTTPStatus.UNPROCESSABLE_ENTITY,
+                    {
+                        "code": (
+                            "sports_source_provider_invalid"
+                        ),
+                        "error": str(exc),
+                    },
+                )
+                return
+
+            self._json(
+                HTTPStatus.OK,
+                self._source_response(
+                    updated
+                ),
+            )
+            return
+
+        source_credentials_prefix = (
+            "/internal/v1/sources/"
+        )
+        source_credentials_suffix = (
+            "/credentials"
+        )
+
+        if (
+            parsed.path.startswith(
+                source_credentials_prefix
+            )
+            and parsed.path.endswith(
+                source_credentials_suffix
+            )
+        ):
+            if not self._require_auth():
+                return
+
+            source_id = urllib.parse.unquote(
+                parsed.path[
+                    len(
+                        source_credentials_prefix
+                    ):
+                    -len(
+                        source_credentials_suffix
+                    )
+                ]
+            ).strip()
+
+            if not source_id:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {
+                        "error": (
+                            "source_id is required."
+                        )
+                    },
+                )
+                return
+
+            payload = self._read_payload()
+
+            if payload is None:
+                return
+
+            allowed_fields = {
+                "server_url",
+                "username",
+                "password",
+            }
+
+            unsupported = (
+                set(payload)
+                - allowed_fields
+            )
+
+            if unsupported:
+                self._json(
+                    HTTPStatus.UNPROCESSABLE_ENTITY,
+                    {
+                        "code": (
+                            "sports_provider_"
+                            "connection_invalid"
+                        ),
+                        "error": (
+                            "Unsupported provider "
+                            "connection fields."
+                        ),
+                    },
+                )
+                return
+
+            if not payload:
+                self._json(
+                    HTTPStatus.UNPROCESSABLE_ENTITY,
+                    {
+                        "code": (
+                            "sports_provider_"
+                            "connection_invalid"
+                        ),
+                        "error": (
+                            "At least one provider "
+                            "connection field is required."
+                        ),
+                    },
+                )
+                return
+
+            try:
+                sources = (
+                    self._source_store()
+                    .load()
+                )
+
+                source = next(
+                    (
+                        item
+                        for item in sources
+                        if (
+                            item.source_id
+                            == source_id
+                        )
+                    ),
+                    None,
+                )
+
+                if source is None:
+                    self._json(
+                        HTTPStatus.NOT_FOUND,
+                        {
+                            "code": (
+                                "sports_source_not_found"
+                            ),
+                            "error": (
+                                "Sports source "
+                                "was not found."
+                            ),
+                        },
+                    )
+                    return
+
+                account_id = (
+                    self._dispatcharr_account_id(
+                        source
+                    )
+                )
+
+                from dispatcharr_admin import (
+                    DispatcharrAccountNotFoundError,
+                    DispatcharrAdminClient,
+                    DispatcharrAdminError,
+                )
+
+                try:
+                    account = (
+                        DispatcharrAdminClient
+                        .from_environment()
+                        .update_credentials(
+                            account_id=account_id,
+                            server_url=(
+                                payload.get(
+                                    "server_url"
+                                )
+                            ),
+                            username=(
+                                payload.get(
+                                    "username"
+                                )
+                            ),
+                            password=(
+                                payload.get(
+                                    "password"
+                                )
+                            ),
+                        )
+                    )
+
+                except (
+                    DispatcharrAccountNotFoundError
+                ):
+                    self._json(
+                        HTTPStatus.NOT_FOUND,
+                        {
+                            "code": (
+                                "dispatcharr_account_"
+                                "not_found"
+                            ),
+                            "error": (
+                                "Dispatcharr account "
+                                "was not found."
+                            ),
+                        },
+                    )
+                    return
+
+                except DispatcharrAdminError:
+                    self._json(
+                        HTTPStatus.UNPROCESSABLE_ENTITY,
+                        {
+                            "code": (
+                                "sports_provider_"
+                                "connection_invalid"
+                            ),
+                            "error": (
+                                "Provider connection "
+                                "settings are invalid "
+                                "or unavailable."
+                            ),
+                        },
+                    )
+                    return
+
+            except SourceLifecycleError:
+                self._json(
+                    HTTPStatus.UNPROCESSABLE_ENTITY,
+                    {
+                        "code": (
+                            "sports_source_invalid"
+                        ),
+                        "error": (
+                            "Sports source backend "
+                            "configuration is invalid."
+                        ),
+                    },
+                )
+                return
+
+            self._json(
+                HTTPStatus.OK,
+                {
+                    "account": (
+                        account.to_mapping()
+                    )
+                },
+            )
+            return
+
         source_prefix = (
             "/internal/v1/sources/"
         )
@@ -703,6 +1389,20 @@ class Handler(BaseHTTPRequestHandler):
                 ):
                     raise SourceLifecycleError(
                         "source_id cannot "
+                        "be changed"
+                    )
+
+                if (
+                    "provider_id" in payload
+                    and str(
+                        payload["provider_id"]
+                    ).strip()
+                    != str(
+                        current.provider_id
+                    ).strip()
+                ):
+                    raise SourceLifecycleError(
+                        "provider_id cannot "
                         "be changed"
                     )
 

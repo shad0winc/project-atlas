@@ -192,6 +192,7 @@ services:
     pids_limit: 256
     networks:
       - atlas-identity
+      - atlas
     volumes:
       - /mnt/storage/configs/sportyfin/state:/mnt/storage/configs/sportyfin/state:rw
       - /mnt/storage/configs/sportyfin/config:/mnt/storage/configs/sportyfin/config:ro
@@ -208,6 +209,9 @@ services:
       SPORTS_THESPORTSDB_LEAGUE_IDS: "${SPORTS_THESPORTSDB_LEAGUE_IDS:?SPORTS_THESPORTSDB_LEAGUE_IDS is required}"
       SPORTS_PROVIDER_TIMEOUT_SECONDS: "${SPORTS_PROVIDER_TIMEOUT_SECONDS:?SPORTS_PROVIDER_TIMEOUT_SECONDS is required}"
       SPORTS_PROVIDER_REQUEST_BUDGET_FILE: "${SPORTS_PROVIDER_REQUEST_BUDGET_FILE:-/mnt/storage/configs/sportyfin/state/provider-request-budget.json}"
+      DISPATCHARR_INTERNAL_URL: "${DISPATCHARR_INTERNAL_URL:-http://atlas-dispatcharr:9191}"
+      DISPATCHARR_ADMIN_USERNAME: "${DISPATCHARR_ADMIN_USERNAME:-}"
+      DISPATCHARR_ADMIN_PASSWORD: "${DISPATCHARR_ADMIN_PASSWORD:-}"
     command:
       - python3
       - /srv/sports/private_api.py
@@ -371,3 +375,6 @@ networks:
   atlas-identity:
     external: true
     name: atlas-identity
+  atlas:
+    external: true
+    name: atlas

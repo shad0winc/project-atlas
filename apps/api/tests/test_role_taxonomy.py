@@ -75,6 +75,7 @@ def test_sports_administrator_matches_current_sports_contract_only() -> None:
     assert role.permissions == frozenset(
         {
             "sports.events.request",
+            "sports.providers.manage",
             "sports.read",
             "sports.recordings.manage",
         }

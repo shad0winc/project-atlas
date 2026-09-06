@@ -27,6 +27,9 @@ _ALLOWED_SOURCE_FIELDS = frozenset(
     {
         "source_id",
         "display_name",
+        "provider_id",
+        "provider_display_name",
+        "account_display_name",
         "kind",
         "trust_class",
         "enabled",
@@ -229,6 +232,9 @@ class SportsSource:
     enabled: bool
     priority: int
     max_connections: int
+    provider_id: str | None = None
+    provider_display_name: str | None = None
+    account_display_name: str | None = None
     backend_reference: str | None = None
     purchased_at: str | None = None
     expires_at: str | None = None
@@ -260,6 +266,36 @@ class SportsSource:
         display_name = _required_text(
             raw.get("display_name"),
             "display_name",
+            max_length=128,
+        )
+
+        # A Sports source is one independently selectable
+        # upstream account. Multiple sources may share one
+        # provider_id so Atlas can present them as accounts
+        # beneath one editable provider/site name.
+        #
+        # Legacy v1 records remain valid: when the new
+        # fields are absent, their existing source identity
+        # and display name provide deterministic defaults.
+        provider_id = _required_text(
+            raw.get("provider_id", source_id),
+            "provider_id",
+            max_length=64,
+        )
+        provider_display_name = _required_text(
+            raw.get(
+                "provider_display_name",
+                display_name,
+            ),
+            "provider_display_name",
+            max_length=128,
+        )
+        account_display_name = _required_text(
+            raw.get(
+                "account_display_name",
+                display_name,
+            ),
+            "account_display_name",
             max_length=128,
         )
 
@@ -338,6 +374,9 @@ class SportsSource:
             enabled=enabled,
             priority=priority,
             max_connections=max_connections,
+            provider_id=provider_id,
+            provider_display_name=provider_display_name,
+            account_display_name=account_display_name,
             backend_reference=_optional_text(
                 raw.get("backend_reference"),
                 "backend_reference",
@@ -362,6 +401,9 @@ class SportsSource:
             "enabled": self.enabled,
             "priority": self.priority,
             "max_connections": self.max_connections,
+            "provider_id": self.provider_id,
+            "provider_display_name": self.provider_display_name,
+            "account_display_name": self.account_display_name,
             "backend_reference": self.backend_reference,
             "purchased_at": self.purchased_at,
             "expires_at": self.expires_at,
@@ -370,6 +412,112 @@ class SportsSource:
                 self.renewal_notice_days
             ),
         }
+
+
+@dataclass(frozen=True, slots=True)
+class SourceProvider:
+    """Credential-safe aggregate of one provider and its accounts."""
+
+    provider_id: str
+    display_name: str
+    account_count: int
+    enabled_account_count: int
+    configured_max_connections: int
+    enabled_max_connections: int
+    source_ids: tuple[str, ...]
+
+    def to_mapping(self) -> dict[str, Any]:
+        return {
+            "provider_id": self.provider_id,
+            "display_name": self.display_name,
+            "account_count": self.account_count,
+            "enabled_account_count": (
+                self.enabled_account_count
+            ),
+            "configured_max_connections": (
+                self.configured_max_connections
+            ),
+            "enabled_max_connections": (
+                self.enabled_max_connections
+            ),
+            "source_ids": list(self.source_ids),
+        }
+
+
+def group_source_providers(
+    sources: tuple[SportsSource, ...]
+    | list[SportsSource],
+) -> tuple[SourceProvider, ...]:
+    """Group account-like Sports sources under stable providers."""
+
+    grouped: dict[str, list[SportsSource]] = {}
+
+    for source in sources:
+        provider_id = (
+            source.provider_id
+            or source.source_id
+        )
+
+        grouped.setdefault(
+            provider_id,
+            [],
+        ).append(source)
+
+    providers: list[SourceProvider] = []
+
+    for provider_id in sorted(grouped):
+        accounts = sorted(
+            grouped[provider_id],
+            key=lambda source: (
+                source.priority,
+                source.source_id,
+            ),
+        )
+
+        names = {
+            (
+                account.provider_display_name
+                or account.display_name
+            )
+            for account in accounts
+        }
+
+        if len(names) != 1:
+            raise SourceLifecycleError(
+                "provider_display_name must be consistent "
+                "for accounts sharing provider_id"
+            )
+
+        display_name = next(iter(names))
+
+        providers.append(
+            SourceProvider(
+                provider_id=provider_id,
+                display_name=display_name,
+                account_count=len(accounts),
+                enabled_account_count=sum(
+                    1
+                    for account in accounts
+                    if account.enabled
+                ),
+                configured_max_connections=sum(
+                    account.max_connections
+                    for account in accounts
+                ),
+                enabled_max_connections=sum(
+                    account.max_connections
+                    for account in accounts
+                    if account.enabled
+                ),
+                source_ids=tuple(
+                    account.source_id
+                    for account in accounts
+                ),
+            )
+        )
+
+    return tuple(providers)
+
 
 
 @dataclass(frozen=True, slots=True)
@@ -501,6 +649,9 @@ class SourceLifecycleStore:
         self,
         sources: Iterable[SportsSource],
     ) -> None:
+        sources = tuple(sources)
+        group_source_providers(sources)
+
         self._validate_existing_path()
 
         values = tuple(sources)
