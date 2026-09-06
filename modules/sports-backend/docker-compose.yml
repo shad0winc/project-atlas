@@ -7,6 +7,10 @@ services:
     environment:
       TZ: "${SPORTS_BACKEND_TIMEZONE:-America/New_York}"
       DISPATCHARR_ENV: "aio"
+      # Xtream provider URLs and account identifiers may be
+      # present in upstream INFO/DEBUG messages. Atlas keeps
+      # unattended Dispatcharr below those verbosity levels.
+      DISPATCHARR_LOG_LEVEL: "WARNING"
 
     volumes:
       - "${DISPATCHARR_DATA_DIR:-/mnt/storage/configs/dispatcharr}:/data"

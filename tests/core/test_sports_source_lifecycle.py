@@ -11,6 +11,7 @@ from modules.sports.src.source_lifecycle import (
     SourceLifecycleStore,
     SportsSource,
     TrustClass,
+    group_source_providers,
     rank_source_candidates,
 )
 
@@ -398,3 +399,338 @@ def test_store_rejects_symbolic_link(
         match="symbolic link",
     ):
         SourceLifecycleStore(link).load()
+
+
+def test_legacy_source_gets_provider_account_defaults() -> None:
+    source = SportsSource.from_mapping(
+        {
+            "source_id": "legacy-source",
+            "display_name": "Legacy Source",
+            "kind": "licensed_subscription",
+            "max_connections": 1,
+        }
+    )
+
+    assert source.source_id == "legacy-source"
+    assert source.provider_id == "legacy-source"
+    assert source.provider_display_name == "Legacy Source"
+    assert source.account_display_name == "Legacy Source"
+
+    mapping = source.to_mapping()
+
+    assert mapping["provider_id"] == "legacy-source"
+    assert (
+        mapping["provider_display_name"]
+        == "Legacy Source"
+    )
+    assert (
+        mapping["account_display_name"]
+        == "Legacy Source"
+    )
+
+
+def test_multiple_accounts_can_share_provider_identity() -> None:
+    primary = SportsSource.from_mapping(
+        {
+            "source_id": "provider-a-primary",
+            "display_name": "Provider A / Primary",
+            "provider_id": "provider-a",
+            "provider_display_name": "Provider A",
+            "account_display_name": "Primary",
+            "kind": "licensed_subscription",
+            "max_connections": 1,
+            "backend_reference": "dispatcharr:m3u:2",
+        }
+    )
+
+    multi = SportsSource.from_mapping(
+        {
+            "source_id": "provider-a-multi",
+            "display_name": "Provider A / Multi",
+            "provider_id": "provider-a",
+            "provider_display_name": "Provider A",
+            "account_display_name": "Multi-stream",
+            "kind": "licensed_subscription",
+            "max_connections": 5,
+            "backend_reference": "dispatcharr:m3u:7",
+        }
+    )
+
+    assert primary.source_id != multi.source_id
+    assert primary.provider_id == multi.provider_id
+
+    assert primary.account_display_name == "Primary"
+    assert multi.account_display_name == "Multi-stream"
+
+    assert primary.max_connections == 1
+    assert multi.max_connections == 5
+
+    assert (
+        primary.backend_reference
+        != multi.backend_reference
+    )
+
+
+def test_provider_and_account_names_are_not_stable_ids() -> None:
+    before = SportsSource.from_mapping(
+        {
+            "source_id": "stable-account-id",
+            "display_name": "Original",
+            "provider_id": "stable-provider-id",
+            "provider_display_name": "Original Provider",
+            "account_display_name": "Original Account",
+            "kind": "licensed_subscription",
+            "max_connections": 1,
+        }
+    )
+
+    after = SportsSource.from_mapping(
+        {
+            **before.to_mapping(),
+            "display_name": "Renamed",
+            "provider_display_name": "Renamed Provider",
+            "account_display_name": "Renamed Account",
+        }
+    )
+
+    assert after.source_id == before.source_id
+    assert after.provider_id == before.provider_id
+
+    assert (
+        after.provider_display_name
+        == "Renamed Provider"
+    )
+    assert (
+        after.account_display_name
+        == "Renamed Account"
+    )
+
+
+def test_provider_account_metadata_rejects_credentials() -> None:
+    with pytest.raises(
+        SourceLifecycleError,
+        match="unsupported source fields",
+    ):
+        SportsSource.from_mapping(
+            {
+                "source_id": "safe-account",
+                "display_name": "Safe",
+                "provider_id": "safe-provider",
+                "provider_display_name": "Safe Provider",
+                "account_display_name": "Primary",
+                "kind": "licensed_subscription",
+                "max_connections": 1,
+                "username": "must-not-be-stored-here",
+            }
+        )
+
+
+
+def test_provider_aggregation_combines_account_capacity() -> None:
+    sources = (
+        SportsSource.from_mapping(
+            {
+                "source_id": "provider-a-primary",
+                "display_name": "Provider A / Primary",
+                "provider_id": "provider-a",
+                "provider_display_name": "Provider A",
+                "account_display_name": "Primary",
+                "kind": "licensed_subscription",
+                "enabled": True,
+                "max_connections": 1,
+            }
+        ),
+        SportsSource.from_mapping(
+            {
+                "source_id": "provider-a-multi",
+                "display_name": "Provider A / Multi",
+                "provider_id": "provider-a",
+                "provider_display_name": "Provider A",
+                "account_display_name": "Multi-stream",
+                "kind": "licensed_subscription",
+                "enabled": True,
+                "max_connections": 5,
+            }
+        ),
+    )
+
+    providers = group_source_providers(
+        sources
+    )
+
+    assert len(providers) == 1
+
+    provider = providers[0]
+
+    assert provider.provider_id == "provider-a"
+    assert provider.display_name == "Provider A"
+    assert provider.account_count == 2
+    assert provider.enabled_account_count == 2
+
+    assert (
+        provider.configured_max_connections
+        == 6
+    )
+    assert provider.enabled_max_connections == 6
+
+    assert provider.source_ids == (
+        "provider-a-multi",
+        "provider-a-primary",
+    )
+
+
+def test_provider_aggregation_separates_disabled_capacity() -> None:
+    sources = (
+        SportsSource.from_mapping(
+            {
+                "source_id": "primary",
+                "display_name": "Primary",
+                "provider_id": "provider-a",
+                "provider_display_name": "Provider A",
+                "account_display_name": "Primary",
+                "kind": "licensed_subscription",
+                "enabled": True,
+                "max_connections": 3,
+            }
+        ),
+        SportsSource.from_mapping(
+            {
+                "source_id": "backup",
+                "display_name": "Backup",
+                "provider_id": "provider-a",
+                "provider_display_name": "Provider A",
+                "account_display_name": "Backup",
+                "kind": "licensed_subscription",
+                "enabled": False,
+                "max_connections": 2,
+            }
+        ),
+    )
+
+    provider = group_source_providers(
+        sources
+    )[0]
+
+    assert provider.account_count == 2
+    assert provider.enabled_account_count == 1
+
+    assert (
+        provider.configured_max_connections
+        == 5
+    )
+    assert provider.enabled_max_connections == 3
+
+
+def test_provider_aggregation_rejects_name_drift() -> None:
+    sources = (
+        SportsSource.from_mapping(
+            {
+                "source_id": "one",
+                "display_name": "One",
+                "provider_id": "same-provider",
+                "provider_display_name": "Provider One",
+                "account_display_name": "One",
+                "kind": "licensed_subscription",
+                "max_connections": 1,
+            }
+        ),
+        SportsSource.from_mapping(
+            {
+                "source_id": "two",
+                "display_name": "Two",
+                "provider_id": "same-provider",
+                "provider_display_name": "Different Name",
+                "account_display_name": "Two",
+                "kind": "licensed_subscription",
+                "max_connections": 1,
+            }
+        ),
+    )
+
+    with pytest.raises(
+        SourceLifecycleError,
+        match="provider_display_name",
+    ):
+        group_source_providers(
+            sources
+        )
+
+
+def test_provider_aggregate_contains_no_credentials() -> None:
+    source = SportsSource.from_mapping(
+        {
+            "source_id": "safe-source",
+            "display_name": "Safe Source",
+            "provider_id": "safe-provider",
+            "provider_display_name": "Safe Provider",
+            "account_display_name": "Primary",
+            "kind": "licensed_subscription",
+            "max_connections": 4,
+            "backend_reference": "dispatcharr:m3u:42",
+        }
+    )
+
+    payload = group_source_providers(
+        (source,)
+    )[0].to_mapping()
+
+    serialized = repr(payload).lower()
+
+    assert "password" not in serialized
+    assert "username" not in serialized
+    assert "server_url" not in serialized
+    assert "api_key" not in serialized
+    assert "token" not in serialized
+    assert "backend_reference" not in payload
+
+
+def test_store_rejects_provider_name_drift_before_write(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "source-lifecycle.json"
+
+    store = SourceLifecycleStore(path)
+
+    original = (
+        SportsSource.from_mapping(
+            {
+                "source_id": "provider-a-primary",
+                "display_name": "Primary",
+                "provider_id": "provider-a",
+                "provider_display_name": "Provider A",
+                "account_display_name": "Primary",
+                "kind": "licensed_subscription",
+                "max_connections": 1,
+            }
+        ),
+    )
+
+    store.write(original)
+
+    before = path.read_bytes()
+
+    invalid = (
+        original[0],
+        SportsSource.from_mapping(
+            {
+                "source_id": "provider-a-secondary",
+                "display_name": "Secondary",
+                "provider_id": "provider-a",
+                "provider_display_name": "Different Provider Name",
+                "account_display_name": "Secondary",
+                "kind": "licensed_subscription",
+                "max_connections": 1,
+            }
+        ),
+    )
+
+    with pytest.raises(
+        SourceLifecycleError,
+        match="provider_display_name",
+    ):
+        store.write(invalid)
+
+    # The failed validation must happen before the
+    # atomic persistence transaction.
+    assert path.read_bytes() == before
+    assert store.load() == original

@@ -165,6 +165,9 @@ def _load_private_sports_api_for_failure_test(monkeypatch):
     source_lifecycle_module.rank_source_candidates = (
         lambda _sources: ()
     )
+    source_lifecycle_module.group_source_providers = (
+        lambda _sources: ()
+    )
 
     subscriptions_module = types.ModuleType("subscriptions")
     subscriptions_module.load_subscriptions = lambda: []

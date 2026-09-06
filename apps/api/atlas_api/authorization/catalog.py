@@ -139,6 +139,7 @@ _BUILT_IN_ROLES: dict[str, RoleDefinition] = {
                 "sports.events.request",
                 "sports.read",
                 "sports.recordings.manage",
+                "sports.providers.manage",
             }
         ),
     ),
