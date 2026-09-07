@@ -1279,3 +1279,167 @@ def test_writer_credential_adapter_uses_only_allowlisted_private_body(
             "password": "",
         },
     }
+
+
+def test_resource_pool_reports_enabled_capacity_and_active_leases(
+    tmp_path,
+) -> None:
+    from atlas.sports_resource_pool import SportsResourcePool
+
+    resource_pool = SportsResourcePool(
+        tmp_path / "sports-resource-pool.json"
+    )
+
+    resource_pool.acquire(
+        user_id="usr-one",
+        target_id="game-one",
+        candidate_source_ids=(
+            "provider-a-multi",
+        ),
+        capacities={
+            "provider-a-primary": 1,
+            "provider-a-multi": 5,
+        },
+    )
+
+    resource_pool.acquire(
+        user_id="usr-two",
+        target_id="game-two",
+        candidate_source_ids=(
+            "provider-a-multi",
+        ),
+        capacities={
+            "provider-a-primary": 1,
+            "provider-a-multi": 5,
+        },
+    )
+
+    app = FastAPI()
+    app.include_router(
+        admin_sports_providers.router
+    )
+
+    app.dependency_overrides[
+        admin_sports_providers.
+        require_sports_providers_manage
+    ] = lambda: _FakeAdminUser()
+
+    app.dependency_overrides[
+        admin_sports_providers.
+        get_admin_sports_service
+    ] = lambda: FakeSportsWriter()
+
+    app.dependency_overrides[
+        admin_sports_providers.
+        get_sports_resource_pool
+    ] = lambda: resource_pool
+
+    response = TestClient(app).get(
+        "/admin/sports/providers/resource-pool"
+    )
+
+    assert response.status_code == 200
+
+    assert response.json() == {
+        "total_capacity": 6,
+        "active": 2,
+        "available": 4,
+        "accounts": [
+            {
+                "source_id": "provider-a-multi",
+                "enabled": True,
+                "capacity": 5,
+                "active": 2,
+                "available": 3,
+            },
+            {
+                "source_id": "provider-a-primary",
+                "enabled": True,
+                "capacity": 1,
+                "active": 0,
+                "available": 1,
+            },
+        ],
+    }
+
+    serialized = response.text.lower()
+
+    assert "backend_reference" not in serialized
+    assert "password" not in serialized
+    assert "username" not in serialized
+    assert "server_url" not in serialized
+    assert "api_key" not in serialized
+    assert "token" not in serialized
+
+
+def test_disabled_provider_account_contributes_zero_pool_capacity(
+    tmp_path,
+) -> None:
+    from atlas.sports_resource_pool import SportsResourcePool
+
+    class PartiallyDisabledWriter(
+        FakeSportsWriter
+    ):
+        def get_source_registry(self):
+            registry = super().get_source_registry()
+
+            registry["sources"][0][
+                "enabled"
+            ] = False
+
+            return registry
+
+    resource_pool = SportsResourcePool(
+        tmp_path / "sports-resource-pool.json"
+    )
+
+    app = FastAPI()
+    app.include_router(
+        admin_sports_providers.router
+    )
+
+    app.dependency_overrides[
+        admin_sports_providers.
+        require_sports_providers_manage
+    ] = lambda: _FakeAdminUser()
+
+    app.dependency_overrides[
+        admin_sports_providers.
+        get_admin_sports_service
+    ] = lambda: PartiallyDisabledWriter()
+
+    app.dependency_overrides[
+        admin_sports_providers.
+        get_sports_resource_pool
+    ] = lambda: resource_pool
+
+    response = TestClient(app).get(
+        "/admin/sports/providers/resource-pool"
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    assert body["total_capacity"] == 5
+    assert body["active"] == 0
+    assert body["available"] == 5
+
+    accounts = {
+        item["source_id"]: item
+        for item in body["accounts"]
+    }
+
+    assert accounts[
+        "provider-a-primary"
+    ] == {
+        "source_id": "provider-a-primary",
+        "enabled": False,
+        "capacity": 0,
+        "active": 0,
+        "available": 0,
+    }
+
+    assert accounts[
+        "provider-a-multi"
+    ]["capacity"] == 5

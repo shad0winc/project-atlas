@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
-from atlas_api.dependencies import get_security_audit_writer
+from atlas.sports_resource_pool import (
+    SportsResourcePool,
+    SportsResourcePoolError,
+)
+from atlas_api.dependencies import (
+    get_security_audit_writer,
+    get_sports_resource_pool,
+)
 
 from typing import Annotated, Any
 
@@ -77,6 +84,25 @@ class AdminSportsProviderListResponse(
     _StrictAdminSportsModel
 ):
     providers: list[AdminSportsProviderResponse]
+
+
+class AdminSportsResourceAccountResponse(
+    _StrictAdminSportsModel
+):
+    source_id: str
+    enabled: bool
+    capacity: int
+    active: int
+    available: int
+
+
+class AdminSportsResourcePoolResponse(
+    _StrictAdminSportsModel
+):
+    total_capacity: int
+    active: int
+    available: int
+    accounts: list[AdminSportsResourceAccountResponse]
 
 
 def get_admin_sports_service(
@@ -353,6 +379,88 @@ def read_admin_sports_providers(
             ),
             detail=(
                 "Sports provider administration "
+                "is unavailable."
+            ),
+        ) from error
+
+
+@router.get(
+    "/resource-pool",
+    response_model=AdminSportsResourcePoolResponse,
+    summary="Read administrator-safe Sports resource-pool utilization",
+)
+def read_admin_sports_resource_pool(
+    _current_user: AuthenticatedUser = Depends(require_sports_providers_manage),
+    service: SportsWriterBackedAPIService = Depends(
+        get_admin_sports_service
+    ),
+    resource_pool: SportsResourcePool = Depends(
+        get_sports_resource_pool
+    ),
+) -> AdminSportsResourcePoolResponse:
+    try:
+        registry = service.get_source_registry()
+
+        capacities: dict[str, int] = {}
+        enabled_by_source: dict[str, bool] = {}
+
+        for source in registry["sources"]:
+            source_id = _required_text(
+                source,
+                "source_id",
+            )
+
+            enabled = source.get(
+                "enabled"
+            )
+
+            if not isinstance(enabled, bool):
+                raise SportsWriterTransportError(
+                    "Private Sports service returned "
+                    "invalid enabled metadata."
+                )
+
+            configured_capacity = _required_int(
+                source,
+                "max_connections",
+            )
+
+            capacities[source_id] = (
+                configured_capacity
+                if enabled
+                else 0
+            )
+            enabled_by_source[source_id] = enabled
+
+        snapshot = resource_pool.snapshot(
+            capacities=capacities
+        )
+
+        return AdminSportsResourcePoolResponse(
+            total_capacity=snapshot.total_capacity,
+            active=snapshot.active,
+            available=snapshot.available,
+            accounts=[
+                AdminSportsResourceAccountResponse(
+                    source_id=item.source_id,
+                    enabled=enabled_by_source[
+                        item.source_id
+                    ],
+                    capacity=item.capacity,
+                    active=item.active,
+                    available=item.available,
+                )
+                for item in snapshot.sources
+            ],
+        )
+    except (
+        SportsWriterTransportError,
+        SportsResourcePoolError,
+    ) as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Sports resource-pool administration "
                 "is unavailable."
             ),
         ) from error
