@@ -68,7 +68,7 @@ def test_registry_is_structurally_valid(tmp_path: Path) -> None:
 
 def test_registry_declares_exact_recovery_surfaces(tmp_path: Path) -> None:
     rows = _rows(tmp_path)
-    assert len(rows) == 13
+    assert len(rows) == 14
     assert all(len(row) == 6 for row in rows)
 
     assert [row[0] for row in rows] == [
@@ -82,6 +82,7 @@ def test_registry_declares_exact_recovery_surfaces(tmp_path: Path) -> None:
         "retention",
         "sports-subscriptions",
         "sports-live-tv-bindings",
+        "sports-live-sources",
         "sports-source-lifecycle",
         "sports-recordings",
         "sports-scheduler",
@@ -115,6 +116,7 @@ def test_sports_registry_excludes_reconstructible_runtime_files(
     serialized = "\n".join("\t".join(row) for row in rows)
 
     assert "subscriptions.json" in serialized
+    assert "live-sources.json" in serialized
     assert "source-lifecycle.json" in serialized
     assert "recordings.json" in serialized
     assert "scheduler.json" in serialized

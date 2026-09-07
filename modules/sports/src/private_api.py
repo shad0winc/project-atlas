@@ -16,7 +16,10 @@ from live_tv_bindings import (
 )
 from live_sources import (
     LiveSourceCatalogError,
+    default_live_source_registry,
     load_live_source_catalog,
+    normalize_live_source,
+    safe_source_summary,
 )
 from providers.registry import enabled_providers
 from source_lifecycle import (
@@ -461,6 +464,33 @@ class Handler(BaseHTTPRequestHandler):
             keep_blank_values=False,
         )
 
+        if parsed.path == "/internal/v1/live-sources":
+            if not self._require_auth():
+                return
+
+            try:
+                sources = (
+                    default_live_source_registry()
+                    .list_sources()
+                )
+
+            except LiveSourceCatalogError:
+                self._backend_unavailable()
+                return
+
+            self._json(
+                HTTPStatus.OK,
+                {
+                    "live_sources": [
+                        safe_source_summary(
+                            source
+                        )
+                        for source in sources
+                    ]
+                },
+            )
+            return
+
         if parsed.path == "/internal/v1/sources":
             try:
                 sources = (
@@ -550,14 +580,17 @@ class Handler(BaseHTTPRequestHandler):
 
                 store.write(updated)
 
-            except SourceLifecycleError as exc:
+            except SourceLifecycleError:
                 self._json(
                     HTTPStatus.UNPROCESSABLE_ENTITY,
                     {
                         "code": (
                             "sports_source_invalid"
                         ),
-                        "error": str(exc),
+                        "error": (
+                            "Sports source configuration "
+                            "is invalid."
+                        ),
                     },
                 )
                 return
@@ -873,6 +906,7 @@ class Handler(BaseHTTPRequestHandler):
             "/internal/v1/events/request",
             "/internal/v1/subscriptions",
             "/internal/v1/live-tv/bindings",
+            "/internal/v1/live-sources",
             "/internal/v1/sources",
         }:
             self._json(HTTPStatus.NOT_FOUND, {"error": "Not found."})
@@ -881,6 +915,70 @@ class Handler(BaseHTTPRequestHandler):
             return
         payload = self._read_payload()
         if payload is None:
+            return
+
+        if parsed.path == "/internal/v1/live-sources":
+            try:
+                source = normalize_live_source(
+                    payload
+                )
+
+                registry = (
+                    default_live_source_registry()
+                )
+
+                existing = (
+                    registry.list_sources()
+                )
+
+                if any(
+                    item.source_id
+                    == source.source_id
+                    for item in existing
+                ):
+                    self._json(
+                        HTTPStatus.CONFLICT,
+                        {
+                            "code": (
+                                "sports_live_source_exists"
+                            ),
+                            "error": (
+                                "Sports live source "
+                                "already exists."
+                            ),
+                        },
+                    )
+                    return
+
+                created = registry.add(
+                    source
+                )
+
+            except LiveSourceCatalogError:
+                self._json(
+                    HTTPStatus.UNPROCESSABLE_ENTITY,
+                    {
+                        "code": (
+                            "sports_live_source_invalid"
+                        ),
+                        "error": (
+                            "Sports live source "
+                            "is invalid."
+                        ),
+                    },
+                )
+                return
+
+            self._json(
+                HTTPStatus.CREATED,
+                {
+                    "live_source": (
+                        safe_source_summary(
+                            created
+                        )
+                    )
+                },
+            )
             return
 
         if parsed.path == "/internal/v1/live-tv/bindings":
@@ -1082,14 +1180,17 @@ class Handler(BaseHTTPRequestHandler):
                 # aggregate before one atomic write.
                 store.write(updated)
 
-            except SourceLifecycleError as exc:
+            except SourceLifecycleError:
                 self._json(
                     HTTPStatus.UNPROCESSABLE_ENTITY,
                     {
                         "code": (
                             "sports_source_provider_invalid"
                         ),
-                        "error": str(exc),
+                        "error": (
+                            "Sports source provider "
+                            "configuration is invalid."
+                        ),
                     },
                 )
                 return
@@ -1431,14 +1532,17 @@ class Handler(BaseHTTPRequestHandler):
 
                 store.write(updated)
 
-            except SourceLifecycleError as exc:
+            except SourceLifecycleError:
                 self._json(
                     HTTPStatus.UNPROCESSABLE_ENTITY,
                     {
                         "code": (
                             "sports_source_invalid"
                         ),
-                        "error": str(exc),
+                        "error": (
+                            "Sports source configuration "
+                            "is invalid."
+                        ),
                     },
                 )
                 return
@@ -1544,6 +1648,67 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlsplit(
             self.path
         )
+
+        live_source_prefix = (
+            "/internal/v1/live-sources/"
+        )
+
+        if parsed.path.startswith(
+            live_source_prefix
+        ):
+            if not self._require_auth():
+                return
+
+            source_id = urllib.parse.unquote(
+                parsed.path[
+                    len(live_source_prefix):
+                ]
+            ).strip()
+
+            if not source_id:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {
+                        "error": (
+                            "source_id is required."
+                        )
+                    },
+                )
+                return
+
+            try:
+                removed = (
+                    default_live_source_registry()
+                    .delete(source_id)
+                )
+
+            except LiveSourceCatalogError:
+                self._backend_unavailable()
+                return
+
+            if not removed:
+                self._json(
+                    HTTPStatus.NOT_FOUND,
+                    {
+                        "code": (
+                            "sports_live_source_not_found"
+                        ),
+                        "error": (
+                            "Sports live source "
+                            "was not found."
+                        ),
+                    },
+                )
+                return
+
+            self._json(
+                HTTPStatus.OK,
+                {
+                    "removed": True,
+                    "source_id": source_id,
+                },
+            )
+            return
 
         source_prefix = (
             "/internal/v1/sources/"
@@ -1703,6 +1868,7 @@ def main() -> int:
             "ATLAS_SPORTS_WRITER_TOKEN is required"
         )
 
+    default_live_source_registry().ensure()
     default_live_tv_binding_registry().ensure()
     SourceLifecycleStore().ensure()
 

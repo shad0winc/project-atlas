@@ -210,6 +210,41 @@ def _load_sports_modules(project_root: Path, subscriptions: Path, recordings: Pa
 
 
 
+def _validate_sports_live_sources(
+    project_root: Path,
+    path: Path,
+) -> str:
+    sports_source = (
+        project_root
+        / "modules"
+        / "sports"
+        / "src"
+    )
+
+    sys.path.insert(
+        0,
+        str(sports_source),
+    )
+
+    try:
+        from live_sources import (
+            load_live_source_catalog,
+        )
+
+        catalog = load_live_source_catalog(
+            path
+        )
+    finally:
+        try:
+            sys.path.remove(
+                str(sports_source)
+            )
+        except ValueError:
+            pass
+
+    return f"{len(catalog.sources)} live sources"
+
+
 def _validate_sports_live_tv_bindings(path: Path) -> str:
     import json
 
@@ -304,6 +339,17 @@ def validate(root: Path, project_root: Path) -> list[tuple[str, str, str]]:
             "PASS",
             _validate_sports_live_tv_bindings(
                 state / "sports/live-tv-bindings.json"
+            ),
+        )
+    )
+
+    results.append(
+        (
+            "sports-live-sources",
+            "PASS",
+            _validate_sports_live_sources(
+                project_root,
+                state / "sports/live-sources.json",
             ),
         )
     )
