@@ -9,6 +9,8 @@ COMPOSE = MODULE / "docker-compose.yml"
 CONF = MODULE / "module.conf"
 ENV_EXAMPLE = MODULE / ".env.example"
 BACKUP_DOC = ROOT / "docs" / "architecture" / "BACKUP_RECOVERY.md"
+TEAMARR_DOCKERFILE = MODULE / "teamarr" / "Dockerfile"
+TEAMARR_PATCHER = MODULE / "teamarr" / "apply_patch.py"
 
 
 def test_sports_backend_module_declares_expected_services() -> None:
@@ -74,17 +76,25 @@ def test_dispatcharr_explicitly_uses_aio_mode() -> None:
 
 def test_teamarr_uses_stable_image_and_data_mount() -> None:
     compose = COMPOSE.read_text(encoding="utf-8")
+    dockerfile = TEAMARR_DOCKERFILE.read_text(encoding="utf-8")
 
+    assert "project-atlas/teamarr:2.15.0-atlas3" in compose
+    assert (
+        "dockerfile: modules/sports-backend/teamarr/Dockerfile"
+        in compose
+    )
     assert (
         "ghcr.io/pharaoh-labs/teamarr@"
         "sha256:d846ec078cde27f68e94f5fc3eec7f1"
         "ec29eca11f653b157ac352fef84b73c0c"
-    ) in compose
+    ) in dockerfile
+    assert 'project-atlas.patch="trusted-date-safety-v3"' in dockerfile
     assert ':/app/data"' in compose
 
 
 def test_sports_backend_images_are_immutable_digest_pins() -> None:
     compose = COMPOSE.read_text(encoding="utf-8")
+    dockerfile = TEAMARR_DOCKERFILE.read_text(encoding="utf-8")
 
     assert (
         "ghcr.io/dispatcharr/dispatcharr@"
@@ -96,9 +106,44 @@ def test_sports_backend_images_are_immutable_digest_pins() -> None:
         "ghcr.io/pharaoh-labs/teamarr@"
         "sha256:d846ec078cde27f68e94f5fc3eec7f1"
         "ec29eca11f653b157ac352fef84b73c0c"
-    ) in compose
+    ) in dockerfile
 
     assert ":latest" not in compose
+    assert ":latest" not in dockerfile
+
+
+def test_teamarr_derivative_patch_is_fail_closed() -> None:
+    patcher = TEAMARR_PATCHER.read_text(encoding="utf-8")
+
+    assert (
+        "931f5afcdf5fab85437628a2ffa623622"
+        "44080ce26aa533b03b16e34812dfd09"
+    ) in patcher
+
+    assert (
+        'FUNCTIONS = (\n'
+        '    "match_single_league",\n'
+        '    "match_multi_league",\n'
+        ')'
+    ) in patcher
+
+    assert "trusted_stream_date > latest_stream_date" in patcher
+    assert "FailedReason.DATE_MISMATCH" in patcher
+    assert "CACHE_ANCHOR" in patcher
+
+    # Atlas v1 trusted temporal fail-closed guard.
+    assert "SAME_DAY_MAX_SKEW_SECONDS = 3 * 60 * 60" in patcher
+    assert "ADJACENT_DAY_MAX_SKEW_SECONDS = 6 * 60 * 60" in patcher
+    assert "MODULE_CONSTANT_ANCHOR" in patcher
+    assert "ANCHOR_MATCH_TOLERANCE_SECONDS = 90 * 60" in patcher
+    assert "generated same-day constant count mismatch" in patcher
+    assert "generated adjacent-day constant count mismatch" in patcher
+    assert "stream_date_dist in (0, 1)" in patcher
+    assert "declared_stream_dt = datetime.combine(" in patcher
+    assert "event_dt_in_stream_tz = event.start_time.astimezone(time_tz)" in patcher
+    assert "temporal_limit = (" in patcher
+    assert "if stream_date_dist == 0" in patcher
+    assert "temporal_skew > temporal_limit" in patcher
 
 
 def test_sports_backend_runtime_scripts_are_declared() -> None:
