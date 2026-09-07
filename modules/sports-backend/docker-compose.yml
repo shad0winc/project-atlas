@@ -29,7 +29,10 @@ services:
       project-atlas.service: dispatcharr
 
   atlas-teamarr:
-    image: ghcr.io/pharaoh-labs/teamarr@sha256:d846ec078cde27f68e94f5fc3eec7f1ec29eca11f653b157ac352fef84b73c0c
+    build:
+      context: ../..
+      dockerfile: modules/sports-backend/teamarr/Dockerfile
+    image: project-atlas/teamarr:2.15.0-atlas3
     container_name: atlas-teamarr
     restart: unless-stopped
 

@@ -7,7 +7,10 @@ COMPOSE_FILE="$MODULE_DIR/docker-compose.yml"
 EXAMPLE_ENV="$MODULE_DIR/.env.example"
 
 DISPATCHARR_IMAGE='ghcr.io/dispatcharr/dispatcharr@sha256:e764cd3fb3a4b14e0c96eeb830cce645b44ef0a2494838e21462c71dde5abeb4'
-TEAMARR_IMAGE='ghcr.io/pharaoh-labs/teamarr@sha256:d846ec078cde27f68e94f5fc3eec7f1ec29eca11f653b157ac352fef84b73c0c'
+TEAMARR_IMAGE='project-atlas/teamarr:2.15.0-atlas3'
+TEAMARR_BASE_IMAGE='ghcr.io/pharaoh-labs/teamarr@sha256:d846ec078cde27f68e94f5fc3eec7f1ec29eca11f653b157ac352fef84b73c0c'
+TEAMARR_DOCKERFILE="$MODULE_DIR/teamarr/Dockerfile"
+TEAMARR_PATCHER="$MODULE_DIR/teamarr/apply_patch.py"
 
 fail() {
     printf 'FAIL %s\n' "$*" >&2
@@ -27,7 +30,9 @@ for file in \
     scripts/uninstall.sh \
     scripts/update.sh \
     scripts/verify.sh \
-    scripts/health.py
+    scripts/health.py \
+    teamarr/Dockerfile \
+    teamarr/apply_patch.py
 do
     test -f "$MODULE_DIR/$file" ||
         fail "Required file missing: $file"
@@ -37,7 +42,19 @@ grep -Fq "image: $DISPATCHARR_IMAGE" "$COMPOSE_FILE" ||
     fail "Dispatcharr image is not pinned to the approved digest"
 
 grep -Fq "image: $TEAMARR_IMAGE" "$COMPOSE_FILE" ||
-    fail "Teamarr image is not pinned to the approved digest"
+    fail "Teamarr derivative image declaration is not approved"
+
+grep -Fq 'dockerfile: modules/sports-backend/teamarr/Dockerfile' "$COMPOSE_FILE" ||
+    fail "Teamarr derivative Dockerfile is not declared"
+
+grep -Fq "FROM $TEAMARR_BASE_IMAGE" "$TEAMARR_DOCKERFILE" ||
+    fail "Teamarr derivative base image is not pinned to the approved digest"
+
+grep -Fq     '931f5afcdf5fab85437628a2ffa62362244080ce26aa533b03b16e34812dfd09'     "$TEAMARR_PATCHER" ||
+    fail "Teamarr upstream source checksum guard is missing"
+
+grep -Fq     'trusted_stream_date > latest_stream_date'     "$TEAMARR_PATCHER" ||
+    fail "Teamarr trusted-future horizon guard is missing"
 
 if grep -Fq ':latest' "$COMPOSE_FILE"; then
     fail "Mutable :latest image tag is prohibited"
@@ -70,7 +87,8 @@ docker compose \
     fail "Sports backend Compose declaration is invalid"
 
 ok "Declarative Sports backend contract valid"
-ok "Immutable image digests pinned"
+ok "Immutable upstream image digests pinned"
+ok "Atlas Teamarr derivative patch contract valid"
 ok "No public host ports declared"
 ok "Persistent mounts declared"
 
@@ -170,7 +188,7 @@ teamarr_config_image="$(
     fail "Running Dispatcharr container does not use pinned image"
 
 [[ "$teamarr_config_image" == "$TEAMARR_IMAGE" ]] ||
-    fail "Running Teamarr container does not use pinned image"
+    fail "Running Teamarr container does not use approved Atlas derivative image"
 
 ok "Dispatcharr running on private atlas network"
 ok "Teamarr running on private atlas network"
