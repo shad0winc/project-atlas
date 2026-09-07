@@ -119,6 +119,17 @@ def prepare_runtime(tmp_path: Path, *, branch: str = "main") -> dict[str, str]:
     )
 
     write_executable(
+        project / "scripts" / "lib" / "sports-live-source-bootstrap.sh",
+        """
+        #!/usr/bin/env bash
+        atlas_sports_live_source_bootstrap_provision() {
+          echo sports-live-source-bootstrap:provision >> "$ATLAS_TEST_EVENTS"
+          return "${ATLAS_TEST_SPORTS_LIVE_SOURCE_BOOTSTRAP_STATUS:-0}"
+        }
+        """,
+    )
+
+    write_executable(
         bin_dir / "git",
         f"""
         #!/usr/bin/env bash
@@ -1084,3 +1095,62 @@ def test_sports_runtime_provisioning_failure_aborts_before_ingress_apply(
 
     assert compose_up_events == []
     assert "maintenance:disable" not in events
+
+
+
+def test_sports_live_source_bootstrap_failure_aborts_before_maintenance(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_SPORTS_LIVE_SOURCE_BOOTSTRAP_STATUS"] = "1"
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode != 0
+    assert (
+        "Sports live-source bootstrap failed before maintenance"
+        in result.stderr
+    )
+
+    events = event_lines(environment)
+
+    assert "sports-live-source-bootstrap:provision" in events
+    assert "maintenance:enable" not in events
+    assert "backup" not in events
+
+    assert not lock_path(environment).exists()
+
+
+def test_ingress_live_source_bootstrap_precedes_maintenance_and_backup(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode == 0, result.stderr
+
+    events = event_lines(environment)
+
+    bootstrap = events.index(
+        "sports-live-source-bootstrap:provision"
+    )
+    maintenance = events.index("maintenance:enable")
+    backup = events.index("backup")
+
+    assert bootstrap < maintenance < backup
+
+
+def test_core_update_does_not_run_sports_live_source_bootstrap(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+
+    result = run_update(environment, "core")
+
+    assert result.returncode == 0, result.stderr
+
+    assert (
+        "sports-live-source-bootstrap:provision"
+        not in event_lines(environment)
+    )
