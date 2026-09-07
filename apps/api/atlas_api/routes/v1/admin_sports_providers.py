@@ -390,9 +390,7 @@ def read_admin_sports_providers(
     summary="Read administrator-safe Sports resource-pool utilization",
 )
 def read_admin_sports_resource_pool(
-    _current_user: AuthenticatedUser = Depends(
-        require_sports_providers_manage
-    ),
+    _current_user: AuthenticatedUser = Depends(require_sports_providers_manage),
     service: SportsWriterBackedAPIService = Depends(
         get_admin_sports_service
     ),
