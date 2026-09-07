@@ -530,6 +530,21 @@ atlas_command_update() {
 
   echo 'Target artifact preflight: PASS'
 
+  if [[ "$scope" == 'ingress' || "$scope" == 'all' ]]; then
+    source "$ATLAS_PROJECT_DIR/scripts/lib/sports-live-source-bootstrap.sh"
+
+    if ! atlas_sports_live_source_bootstrap_provision; then
+      atlas_deployment_set_status \
+        "$(atlas_deployment_record_dir "$identifier")" \
+        aborted
+
+      atlas_deployment_release_lock "$identifier"
+
+      echo 'ERROR: Sports live-source bootstrap failed before maintenance.' >&2
+      return 1
+    fi
+  fi
+
   if ! atlas_command_maintenance enable; then
     atlas_deployment_set_status \
       "$(atlas_deployment_record_dir "$identifier")" \
