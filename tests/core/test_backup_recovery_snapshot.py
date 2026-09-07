@@ -40,6 +40,16 @@ def _write_state(tmp_path: Path) -> dict[str, str]:
         encoding="utf-8",
     )
 
+    live_sources = (
+        Path(env["SPORTS_CONFIG_DIR"])
+        / "state"
+        / "live-sources.json"
+    )
+    live_sources.write_text(
+        '{"version":1,"sources":[]}\n',
+        encoding="utf-8",
+    )
+
     paths = {
         "users": Path(env["ATLAS_USERS_DIR"]) / "users.json",
         "favorites": Path(env["ATLAS_IDENTITY_DIR"]) / "favorites" / "favorites.json",
@@ -102,6 +112,7 @@ def test_snapshot_captures_every_required_surface(tmp_path: Path) -> None:
         "state/retention/state.json",
         "state/sports/subscriptions.json",
         "state/sports/live-tv-bindings.json",
+        "state/sports/live-sources.json",
         "state/sports/source-lifecycle.json",
         "state/sports/recordings.json",
         "state/sports/scheduler.json",

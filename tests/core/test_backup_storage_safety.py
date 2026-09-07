@@ -388,6 +388,16 @@ def _write_recovery_state(project: Path) -> None:
         encoding="utf-8",
     )
 
+    live_sources = (
+        Path(env["SPORTS_CONFIG_DIR"])
+        / "state"
+        / "live-sources.json"
+    )
+    live_sources.write_text(
+        '{"version":1,"sources":[]}\n',
+        encoding="utf-8",
+    )
+
     files = {
         Path(env["ATLAS_USERS_DIR"]) / "users.json": '{"users": []}\n',
         Path(env["ATLAS_IDENTITY_DIR"]) / "favorites" / "favorites.json": '{}\n',

@@ -109,6 +109,33 @@ def _load_private_sports_api_for_failure_test(monkeypatch):
     live_sources_module.LiveSourceCatalogError = LiveSourceCatalogError
     live_sources_module.load_live_source_catalog = lambda: None
 
+    class LiveSourceRegistryStub:
+        def ensure(self):
+            return None
+
+        def list_sources(self):
+            return ()
+
+        def add(self, source):
+            return source
+
+        def delete(self, _source_id):
+            return False
+
+    live_source_registry = LiveSourceRegistryStub()
+
+    live_sources_module.default_live_source_registry = (
+        lambda: live_source_registry
+    )
+    live_sources_module.normalize_live_source = (
+        lambda payload: payload
+    )
+    live_sources_module.safe_source_summary = (
+        lambda source: source
+        if isinstance(source, dict)
+        else {}
+    )
+
     source_lifecycle_module = types.ModuleType(
         "source_lifecycle"
     )

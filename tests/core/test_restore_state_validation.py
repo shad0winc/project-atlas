@@ -23,6 +23,7 @@ SURFACES = (
     ("retention", "state/retention", "required", "captured"),
     ("sports-subscriptions", "state/sports/subscriptions.json", "required", "captured"),
     ("sports-live-tv-bindings", "state/sports/live-tv-bindings.json", "required", "captured"),
+    ("sports-live-sources", "state/sports/live-sources.json", "required", "captured"),
     ("sports-source-lifecycle", "state/sports/source-lifecycle.json", "required", "captured"),
     ("sports-recordings", "state/sports/recordings.json", "required", "captured"),
     ("sports-scheduler", "state/sports/scheduler.json", "required", "captured"),
@@ -61,6 +62,7 @@ def _staged_root(tmp_path: Path) -> Path:
     (root / "state/retention").mkdir(parents=True)
     _write_json(root / "state/sports/subscriptions.json", {"subscriptions": []})
     _write_json(root / "state/sports/live-tv-bindings.json", {"version": 1, "bindings": {}})
+    _write_json(root / "state/sports/live-sources.json", {"version": 1, "sources": []})
     _write_json(root / "state/sports/source-lifecycle.json", {"version": 1, "sources": []})
     _write_json(root / "state/sports/recordings.json", {})
     _write_json(root / "state/sports/scheduler.json", {})
@@ -107,6 +109,7 @@ def test_consumer_validation_accepts_structurally_valid_state(tmp_path: Path) ->
     assert "PASS retention" in result.stdout
     assert "PASS sports-subscriptions" in result.stdout
     assert "PASS sports-live-tv-bindings" in result.stdout
+    assert "PASS sports-live-sources" in result.stdout
     assert "PASS sports-source-lifecycle" in result.stdout
     assert "PASS sports-recordings" in result.stdout
     assert "PASS sports-scheduler" in result.stdout
@@ -207,6 +210,29 @@ def test_consumer_validation_rejects_invalid_current_ari_state(tmp_path: Path) -
     assert result.returncode != 0
     assert "staged recovery consumer validation failed" in result.stderr
     assert "Traceback" not in result.stderr
+
+
+def test_consumer_validation_rejects_invalid_live_sources(
+    tmp_path: Path,
+) -> None:
+    root = _staged_root(tmp_path)
+
+    _write_json(
+        root / "state/sports/live-sources.json",
+        {
+            "version": 999,
+            "sources": [],
+        },
+    )
+
+    result = _validate(root)
+
+    assert result.returncode != 0
+    assert (
+        "live source catalog version is invalid"
+        in result.stderr
+    )
+
 
 
 def test_consumer_validation_rejects_invalid_source_lifecycle(

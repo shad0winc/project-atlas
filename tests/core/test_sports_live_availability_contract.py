@@ -26,7 +26,13 @@ def test_writer_has_read_only_live_source_config_mount() -> None:
 
     assert (
         'SPORTS_LIVE_SOURCE_CATALOG_PATH: '
-        '"${SPORTS_LIVE_SOURCE_CATALOG_PATH:-}"'
+        '"${SPORTS_LIVE_SOURCE_CATALOG_PATH:-/mnt/storage/configs/sportyfin/state/live-sources.json}"'
+        in writer
+    )
+
+    assert (
+        "/mnt/storage/configs/sportyfin/state:"
+        "/mnt/storage/configs/sportyfin/state:rw"
         in writer
     )
     assert (

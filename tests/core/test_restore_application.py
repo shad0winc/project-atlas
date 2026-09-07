@@ -20,6 +20,7 @@ SURFACES = (
     ("retention", "state/retention", "required", "captured"),
     ("sports-subscriptions", "state/sports/subscriptions.json", "required", "captured"),
     ("sports-live-tv-bindings", "state/sports/live-tv-bindings.json", "required", "captured"),
+    ("sports-live-sources", "state/sports/live-sources.json", "required", "captured"),
     ("sports-source-lifecycle", "state/sports/source-lifecycle.json", "required", "captured"),
     ("sports-recordings", "state/sports/recordings.json", "required", "captured"),
     ("sports-scheduler", "state/sports/scheduler.json", "required", "captured"),
@@ -63,6 +64,7 @@ def _stage(tmp_path: Path) -> Path:
         "state/sports/recordings.json": "new-recordings\n",
         "state/sports/scheduler.json": "new-sports-scheduler\n",
         "state/sports/live-tv-bindings.json": '{"version":1,"bindings":{"sports-test":{"jellyfin_item_id":"jf-test"}}}\n',
+        "state/sports/live-sources.json": '{"version":1,"sources":[]}\n',
         "state/sports/source-lifecycle.json": '{"version":1,"sources":[]}\n',
     }
     for relative, value in files.items():
@@ -101,6 +103,7 @@ def _destinations(env: dict[str, str]) -> dict[str, Path]:
         "retention": Path(env["ATLAS_ARI_DIR"]),
         "sports-subscriptions": sports / "state/subscriptions.json",
         "sports-live-tv-bindings": sports / "state/live-tv-bindings.json",
+        "sports-live-sources": sports / "state/live-sources.json",
         "sports-source-lifecycle": sports / "state/source-lifecycle.json",
         "sports-recordings": sports / "recordings/recordings.json",
         "sports-scheduler": atlas / "runtime/scheduler/sports.json",
