@@ -108,6 +108,17 @@ def prepare_runtime(tmp_path: Path, *, branch: str = "main") -> dict[str, str]:
     )
 
     write_executable(
+        project / "scripts" / "lib" / "sports-runtime.sh",
+        """
+        #!/usr/bin/env bash
+        atlas_sports_runtime_provision() {
+          echo sports-runtime:provision >> "$ATLAS_TEST_EVENTS"
+          return "${ATLAS_TEST_SPORTS_RUNTIME_STATUS:-0}"
+        }
+        """,
+    )
+
+    write_executable(
         bin_dir / "git",
         f"""
         #!/usr/bin/env bash
@@ -1030,3 +1041,46 @@ def test_sports_writer_not_running_blocks_ingress_verification(
     )
     assert "maintenance:disable" not in event_lines(environment)
     assert lock_path(environment).is_dir()
+
+
+
+def test_sports_runtime_provisioning_failure_aborts_before_ingress_apply(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_SPORTS_RUNTIME_STATUS"] = "1"
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode != 0
+    assert "Sports runtime provisioning failed" in result.stderr
+
+    events = event_lines(environment)
+
+    expected_provisioners = (
+        "audit-runtime:provision",
+        "identity-writer-runtime:provision",
+        "favorites-runtime:provision",
+        "password-recovery-runtime:provision",
+        "sports-runtime:provision",
+    )
+
+    for event in expected_provisioners:
+        assert event in events
+
+    positions = [
+        events.index(event)
+        for event in expected_provisioners
+    ]
+
+    assert positions == sorted(positions)
+
+    compose_up_events = [
+        event
+        for event in events
+        if event.startswith("docker compose ")
+        and " up " in f" {event} "
+    ]
+
+    assert compose_up_events == []
+    assert "maintenance:disable" not in events

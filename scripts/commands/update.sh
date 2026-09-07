@@ -331,6 +331,7 @@ atlas_update_ingress_apply() {
   source "$ATLAS_PROJECT_DIR/scripts/lib/identity-writer-runtime.sh"
   source "$ATLAS_PROJECT_DIR/scripts/lib/favorites-runtime.sh"
   source "$ATLAS_PROJECT_DIR/scripts/lib/password-recovery-runtime.sh"
+  source "$ATLAS_PROJECT_DIR/scripts/lib/sports-runtime.sh"
 
   atlas_audit_runtime_provision || {
     echo 'ERROR: security audit runtime provisioning failed.' >&2
@@ -349,6 +350,11 @@ atlas_update_ingress_apply() {
 
   atlas_password_recovery_runtime_provision || {
     echo 'ERROR: password recovery runtime provisioning failed.' >&2
+    return 1
+  }
+
+  atlas_sports_runtime_provision || {
+    echo 'ERROR: Sports runtime provisioning failed.' >&2
     return 1
   }
 
