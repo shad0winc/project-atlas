@@ -15,13 +15,15 @@ from atlas_api.auth.models import AuthenticatedUser
 from atlas_api.dependencies import (
     get_live_session_policy_store,
     get_live_session_registry,
+    get_sports_session_registry,
     get_user_profile_store,
 )
 from atlas_api.playback_capabilities import PlaybackCapabilityService
-from atlas_api.live_sessions import (
-    LiveSessionLimitExceeded,
-    LiveSessionNotFound,
-    LiveSessionRegistry,
+from atlas.sports_session_registry import (
+    SportsSessionLimitExceeded,
+    SportsSessionNotFound,
+    SportsSessionRegistry,
+    SportsSessionStateError,
 )
 from atlas_api.routes.v1.playback import (
     get_playback_capability_service,
@@ -150,8 +152,8 @@ def read_sports_live_session(
         Depends(get_live_session_policy_store),
     ],
     live_sessions: Annotated[
-        LiveSessionRegistry,
-        Depends(get_live_session_registry),
+        SportsSessionRegistry,
+        Depends(get_sports_session_registry),
     ],
     response: Response,
     atlas_channel_id: Annotated[
@@ -209,24 +211,6 @@ def read_sports_live_session(
         )
 
     try:
-        session = playback.resolve_live_session(
-            provider="jellyfin",
-            item_id=jellyfin_item_id,
-            jellyfin_user_id=jellyfin_user_id,
-            subtitle_stream_index=_subtitle_stream_index(subtitle),
-        )
-    except PlaybackNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Sports live channel is not available.",
-        ) from exc
-    except PlaybackUnavailableError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Playback is not configured.",
-        ) from exc
-
-    try:
         effective_limit = live_policy.effective_limit(current_user.user_id)
     except LiveSessionPolicyError as exc:
         raise HTTPException(
@@ -240,11 +224,48 @@ def read_sports_live_session(
             target_id=atlas_channel_id,
             limit=effective_limit,
         )
-    except LiveSessionLimitExceeded as exc:
+    except SportsSessionLimitExceeded as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Live session limit reached.",
         ) from exc
+    except SportsSessionStateError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Live session admission is unavailable.",
+        ) from exc
+
+    try:
+        session = playback.resolve_live_session(
+            provider="jellyfin",
+            item_id=jellyfin_item_id,
+            jellyfin_user_id=jellyfin_user_id,
+            subtitle_stream_index=_subtitle_stream_index(subtitle),
+        )
+    except PlaybackNotFoundError as exc:
+        live_sessions.release(
+            session_id=live_session.session_id,
+            user_id=current_user.user_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sports live channel is not available.",
+        ) from exc
+    except PlaybackUnavailableError as exc:
+        live_sessions.release(
+            session_id=live_session.session_id,
+            user_id=current_user.user_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Playback is not configured.",
+        ) from exc
+    except Exception:
+        live_sessions.release(
+            session_id=live_session.session_id,
+            user_id=current_user.user_id,
+        )
+        raise
 
     try:
         capability = capabilities.create_bootstrap(
@@ -284,8 +305,8 @@ def heartbeat_sports_live_session(
         Depends(require_sports_read),
     ],
     live_sessions: Annotated[
-        LiveSessionRegistry,
-        Depends(get_live_session_registry),
+        SportsSessionRegistry,
+        Depends(get_sports_session_registry),
     ],
     session_id: Annotated[
         str,
@@ -297,10 +318,15 @@ def heartbeat_sports_live_session(
             session_id=session_id,
             user_id=current_user.user_id,
         )
-    except LiveSessionNotFound as exc:
+    except SportsSessionNotFound as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Live session was not found.",
+        ) from exc
+    except SportsSessionStateError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Live session state is unavailable.",
         ) from exc
 
     return {
@@ -321,8 +347,8 @@ def release_sports_live_session(
         Depends(require_sports_read),
     ],
     live_sessions: Annotated[
-        LiveSessionRegistry,
-        Depends(get_live_session_registry),
+        SportsSessionRegistry,
+        Depends(get_sports_session_registry),
     ],
     session_id: Annotated[
         str,

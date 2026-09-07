@@ -105,23 +105,23 @@ class FakeLiveSessions:
         self.active = {"live-session-test"}
 
     def admit(self, **kwargs):
-        from atlas_api.live_sessions import LiveSessionLimitExceeded
+        from atlas.sports_session_registry import SportsSessionLimitExceeded
 
         self.admit_calls.append(dict(kwargs))
         if self.block:
-            raise LiveSessionLimitExceeded("Live-session limit reached.")
+            raise SportsSessionLimitExceeded("Sports session limit reached.")
         self.active.add("live-session-test")
         return _FakeLiveRecord("live-session-test")
 
     def heartbeat(self, *, session_id: str, user_id: str):
-        from atlas_api.live_sessions import LiveSessionNotFound, LiveSessionRecord
+        from atlas.sports_session_registry import SportsSessionNotFound, SportsSessionRecord
 
         self.heartbeat_calls.append(
             {"session_id": session_id, "user_id": user_id}
         )
         if session_id not in self.active:
-            raise LiveSessionNotFound("missing")
-        return LiveSessionRecord(
+            raise SportsSessionNotFound("missing")
+        return SportsSessionRecord(
             session_id=session_id,
             user_id=user_id,
             target_id="sports-event-001",
@@ -199,7 +199,7 @@ def build_harness() -> Harness:
         sports_playback.get_live_session_policy_store
     ] = lambda: policy
     app.dependency_overrides[
-        sports_playback.get_live_session_registry
+        sports_playback.get_sports_session_registry
     ] = lambda: live_sessions
 
     return Harness(
@@ -291,6 +291,12 @@ def test_watch_live_bound_non_live_or_missing_jellyfin_item_is_404() -> None:
     assert response.json()["detail"] == (
         "Sports live channel is not available."
     )
+    assert harness.live_sessions.release_calls == [
+        {
+            "session_id": "live-session-test",
+            "user_id": USER.user_id,
+        }
+    ]
 
 
 def test_watch_live_writer_failure_is_503_without_private_detail() -> None:
@@ -337,7 +343,31 @@ def test_watch_live_limit_reached_is_409_without_capability() -> None:
 
     assert response.status_code == 409
     assert response.json()["detail"] == "Live session limit reached."
+    assert harness.playback.calls == []
     assert harness.capabilities.calls == []
+
+
+def test_watch_live_capability_failure_releases_shared_session() -> None:
+    harness = build_harness()
+
+    def fail_capability(**kwargs):
+        raise RuntimeError("capability failed")
+
+    harness.capabilities.create_bootstrap = fail_capability  # type: ignore[method-assign]
+
+    try:
+        harness.client.get(
+            "/api/v1/sports/live/sports-event-001/session"
+        )
+    except RuntimeError:
+        pass
+
+    assert harness.live_sessions.release_calls == [
+        {
+            "session_id": "live-session-test",
+            "user_id": USER.user_id,
+        }
+    ]
 
 
 def test_watch_live_heartbeat_is_scoped_to_authenticated_user() -> None:

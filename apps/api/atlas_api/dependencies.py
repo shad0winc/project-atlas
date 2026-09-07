@@ -37,6 +37,7 @@ from atlas.password_recovery import (
 )
 from atlas.user_profiles import UserProfileError, UserProfileStore
 from atlas.sports_resource_pool import SportsResourcePool
+from atlas.sports_session_registry import SportsSessionRegistry
 from atlas.live_session_policy import (
     LiveSessionPolicyStore,
     default_live_session_policy_store,
@@ -247,6 +248,22 @@ def get_sports_resource_pool() -> SportsResourcePool:
 
 
 @lru_cache(maxsize=1)
+
+@lru_cache(maxsize=1)
+def get_sports_session_registry() -> SportsSessionRegistry:
+    raw_path = os.getenv(
+        "ATLAS_SPORTS_SESSION_PATH",
+        "/mnt/storage/configs/atlas/runtime/sports/live-sessions.json",
+    ).strip()
+
+    if not raw_path:
+        raise ValueError(
+            "ATLAS_SPORTS_SESSION_PATH must not be empty."
+        )
+
+    return SportsSessionRegistry(raw_path)
+
+
 def get_live_session_registry() -> LiveSessionRegistry:
     """Return process-local heartbeat state for active Live playback."""
 
