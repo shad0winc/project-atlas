@@ -56,6 +56,7 @@ services:
       - /mnt/storage/configs/atlas/identity/custom_roles:/mnt/storage/configs/atlas/identity/custom_roles:ro
       - /mnt/storage/configs/atlas/identity/favorites:/mnt/storage/configs/atlas/identity/favorites:rw
       - /mnt/storage/configs/atlas/runtime/requests:/mnt/storage/configs/atlas/runtime/requests:rw
+      - /mnt/storage/configs/atlas/runtime/sports:/mnt/storage/configs/atlas/runtime/sports:rw
       - /mnt/storage/configs/atlas/runtime/events.jsonl:/mnt/storage/configs/atlas/runtime/events.jsonl:rw
       - /mnt/storage/configs/atlas/runtime/ari:/mnt/storage/configs/atlas/runtime/ari:ro
       - /mnt/storage/configs/atlas/runtime/services:/mnt/storage/configs/atlas/runtime/services:ro
@@ -76,6 +77,7 @@ services:
       ATLAS_JELLYSEERR_ANIME_MOVIE_SERVER_ID: "${ATLAS_JELLYSEERR_ANIME_MOVIE_SERVER_ID:-}"
       ATLAS_JELLYSEERR_ANIME_TV_SERVER_ID: "${ATLAS_JELLYSEERR_ANIME_TV_SERVER_ID:-}"
       ATLAS_REQUESTS_DIR: "/mnt/storage/configs/atlas/runtime/requests"
+      ATLAS_SPORTS_RESOURCE_POOL_PATH: "/mnt/storage/configs/atlas/runtime/sports/resource-pool.json"
       ATLAS_USERS_DIR: "/mnt/storage/configs/atlas/users"
       ATLAS_CUSTOM_ROLES_PATH: "/mnt/storage/configs/atlas/identity/custom_roles/custom_roles.json"
       ATLAS_IDENTITY_WRITER_URL: "http://identity-writer:8001"

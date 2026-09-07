@@ -36,6 +36,7 @@ from atlas.password_recovery import (
     default_store as default_password_recovery_store,
 )
 from atlas.user_profiles import UserProfileError, UserProfileStore
+from atlas.sports_resource_pool import SportsResourcePool
 from atlas.live_session_policy import (
     LiveSessionPolicyStore,
     default_live_session_policy_store,
@@ -224,6 +225,25 @@ def get_live_session_policy_store() -> LiveSessionPolicyStore:
     """Return read-only access to durable Live playback concurrency policy."""
 
     return default_live_session_policy_store()
+
+
+@lru_cache(maxsize=1)
+def get_sports_resource_pool() -> SportsResourcePool:
+    """Return the process-wide shared Sports upstream lease pool."""
+
+    raw_path = os.environ.get(
+        "ATLAS_SPORTS_RESOURCE_POOL_PATH",
+        "/mnt/storage/configs/atlas/runtime/sports/resource-pool.json",
+    ).strip()
+
+    if not raw_path:
+        raise ValueError(
+            "ATLAS_SPORTS_RESOURCE_POOL_PATH cannot be empty."
+        )
+
+    return SportsResourcePool(
+        Path(raw_path),
+    )
 
 
 @lru_cache(maxsize=1)
