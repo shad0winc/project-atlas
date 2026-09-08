@@ -4,6 +4,7 @@ import { Card } from "../../../components/ui/Card";
 import { usePermission } from "../../../lib/authorization";
 import { PORTAL_ROUTES } from "../../../lib/navigation/portal";
 import { LiveSessionManagement } from "./LiveSessionManagement";
+import { ProviderAccountManagement } from "./ProviderAccountManagement";
 import { RoleManagement } from "./RoleManagement";
 
 const administrationDestinations = [
@@ -74,6 +75,7 @@ export function AdministrationView(): React.ReactElement {
         ))}
       </div>
 
+      <ProviderAccountManagement />
       <LiveSessionManagement />
       <RoleManagement />
     </section>
