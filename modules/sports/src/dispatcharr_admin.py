@@ -373,6 +373,212 @@ class DispatcharrAdminClient:
             )
         )
 
+    def create_account(
+        self,
+        *,
+        name: str,
+        server_url: str,
+        username: str,
+        password: str,
+        max_connections: int,
+    ) -> SafeDispatcharrAccount:
+        """Create one disabled-by-Atlas Xtream account in Dispatcharr."""
+
+        normalized_name = str(
+            name
+            or ""
+        ).strip()
+
+        if not normalized_name:
+            raise DispatcharrAdminError(
+                "Account name cannot be blank."
+            )
+
+        normalized_server_url = str(
+            server_url
+            or ""
+        ).strip()
+
+        if not normalized_server_url:
+            raise DispatcharrAdminError(
+                "Server URL cannot be blank."
+            )
+
+        parsed = urllib.parse.urlsplit(
+            normalized_server_url
+        )
+
+        if (
+            parsed.scheme
+            not in {"http", "https"}
+            or not parsed.netloc
+            or parsed.username
+            or parsed.password
+        ):
+            raise DispatcharrAdminError(
+                "Server URL is invalid."
+            )
+
+        normalized_username = str(
+            username
+            or ""
+        ).strip()
+
+        if not normalized_username:
+            raise DispatcharrAdminError(
+                "Username cannot be blank."
+            )
+
+        if (
+            not isinstance(password, str)
+            or password == ""
+        ):
+            raise DispatcharrAdminError(
+                "Password cannot be blank."
+            )
+
+        if isinstance(
+            max_connections,
+            bool,
+        ):
+            raise DispatcharrAdminError(
+                "Maximum connections must "
+                "be an integer."
+            )
+
+        try:
+            normalized_max_connections = int(
+                max_connections
+            )
+        except (
+            TypeError,
+            ValueError,
+        ) as error:
+            raise DispatcharrAdminError(
+                "Maximum connections must "
+                "be an integer."
+            ) from error
+
+        if not (
+            1
+            <= normalized_max_connections
+            <= 1000
+        ):
+            raise DispatcharrAdminError(
+                "Maximum connections must "
+                "be between 1 and 1000."
+            )
+
+        # Keep this allowlist intentionally narrow.
+        #
+        # Dispatcharr owns provider credentials and
+        # discovery. Atlas owns pool participation.
+        # Newly discovered groups must not be
+        # automatically enabled by account creation.
+        body: dict[str, Any] = {
+            "name": normalized_name,
+            "server_url": (
+                normalized_server_url
+            ),
+            "account_type": "XC",
+            "username": (
+                normalized_username
+            ),
+            "password": password,
+            "max_streams": (
+                normalized_max_connections
+            ),
+            "is_active": True,
+            "enable_vod": False,
+            "auto_enable_new_groups_live": (
+                False
+            ),
+            "auto_enable_new_groups_vod": (
+                False
+            ),
+            "auto_enable_new_groups_series": (
+                False
+            ),
+        }
+
+        token = self._access_token()
+
+        payload = self._json_request(
+            "POST",
+            "/api/m3u/accounts/",
+            body,
+            access_token=token,
+        )
+
+        if not isinstance(
+            payload,
+            dict,
+        ):
+            raise DispatcharrAdminError(
+                "Dispatcharr returned an invalid "
+                "account creation response."
+            )
+
+        # Dispatcharr may include credentials in its
+        # administrator response. Always pass the
+        # response through the existing safe mapper.
+        return self._safe_account(
+            payload
+        )
+
+    def delete_account(
+        self,
+        *,
+        account_id: int,
+    ) -> None:
+        """Delete one Dispatcharr account after caller-owned safety guards."""
+
+        if isinstance(
+            account_id,
+            bool,
+        ):
+            raise DispatcharrAdminError(
+                "Account identifier is invalid."
+            )
+
+        try:
+            normalized_account_id = int(
+                account_id
+            )
+        except (
+            TypeError,
+            ValueError,
+        ) as error:
+            raise DispatcharrAdminError(
+                "Account identifier is invalid."
+            ) from error
+
+        if normalized_account_id < 1:
+            raise DispatcharrAdminError(
+                "Account identifier is invalid."
+            )
+
+        token = self._access_token()
+
+        payload = self._json_request(
+            "DELETE",
+            (
+                "/api/m3u/accounts/"
+                f"{normalized_account_id}/"
+            ),
+            {},
+            access_token=token,
+        )
+
+        if not isinstance(
+            payload,
+            dict,
+        ):
+            raise DispatcharrAdminError(
+                "Dispatcharr returned an invalid "
+                "account deletion response."
+            )
+
     def update_credentials(
         self,
         *,

@@ -1443,3 +1443,519 @@ def test_disabled_provider_account_contributes_zero_pool_capacity(
     assert accounts[
         "provider-a-multi"
     ]["capacity"] == 5
+
+
+def _provider_account_lifecycle_client(
+    writer,
+    *,
+    resource_pool=None,
+    audit_writer=None,
+):
+    app = FastAPI()
+    app.include_router(
+        admin_sports_providers.router
+    )
+
+    app.dependency_overrides[
+        admin_sports_providers.
+        require_sports_providers_manage
+    ] = lambda: _FakeAdminUser()
+
+    app.dependency_overrides[
+        admin_sports_providers.
+        get_admin_sports_service
+    ] = lambda: writer
+
+    if resource_pool is not None:
+        app.dependency_overrides[
+            admin_sports_providers.
+            get_sports_resource_pool
+        ] = lambda: resource_pool
+
+    if audit_writer is not None:
+        app.dependency_overrides[
+            admin_sports_providers.
+            get_security_audit_writer
+        ] = lambda: audit_writer
+
+    return TestClient(app)
+
+
+class ProviderAccountLifecycleFakeSportsWriter(
+    MutableFakeSportsWriter
+):
+    def __init__(
+        self,
+        *,
+        target_enabled: bool = False,
+    ) -> None:
+        super().__init__()
+        self.target_enabled = (
+            target_enabled
+        )
+        self.account_creates = []
+        self.account_removals = []
+
+    def get_source_registry(self):
+        original = (
+            super()
+            .get_source_registry()
+        )
+
+        registry = {
+            "providers": [
+                dict(item)
+                for item
+                in original["providers"]
+            ],
+            "sources": [
+                dict(item)
+                for item
+                in original["sources"]
+            ],
+        }
+
+        for source in registry["sources"]:
+            if (
+                source.get("source_id")
+                == "provider-a-primary"
+            ):
+                source["enabled"] = (
+                    self.target_enabled
+                )
+
+        return registry
+
+    def create_provider_account(
+        self,
+        **fields,
+    ):
+        self.account_creates.append(
+            dict(fields)
+        )
+        return self.get_source_registry()
+
+    def remove_provider_account(
+        self,
+        *,
+        source_id: str,
+    ):
+        self.account_removals.append(
+            source_id
+        )
+        return True
+
+
+class ProviderAccountLifecycleAuditWriter:
+    def __init__(self) -> None:
+        self.events = []
+
+    def publish(
+        self,
+        event,
+        payload,
+    ) -> None:
+        self.events.append(
+            (
+                event,
+                dict(payload),
+            )
+        )
+
+
+class ProviderAccountDeleteResource:
+    def __init__(
+        self,
+        *,
+        source_id: str,
+        active: int,
+    ) -> None:
+        self.source_id = source_id
+        self.active = active
+
+
+class ProviderAccountDeleteSnapshot:
+    def __init__(
+        self,
+        *,
+        source_id: str,
+        active: int,
+    ) -> None:
+        self.sources = (
+            ProviderAccountDeleteResource(
+                source_id=source_id,
+                active=active,
+            ),
+        )
+
+
+class ProviderAccountDeletePool:
+    def __init__(
+        self,
+        *,
+        active: int,
+    ) -> None:
+        self.active = active
+        self.snapshots = []
+
+    def snapshot(
+        self,
+        *,
+        capacities,
+    ):
+        self.snapshots.append(
+            dict(capacities)
+        )
+
+        source_id = next(
+            iter(capacities)
+        )
+
+        return (
+            ProviderAccountDeleteSnapshot(
+                source_id=source_id,
+                active=self.active,
+            )
+        )
+
+
+def test_admin_can_create_disabled_provider_account_without_exposing_secrets() -> None:
+    writer = (
+        ProviderAccountLifecycleFakeSportsWriter()
+    )
+    audit_writer = (
+        ProviderAccountLifecycleAuditWriter()
+    )
+
+    client = (
+        _provider_account_lifecycle_client(
+            writer,
+            audit_writer=audit_writer,
+        )
+    )
+
+    response = client.post(
+            (
+                "/admin/sports/providers/"
+                "provider-a/accounts"
+            ),
+            json={
+                "source_id": (
+                    "provider-a-secondary"
+                ),
+                "provider_display_name": (
+                    "Provider A"
+                ),
+                "account_display_name": (
+                    "Secondary"
+                ),
+                "server_url": (
+                    "https://provider.example"
+                ),
+                "username": (
+                    "provider-user"
+                ),
+                "password": (
+                    "provider-secret"
+                ),
+                "max_connections": 3,
+                "priority": 120,
+            },
+        )
+
+    assert response.status_code == 201
+
+    assert writer.account_creates == [
+        {
+            "source_id": (
+                "provider-a-secondary"
+            ),
+            "provider_id": "provider-a",
+            "provider_display_name": (
+                "Provider A"
+            ),
+            "account_display_name": (
+                "Secondary"
+            ),
+            "server_url": (
+                "https://provider.example"
+            ),
+            "username": (
+                "provider-user"
+            ),
+            "password": (
+                "provider-secret"
+            ),
+            "max_connections": 3,
+            "priority": 120,
+        }
+    ]
+
+    assert len(audit_writer.events) == 1
+
+    event, payload = (
+        audit_writer.events[0]
+    )
+
+    assert event == (
+        "security.sports."
+        "provider_account_created"
+    )
+
+    assert set(payload) == {
+        "actor_user_id",
+        "provider_id",
+        "source_id",
+    }
+
+    assert payload["provider_id"] == (
+        "provider-a"
+    )
+    assert payload["source_id"] == (
+        "provider-a-secondary"
+    )
+
+    rendered = response.text.lower()
+
+    for forbidden in (
+        "server_url",
+        "username",
+        "password",
+        "provider-secret",
+        "provider-user",
+        "provider.example",
+        "backend_reference",
+    ):
+        assert forbidden not in rendered
+
+
+def test_admin_provider_account_create_rejects_control_fields() -> None:
+    writer = (
+        ProviderAccountLifecycleFakeSportsWriter()
+    )
+
+    forbidden_fields = (
+        ("enabled", True),
+        (
+            "backend_reference",
+            "dispatcharr:m3u:42",
+        ),
+        ("account_type", "XC"),
+        ("token", "secret"),
+        ("api_key", "secret"),
+    )
+
+    for field, value in forbidden_fields:
+        response = _client(writer).post(
+            (
+                "/admin/sports/providers/"
+                "provider-a/accounts"
+            ),
+            json={
+                "source_id": (
+                    "provider-a-secondary"
+                ),
+                "provider_display_name": (
+                    "Provider A"
+                ),
+                "account_display_name": (
+                    "Secondary"
+                ),
+                "server_url": (
+                    "https://provider.example"
+                ),
+                "username": "user",
+                "password": "secret",
+                "max_connections": 2,
+                field: value,
+            },
+        )
+
+        assert response.status_code == 422
+
+    assert writer.account_creates == []
+
+
+def test_admin_can_remove_disabled_provider_account_with_zero_active_leases() -> None:
+    writer = (
+        ProviderAccountLifecycleFakeSportsWriter(
+            target_enabled=False
+        )
+    )
+    resource_pool = (
+        ProviderAccountDeletePool(
+            active=0
+        )
+    )
+    audit_writer = (
+        ProviderAccountLifecycleAuditWriter()
+    )
+
+    client = (
+        _provider_account_lifecycle_client(
+            writer,
+            resource_pool=resource_pool,
+            audit_writer=audit_writer,
+        )
+    )
+
+    response = client.delete(
+            (
+                "/admin/sports/providers/"
+                "provider-a/accounts/"
+                "provider-a-primary"
+            )
+        )
+
+    assert response.status_code == 200
+
+    assert response.json() == {
+        "removed": True,
+        "source_id": (
+            "provider-a-primary"
+        ),
+    }
+
+    assert resource_pool.snapshots == [
+        {
+            "provider-a-primary": 0,
+        }
+    ]
+
+    assert writer.account_removals == [
+        "provider-a-primary"
+    ]
+
+    assert len(audit_writer.events) == 1
+
+    event, payload = (
+        audit_writer.events[0]
+    )
+
+    assert event == (
+        "security.sports."
+        "provider_account_removed"
+    )
+
+    assert set(payload) == {
+        "actor_user_id",
+        "provider_id",
+        "source_id",
+    }
+
+
+def test_admin_provider_account_remove_blocks_active_upstream_lease() -> None:
+    writer = (
+        ProviderAccountLifecycleFakeSportsWriter(
+            target_enabled=False
+        )
+    )
+    resource_pool = (
+        ProviderAccountDeletePool(
+            active=1
+        )
+    )
+    audit_writer = (
+        ProviderAccountLifecycleAuditWriter()
+    )
+
+    client = (
+        _provider_account_lifecycle_client(
+            writer,
+            resource_pool=resource_pool,
+            audit_writer=audit_writer,
+        )
+    )
+
+    response = client.delete(
+            (
+                "/admin/sports/providers/"
+                "provider-a/accounts/"
+                "provider-a-primary"
+            )
+        )
+
+    assert response.status_code == 409
+
+    assert resource_pool.snapshots == [
+        {
+            "provider-a-primary": 0,
+        }
+    ]
+
+    assert writer.account_removals == []
+    assert audit_writer.events == []
+
+
+def test_admin_provider_account_remove_requires_disabled_account() -> None:
+    writer = (
+        ProviderAccountLifecycleFakeSportsWriter(
+            target_enabled=True
+        )
+    )
+    resource_pool = (
+        ProviderAccountDeletePool(
+            active=0
+        )
+    )
+    audit_writer = (
+        ProviderAccountLifecycleAuditWriter()
+    )
+
+    client = (
+        _provider_account_lifecycle_client(
+            writer,
+            resource_pool=resource_pool,
+            audit_writer=audit_writer,
+        )
+    )
+
+    response = client.delete(
+            (
+                "/admin/sports/providers/"
+                "provider-a/accounts/"
+                "provider-a-primary"
+            )
+        )
+
+    assert response.status_code == 409
+    assert resource_pool.snapshots == []
+    assert writer.account_removals == []
+    assert audit_writer.events == []
+
+
+def test_admin_provider_account_remove_is_provider_scoped() -> None:
+    writer = (
+        ProviderAccountLifecycleFakeSportsWriter(
+            target_enabled=False
+        )
+    )
+    resource_pool = (
+        ProviderAccountDeletePool(
+            active=0
+        )
+    )
+    audit_writer = (
+        ProviderAccountLifecycleAuditWriter()
+    )
+
+    client = (
+        _provider_account_lifecycle_client(
+            writer,
+            resource_pool=resource_pool,
+            audit_writer=audit_writer,
+        )
+    )
+
+    response = client.delete(
+            (
+                "/admin/sports/providers/"
+                "wrong-provider/accounts/"
+                "provider-a-primary"
+            )
+        )
+
+    assert response.status_code == 404
+    assert resource_pool.snapshots == []
+    assert writer.account_removals == []
+    assert audit_writer.events == []

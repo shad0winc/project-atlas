@@ -249,6 +249,24 @@ class SportsLiveTvBindingNotFoundError(LookupError):
     """Raised when an Atlas Sports channel has no exact Live TV binding."""
 
 
+class SportsProviderAccountConflictError(
+    SportsWriterTransportError
+):
+    """Provider-account mutation conflicts with current state."""
+
+
+class SportsProviderAccountNotFoundError(
+    SportsWriterTransportError
+):
+    """Provider account disappeared during a scoped mutation."""
+
+
+class SportsProviderAccountInvalidError(
+    SportsWriterTransportError
+):
+    """Provider-account lifecycle request is invalid."""
+
+
 class SportsWriterBackedAPIService:
     """Authenticated API adapter backed by the private Sports service."""
 
@@ -814,6 +832,251 @@ class SportsWriterBackedAPIService:
             payload
         )
 
+    def create_provider_account(
+        self,
+        *,
+        source_id: str,
+        provider_id: str,
+        provider_display_name: str,
+        account_display_name: str,
+        server_url: str,
+        username: str,
+        password: str,
+        max_connections: int,
+        priority: int = 100,
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Create one disabled provider account transactionally."""
+
+        normalized_source_id = source_id.strip()
+        normalized_provider_id = provider_id.strip()
+        normalized_provider_display_name = (
+            provider_display_name.strip()
+        )
+        normalized_account_display_name = (
+            account_display_name.strip()
+        )
+        normalized_server_url = server_url.strip()
+        normalized_username = username.strip()
+
+        required = (
+            normalized_source_id,
+            normalized_provider_id,
+            normalized_provider_display_name,
+            normalized_account_display_name,
+            normalized_server_url,
+            normalized_username,
+        )
+
+        if not all(required):
+            raise ValueError(
+                "Provider account identity and "
+                "connection fields are required."
+            )
+
+        if (
+            not isinstance(password, str)
+            or password == ""
+        ):
+            raise ValueError(
+                "Provider account password is required."
+            )
+
+        if (
+            isinstance(max_connections, bool)
+            or not isinstance(max_connections, int)
+            or max_connections <= 0
+        ):
+            raise ValueError(
+                "Provider account capacity must "
+                "be a positive integer."
+            )
+
+        if (
+            isinstance(priority, bool)
+            or not isinstance(priority, int)
+            or priority < 0
+        ):
+            raise ValueError(
+                "Provider account priority must "
+                "be a non-negative integer."
+            )
+
+        payload = self._request(
+            "POST",
+            "/internal/v1/provider-accounts",
+            {
+                "source_id": normalized_source_id,
+                "provider_id": normalized_provider_id,
+                "provider_display_name": (
+                    normalized_provider_display_name
+                ),
+                "account_display_name": (
+                    normalized_account_display_name
+                ),
+                "server_url": normalized_server_url,
+                "username": normalized_username,
+                "password": password,
+                "max_connections": max_connections,
+                "priority": priority,
+            },
+        )
+
+        source = payload.get("source")
+        account = payload.get("account")
+
+        if not isinstance(source, dict):
+            raise SportsWriterTransportError(
+                "Private Sports service returned "
+                "an invalid created source."
+            )
+
+        if not isinstance(account, dict):
+            raise SportsWriterTransportError(
+                "Private Sports service returned "
+                "an invalid created account."
+            )
+
+        # Reuse the existing recursive credential
+        # boundary rather than maintaining a second
+        # secret-key allow/deny implementation.
+        safe_source = (
+            self._safe_source_registry_payload(
+                {
+                    "providers": [],
+                    "sources": [
+                        source,
+                    ],
+                }
+            )["sources"][0]
+        )
+
+        if (
+            str(
+                safe_source.get(
+                    "source_id",
+                    "",
+                )
+            ).strip()
+            != normalized_source_id
+        ):
+            raise SportsWriterTransportError(
+                "Private Sports service returned "
+                "the wrong created source."
+            )
+
+        if (
+            str(
+                safe_source.get(
+                    "provider_id",
+                    "",
+                )
+            ).strip()
+            != normalized_provider_id
+        ):
+            raise SportsWriterTransportError(
+                "Private Sports service returned "
+                "the wrong created provider."
+            )
+
+        if safe_source.get("enabled") is not False:
+            raise SportsWriterTransportError(
+                "New provider account was not "
+                "created disabled."
+            )
+
+        allowed_account_fields = {
+            "account_id",
+            "name",
+            "account_type",
+            "enabled",
+            "configured_max_connections",
+            "credentials_configured",
+        }
+
+        if set(account) != allowed_account_fields:
+            raise SportsWriterTransportError(
+                "Private Sports service returned "
+                "an unsafe created account."
+            )
+
+        if account.get("account_type") != "XC":
+            raise SportsWriterTransportError(
+                "Private Sports service created "
+                "an unexpected account type."
+            )
+
+        if not isinstance(
+            account.get(
+                "credentials_configured"
+            ),
+            bool,
+        ):
+            raise SportsWriterTransportError(
+                "Private Sports service returned "
+                "invalid created credential state."
+            )
+
+        # Do not return the private creation payload:
+        # source metadata includes backend_reference.
+        # Refresh through the established safe registry
+        # adapter instead.
+        return self.get_source_registry()
+
+    def remove_provider_account(
+        self,
+        *,
+        source_id: str,
+    ) -> bool:
+        """Remove one already-disabled provider account."""
+
+        normalized_source_id = source_id.strip()
+
+        if not normalized_source_id:
+            raise ValueError(
+                "source_id is required"
+            )
+
+        payload = self._request(
+            "DELETE",
+            "/internal/v1/provider-accounts/"
+            + urllib.parse.quote(
+                normalized_source_id,
+                safe="",
+            ),
+        )
+
+        if set(payload) != {
+            "removed",
+            "source_id",
+        }:
+            raise SportsWriterTransportError(
+                "Private Sports service returned "
+                "an unsafe provider-account "
+                "removal response."
+            )
+
+        if payload.get("removed") is not True:
+            raise SportsWriterTransportError(
+                "Private Sports service did not "
+                "confirm provider-account removal."
+            )
+
+        if (
+            str(
+                payload.get(
+                    "source_id",
+                    "",
+                )
+            ).strip()
+            != normalized_source_id
+        ):
+            raise SportsWriterTransportError(
+                "Private Sports service returned "
+                "the wrong removed source."
+            )
+
+        return True
+
     def update_dispatcharr_credentials(
         self,
         *,
@@ -1081,6 +1344,22 @@ class SportsWriterBackedAPIService:
                     "Private Sports service request failed.",
                 )
             ).strip()
+            if code in {
+                "sports_source_exists",
+                "sports_provider_account_enabled",
+                "sports_provider_account_playback_dependency",
+            }:
+                raise SportsProviderAccountConflictError(
+                    message
+                ) from exc
+            if code == "sports_source_not_found":
+                raise SportsProviderAccountNotFoundError(
+                    message
+                ) from exc
+            if code == "sports_provider_account_invalid":
+                raise SportsProviderAccountInvalidError(
+                    message
+                ) from exc
             if code == "sports_live_tv_binding_not_found":
                 raise SportsLiveTvBindingNotFoundError(message) from exc
             if code == "provider_not_found":

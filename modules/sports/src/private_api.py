@@ -902,6 +902,386 @@ class Handler(BaseHTTPRequestHandler):
             )
             return
 
+        if (
+            parsed.path
+            == "/internal/v1/provider-accounts"
+        ):
+            if not self._require_auth():
+                return
+
+            payload = self._read_payload()
+
+            if payload is None:
+                return
+
+            allowed_fields = {
+                "source_id",
+                "provider_id",
+                "provider_display_name",
+                "account_display_name",
+                "server_url",
+                "username",
+                "password",
+                "max_connections",
+                "priority",
+            }
+
+            unsupported = (
+                set(payload)
+                - allowed_fields
+            )
+
+            if unsupported:
+                self._json(
+                    HTTPStatus.UNPROCESSABLE_ENTITY,
+                    {
+                        "code": (
+                            "sports_provider_account_"
+                            "invalid"
+                        ),
+                        "error": (
+                            "Unsupported provider "
+                            "account fields."
+                        ),
+                    },
+                )
+                return
+
+            required_text_fields = (
+                "source_id",
+                "provider_id",
+                "provider_display_name",
+                "account_display_name",
+                "server_url",
+                "username",
+            )
+
+            normalized: dict[str, Any] = {}
+
+            for field in required_text_fields:
+                value = payload.get(field)
+
+                if not isinstance(
+                    value,
+                    str,
+                ):
+                    self._json(
+                        HTTPStatus.UNPROCESSABLE_ENTITY,
+                        {
+                            "code": (
+                                "sports_provider_"
+                                "account_invalid"
+                            ),
+                            "error": (
+                                "Provider account "
+                                "configuration is invalid."
+                            ),
+                        },
+                    )
+                    return
+
+                value = value.strip()
+
+                if not value:
+                    self._json(
+                        HTTPStatus.UNPROCESSABLE_ENTITY,
+                        {
+                            "code": (
+                                "sports_provider_"
+                                "account_invalid"
+                            ),
+                            "error": (
+                                "Provider account "
+                                "configuration is invalid."
+                            ),
+                        },
+                    )
+                    return
+
+                normalized[field] = value
+
+            password = payload.get(
+                "password"
+            )
+
+            if (
+                not isinstance(
+                    password,
+                    str,
+                )
+                or password == ""
+            ):
+                self._json(
+                    HTTPStatus.UNPROCESSABLE_ENTITY,
+                    {
+                        "code": (
+                            "sports_provider_account_"
+                            "invalid"
+                        ),
+                        "error": (
+                            "Provider account "
+                            "configuration is invalid."
+                        ),
+                    },
+                )
+                return
+
+            try:
+                source = SportsSource.from_mapping(
+                    {
+                        "source_id": (
+                            normalized[
+                                "source_id"
+                            ]
+                        ),
+                        "display_name": (
+                            normalized[
+                                "account_display_name"
+                            ]
+                        ),
+                        "provider_id": (
+                            normalized[
+                                "provider_id"
+                            ]
+                        ),
+                        "provider_display_name": (
+                            normalized[
+                                "provider_display_name"
+                            ]
+                        ),
+                        "account_display_name": (
+                            normalized[
+                                "account_display_name"
+                            ]
+                        ),
+                        "kind": (
+                            "licensed_subscription"
+                        ),
+                        "enabled": False,
+                        "priority": payload.get(
+                            "priority",
+                            100,
+                        ),
+                        "max_connections": (
+                            payload.get(
+                                "max_connections"
+                            )
+                        ),
+                    }
+                )
+
+                store = self._source_store()
+                sources = store.load()
+
+                if any(
+                    item.source_id
+                    == source.source_id
+                    for item in sources
+                ):
+                    self._json(
+                        HTTPStatus.CONFLICT,
+                        {
+                            "code": (
+                                "sports_source_exists"
+                            ),
+                            "error": (
+                                "Sports source "
+                                "already exists."
+                            ),
+                        },
+                    )
+                    return
+
+                # Validate aggregate provider
+                # identity before any backend
+                # mutation. Accounts sharing one
+                # provider_id must agree on provider
+                # metadata.
+                group_source_providers(
+                    (
+                        *sources,
+                        source,
+                    )
+                )
+
+            except SourceLifecycleError:
+                self._json(
+                    HTTPStatus.UNPROCESSABLE_ENTITY,
+                    {
+                        "code": (
+                            "sports_provider_account_"
+                            "invalid"
+                        ),
+                        "error": (
+                            "Provider account "
+                            "configuration is invalid."
+                        ),
+                    },
+                )
+                return
+
+            from dispatcharr_admin import (
+                DispatcharrAdminClient,
+                DispatcharrAdminError,
+            )
+
+            client = (
+                DispatcharrAdminClient
+                .from_environment()
+            )
+
+            try:
+                account = client.create_account(
+                    # Atlas source identity is used
+                    # as the backend account name so
+                    # Dispatcharr's unique-name
+                    # constraint is deterministic.
+                    name=source.source_id,
+                    server_url=(
+                        normalized[
+                            "server_url"
+                        ]
+                    ),
+                    username=(
+                        normalized[
+                            "username"
+                        ]
+                    ),
+                    password=password,
+                    max_connections=(
+                        source.max_connections
+                    ),
+                )
+
+            except DispatcharrAdminError:
+                self._json(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    {
+                        "code": (
+                            "dispatcharr_admin_"
+                            "unavailable"
+                        ),
+                        "error": (
+                            "Dispatcharr account "
+                            "creation is unavailable."
+                        ),
+                    },
+                )
+                return
+
+            account_id = getattr(
+                account,
+                "account_id",
+                None,
+            )
+
+            if (
+                isinstance(
+                    account_id,
+                    bool,
+                )
+                or not isinstance(
+                    account_id,
+                    int,
+                )
+                or account_id < 1
+            ):
+                self._json(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    {
+                        "code": (
+                            "dispatcharr_admin_"
+                            "invalid_response"
+                        ),
+                        "error": (
+                            "Dispatcharr returned "
+                            "invalid account metadata."
+                        ),
+                    },
+                )
+                return
+
+            source_mapping = (
+                source.to_mapping()
+            )
+
+            source_mapping[
+                "backend_reference"
+            ] = (
+                "dispatcharr:m3u:"
+                f"{account_id}"
+            )
+
+            try:
+                created_source = (
+                    SportsSource.from_mapping(
+                        source_mapping
+                    )
+                )
+
+                updated = (
+                    *sources,
+                    created_source,
+                )
+
+                store.write(updated)
+
+            except (
+                SourceLifecycleError,
+                OSError,
+            ):
+                try:
+                    client.delete_account(
+                        account_id=account_id
+                    )
+
+                except DispatcharrAdminError:
+                    self._json(
+                        HTTPStatus.SERVICE_UNAVAILABLE,
+                        {
+                            "code": (
+                                "sports_provider_account_"
+                                "reconciliation_required"
+                            ),
+                            "error": (
+                                "Provider account "
+                                "creation requires "
+                                "operator reconciliation."
+                            ),
+                        },
+                    )
+                    return
+
+                self._json(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    {
+                        "code": (
+                            "sports_provider_account_"
+                            "create_failed"
+                        ),
+                        "error": (
+                            "Provider account "
+                            "creation could not "
+                            "be persisted."
+                        ),
+                    },
+                )
+                return
+
+            self._json(
+                HTTPStatus.CREATED,
+                {
+                    "source": (
+                        created_source
+                        .to_mapping()
+                    ),
+                    "account": (
+                        account.to_mapping()
+                    ),
+                },
+            )
+            return
+
         if parsed.path not in {
             "/internal/v1/events/request",
             "/internal/v1/subscriptions",
@@ -1696,6 +2076,214 @@ class Handler(BaseHTTPRequestHandler):
                         "error": (
                             "Sports live source "
                             "was not found."
+                        ),
+                    },
+                )
+                return
+
+            self._json(
+                HTTPStatus.OK,
+                {
+                    "removed": True,
+                    "source_id": source_id,
+                },
+            )
+            return
+
+        provider_account_delete_prefix = (
+            "/internal/v1/provider-accounts/"
+        )
+
+        if parsed.path.startswith(
+            provider_account_delete_prefix
+        ):
+            if not self._require_auth():
+                return
+
+            source_id = urllib.parse.unquote(
+                parsed.path[
+                    len(
+                        provider_account_delete_prefix
+                    ):
+                ]
+            ).strip()
+
+            if not source_id:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {
+                        "error": (
+                            "source_id is required."
+                        )
+                    },
+                )
+                return
+
+            try:
+                store = self._source_store()
+                sources = store.load()
+
+                source = next(
+                    (
+                        item
+                        for item in sources
+                        if (
+                            item.source_id
+                            == source_id
+                        )
+                    ),
+                    None,
+                )
+
+                if source is None:
+                    self._json(
+                        HTTPStatus.NOT_FOUND,
+                        {
+                            "code": (
+                                "sports_source_not_found"
+                            ),
+                            "error": (
+                                "Sports source "
+                                "was not found."
+                            ),
+                        },
+                    )
+                    return
+
+                if source.enabled:
+                    self._json(
+                        HTTPStatus.CONFLICT,
+                        {
+                            "code": (
+                                "sports_provider_account_"
+                                "enabled"
+                            ),
+                            "error": (
+                                "Provider account must "
+                                "be disabled before "
+                                "removal."
+                            ),
+                        },
+                    )
+                    return
+
+                account_id = (
+                    self._dispatcharr_account_id(
+                        source
+                    )
+                )
+
+            except SourceLifecycleError:
+                self._json(
+                    HTTPStatus.UNPROCESSABLE_ENTITY,
+                    {
+                        "code": (
+                            "sports_provider_account_"
+                            "invalid"
+                        ),
+                        "error": (
+                            "Provider account backend "
+                            "configuration is invalid."
+                        ),
+                    },
+                )
+                return
+
+            # v1 fails closed here because LiveSource
+            # records describe logical playback
+            # channels but do not encode the specific
+            # Dispatcharr account(s) feeding them.
+            try:
+                live_sources = (
+                    default_live_source_registry()
+                    .list_sources()
+                )
+
+            except LiveSourceCatalogError:
+                self._backend_unavailable()
+                return
+
+            if live_sources:
+                self._json(
+                    HTTPStatus.CONFLICT,
+                    {
+                        "code": (
+                            "sports_provider_account_"
+                            "playback_dependency"
+                        ),
+                        "error": (
+                            "Provider account cannot "
+                            "be removed while Sports "
+                            "LiveSource playback "
+                            "dependencies exist."
+                        ),
+                    },
+                )
+                return
+
+            from dispatcharr_admin import (
+                DispatcharrAdminClient,
+                DispatcharrAdminError,
+            )
+
+            client = (
+                DispatcharrAdminClient
+                .from_environment()
+            )
+
+            try:
+                client.delete_account(
+                    account_id=account_id
+                )
+
+            except DispatcharrAdminError:
+                self._json(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    {
+                        "code": (
+                            "dispatcharr_admin_"
+                            "unavailable"
+                        ),
+                        "error": (
+                            "Dispatcharr account "
+                            "removal is unavailable."
+                        ),
+                    },
+                )
+                return
+
+            updated = tuple(
+                item
+                for item in sources
+                if item.source_id
+                != source_id
+            )
+
+            try:
+                store.write(updated)
+
+            except (
+                SourceLifecycleError,
+                OSError,
+            ):
+                # Dispatcharr deletion has already
+                # succeeded and cannot be reconstructed
+                # from Atlas because credentials are
+                # intentionally not persisted here.
+                #
+                # Leave the stale disabled lifecycle
+                # record visible for reconciliation.
+                self._json(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    {
+                        "code": (
+                            "sports_provider_account_"
+                            "reconciliation_required"
+                        ),
+                        "error": (
+                            "Provider account removal "
+                            "requires operator "
+                            "reconciliation."
                         ),
                     },
                 )
