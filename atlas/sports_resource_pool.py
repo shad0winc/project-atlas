@@ -17,6 +17,7 @@ from uuid import uuid4
 
 SPORTS_RESOURCE_POOL_VERSION = 1
 DEFAULT_SPORTS_RESOURCE_LEASE_TTL_SECONDS = 90
+SPORTS_RESOURCE_POOL_FILE_MODE = 0o660
 
 
 class SportsResourcePoolError(RuntimeError):
@@ -457,10 +458,19 @@ class SportsResourcePool:
         fd = os.open(
             self.lock_path,
             os.O_CREAT | os.O_RDWR,
-            0o600,
+            SPORTS_RESOURCE_POOL_FILE_MODE,
         )
 
         try:
+            # os.open() creation mode is filtered through the process umask.
+            # The shared Sports runtime directory supplies the canonical group;
+            # force the exact private group-writable mode after opening so all
+            # Atlas API workers can coordinate on the same lock.
+            os.fchmod(
+                fd,
+                SPORTS_RESOURCE_POOL_FILE_MODE,
+            )
+
             fcntl.flock(
                 fd,
                 fcntl.LOCK_EX,
@@ -617,9 +627,12 @@ class SportsResourcePool:
         )
 
         try:
+            # mkstemp() creates a private 0600 file. Promote it to the
+            # canonical private shared-runtime mode before atomically
+            # replacing the authoritative Sports resource-pool state.
             os.fchmod(
                 fd,
-                0o600,
+                SPORTS_RESOURCE_POOL_FILE_MODE,
             )
 
             with os.fdopen(

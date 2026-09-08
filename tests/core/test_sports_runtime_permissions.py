@@ -29,6 +29,8 @@ def _run(
     environment["ATLAS_SPORTS_RUNTIME_UID"] = str(os.geteuid())
     environment["ATLAS_SPORTS_RUNTIME_GID"] = str(os.getegid())
     environment["ATLAS_SPORTS_RUNTIME_MODE"] = "2770"
+    environment["ATLAS_SPORTS_RUNTIME_FILE_GID"] = str(os.getegid())
+    environment["ATLAS_SPORTS_RUNTIME_FILE_MODE"] = "0660"
 
     return subprocess.run(
         [
@@ -58,12 +60,15 @@ def test_helper_defines_narrow_sports_runtime_contract() -> None:
     assert "ATLAS_SPORTS_RUNTIME_UID" in source
     assert "ATLAS_SPORTS_RUNTIME_GID" in source
     assert "ATLAS_SPORTS_RUNTIME_MODE" in source
+    assert "ATLAS_SPORTS_RUNTIME_FILE_GID" in source
+    assert "ATLAS_SPORTS_RUNTIME_FILE_MODE" in source
 
     assert "/mnt/storage/configs/atlas/runtime/sports" in source
     assert "20000" in source
     assert "2770" in source
+    assert "0660" in source
 
-    assert "resource-pool.json" not in source
+    assert "resource-pool.json" in source
     assert "live-sessions.json" not in source
 
 
@@ -181,6 +186,109 @@ def test_provision_rejects_symlink_runtime_path(
 
     runtime_dir = tmp_path / "sports"
     runtime_dir.symlink_to(target, target_is_directory=True)
+
+    result = _run(
+        "atlas_sports_runtime_provision",
+        runtime_dir=runtime_dir,
+    )
+
+    assert result.returncode != 0
+    assert "must not be a symlink" in result.stderr
+
+def test_provision_does_not_create_resource_pool_files(
+    tmp_path: Path,
+) -> None:
+    runtime_dir = tmp_path / "sports"
+
+    result = _run(
+        "atlas_sports_runtime_provision",
+        runtime_dir=runtime_dir,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert not (runtime_dir / "resource-pool.json").exists()
+    assert not (runtime_dir / "resource-pool.json.lock").exists()
+
+
+def test_provision_repairs_resource_pool_file_contract(
+    tmp_path: Path,
+) -> None:
+    runtime_dir = tmp_path / "sports"
+    runtime_dir.mkdir()
+
+    state = runtime_dir / "resource-pool.json"
+    lock = runtime_dir / "resource-pool.json.lock"
+
+    state.write_text(
+        '{"version":1,"leases":{}}\n',
+        encoding="utf-8",
+    )
+    lock.touch()
+
+    state.chmod(0o600)
+    lock.chmod(0o600)
+
+    original_state = state.read_text(
+        encoding="utf-8",
+    )
+
+    result = _run(
+        "atlas_sports_runtime_provision",
+        runtime_dir=runtime_dir,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert state.read_text(encoding="utf-8") == original_state
+    assert state.stat().st_uid == os.geteuid()
+    assert lock.stat().st_uid == os.geteuid()
+    assert state.stat().st_gid == os.getegid()
+    assert lock.stat().st_gid == os.getegid()
+    assert _mode(state) == 0o660
+    assert _mode(lock) == 0o660
+
+
+def test_verify_rejects_private_resource_pool_file_mode(
+    tmp_path: Path,
+) -> None:
+    runtime_dir = tmp_path / "sports"
+
+    provision = _run(
+        "atlas_sports_runtime_provision",
+        runtime_dir=runtime_dir,
+    )
+
+    assert provision.returncode == 0, provision.stderr
+
+    state = runtime_dir / "resource-pool.json"
+    state.write_text(
+        '{"version":1,"leases":{}}\n',
+        encoding="utf-8",
+    )
+    state.chmod(0o600)
+
+    result = _run(
+        "atlas_sports_runtime_verify",
+        runtime_dir=runtime_dir,
+    )
+
+    assert result.returncode != 0
+    assert "file mode mismatch" in result.stderr
+
+
+def test_provision_rejects_resource_pool_symlink(
+    tmp_path: Path,
+) -> None:
+    runtime_dir = tmp_path / "sports"
+    runtime_dir.mkdir()
+
+    target = tmp_path / "target.json"
+    target.write_text(
+        '{"version":1,"leases":{}}\n',
+        encoding="utf-8",
+    )
+
+    state = runtime_dir / "resource-pool.json"
+    state.symlink_to(target)
 
     result = _run(
         "atlas_sports_runtime_provision",

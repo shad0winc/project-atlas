@@ -761,3 +761,56 @@ def test_user_limit_must_be_positive_integer(
             },
             user_limit=value,
         )
+
+
+def test_resource_pool_files_are_shared_private_despite_restrictive_umask(
+    tmp_path: Path,
+) -> None:
+    import os
+
+    path = tmp_path / "resource-pool.json"
+    store = pool(
+        path,
+        clock=Clock(),
+        ids=LeaseIds(),
+    )
+
+    previous_umask = os.umask(0o077)
+
+    try:
+        snapshot = store.snapshot(
+            capacities={},
+        )
+    finally:
+        os.umask(previous_umask)
+
+    assert snapshot.active == 0
+    assert path.is_file()
+    assert store.lock_path.is_file()
+    assert path.stat().st_mode & 0o777 == 0o660
+    assert store.lock_path.stat().st_mode & 0o777 == 0o660
+
+
+def test_resource_pool_repairs_owner_accessible_private_lock_mode(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "resource-pool.json"
+    lock = path.with_name(
+        path.name + ".lock"
+    )
+
+    lock.touch()
+    lock.chmod(0o600)
+
+    store = pool(
+        path,
+        clock=Clock(),
+        ids=LeaseIds(),
+    )
+
+    store.snapshot(
+        capacities={},
+    )
+
+    assert lock.stat().st_mode & 0o777 == 0o660
+    assert path.stat().st_mode & 0o777 == 0o660
