@@ -27,6 +27,9 @@ from pydantic import (
 from atlas_api.auth.models import AuthenticatedUser
 from atlas_api.security import require_permission
 from atlas_api.services.sports import (
+    SportsProviderAccountConflictError,
+    SportsProviderAccountInvalidError,
+    SportsProviderAccountNotFoundError,
     SportsWriterBackedAPIService,
     SportsWriterTransportError,
     build_default_sports_api_service,
@@ -1068,5 +1071,417 @@ def update_admin_sports_account_credentials(
     return (
         AdminSportsDispatcharrAccountResponse(
             **account
+        )
+    )
+
+class AdminSportsProviderAccountCreateRequest(
+    _StrictAdminSportsModel
+):
+    source_id: str
+    provider_display_name: str
+    account_display_name: str
+    server_url: str
+    username: str
+    password: str
+    max_connections: int
+    priority: int = 100
+
+
+class AdminSportsProviderAccountRemoveResponse(
+    _StrictAdminSportsModel
+):
+    removed: bool
+    source_id: str
+
+
+def _provider_account_source(
+    registry: dict[str, list[dict[str, Any]]],
+    *,
+    provider_id: str,
+    source_id: str,
+) -> dict[str, Any] | None:
+    for source in registry["sources"]:
+        if (
+            _required_text(
+                source,
+                "provider_id",
+            )
+            == provider_id
+            and _required_text(
+                source,
+                "source_id",
+            )
+            == source_id
+        ):
+            return source
+
+    return None
+
+
+@router.post(
+    "/{provider_id}/accounts",
+    response_model=AdminSportsProviderListResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary=(
+        "Create one disabled Sports provider "
+        "account securely"
+    ),
+)
+def create_admin_sports_provider_account(
+    provider_id: str,
+    request: AdminSportsProviderAccountCreateRequest,
+    current_user: AuthenticatedUser = Depends(require_sports_providers_manage),
+    service: SportsWriterBackedAPIService = Depends(
+        get_admin_sports_service
+    ),
+    audit_writer=Depends(
+        get_security_audit_writer
+    ),
+) -> AdminSportsProviderListResponse:
+    normalized_provider_id = (
+        provider_id.strip()
+    )
+    normalized_source_id = (
+        request.source_id.strip()
+    )
+
+    if (
+        not normalized_provider_id
+        or not normalized_source_id
+    ):
+        raise HTTPException(
+            status_code=(
+                status.HTTP_422_UNPROCESSABLE_ENTITY
+            ),
+            detail=(
+                "Provider and source identities "
+                "are required."
+            ),
+        )
+
+    if (
+        isinstance(
+            request.max_connections,
+            bool,
+        )
+        or request.max_connections <= 0
+    ):
+        raise HTTPException(
+            status_code=(
+                status.HTTP_422_UNPROCESSABLE_ENTITY
+            ),
+            detail=(
+                "Provider account capacity must "
+                "be a positive integer."
+            ),
+        )
+
+    if (
+        isinstance(
+            request.priority,
+            bool,
+        )
+        or request.priority < 0
+    ):
+        raise HTTPException(
+            status_code=(
+                status.HTTP_422_UNPROCESSABLE_ENTITY
+            ),
+            detail=(
+                "Provider account priority must "
+                "be a non-negative integer."
+            ),
+        )
+
+    try:
+        updated = (
+            service.create_provider_account(
+                source_id=(
+                    normalized_source_id
+                ),
+                provider_id=(
+                    normalized_provider_id
+                ),
+                provider_display_name=(
+                    request.provider_display_name
+                ),
+                account_display_name=(
+                    request.account_display_name
+                ),
+                server_url=(
+                    request.server_url
+                ),
+                username=(
+                    request.username
+                ),
+                password=(
+                    request.password
+                ),
+                max_connections=(
+                    request.max_connections
+                ),
+                priority=(
+                    request.priority
+                ),
+            )
+        )
+
+    except SportsProviderAccountConflictError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Sports provider account "
+                "already exists or conflicts "
+                "with current provider state."
+            ),
+        ) from error
+
+    except (
+        SportsProviderAccountInvalidError,
+        ValueError,
+    ) as error:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_422_UNPROCESSABLE_ENTITY
+            ),
+            detail=(
+                "Sports provider account "
+                "configuration is invalid."
+            ),
+        ) from error
+
+    except (
+        SportsProviderAccountNotFoundError,
+        SportsWriterTransportError,
+    ) as error:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_503_SERVICE_UNAVAILABLE
+            ),
+            detail=(
+                "Sports provider account "
+                "creation is unavailable."
+            ),
+        ) from error
+
+    # Credentials are deliberately absent from
+    # audit metadata. Only stable Atlas identity
+    # is recorded.
+    audit_writer.publish(
+        "security.sports.provider_account_created",
+        {
+            "actor_user_id": (
+                current_user.user_id
+            ),
+            "provider_id": (
+                normalized_provider_id
+            ),
+            "source_id": (
+                normalized_source_id
+            ),
+        },
+    )
+
+    return _response(updated)
+
+
+@router.delete(
+    "/{provider_id}/accounts/{source_id}",
+    response_model=(
+        AdminSportsProviderAccountRemoveResponse
+    ),
+    summary=(
+        "Remove one disabled Sports provider "
+        "account when no upstream lease is active"
+    ),
+)
+def remove_admin_sports_provider_account(
+    provider_id: str,
+    source_id: str,
+    current_user: AuthenticatedUser = Depends(require_sports_providers_manage),
+    service: SportsWriterBackedAPIService = Depends(
+        get_admin_sports_service
+    ),
+    resource_pool: SportsResourcePool = Depends(
+        get_sports_resource_pool
+    ),
+    audit_writer=Depends(
+        get_security_audit_writer
+    ),
+) -> AdminSportsProviderAccountRemoveResponse:
+    normalized_provider_id = (
+        provider_id.strip()
+    )
+    normalized_source_id = (
+        source_id.strip()
+    )
+
+    try:
+        registry = service.get_source_registry()
+
+        source = _provider_account_source(
+            registry,
+            provider_id=(
+                normalized_provider_id
+            ),
+            source_id=(
+                normalized_source_id
+            ),
+        )
+
+        if source is None:
+            raise HTTPException(
+                status_code=(
+                    status.HTTP_404_NOT_FOUND
+                ),
+                detail=(
+                    "Sports provider account "
+                    "was not found."
+                ),
+            )
+
+        enabled = source.get("enabled")
+
+        if not isinstance(enabled, bool):
+            raise SportsWriterTransportError(
+                "Private Sports service returned "
+                "invalid enabled metadata."
+            )
+
+        if enabled:
+            raise HTTPException(
+                status_code=(
+                    status.HTTP_409_CONFLICT
+                ),
+                detail=(
+                    "Disable the Sports provider "
+                    "account before removing it."
+                ),
+            )
+
+        # The disabled account contributes zero
+        # future capacity, but snapshot still
+        # reports leases that are already active
+        # for this exact source_id.
+        snapshot = resource_pool.snapshot(
+            capacities={
+                normalized_source_id: 0,
+            }
+        )
+
+        resource_source = next(
+            (
+                item
+                for item in snapshot.sources
+                if item.source_id
+                == normalized_source_id
+            ),
+            None,
+        )
+
+        if resource_source is None:
+            raise SportsWriterTransportError(
+                "Sports resource pool omitted "
+                "the provider account."
+            )
+
+        active = resource_source.active
+
+        if (
+            isinstance(active, bool)
+            or not isinstance(active, int)
+            or active < 0
+        ):
+            raise SportsWriterTransportError(
+                "Sports resource pool returned "
+                "invalid active lease metadata."
+            )
+
+        if active > 0:
+            raise HTTPException(
+                status_code=(
+                    status.HTTP_409_CONFLICT
+                ),
+                detail=(
+                    "Sports provider account has "
+                    "active upstream leases."
+                ),
+            )
+
+        removed = (
+            service.remove_provider_account(
+                source_id=(
+                    normalized_source_id
+                )
+            )
+        )
+
+        if removed is not True:
+            raise SportsWriterTransportError(
+                "Sports provider account removal "
+                "was not confirmed."
+            )
+
+    except HTTPException:
+        raise
+
+    except SportsProviderAccountNotFoundError as error:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_404_NOT_FOUND
+            ),
+            detail=(
+                "Sports provider account "
+                "was not found."
+            ),
+        ) from error
+
+    except SportsProviderAccountConflictError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Sports provider account cannot "
+                "be removed while playback "
+                "dependencies exist."
+            ),
+        ) from error
+
+    except (
+        SportsProviderAccountInvalidError,
+        SportsWriterTransportError,
+        SportsResourcePoolError,
+        ValueError,
+    ) as error:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_503_SERVICE_UNAVAILABLE
+            ),
+            detail=(
+                "Sports provider account "
+                "removal is unavailable."
+            ),
+        ) from error
+
+    audit_writer.publish(
+        "security.sports.provider_account_removed",
+        {
+            "actor_user_id": (
+                current_user.user_id
+            ),
+            "provider_id": (
+                normalized_provider_id
+            ),
+            "source_id": (
+                normalized_source_id
+            ),
+        },
+    )
+
+    return (
+        AdminSportsProviderAccountRemoveResponse(
+            removed=True,
+            source_id=(
+                normalized_source_id
+            ),
         )
     )
