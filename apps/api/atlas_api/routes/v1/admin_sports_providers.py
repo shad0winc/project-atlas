@@ -1144,10 +1144,14 @@ def create_admin_sports_provider_account(
     normalized_source_id = (
         request.source_id.strip()
     )
+    normalized_provider_display_name = (
+        request.provider_display_name.strip()
+    )
 
     if (
         not normalized_provider_id
         or not normalized_source_id
+        or not normalized_provider_display_name
     ):
         raise HTTPException(
             status_code=(
@@ -1194,6 +1198,116 @@ def create_admin_sports_provider_account(
         )
 
     try:
+        # Public fail-closed preflight. Credential-bearing
+        # account creation must not begin until Atlas has
+        # proved that the requested source identity is new
+        # and that an existing provider identity is not
+        # being renamed implicitly through account creation.
+        registry = service.get_source_registry()
+
+        sources = registry.get("sources")
+        providers = registry.get("providers")
+
+        if (
+            not isinstance(sources, list)
+            or not isinstance(providers, list)
+        ):
+            raise SportsWriterTransportError(
+                "Sports source registry is invalid."
+            )
+
+        for source in sources:
+            if not isinstance(source, dict):
+                raise SportsWriterTransportError(
+                    "Sports source registry contains "
+                    "invalid source metadata."
+                )
+
+            existing_source_id = source.get(
+                "source_id"
+            )
+
+            if not isinstance(
+                existing_source_id,
+                str,
+            ):
+                raise SportsWriterTransportError(
+                    "Sports source registry contains "
+                    "invalid source identity metadata."
+                )
+
+            if (
+                existing_source_id.strip()
+                == normalized_source_id
+            ):
+                raise SportsProviderAccountConflictError(
+                    "Sports source already exists."
+                )
+
+        matching_providers = []
+
+        for provider in providers:
+            if not isinstance(provider, dict):
+                raise SportsWriterTransportError(
+                    "Sports source registry contains "
+                    "invalid provider metadata."
+                )
+
+            existing_provider_id = provider.get(
+                "provider_id"
+            )
+
+            if not isinstance(
+                existing_provider_id,
+                str,
+            ):
+                raise SportsWriterTransportError(
+                    "Sports source registry contains "
+                    "invalid provider identity metadata."
+                )
+
+            if (
+                existing_provider_id.strip()
+                == normalized_provider_id
+            ):
+                matching_providers.append(
+                    provider
+                )
+
+        if len(matching_providers) > 1:
+            raise SportsWriterTransportError(
+                "Sports source registry contains "
+                "duplicate provider identities."
+            )
+
+        if matching_providers:
+            existing_display_name = (
+                matching_providers[0].get(
+                    "display_name"
+                )
+            )
+
+            if (
+                not isinstance(
+                    existing_display_name,
+                    str,
+                )
+                or not existing_display_name.strip()
+            ):
+                raise SportsWriterTransportError(
+                    "Sports provider display metadata "
+                    "is invalid."
+                )
+
+            if (
+                existing_display_name.strip()
+                != normalized_provider_display_name
+            ):
+                raise SportsProviderAccountConflictError(
+                    "Sports provider display identity "
+                    "does not match existing state."
+                )
+
         updated = (
             service.create_provider_account(
                 source_id=(
@@ -1203,7 +1317,7 @@ def create_admin_sports_provider_account(
                     normalized_provider_id
                 ),
                 provider_display_name=(
-                    request.provider_display_name
+                    normalized_provider_display_name
                 ),
                 account_display_name=(
                     request.account_display_name
@@ -1446,8 +1560,18 @@ def remove_admin_sports_provider_account(
             ),
         ) from error
 
+    except SportsProviderAccountInvalidError as error:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_422_UNPROCESSABLE_ENTITY
+            ),
+            detail=(
+                "Sports provider account "
+                "configuration is invalid."
+            ),
+        ) from error
+
     except (
-        SportsProviderAccountInvalidError,
         SportsWriterTransportError,
         SportsResourcePoolError,
         ValueError,

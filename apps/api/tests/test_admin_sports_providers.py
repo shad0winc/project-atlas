@@ -1729,6 +1729,117 @@ def test_admin_can_create_disabled_provider_account_without_exposing_secrets() -
         assert forbidden not in rendered
 
 
+def test_admin_provider_account_create_rejects_duplicate_source_before_backend_mutation() -> None:
+    writer = (
+        ProviderAccountLifecycleFakeSportsWriter()
+    )
+    audit_writer = (
+        ProviderAccountLifecycleAuditWriter()
+    )
+
+    client = (
+        _provider_account_lifecycle_client(
+            writer,
+            audit_writer=audit_writer,
+        )
+    )
+
+    response = client.post(
+        (
+            "/admin/sports/providers/"
+            "provider-a/accounts"
+        ),
+        json={
+            "source_id": "provider-a-primary",
+            "provider_display_name": "Provider A",
+            "account_display_name": "Duplicate",
+            "server_url": "https://provider.example",
+            "username": "provider-user",
+            "password": "provider-secret",
+            "max_connections": 2,
+            "priority": 100,
+        },
+    )
+
+    assert response.status_code == 409
+    assert writer.account_creates == []
+    assert audit_writer.events == []
+
+
+def test_admin_provider_account_create_rejects_provider_display_mismatch_before_backend_mutation() -> None:
+    writer = (
+        ProviderAccountLifecycleFakeSportsWriter()
+    )
+    audit_writer = (
+        ProviderAccountLifecycleAuditWriter()
+    )
+
+    client = (
+        _provider_account_lifecycle_client(
+            writer,
+            audit_writer=audit_writer,
+        )
+    )
+
+    response = client.post(
+        (
+            "/admin/sports/providers/"
+            "provider-a/accounts"
+        ),
+        json={
+            "source_id": "provider-a-secondary",
+            "provider_display_name": "Other Provider",
+            "account_display_name": "Secondary",
+            "server_url": "https://provider.example",
+            "username": "provider-user",
+            "password": "provider-secret",
+            "max_connections": 2,
+            "priority": 100,
+        },
+    )
+
+    assert response.status_code == 409
+    assert writer.account_creates == []
+    assert audit_writer.events == []
+
+
+def test_admin_provider_account_create_requires_provider_display_name_before_backend_mutation() -> None:
+    writer = (
+        ProviderAccountLifecycleFakeSportsWriter()
+    )
+    audit_writer = (
+        ProviderAccountLifecycleAuditWriter()
+    )
+
+    client = (
+        _provider_account_lifecycle_client(
+            writer,
+            audit_writer=audit_writer,
+        )
+    )
+
+    response = client.post(
+        (
+            "/admin/sports/providers/"
+            "new-provider/accounts"
+        ),
+        json={
+            "source_id": "new-provider-primary",
+            "provider_display_name": "   ",
+            "account_display_name": "Primary",
+            "server_url": "https://provider.example",
+            "username": "provider-user",
+            "password": "provider-secret",
+            "max_connections": 2,
+            "priority": 100,
+        },
+    )
+
+    assert response.status_code == 422
+    assert writer.account_creates == []
+    assert audit_writer.events == []
+
+
 def test_admin_provider_account_create_rejects_control_fields() -> None:
     writer = (
         ProviderAccountLifecycleFakeSportsWriter()
@@ -1920,6 +2031,62 @@ def test_admin_provider_account_remove_requires_disabled_account() -> None:
 
     assert response.status_code == 409
     assert resource_pool.snapshots == []
+    assert writer.account_removals == []
+    assert audit_writer.events == []
+
+
+def test_admin_provider_account_remove_maps_invalid_account_to_422() -> None:
+    class InvalidRemovalWriter(
+        ProviderAccountLifecycleFakeSportsWriter
+    ):
+        def remove_provider_account(
+            self,
+            *,
+            source_id: str,
+        ):
+            raise (
+                admin_sports_providers.
+                SportsProviderAccountInvalidError(
+                    "invalid provider account"
+                )
+            )
+
+    writer = InvalidRemovalWriter(
+        target_enabled=False
+    )
+    resource_pool = (
+        ProviderAccountDeletePool(
+            active=0
+        )
+    )
+    audit_writer = (
+        ProviderAccountLifecycleAuditWriter()
+    )
+
+    client = (
+        _provider_account_lifecycle_client(
+            writer,
+            resource_pool=resource_pool,
+            audit_writer=audit_writer,
+        )
+    )
+
+    response = client.delete(
+        (
+            "/admin/sports/providers/"
+            "provider-a/accounts/"
+            "provider-a-primary"
+        )
+    )
+
+    assert response.status_code == 422
+
+    assert resource_pool.snapshots == [
+        {
+            "provider-a-primary": 0,
+        }
+    ]
+
     assert writer.account_removals == []
     assert audit_writer.events == []
 
