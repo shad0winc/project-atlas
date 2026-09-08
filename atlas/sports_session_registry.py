@@ -15,7 +15,8 @@ from typing import Iterator
 from uuid import uuid4
 
 
-STATE_VERSION = 1
+STATE_VERSION = 2
+LEGACY_STATE_VERSION = 1
 DEFAULT_SPORTS_SESSION_TTL_SECONDS = 90
 
 
@@ -42,6 +43,7 @@ class SportsSessionRecord:
     target_id: str
     created_at: float
     last_seen_at: float
+    resource_lease_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,6 +89,7 @@ class SportsSessionRegistry:
         user_id: str,
         target_id: str,
         limit: int,
+        resource_lease_id: str | None = None,
     ) -> SportsSessionRecord:
         normalized_user = _required_identifier(
             user_id,
@@ -95,6 +98,15 @@ class SportsSessionRegistry:
         normalized_target = _required_identifier(
             target_id,
             "Sports-session target ID",
+        )
+
+        normalized_resource_lease_id = (
+            _required_identifier(
+                resource_lease_id,
+                "Sports resource lease ID",
+            )
+            if resource_lease_id is not None
+            else None
         )
 
         if (
@@ -138,6 +150,9 @@ class SportsSessionRegistry:
                 "target_id": normalized_target,
                 "created_at": now,
                 "last_seen_at": now,
+                "resource_lease_id": (
+                    normalized_resource_lease_id
+                ),
             }
 
             state["sessions"][session_id] = payload
@@ -182,12 +197,14 @@ class SportsSessionRegistry:
 
             return _record(normalized_session, payload)
 
-    def release(
+    def release_record(
         self,
         *,
         session_id: str,
         user_id: str,
-    ) -> bool:
+    ) -> SportsSessionRecord | None:
+        """Atomically remove and return one owned Sports session."""
+
         normalized_session = _required_identifier(
             session_id,
             "Sports-session identifier",
@@ -202,7 +219,9 @@ class SportsSessionRegistry:
             state = self._read_state()
             changed = self._prune_stale(state, now)
 
-            payload = state["sessions"].get(normalized_session)
+            payload = state["sessions"].get(
+                normalized_session
+            )
 
             if (
                 payload is None
@@ -210,11 +229,33 @@ class SportsSessionRegistry:
             ):
                 if changed:
                     self._write_state(state)
-                return False
+                return None
 
-            state["sessions"].pop(normalized_session)
+            record = _record(
+                normalized_session,
+                payload,
+            )
+
+            state["sessions"].pop(
+                normalized_session
+            )
             self._write_state(state)
-            return True
+
+            return record
+
+    def release(
+        self,
+        *,
+        session_id: str,
+        user_id: str,
+    ) -> bool:
+        return (
+            self.release_record(
+                session_id=session_id,
+                user_id=user_id,
+            )
+            is not None
+        )
 
     def active_count_for_user(
         self,
@@ -376,7 +417,12 @@ class SportsSessionRegistry:
                 "Sports-session state is invalid."
             )
 
-        if payload.get("version") != STATE_VERSION:
+        version = payload.get("version")
+
+        if version not in {
+            LEGACY_STATE_VERSION,
+            STATE_VERSION,
+        }:
             raise SportsSessionStateError(
                 "Sports-session state version is unsupported."
             )
@@ -400,12 +446,19 @@ class SportsSessionRegistry:
                     "Sports-session state is invalid."
                 )
 
-            if set(raw) != {
+            expected_fields = {
                 "user_id",
                 "target_id",
                 "created_at",
                 "last_seen_at",
-            }:
+            }
+
+            if version == STATE_VERSION:
+                expected_fields.add(
+                    "resource_lease_id"
+                )
+
+            if set(raw) != expected_fields:
                 raise SportsSessionStateError(
                     "Sports-session state is invalid."
                 )
@@ -423,6 +476,20 @@ class SportsSessionRegistry:
                 raw.get("last_seen_at")
             )
 
+            raw_resource_lease_id = (
+                raw.get("resource_lease_id")
+                if version == STATE_VERSION
+                else None
+            )
+
+            resource_lease_id = (
+                _required_state_identifier(
+                    raw_resource_lease_id
+                )
+                if raw_resource_lease_id is not None
+                else None
+            )
+
             if last_seen_at < created_at:
                 raise SportsSessionStateError(
                     "Sports-session state is invalid."
@@ -433,6 +500,7 @@ class SportsSessionRegistry:
                 "target_id": target_id,
                 "created_at": created_at,
                 "last_seen_at": last_seen_at,
+                "resource_lease_id": resource_lease_id,
             }
 
         return {
@@ -527,6 +595,12 @@ def _record(
         target_id=str(payload["target_id"]),
         created_at=float(payload["created_at"]),
         last_seen_at=float(payload["last_seen_at"]),
+        resource_lease_id=(
+            str(payload["resource_lease_id"])
+            if payload.get("resource_lease_id")
+            is not None
+            else None
+        ),
     )
 
 

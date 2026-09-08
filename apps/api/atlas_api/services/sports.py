@@ -486,6 +486,214 @@ class SportsWriterBackedAPIService:
             "atlas_channel_id": None,
         }
 
+    def list_live_sources(
+        self,
+    ) -> list[dict[str, Any]]:
+        """Return credential-safe authorized LiveSource metadata."""
+
+        payload = self._request(
+            "GET",
+            "/internal/v1/live-sources",
+        )
+
+        raw_sources = payload.get(
+            "live_sources"
+        )
+
+        if not isinstance(raw_sources, list):
+            raise SportsWriterTransportError(
+                "Private Sports service returned an invalid "
+                "LiveSource payload."
+            )
+
+        allowed_fields = {
+            "id",
+            "name",
+            "provider",
+            "provider_event_id",
+            "standalone",
+            "atlas_channel_id",
+            "resource_source_ids",
+        }
+
+        normalized: list[
+            dict[str, Any]
+        ] = []
+
+        for raw in raw_sources:
+            if (
+                not isinstance(raw, dict)
+                or not set(raw).issubset(
+                    allowed_fields
+                )
+            ):
+                raise SportsWriterTransportError(
+                    "Private Sports service returned an unsafe "
+                    "LiveSource entry."
+                )
+
+            source_id = raw.get("id")
+            name = raw.get("name")
+            provider = raw.get("provider")
+            provider_event_id = raw.get(
+                "provider_event_id"
+            )
+            standalone = raw.get(
+                "standalone"
+            )
+            atlas_channel_id = raw.get(
+                "atlas_channel_id"
+            )
+
+            if (
+                not isinstance(source_id, str)
+                or not source_id.strip()
+                or not isinstance(name, str)
+                or not name.strip()
+                or not isinstance(standalone, bool)
+            ):
+                raise SportsWriterTransportError(
+                    "Private Sports service returned an invalid "
+                    "LiveSource entry."
+                )
+
+            if (
+                provider is not None
+                and (
+                    not isinstance(provider, str)
+                    or not provider.strip()
+                )
+            ):
+                raise SportsWriterTransportError(
+                    "Private Sports service returned an invalid "
+                    "LiveSource provider."
+                )
+
+            if (
+                provider_event_id is not None
+                and (
+                    not isinstance(
+                        provider_event_id,
+                        str,
+                    )
+                    or not provider_event_id.strip()
+                )
+            ):
+                raise SportsWriterTransportError(
+                    "Private Sports service returned an invalid "
+                    "LiveSource provider event."
+                )
+
+            raw_resource_source_ids = raw.get(
+                "resource_source_ids",
+                [],
+            )
+
+            if (
+                atlas_channel_id is not None
+                and (
+                    not isinstance(
+                        atlas_channel_id,
+                        str,
+                    )
+                    or not atlas_channel_id.strip()
+                )
+            ):
+                raise SportsWriterTransportError(
+                    "Private Sports service returned invalid "
+                    "LiveSource channel metadata."
+                )
+
+            if not isinstance(
+                raw_resource_source_ids,
+                list,
+            ):
+                raise SportsWriterTransportError(
+                    "Private Sports service returned invalid "
+                    "LiveSource resource metadata."
+                )
+
+            resource_source_ids: list[str] = []
+            seen_resource_source_ids: set[str] = set()
+
+            for raw_resource_source_id in (
+                raw_resource_source_ids
+            ):
+                if (
+                    not isinstance(
+                        raw_resource_source_id,
+                        str,
+                    )
+                    or not raw_resource_source_id.strip()
+                ):
+                    raise SportsWriterTransportError(
+                        "Private Sports service returned invalid "
+                        "LiveSource resource metadata."
+                    )
+
+                resource_source_id = (
+                    raw_resource_source_id.strip()
+                )
+
+                if (
+                    resource_source_id
+                    in seen_resource_source_ids
+                ):
+                    raise SportsWriterTransportError(
+                        "Private Sports service returned duplicate "
+                        "LiveSource resource metadata."
+                    )
+
+                seen_resource_source_ids.add(
+                    resource_source_id
+                )
+                resource_source_ids.append(
+                    resource_source_id
+                )
+
+            if (
+                resource_source_ids
+                and atlas_channel_id is None
+            ):
+                raise SportsWriterTransportError(
+                    "Private Sports service returned incomplete "
+                    "resource-managed LiveSource metadata."
+                )
+
+            normalized.append(
+                {
+                    "id": source_id.strip(),
+                    "name": name.strip(),
+                    "provider": (
+                        provider.strip()
+                        if isinstance(provider, str)
+                        else None
+                    ),
+                    "provider_event_id": (
+                        provider_event_id.strip()
+                        if isinstance(
+                            provider_event_id,
+                            str,
+                        )
+                        else None
+                    ),
+                    "standalone": standalone,
+                    "atlas_channel_id": (
+                        atlas_channel_id.strip()
+                        if isinstance(
+                            atlas_channel_id,
+                            str,
+                        )
+                        else None
+                    ),
+                    "resource_source_ids": (
+                        resource_source_ids
+                    ),
+                }
+            )
+
+        return normalized
+
     def get_live_tv_binding(
         self,
         *,
