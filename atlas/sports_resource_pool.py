@@ -463,13 +463,14 @@ class SportsResourcePool:
 
         try:
             # os.open() creation mode is filtered through the process umask.
-            # The shared Sports runtime directory supplies the canonical group;
-            # force the exact private group-writable mode after opening so all
-            # Atlas API workers can coordinate on the same lock.
-            os.fchmod(
-                fd,
-                SPORTS_RESOURCE_POOL_FILE_MODE,
-            )
+            # Normalize a lock owned by this runtime user. A canonically
+            # provisioned root-owned lock is already normalized by deployment
+            # and is accessed by the API through the shared runtime group.
+            if os.fstat(fd).st_uid == os.geteuid():
+                os.fchmod(
+                    fd,
+                    SPORTS_RESOURCE_POOL_FILE_MODE,
+                )
 
             fcntl.flock(
                 fd,

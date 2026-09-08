@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import pytest
@@ -814,3 +815,44 @@ def test_resource_pool_repairs_owner_accessible_private_lock_mode(
 
     assert lock.stat().st_mode & 0o777 == 0o660
     assert path.stat().st_mode & 0o777 == 0o660
+
+
+def test_resource_pool_uses_nonowned_shared_lock_without_chmod(
+    tmp_path,
+    monkeypatch,
+):
+    path = tmp_path / "sports-resource-pool.json"
+
+    store = SportsResourcePool(
+        path,
+        clock=Clock(),
+    )
+
+    store.lock_path.touch()
+    store.lock_path.chmod(0o660)
+
+    lock_owner = store.lock_path.stat().st_uid
+
+    # Simulate production: the process can open the shared lock through
+    # its group permissions, but the inode belongs to another uid.
+    monkeypatch.setattr(
+        os,
+        "geteuid",
+        lambda: lock_owner + 1,
+    )
+
+    def reject_fchmod(*_args):
+        raise AssertionError(
+            "non-owner shared lock must not be chmodded"
+        )
+
+    monkeypatch.setattr(
+        os,
+        "fchmod",
+        reject_fchmod,
+    )
+
+    with store._locked():
+        pass
+
+    assert store.lock_path.stat().st_mode & 0o777 == 0o660
