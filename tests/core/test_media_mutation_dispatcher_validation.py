@@ -82,14 +82,14 @@ class MediaMutationDispatcherValidationTests(
             mode=MediaMutationMode.PREVIEW,
         )
 
-    def test_validation_rejects_live_mutations(
+    def test_validation_requires_delete_capability_for_live_delete(
         self,
     ) -> None:
         dispatcher = MediaMutationDispatcher()
 
         with self.assertRaisesRegex(
             MediaMutationDispatchError,
-            "live provider mutations are not enabled",
+            "jellyfin does not support live delete",
         ):
             dispatcher.validate(
                 provider=PreviewProvider(),

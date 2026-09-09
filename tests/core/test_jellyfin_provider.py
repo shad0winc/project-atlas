@@ -35,7 +35,7 @@ class JellyfinProviderTests(unittest.TestCase):
                 ProviderCapability.PREVIEW_DELETE
             )
         )
-        self.assertFalse(
+        self.assertTrue(
             capabilities.supports(
                 ProviderCapability.DELETE
             )

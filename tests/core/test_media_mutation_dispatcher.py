@@ -135,14 +135,14 @@ class MediaMutationDispatcherTests(unittest.TestCase):
             ProviderOperation.DELETE,
         )
 
-    def test_rejects_live_mutations(
+    def test_live_delete_requires_delete_capability(
         self,
     ) -> None:
         provider = RecordingPreviewProvider()
 
         with self.assertRaisesRegex(
             MediaMutationDispatchError,
-            "live provider mutations are not enabled",
+            "jellyfin does not support live delete",
         ):
             self.dispatcher.execute(
                 provider=provider,

@@ -77,6 +77,7 @@ class JellyfinProvider:
                 {
                     ProviderCapability.LIST_MEDIA,
                     ProviderCapability.PREVIEW_DELETE,
+                    ProviderCapability.DELETE,
                 }
             ),
             supports_batch_listing=True,
@@ -787,6 +788,43 @@ class JellyfinProvider:
             item_id=normalized_id,
             success=True,
             message="Preview verified",
+            executed_at=self._executed_at(),
+        )
+
+    def delete_item(
+        self,
+        item_id: str,
+    ) -> ProviderMutationResult:
+        """Delete one existing Jellyfin media item."""
+
+        normalized_id = _required(
+            item_id,
+            "item_id",
+        )
+
+        try:
+            self.get_item(normalized_id)
+        except _JellyfinResourceNotFoundError:
+            return ProviderMutationResult(
+                provider=self.name,
+                operation=ProviderOperation.DELETE,
+                item_id=normalized_id,
+                success=False,
+                message="Item not found",
+                executed_at=self._executed_at(),
+            )
+
+        self._request_json(
+            f"/Items/{quote(normalized_id, safe='')}",
+            method="DELETE",
+        )
+
+        return ProviderMutationResult(
+            provider=self.name,
+            operation=ProviderOperation.DELETE,
+            item_id=normalized_id,
+            success=True,
+            message="Deleted",
             executed_at=self._executed_at(),
         )
 
