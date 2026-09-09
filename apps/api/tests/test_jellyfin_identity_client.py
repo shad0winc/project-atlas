@@ -73,7 +73,14 @@ def test_create_user_uses_admin_api_key_and_validates_identity() -> None:
         for key, value in observed["headers"].items()
     }
 
-    assert headers["x-emby-token"] == "admin-api-key"
+    assert headers["authorization"] == (
+        'MediaBrowser Client="Project Atlas", '
+        'Device="Atlas API", '
+        'DeviceId="atlas-api", '
+        'Version="0.1.0", '
+        'Token="admin-api-key"'
+    )
+    assert "x-emby-token" not in headers
     assert headers["content-type"] == "application/json"
 
 

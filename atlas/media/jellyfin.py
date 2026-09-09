@@ -13,6 +13,9 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
+from atlas.media.jellyfin_auth import (
+    build_jellyfin_authorization,
+)
 from atlas.media.capabilities import (
     ProviderCapabilities,
     ProviderCapability,
@@ -1061,7 +1064,9 @@ class JellyfinProvider:
         body = None
         headers = {
             "Accept": "application/json",
-            "X-Emby-Token": self.api_key.strip(),
+            "Authorization": build_jellyfin_authorization(
+                token=self.api_key,
+            ),
         }
         if payload is not None:
             body = json.dumps(payload).encode("utf-8")

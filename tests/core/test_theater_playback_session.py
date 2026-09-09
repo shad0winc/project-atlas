@@ -68,7 +68,19 @@ def test_playback_info_keeps_privileged_data_server_side():
 
     sent = request.call_args.args[0]
     assert sent.method == "POST"
-    assert sent.headers["X-emby-token"] == "server-secret"
+    headers = {
+        str(key).lower(): value
+        for key, value in sent.header_items()
+    }
+
+    assert headers["authorization"] == (
+        'MediaBrowser Client="Project Atlas", '
+        'Device="Atlas API", '
+        'DeviceId="atlas-api", '
+        'Version="0.1.0", '
+        'Token="server-secret"'
+    )
+    assert "x-emby-token" not in headers
     assert sent.full_url.endswith("/Items/abc/PlaybackInfo")
 
     assert result["stream_path"] == (

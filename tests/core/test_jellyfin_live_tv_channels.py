@@ -46,10 +46,20 @@ class JellyfinLiveTvChannelTests(unittest.TestCase):
             "http://jellyfin:8096/LiveTv/Channels?StartIndex=0&Limit=200",
             request.call_args.args[0].full_url,
         )
+        observed_request = request.call_args.args[0]
+        headers = {
+            str(key).lower(): value
+            for key, value in observed_request.header_items()
+        }
         self.assertEqual(
-            "secret",
-            request.call_args.args[0].headers["X-emby-token"],
+            'MediaBrowser Client="Project Atlas", '
+            'Device="Atlas API", '
+            'DeviceId="atlas-api", '
+            'Version="0.1.0", '
+            'Token="secret"',
+            headers["authorization"],
         )
+        self.assertNotIn("x-emby-token", headers)
 
     def test_returns_only_safe_normalized_channel_identity(self) -> None:
         with patch(

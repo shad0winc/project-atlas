@@ -7,6 +7,9 @@ from typing import Any, Callable, Mapping, Protocol
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from atlas.media.jellyfin_auth import (
+    build_jellyfin_authorization,
+)
 from atlas.user_profiles import UserProfileError, UserProfileStore
 from atlas_api.auth.exceptions import AuthenticationProviderError
 from atlas_api.auth.models import AuthenticatedUser
@@ -61,11 +64,11 @@ class JellyfinAuthenticationClient:
         self._base_url = normalized_url
         self._timeout_seconds = timeout_seconds
         self._opener = opener
-        self._authorization = (
-            f'MediaBrowser Client="{client_name}", '
-            f'Device="{device_name}", '
-            f'DeviceId="{device_id}", '
-            f'Version="{client_version}"'
+        self._authorization = build_jellyfin_authorization(
+            client_name=client_name,
+            client_version=client_version,
+            device_name=device_name,
+            device_id=device_id,
         )
 
     def authenticate(
