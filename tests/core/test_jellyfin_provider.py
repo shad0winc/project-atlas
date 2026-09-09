@@ -82,10 +82,20 @@ class JellyfinProviderTests(unittest.TestCase):
         self.assertEqual("movie", item.media_type)
         self.assertEqual("Movies", item.metadata["library"])
         self.assertEqual(2, request.call_count)
+        first_request = request.call_args_list[0].args[0]
+        headers = {
+            str(key).lower(): value
+            for key, value in first_request.header_items()
+        }
         self.assertEqual(
-            "secret",
-            request.call_args_list[0].args[0].headers["X-emby-token"],
+            'MediaBrowser Client="Project Atlas", '
+            'Device="Atlas API", '
+            'DeviceId="atlas-api", '
+            'Version="0.1.0", '
+            'Token="secret"',
+            headers["authorization"],
         )
+        self.assertNotIn("x-emby-token", headers)
         self.assertEqual(
             "http://jellyfin:8096/Items?Ids=abc&Recursive=true&Limit=1",
             request.call_args_list[0].args[0].full_url,

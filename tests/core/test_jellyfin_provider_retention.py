@@ -152,10 +152,19 @@ def test_retention_state_normalizes_global_and_user_data() -> None:
     )
 
     for call in request.call_args_list:
-        assert (
-            call.args[0].headers["X-emby-token"]
-            == "secret"
+        headers = {
+            str(key).lower(): value
+            for key, value in call.args[0].header_items()
+        }
+
+        assert headers["authorization"] == (
+            'MediaBrowser Client="Project Atlas", '
+            'Device="Atlas API", '
+            'DeviceId="atlas-api", '
+            'Version="0.1.0", '
+            'Token="secret"'
         )
+        assert "x-emby-token" not in headers
 
 
 def test_retention_state_preserves_requested_user_order() -> None:

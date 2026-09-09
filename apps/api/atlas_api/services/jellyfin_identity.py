@@ -12,6 +12,10 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
+from atlas.media.jellyfin_auth import (
+    build_jellyfin_authorization,
+)
+
 
 RequestOpener = Callable[..., Any]
 
@@ -212,7 +216,9 @@ class JellyfinIdentityClient:
             method=method,
             headers={
                 "Accept": "application/json",
-                "X-Emby-Token": self._api_key,
+                "Authorization": build_jellyfin_authorization(
+                    token=self._api_key,
+                ),
                 **(
                     {"Content-Type": "application/json"}
                     if body is not None
