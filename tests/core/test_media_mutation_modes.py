@@ -83,13 +83,15 @@ class MediaMutationModeTests(unittest.TestCase):
 
         self.assertEqual(provider.calls, [])
 
-    def test_live_mode_is_rejected_during_validation(self) -> None:
+    def test_live_mode_requires_delete_capability_during_validation(
+        self,
+    ) -> None:
         provider = ModeProvider()
         dispatcher = MediaMutationDispatcher()
 
         with self.assertRaisesRegex(
             MediaMutationDispatchError,
-            "live provider mutations are not enabled",
+            "does not support live delete",
         ):
             dispatcher.validate(
                 provider=provider,
@@ -99,13 +101,15 @@ class MediaMutationModeTests(unittest.TestCase):
 
         self.assertEqual(provider.calls, [])
 
-    def test_live_mode_is_rejected_without_execution(self) -> None:
+    def test_live_mode_requires_delete_capability_without_execution(
+        self,
+    ) -> None:
         provider = ModeProvider()
         dispatcher = MediaMutationDispatcher()
 
         with self.assertRaisesRegex(
             MediaMutationDispatchError,
-            "live provider mutations are not enabled",
+            "does not support live delete",
         ):
             dispatcher.execute(
                 provider=provider,

@@ -29,9 +29,10 @@ class MediaMutationMode(str, Enum):
 class MediaMutationDispatcher:
     """Dispatch validated media mutations to provider implementations.
 
-    Preview mutations may be dispatched to provider preview methods. Live
-    provider mutations remain disabled until Atlas introduces all required
-    authorization and safety gates.
+    Preview mutations require the corresponding preview capability. Live
+    mutations require an explicit destructive provider capability and
+    implementation. Higher-level authorization remains the caller's
+    responsibility.
     """
 
     def validate(
@@ -179,8 +180,31 @@ class MediaMutationDispatcher:
     ):
         """Resolve a live mutation implementation."""
 
+        if operation is ProviderOperation.DELETE:
+            if not capabilities.supports(
+                ProviderCapability.DELETE,
+            ):
+                raise MediaMutationDispatchError(
+                    f"{provider_name} does not support live delete"
+                )
+
+            delete_item = getattr(
+                provider,
+                "delete_item",
+                None,
+            )
+
+            if not callable(delete_item):
+                raise MediaMutationDispatchError(
+                    "provider declares live delete support "
+                    "but does not implement delete_item"
+                )
+
+            return delete_item
+
         raise MediaMutationDispatchError(
-            "live provider mutations are not enabled"
+            "unsupported live provider mutation: "
+            f"{operation.value}"
         )
 
     @staticmethod
