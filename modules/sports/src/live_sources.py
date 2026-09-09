@@ -30,6 +30,7 @@ class LiveSource:
     provider: str | None = None
     provider_event_id: str | None = None
     standalone: bool = False
+    resource_source_ids: tuple[str, ...] = ()
 
     @property
     def event_key(self) -> tuple[str, str] | None:
@@ -62,6 +63,11 @@ class LiveSource:
 
         if self.standalone:
             result["standalone"] = True
+
+        if self.resource_source_ids:
+            result["resource_source_ids"] = list(
+                self.resource_source_ids
+            )
 
         return result
 
@@ -140,6 +146,7 @@ def _parse_source(
         "provider",
         "provider_event_id",
         "standalone",
+        "resource_source_ids",
     }
 
     if not set(entry).issubset(
@@ -179,6 +186,41 @@ def _parse_source(
         )
     )
 
+    raw_resource_source_ids = entry.get(
+        "resource_source_ids",
+        [],
+    )
+
+    if not isinstance(
+        raw_resource_source_ids,
+        list,
+    ):
+        raise LiveSourceCatalogError(
+            "resource_source_ids must be a list"
+        )
+
+    resource_source_ids: list[str] = []
+    seen_resource_source_ids: set[str] = set()
+
+    for raw_source_id in raw_resource_source_ids:
+        source_id_value = _required(
+            raw_source_id,
+            "resource_source_ids entry",
+        )
+
+        if source_id_value in seen_resource_source_ids:
+            raise LiveSourceCatalogError(
+                "resource_source_ids must not contain duplicates"
+            )
+
+        seen_resource_source_ids.add(
+            source_id_value
+        )
+
+        resource_source_ids.append(
+            source_id_value
+        )
+
     if bool(provider) != bool(
         provider_event_id
     ):
@@ -215,6 +257,9 @@ def _parse_source(
             provider_event_id
         ),
         standalone=standalone,
+        resource_source_ids=tuple(
+            resource_source_ids
+        ),
     )
 
 
@@ -770,7 +815,7 @@ def safe_source_summary(
 ) -> dict[str, object]:
     """Return metadata without exposing stream_url."""
 
-    return {
+    result: dict[str, object] = {
         "id": source.source_id,
         "name": source.name,
         "provider": source.provider,
@@ -779,3 +824,13 @@ def safe_source_summary(
         ),
         "standalone": source.standalone,
     }
+
+    if source.resource_source_ids:
+        result["atlas_channel_id"] = (
+            source.atlas_channel_id
+        )
+        result["resource_source_ids"] = list(
+            source.resource_source_ids
+        )
+
+    return result

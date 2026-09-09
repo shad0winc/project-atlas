@@ -393,3 +393,288 @@ def test_invalid_state_fails_closed(
         SportsSessionStateError
     ):
         store.snapshot_active()
+
+
+def test_resource_lease_id_is_persisted_and_returned(
+    tmp_path: Path,
+) -> None:
+    clock = Clock()
+    ids = SessionIds()
+    path = tmp_path / "sessions.json"
+
+    store = registry(
+        path,
+        clock=clock,
+        ids=ids,
+    )
+
+    session = store.admit(
+        user_id="usr-one",
+        target_id="game-one",
+        limit=1,
+        resource_lease_id="lease-one",
+    )
+
+    assert session.resource_lease_id == "lease-one"
+
+    persisted = path.read_text(
+        encoding="utf-8"
+    )
+
+    assert '"version":2' in persisted
+    assert (
+        '"resource_lease_id":"lease-one"'
+        in persisted
+    )
+
+    reloaded = registry(
+        path,
+        clock=clock,
+        ids=ids,
+    ).list_active_for_user(
+        "usr-one"
+    )
+
+    assert len(reloaded) == 1
+    assert (
+        reloaded[0].resource_lease_id
+        == "lease-one"
+    )
+
+
+def test_v1_session_state_is_read_as_unlinked_and_upgraded_on_write(
+    tmp_path: Path,
+) -> None:
+    clock = Clock()
+    ids = SessionIds()
+    path = tmp_path / "sessions.json"
+
+    path.write_text(
+        (
+            '{"version":1,"sessions":{'
+            '"legacy-session":{'
+            '"user_id":"usr-one",'
+            '"target_id":"game-one",'
+            '"created_at":1000.0,'
+            '"last_seen_at":1000.0'
+            '}}}\n'
+        ),
+        encoding="utf-8",
+    )
+
+    store = registry(
+        path,
+        clock=clock,
+        ids=ids,
+    )
+
+    records = store.list_active_for_user(
+        "usr-one"
+    )
+
+    assert len(records) == 1
+    assert (
+        records[0].session_id
+        == "legacy-session"
+    )
+    assert records[0].resource_lease_id is None
+
+    store.heartbeat(
+        session_id="legacy-session",
+        user_id="usr-one",
+    )
+
+    persisted = path.read_text(
+        encoding="utf-8"
+    )
+
+    assert '"version":2' in persisted
+    assert (
+        '"resource_lease_id":null'
+        in persisted
+    )
+
+
+def test_v2_session_requires_resource_lease_field(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "sessions.json"
+
+    path.write_text(
+        (
+            '{"version":2,"sessions":{'
+            '"bad":{'
+            '"user_id":"usr-one",'
+            '"target_id":"game-one",'
+            '"created_at":1000.0,'
+            '"last_seen_at":1000.0'
+            '}}}\n'
+        ),
+        encoding="utf-8",
+    )
+
+    store = SportsSessionRegistry(path)
+
+    with pytest.raises(
+        SportsSessionStateError
+    ):
+        store.snapshot_active()
+
+
+@pytest.mark.parametrize(
+    "resource_lease_id",
+    [
+        "",
+        "   ",
+        4,
+        True,
+    ],
+)
+def test_admit_rejects_invalid_resource_lease_id(
+    tmp_path: Path,
+    resource_lease_id,
+) -> None:
+    store = SportsSessionRegistry(
+        tmp_path / "sessions.json"
+    )
+
+    with pytest.raises(ValueError):
+        store.admit(
+            user_id="usr-one",
+            target_id="game-one",
+            limit=1,
+            resource_lease_id=resource_lease_id,
+        )
+
+
+def test_unlinked_session_remains_supported(
+    tmp_path: Path,
+) -> None:
+    clock = Clock()
+    ids = SessionIds()
+
+    store = registry(
+        tmp_path / "sessions.json",
+        clock=clock,
+        ids=ids,
+    )
+
+    session = store.admit(
+        user_id="usr-one",
+        target_id="game-one",
+        limit=1,
+    )
+
+    assert session.resource_lease_id is None
+
+    refreshed = store.heartbeat(
+        session_id=session.session_id,
+        user_id="usr-one",
+    )
+
+    assert refreshed.resource_lease_id is None
+
+
+def test_release_record_returns_linked_session_atomically(
+    tmp_path,
+) -> None:
+    registry = SportsSessionRegistry(
+        tmp_path / "sessions.json",
+        session_id_factory=lambda: "session-release-record",
+    )
+
+    admitted = registry.admit(
+        user_id="user-one",
+        target_id="sports-live-game",
+        limit=2,
+        resource_lease_id="resource-lease-one",
+    )
+
+    released = registry.release_record(
+        session_id=admitted.session_id,
+        user_id="user-one",
+    )
+
+    assert released == admitted
+    assert (
+        released.resource_lease_id
+        == "resource-lease-one"
+    )
+    assert (
+        registry.active_count_for_user(
+            "user-one"
+        )
+        == 0
+    )
+
+    assert (
+        registry.release_record(
+            session_id=admitted.session_id,
+            user_id="user-one",
+        )
+        is None
+    )
+
+
+def test_release_record_preserves_owner_isolation(
+    tmp_path,
+) -> None:
+    registry = SportsSessionRegistry(
+        tmp_path / "sessions.json",
+        session_id_factory=lambda: "session-owned",
+    )
+
+    admitted = registry.admit(
+        user_id="owner",
+        target_id="sports-live-game",
+        limit=1,
+        resource_lease_id="resource-owned",
+    )
+
+    assert (
+        registry.release_record(
+            session_id=admitted.session_id,
+            user_id="other-user",
+        )
+        is None
+    )
+
+    remaining = registry.list_active_for_user(
+        "owner"
+    )
+
+    assert remaining == (
+        admitted,
+    )
+
+
+def test_release_bool_contract_uses_atomic_release_record(
+    tmp_path,
+) -> None:
+    registry = SportsSessionRegistry(
+        tmp_path / "sessions.json",
+        session_id_factory=lambda: "session-bool",
+    )
+
+    admitted = registry.admit(
+        user_id="user-one",
+        target_id="sports-live-game",
+        limit=1,
+        resource_lease_id="resource-bool",
+    )
+
+    assert (
+        registry.release(
+            session_id=admitted.session_id,
+            user_id="user-one",
+        )
+        is True
+    )
+
+    assert (
+        registry.release(
+            session_id=admitted.session_id,
+            user_id="user-one",
+        )
+        is False
+    )
