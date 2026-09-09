@@ -219,57 +219,139 @@ def test_safe_summary_does_not_expose_stream_url() -> None:
     assert '"stream_url"' not in body
 
 
-def test_no_live_source_put_or_patch_route() -> None:
+def test_patch_live_source_resource_requires_auth() -> None:
     content = private_api_text()
 
-    for method in (
-        "do_PUT",
-        "do_PATCH",
-    ):
-        token = (
-            f"    def {method}"
-        )
+    block = method_block(
+        content,
+        "do_PATCH(self) -> None:",
+        "do_DELETE(self) -> None:",
+    )
 
-        if token not in content:
-            continue
+    start = block.index(
+        'live_source_prefix = ('
+    )
 
-        start = content.index(
-            token
-        )
+    end = block.index(
+        'provider_prefix = (',
+        start,
+    )
 
-        remainder = content[
-            start:
-        ]
+    route = block[
+        start:end
+    ]
 
-        later_methods = [
-            position
-            for candidate in (
-                "    def do_GET",
-                "    def do_POST",
-                "    def do_DELETE",
-            )
-            if (
-                (
-                    position
-                    := remainder.find(
-                        candidate,
-                        1,
-                    )
-                )
-                != -1
-            )
-        ]
+    assert (
+        '"/internal/v1/live-sources/"'
+        in route
+    )
 
-        end = min(
-            later_methods,
-            default=len(remainder),
-        )
+    assert "_require_auth()" in route
 
-        block = remainder[
-            :end
-        ]
 
-        assert (
-            "/internal/v1/live-sources"
-            not in block
-        )
+def test_patch_live_source_resource_is_narrow_and_safe() -> None:
+    content = private_api_text()
+
+    block = method_block(
+        content,
+        "do_PATCH(self) -> None:",
+        "do_DELETE(self) -> None:",
+    )
+
+    start = block.index(
+        'live_source_prefix = ('
+    )
+
+    end = block.index(
+        'provider_prefix = (',
+        start,
+    )
+
+    route = block[
+        start:end
+    ]
+
+    assert (
+        '"resource_source_ids"'
+        in route
+    )
+
+    assert (
+        "unsupported live source fields"
+        in route
+    )
+
+    assert (
+        "registry.list_sources()"
+        in route
+    )
+
+    assert (
+        "current.state_dict()"
+        in route
+    )
+
+    assert (
+        "normalize_live_source"
+        in route
+    )
+
+    assert (
+        "registry.set("
+        in route
+    )
+
+    assert (
+        "safe_source_summary"
+        in route
+    )
+
+    assert '"stream_url"' not in route
+
+    assert (
+        "payload.get("
+        not in route
+    )
+
+
+def test_patch_live_source_resource_preserves_identity() -> None:
+    content = private_api_text()
+
+    block = method_block(
+        content,
+        "do_PATCH(self) -> None:",
+        "do_DELETE(self) -> None:",
+    )
+
+    start = block.index(
+        'live_source_prefix = ('
+    )
+
+    end = block.index(
+        'provider_prefix = (',
+        start,
+    )
+
+    route = block[
+        start:end
+    ]
+
+    assert (
+        'merged["id"] = source_id'
+        in route
+    )
+
+    assert (
+        "current.state_dict()"
+        in route
+    )
+
+    assert (
+        "sports_live_source_not_found"
+        in route
+    )
+
+    assert (
+        "sports_live_source_invalid"
+        in route
+    )
