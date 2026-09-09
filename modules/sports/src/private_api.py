@@ -1450,6 +1450,136 @@ class Handler(BaseHTTPRequestHandler):
             self.path
         )
 
+        live_source_prefix = (
+            "/internal/v1/live-sources/"
+        )
+
+        if parsed.path.startswith(
+            live_source_prefix
+        ):
+            if not self._require_auth():
+                return
+
+            source_id = urllib.parse.unquote(
+                parsed.path[
+                    len(live_source_prefix):
+                ]
+            ).strip()
+
+            if not source_id:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {
+                        "error": (
+                            "source_id is required."
+                        )
+                    },
+                )
+                return
+
+            payload = self._read_payload()
+
+            if payload is None:
+                return
+
+            try:
+                allowed_fields = {
+                    "resource_source_ids",
+                }
+
+                unsupported = (
+                    set(payload)
+                    - allowed_fields
+                )
+
+                if unsupported:
+                    raise LiveSourceCatalogError(
+                        "unsupported live source fields"
+                    )
+
+                if (
+                    "resource_source_ids"
+                    not in payload
+                ):
+                    raise LiveSourceCatalogError(
+                        "resource_source_ids is required"
+                    )
+
+                registry = (
+                    default_live_source_registry()
+                )
+
+                sources = (
+                    registry.list_sources()
+                )
+
+                current = next(
+                    (
+                        item
+                        for item in sources
+                        if item.source_id
+                        == source_id
+                    ),
+                    None,
+                )
+
+                if current is None:
+                    self._json(
+                        HTTPStatus.NOT_FOUND,
+                        {
+                            "code": (
+                                "sports_live_source_not_found"
+                            ),
+                            "error": (
+                                "Sports live source "
+                                "was not found."
+                            ),
+                        },
+                    )
+                    return
+
+                merged = current.state_dict()
+
+                merged.update(payload)
+                merged["id"] = source_id
+
+                updated_source = (
+                    normalize_live_source(
+                        merged
+                    )
+                )
+
+                registry.set(
+                    updated_source
+                )
+
+            except LiveSourceCatalogError:
+                self._json(
+                    HTTPStatus.UNPROCESSABLE_ENTITY,
+                    {
+                        "code": (
+                            "sports_live_source_invalid"
+                        ),
+                        "error": (
+                            "Sports live source "
+                            "is invalid."
+                        ),
+                    },
+                )
+                return
+
+            self._json(
+                HTTPStatus.OK,
+                {
+                    "live_source": (
+                        safe_source_summary(
+                            updated_source
+                        )
+                    )
+                },
+            )
+            return
+
         provider_prefix = (
             "/internal/v1/providers/"
         )
