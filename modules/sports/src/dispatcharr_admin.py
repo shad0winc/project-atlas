@@ -54,6 +54,26 @@ class SafeDispatcharrAccount:
 
 
 @dataclass(frozen=True, slots=True)
+class SafeDispatcharrStream:
+    """Secret-free Dispatcharr stream identity for Sports resolution."""
+
+    stream_id: int
+    name: str
+    m3u_account_id: int
+    group_name: str | None
+    is_stale: bool
+
+    def to_mapping(self) -> dict[str, Any]:
+        return {
+            "stream_id": self.stream_id,
+            "name": self.name,
+            "m3u_account_id": self.m3u_account_id,
+            "group_name": self.group_name,
+            "is_stale": self.is_stale,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class SafeConnectionTest:
     ok: bool
     status: str
@@ -663,6 +683,265 @@ class DispatcharrAdminClient:
             payload
         )
 
+    @staticmethod
+    def _positive_identifier(
+        value: object,
+        *,
+        field: str,
+    ) -> int:
+        if isinstance(value, bool):
+            raise DispatcharrAdminError(
+                f"Dispatcharr {field} is invalid."
+            )
+
+        try:
+            normalized = int(value)
+        except (
+            TypeError,
+            ValueError,
+        ) as error:
+            raise DispatcharrAdminError(
+                f"Dispatcharr {field} is invalid."
+            ) from error
+
+        if normalized < 1:
+            raise DispatcharrAdminError(
+                f"Dispatcharr {field} is invalid."
+            )
+
+        return normalized
+
+    def _paginated_get(
+        self,
+        path: str,
+        *,
+        access_token: str,
+        page_size: int = 10000,
+    ) -> tuple[Mapping[str, Any], ...]:
+        """Read all rows from one DRF list endpoint without exposing next URLs."""
+
+        rows: list[Mapping[str, Any]] = []
+        page = 1
+
+        while True:
+            separator = "&" if "?" in path else "?"
+
+            payload = self._json_request(
+                "GET",
+                (
+                    f"{path}{separator}"
+                    f"page={page}&page_size={page_size}"
+                ),
+                access_token=access_token,
+            )
+
+            if isinstance(payload, list):
+                for item in payload:
+                    if not isinstance(item, Mapping):
+                        raise DispatcharrAdminError(
+                            "Dispatcharr returned an invalid list response."
+                        )
+                    rows.append(item)
+
+                return tuple(rows)
+
+            if not isinstance(payload, Mapping):
+                raise DispatcharrAdminError(
+                    "Dispatcharr returned an invalid list response."
+                )
+
+            results = payload.get("results")
+
+            if not isinstance(results, list):
+                raise DispatcharrAdminError(
+                    "Dispatcharr returned an invalid paginated response."
+                )
+
+            for item in results:
+                if not isinstance(item, Mapping):
+                    raise DispatcharrAdminError(
+                        "Dispatcharr returned an invalid list response."
+                    )
+                rows.append(item)
+
+            next_page = payload.get("next")
+
+            if not next_page:
+                return tuple(rows)
+
+            page += 1
+
+            # Defensive bound against malformed/non-advancing pagination.
+            if page > 10000:
+                raise DispatcharrAdminError(
+                    "Dispatcharr pagination did not terminate."
+                )
+
+    def _group_names(
+        self,
+        *,
+        access_token: str,
+    ) -> dict[int, str]:
+        rows = self._paginated_get(
+            "/api/channels/groups/",
+            access_token=access_token,
+        )
+
+        groups: dict[int, str] = {}
+
+        for raw in rows:
+            group_id = self._positive_identifier(
+                raw.get("id"),
+                field="channel group identifier",
+            )
+
+            name = str(
+                raw.get(
+                    "name",
+                    "",
+                )
+            ).strip()
+
+            if not name:
+                raise DispatcharrAdminError(
+                    "Dispatcharr channel group metadata is incomplete."
+                )
+
+            if group_id in groups:
+                raise DispatcharrAdminError(
+                    "Dispatcharr returned duplicate channel group identifiers."
+                )
+
+            groups[group_id] = name
+
+        return groups
+
+    @classmethod
+    def _safe_stream(
+        cls,
+        raw: Mapping[str, Any],
+        *,
+        expected_account_id: int,
+        group_names: Mapping[int, str],
+    ) -> SafeDispatcharrStream:
+        # Use Dispatcharr's database PK. Its serializer also exposes a
+        # provider-side stream_id which is only unique within an account
+        # and must not cross the Atlas resolution boundary.
+        stream_id = cls._positive_identifier(
+            raw.get("id"),
+            field="stream identifier",
+        )
+
+        account_id = cls._positive_identifier(
+            raw.get("m3u_account"),
+            field="stream account identifier",
+        )
+
+        if account_id != expected_account_id:
+            raise DispatcharrAdminError(
+                "Dispatcharr returned a stream for the wrong account."
+            )
+
+        name = str(
+            raw.get(
+                "name",
+                "",
+            )
+        ).strip()
+
+        if not name:
+            raise DispatcharrAdminError(
+                "Dispatcharr stream metadata is incomplete."
+            )
+
+        raw_group = raw.get("channel_group")
+        group_name: str | None = None
+
+        if raw_group is not None:
+            group_id = cls._positive_identifier(
+                raw_group,
+                field="stream channel group identifier",
+            )
+
+            group_name = group_names.get(
+                group_id
+            )
+
+            if group_name is None:
+                raise DispatcharrAdminError(
+                    "Dispatcharr stream references an unknown channel group."
+                )
+
+        return SafeDispatcharrStream(
+            stream_id=stream_id,
+            name=name,
+            m3u_account_id=account_id,
+            group_name=group_name,
+            is_stale=bool(
+                raw.get(
+                    "is_stale",
+                    False,
+                )
+            ),
+        )
+
+    def list_streams(
+        self,
+        *,
+        account_id: int,
+    ) -> tuple[SafeDispatcharrStream, ...]:
+        """Return secret-free imported streams for one Dispatcharr account."""
+
+        normalized_account_id = self._positive_identifier(
+            account_id,
+            field="account identifier",
+        )
+
+        token = self._access_token()
+
+        group_names = self._group_names(
+            access_token=token,
+        )
+
+        query = urllib.parse.urlencode(
+            {
+                "m3u_account": normalized_account_id,
+            }
+        )
+
+        rows = self._paginated_get(
+            (
+                "/api/channels/streams/"
+                f"?{query}"
+            ),
+            access_token=token,
+        )
+
+        streams = tuple(
+            self._safe_stream(
+                raw,
+                expected_account_id=(
+                    normalized_account_id
+                ),
+                group_names=group_names,
+            )
+            for raw in rows
+        )
+
+        stream_ids = [
+            stream.stream_id
+            for stream in streams
+        ]
+
+        if len(stream_ids) != len(
+            set(stream_ids)
+        ):
+            raise DispatcharrAdminError(
+                "Dispatcharr returned duplicate stream identifiers."
+            )
+
+        return streams
+
     def test_connection(
         self,
         *,
@@ -901,4 +1180,5 @@ __all__ = [
     "DispatcharrAuthError",
     "SafeConnectionTest",
     "SafeDispatcharrAccount",
+    "SafeDispatcharrStream",
 ]
