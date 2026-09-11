@@ -12,6 +12,21 @@ from typing import Any
 
 from atlas.events import publish_event
 from controller import load_state, process_games
+from dispatcharr_admin import DispatcharrAdminClient
+from dispatcharr_channel_bindings import (
+    DispatcharrChannelBindingRegistry,
+    default_dispatcharr_channel_binding_registry,
+)
+from lifecycle import should_surface_game
+from live_source_orchestration import (
+    build_live_source_provisioning_plan,
+    reconcile_dispatcharr_channel,
+    resolve_event_live_source_content,
+)
+from source_lifecycle import (
+    SourceLifecycleStore,
+    SportsSource,
+)
 from health import write_health_report
 from providers.registry import enabled_providers
 from subscriptions import (
@@ -31,6 +46,13 @@ CONTROLLER_INTERVAL_SECONDS = int(
     os.getenv(
         "SPORTS_CONTROLLER_INTERVAL_SECONDS",
         "30",
+    )
+)
+
+PREGAME_WINDOW_MINUTES = int(
+    os.getenv(
+        "SPORTS_PREGAME_WINDOW_MINUTES",
+        "60",
     )
 )
 
@@ -498,6 +520,80 @@ def recording_counts(
 
 
 
+
+def run_live_source_provisioning_pipeline(
+    games: list[dict[str, Any]],
+    *,
+    now: datetime | None = None,
+    dispatcharr: DispatcharrAdminClient | None = None,
+    sources: tuple[SportsSource, ...] | None = None,
+    bindings: DispatcharrChannelBindingRegistry | None = None,
+) -> int:
+    """Reconcile authorized Dispatcharr channels for surfaced games."""
+    if now is None:
+        now = datetime.now(timezone.utc)
+
+    surfaced_games = [
+        game
+        for game in games
+        if should_surface_game(
+            game,
+            now,
+            PREGAME_WINDOW_MINUTES,
+        )
+    ]
+
+    if not surfaced_games:
+        return 0
+
+    source_records = (
+        sources
+        if sources is not None
+        else SourceLifecycleStore().load()
+    )
+
+    if not source_records:
+        return 0
+
+    client = (
+        dispatcharr
+        if dispatcharr is not None
+        else DispatcharrAdminClient.from_environment()
+    )
+
+    binding_registry = (
+        bindings
+        if bindings is not None
+        else default_dispatcharr_channel_binding_registry()
+    )
+
+    reconciled = 0
+
+    for game in surfaced_games:
+        resolution = resolve_event_live_source_content(
+            event=game,
+            sources=source_records,
+            dispatcharr=client,
+        )
+
+        if resolution is None:
+            continue
+
+        plan = build_live_source_provisioning_plan(
+            event=game,
+            resolution=resolution,
+        )
+
+        reconcile_dispatcharr_channel(
+            plan=plan,
+            dispatcharr=client,
+            bindings=binding_registry,
+        )
+
+        reconciled += 1
+
+    return reconciled
+
 def run_operations_pipeline(
     provider_result: dict[str, Any],
     recordings: dict[str, dict[str, Any]],
@@ -529,6 +625,22 @@ def run_operations_pipeline(
 
     next_games = process_games(
         subscribed_games
+    )
+
+    current_game_ids = {
+        str(game.get("id", "")).strip()
+        for game in subscribed_games
+        if str(game.get("id", "")).strip()
+    }
+
+    current_games = [
+        game
+        for game_id, game in next_games.items()
+        if game_id in current_game_ids
+    ]
+
+    run_live_source_provisioning_pipeline(
+        current_games
     )
 
     write_provider_health(
