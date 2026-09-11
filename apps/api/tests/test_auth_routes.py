@@ -229,6 +229,7 @@ class AuthenticationRouteTests(unittest.TestCase):
                         "cleanup.*",
                         "downloads.*",
                         "favorites.*",
+                        "dislikes.*",
                         "gameservers.*",
                         "media.*",
                         "modules.*",
