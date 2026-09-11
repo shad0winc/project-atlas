@@ -85,7 +85,7 @@ def test_ingress_api_has_read_only_identity_access() -> None:
     ) in api
 
 
-def test_ingress_api_limits_writable_identity_state_to_favorites() -> None:
+def test_ingress_api_limits_writable_identity_state_to_preferences() -> None:
     content = INGRESS_COMPOSE.read_text(encoding="utf-8")
     api = _service_block(content, "api", "identity-writer")
 
@@ -107,6 +107,11 @@ def test_ingress_api_limits_writable_identity_state_to_favorites() -> None:
     assert (
         "      - /mnt/storage/configs/atlas/identity/favorites:"
         "/mnt/storage/configs/atlas/identity/favorites:rw\n"
+    ) in api
+
+    assert (
+        "      - /mnt/storage/configs/atlas/identity/dislikes:"
+        "/mnt/storage/configs/atlas/identity/dislikes:rw\n"
     ) in api
 
     assert (

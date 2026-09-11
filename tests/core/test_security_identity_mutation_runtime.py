@@ -61,6 +61,10 @@ def test_identity_writer_is_private_and_least_privileged() -> None:
     ) not in writer
 
     assert (
+        "/mnt/storage/configs/atlas/identity/dislikes:"
+    ) not in writer
+
+    assert (
         "/mnt/storage/configs/atlas/runtime/requests:"
     ) not in writer
 

@@ -55,6 +55,7 @@ services:
       - /mnt/storage/configs/atlas/identity/password-recovery:/mnt/storage/configs/atlas/identity/password-recovery:rw
       - /mnt/storage/configs/atlas/identity/custom_roles:/mnt/storage/configs/atlas/identity/custom_roles:ro
       - /mnt/storage/configs/atlas/identity/favorites:/mnt/storage/configs/atlas/identity/favorites:rw
+      - /mnt/storage/configs/atlas/identity/dislikes:/mnt/storage/configs/atlas/identity/dislikes:rw
       - /mnt/storage/configs/atlas/runtime/requests:/mnt/storage/configs/atlas/runtime/requests:rw
       - /mnt/storage/configs/atlas/runtime/sports:/mnt/storage/configs/atlas/runtime/sports:rw
       - /mnt/storage/configs/atlas/runtime/events.jsonl:/mnt/storage/configs/atlas/runtime/events.jsonl:rw

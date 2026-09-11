@@ -10,6 +10,7 @@ MAINTENANCE_FLAG="$MAINTENANCE_DIR/enabled"
 
 source "$PROJECT_DIR/scripts/lib/audit-runtime.sh"
 source "$PROJECT_DIR/scripts/lib/favorites-runtime.sh"
+source "$PROJECT_DIR/scripts/lib/dislikes-runtime.sh"
 source "$PROJECT_DIR/scripts/lib/password-recovery-runtime.sh"
 
 EXPECTED_CADDY_MEMORY=536870912
@@ -83,6 +84,12 @@ else
   fail "Favorites runtime ownership / access contract"
 fi
 
+if atlas_dislikes_runtime_verify >/dev/null 2>&1; then
+  pass "Dislikes runtime ownership / access contract"
+else
+  fail "Dislikes runtime ownership / access contract"
+fi
+
 if atlas_password_recovery_runtime_verify >/dev/null 2>&1; then
   pass "Password recovery runtime ownership / access contract"
 else
@@ -118,6 +125,37 @@ if docker inspect atlas-api >/dev/null 2>&1; then
   fi
 else
   fail "Atlas API Favorites persistence access"
+fi
+
+if docker inspect atlas-api >/dev/null 2>&1; then
+  if docker exec atlas-api sh -lc '
+    set -eu
+
+    dislikes=/mnt/storage/configs/atlas/identity/dislikes
+    records="$dislikes/records"
+    registry="$dislikes/dislikes.json"
+
+    test -d "$dislikes"
+    test -r "$dislikes"
+    test -w "$dislikes"
+    test -x "$dislikes"
+
+    test -d "$records"
+    test -r "$records"
+    test -w "$records"
+    test -x "$records"
+
+    if [ -e "$registry" ]; then
+      test -r "$registry"
+    fi
+  '
+  then
+    pass "Atlas API Dislikes persistence access"
+  else
+    fail "Atlas API Dislikes persistence access"
+  fi
+else
+  fail "Atlas API Dislikes persistence access"
 fi
 
 if docker inspect atlas-api >/dev/null 2>&1; then

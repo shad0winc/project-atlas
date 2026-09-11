@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { addFavorite } from "../../favorites";
+import { DislikeAction } from "../../dislikes";
 import { WatchAction } from "../../playback/components/WatchAction";
 
 import { ATLAS_PERMISSIONS } from "../../../lib/authorization/permissions";
@@ -20,6 +21,8 @@ type MediaCatalogContentProps = Readonly<{
   loading: boolean;
   error: string | null;
   canFavorite: boolean;
+  canDislike?: boolean;
+  dislikeExpectedUserId?: string;
   favoritingItemId: string | null;
   favoritedItemIds: ReadonlySet<string>;
   onFavorite: (item: MediaCatalogItem) => void;
@@ -35,6 +38,8 @@ export function MediaCatalogContent({
   loading,
   error,
   canFavorite,
+  canDislike = false,
+  dislikeExpectedUserId,
   favoritingItemId,
   favoritedItemIds,
   onFavorite,
@@ -98,6 +103,14 @@ export function MediaCatalogContent({
                 <p className="media-discovery-status">Provider: {item.provider}</p>
 
                 <WatchAction provider={item.provider} itemId={item.itemId} />
+                {canDislike && dislikeExpectedUserId ? (
+                  <DislikeAction
+                    expectedUserId={dislikeExpectedUserId}
+                    itemId={item.itemId}
+                    provider={item.provider}
+                    title={item.title}
+                  />
+                ) : null}
 
                 {canFavorite ? (
                   <button
@@ -148,6 +161,7 @@ export function MediaCatalogView(): React.ReactElement {
   const [favoritedItemIds, setFavoritedItemIds] = useState<ReadonlySet<string>>(() => new Set());
 
   const canFavorite = can(ATLAS_PERMISSIONS.favoritesWrite);
+  const canDislike = can(ATLAS_PERMISSIONS.dislikesWrite);
 
   const load = useCallback((): void => {
     setLoading(true);
@@ -236,6 +250,12 @@ export function MediaCatalogView(): React.ReactElement {
   return (
     <MediaCatalogContent
       canFavorite={canFavorite}
+      canDislike={canDislike}
+      dislikeExpectedUserId={
+        canDislike && user !== null
+          ? user.user_id
+          : undefined
+      }
       error={error}
       favoritedItemIds={favoritedItemIds}
       favoritingItemId={favoritingItemId}

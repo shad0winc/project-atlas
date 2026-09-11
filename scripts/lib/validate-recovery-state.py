@@ -118,6 +118,25 @@ def _validate_favorites(identity_root: Path) -> str:
     return f"{len(registry['favorites'])} favorites"
 
 
+def _validate_dislikes(identity_root: Path) -> str:
+    from atlas.dislikes import DislikeStore, validate_dislike
+
+    store = DislikeStore(identity_root)
+    registry = store._load_registry()
+    relationships: set[tuple[str, str, str]] = set()
+    for dislike_id, entry in registry["dislikes"].items():
+        path = store._safe_path(entry["path"], dislike_id)
+        _require(path.is_file() and not path.is_symlink(), f"missing dislike: {dislike_id}")
+        record = validate_dislike(_json_object(path))
+        _require(record["dislike_id"] == dislike_id, f"dislike ID mismatch: {dislike_id}")
+        for field in ("user_id", "provider", "item_id", "media_type"):
+            _require(record[field] == entry[field], f"dislike registry mismatch: {dislike_id}")
+        relationship = (record["user_id"], record["provider"], record["item_id"])
+        _require(relationship not in relationships, "duplicate dislike relationship")
+        relationships.add(relationship)
+    return f"{len(registry['dislikes'])} dislikes"
+
+
 def _validate_requests(root: Path) -> str:
     from atlas.media_requests.repository import JsonMediaRequestRepository
 
@@ -448,6 +467,7 @@ def validate(root: Path, project_root: Path) -> list[tuple[str, str, str]]:
         results.append(("identity-invitations", "SKIP", "absent optional"))
 
     results.append(("favorites", "PASS", _validate_favorites(identity)))
+    results.append(("dislikes", "PASS", _validate_dislikes(identity)))
 
     if policies.get("requests") == "captured":
         results.append(("requests", "PASS", _validate_requests(state / "requests")))

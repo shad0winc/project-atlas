@@ -17,6 +17,7 @@ SURFACES = (
     ("users", "state/users", "required", "directory", True),
     ("identity-invitations", "state/identity/invitations", "optional", "directory", False),
     ("favorites", "state/identity/favorites", "required", "directory", True),
+    ("dislikes", "state/identity/dislikes", "required", "directory", True),
     ("requests", "state/requests/requests.json", "optional", "file", False),
     ("scheduler", "state/scheduler/tasks.json", "required", "file", True),
     ("runtime-events", "state/runtime/events.jsonl", "required", "file", True),
@@ -66,6 +67,7 @@ def _build_archive(tmp_path: Path) -> tuple[Path, dict[str, str]]:
     files = {
         "state/users/users.json": "users-v1\n",
         "state/identity/favorites/favorites.json": "favorites-v1\n",
+        "state/identity/dislikes/dislikes.json": "dislikes-v1\n",
         "state/scheduler/tasks.json": "scheduler-v1\n",
         "state/runtime/events.jsonl": "event-v1\n",
         "state/runtime/subscribers/user.cursor": "1\n",
@@ -336,7 +338,7 @@ def test_restore_plan_maps_only_declared_surfaces(tmp_path: Path) -> None:
 
         assert result.returncode == 0, result.stderr
         rows = [line.split("\t") for line in result.stdout.splitlines() if line]
-        assert len(rows) == 15
+        assert len(rows) == 16
         by_surface = {row[0]: row for row in rows}
         assert set(by_surface) == {surface for surface, *_ in SURFACES}
         assert by_surface["users"][1] == "replace"

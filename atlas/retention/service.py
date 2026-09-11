@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from atlas.dislikes import DislikeStore, default_dislike_store
+
 from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta, timezone
 from typing import Any, Protocol
@@ -49,6 +51,7 @@ class RetentionService:
         ]
         | None = None,
         user_store: RetentionUserStore | None = None,
+        dislike_store: DislikeStore | None = None,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
         self.policy_service = (
@@ -68,6 +71,7 @@ class RetentionService:
         )
 
         self.user_store = user_store
+        self.dislike_store = dislike_store
         self.clock = (
             clock
             if clock is not None
@@ -97,6 +101,73 @@ class RetentionService:
         # Preserve the established service contract for callers that have
         # not yet opted into provider-backed timing semantics. Production
         # wiring is introduced separately after this contract is certified.
+        if self.dislike_store is not None:
+            dislikes = [
+                dislike
+                for dislike in self.dislike_store.list(
+                    provider=policy.provider,
+                )
+                if dislike["item_id"] == policy.item_id
+            ]
+
+            if dislikes:
+                try:
+                    disliked_at = min(
+                        datetime.fromisoformat(
+                            str(
+                                dislike["created_at"]
+                            ).replace(
+                                "Z",
+                                "+00:00",
+                            )
+                        )
+                        for dislike in dislikes
+                    )
+                except (
+                    KeyError,
+                    TypeError,
+                    ValueError,
+                ) as exc:
+                    raise RetentionError(
+                        "invalid Dislike retention state"
+                    ) from exc
+
+                if disliked_at.tzinfo is None:
+                    raise RetentionError(
+                        "Dislike created_at must include timezone"
+                    )
+
+                now = self.clock()
+
+                if (
+                    not isinstance(now, datetime)
+                    or now.tzinfo is None
+                ):
+                    raise RetentionError(
+                        "retention clock must return "
+                        "timezone-aware datetime"
+                    )
+
+                disliked_at = disliked_at.astimezone(
+                    timezone.utc
+                )
+                now = now.astimezone(
+                    timezone.utc
+                )
+
+                eligible = (
+                    now
+                    >= disliked_at
+                    + timedelta(hours=24)
+                )
+
+                return RetentionDecision(
+                    provider=policy.provider,
+                    item_id=policy.item_id,
+                    eligible=eligible,
+                    policy=policy,
+                )
+
         if (
             self.media_providers is None
             or self.user_store is None
@@ -444,6 +515,7 @@ def default_retention_service() -> RetentionService:
     """Construct the production media-retention service."""
 
     return RetentionService(
+        dislike_store=default_dislike_store(),
         media_providers={
             "jellyfin": default_jellyfin_provider(),
         },

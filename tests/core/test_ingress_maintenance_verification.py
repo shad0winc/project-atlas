@@ -62,6 +62,10 @@ def _write_fake_docker(path: Path) -> None:
                 exit "${ATLAS_TEST_PASSWORD_RECOVERY_ACCESS_STATUS:-0}"
               fi
 
+              if [[ "$args" == *"dislikes"* ]]; then
+                exit "${ATLAS_TEST_DISLIKES_ACCESS_STATUS:-0}"
+              fi
+
               exit "${ATLAS_TEST_FAVORITES_ACCESS_STATUS:-0}"
             fi
 
@@ -107,6 +111,8 @@ def _run_verifier(
     public_status: str = "503",
     favorites_runtime_status: str = "0",
     favorites_access_status: str = "0",
+    dislikes_runtime_status: str = "0",
+    dislikes_access_status: str = "0",
     password_recovery_runtime_status: str = "0",
     password_recovery_access_status: str = "0",
 ) -> subprocess.CompletedProcess[str]:
@@ -154,6 +160,26 @@ def _run_verifier(
     )
     favorites_runtime.chmod(0o755)
 
+
+    dislikes_runtime = (
+        project
+        / "scripts"
+        / "lib"
+        / "dislikes-runtime.sh"
+    )
+    dislikes_runtime.write_text(
+        textwrap.dedent(
+            """
+            #!/usr/bin/env bash
+            atlas_dislikes_runtime_verify() {
+              return "${ATLAS_TEST_DISLIKES_RUNTIME_STATUS:-0}"
+            }
+            """
+        ).lstrip(),
+        encoding="utf-8",
+    )
+    dislikes_runtime.chmod(0o755)
+
     password_recovery_runtime = (
         project
         / "scripts"
@@ -187,6 +213,8 @@ def _run_verifier(
             "ATLAS_TEST_PUBLIC_STATUS": public_status,
             "ATLAS_TEST_FAVORITES_RUNTIME_STATUS": favorites_runtime_status,
             "ATLAS_TEST_FAVORITES_ACCESS_STATUS": favorites_access_status,
+            "ATLAS_TEST_DISLIKES_RUNTIME_STATUS": dislikes_runtime_status,
+            "ATLAS_TEST_DISLIKES_ACCESS_STATUS": dislikes_access_status,
             "ATLAS_TEST_PASSWORD_RECOVERY_RUNTIME_STATUS": (
                 password_recovery_runtime_status
             ),
@@ -261,6 +289,37 @@ def test_normal_mode_fails_if_api_cannot_access_favorites_persistence(
 
     assert result.returncode != 0
     assert "Atlas API Favorites persistence access" in result.stderr
+    assert "Atlas Ingress Status: FAIL" in result.stderr
+
+
+def test_normal_mode_fails_if_dislikes_runtime_contract_is_invalid(
+    tmp_path: Path,
+) -> None:
+    result = _run_verifier(
+        tmp_path,
+        maintenance=False,
+        dislikes_runtime_status="1",
+    )
+
+    assert result.returncode != 0
+    assert (
+        "Dislikes runtime ownership / access contract"
+        in result.stderr
+    )
+    assert "Atlas Ingress Status: FAIL" in result.stderr
+
+
+def test_normal_mode_fails_if_api_cannot_access_dislikes_persistence(
+    tmp_path: Path,
+) -> None:
+    result = _run_verifier(
+        tmp_path,
+        maintenance=False,
+        dislikes_access_status="1",
+    )
+
+    assert result.returncode != 0
+    assert "Atlas API Dislikes persistence access" in result.stderr
     assert "Atlas Ingress Status: FAIL" in result.stderr
 
 

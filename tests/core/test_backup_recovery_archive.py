@@ -31,6 +31,7 @@ SURFACES = (
     ("users", "state/users", "required", "directory", True),
     ("identity-invitations", "state/identity/invitations", "optional", "directory", False),
     ("favorites", "state/identity/favorites", "required", "directory", True),
+    ("dislikes", "state/identity/dislikes", "required", "directory", True),
     ("requests", "state/requests/requests.json", "optional", "file", False),
     ("scheduler", "state/scheduler/tasks.json", "required", "file", True),
     ("runtime-events", "state/runtime/events.jsonl", "required", "file", True),
@@ -59,6 +60,7 @@ def _build_archive(
     files = {
         "state/users/users.json": "users-v1\n",
         "state/identity/favorites/favorites.json": "favorites-v1\n",
+        "state/identity/dislikes/dislikes.json": "dislikes-v1\n",
         "state/scheduler/tasks.json": "scheduler-v1\n",
         "state/runtime/events.jsonl": "event-v1\n",
         "state/runtime/subscribers/user.cursor": "1\n",

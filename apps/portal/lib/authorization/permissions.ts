@@ -12,6 +12,8 @@ export const ATLAS_PERMISSIONS = {
   sportsProvidersManage: "sports.providers.manage",
   favoritesRead: "favorites.read",
   favoritesWrite: "favorites.write",
+  dislikesRead: "dislikes.read",
+  dislikesWrite: "dislikes.write",
   mediaRead: "media.read",
   monitoringRead: "monitoring.read",
   downloadsManage: "downloads.manage",
