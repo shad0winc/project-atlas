@@ -651,3 +651,412 @@ def test_provisioning_plan_is_secret_and_url_free() -> None:
         "https://",
     ):
         assert forbidden not in rendered
+
+
+class FakeChannelBindings:
+    def __init__(self, binding=None) -> None:
+        self.binding = binding
+        self.resolve_calls = []
+        self.set_calls = []
+
+    def resolve(self, atlas_channel_id):
+        self.resolve_calls.append(
+            atlas_channel_id
+        )
+        return self.binding
+
+    def set(
+        self,
+        atlas_channel_id,
+        channel_id,
+        channel_uuid,
+    ):
+        from dispatcharr_channel_bindings import (
+            DispatcharrChannelBinding,
+        )
+
+        self.set_calls.append(
+            (
+                atlas_channel_id,
+                channel_id,
+                channel_uuid,
+            )
+        )
+
+        self.binding = DispatcharrChannelBinding(
+            atlas_channel_id=atlas_channel_id,
+            dispatcharr_channel_id=channel_id,
+            dispatcharr_channel_uuid=channel_uuid,
+        )
+
+        return self.binding
+
+
+class FakeChannelDispatcharr:
+    def __init__(self) -> None:
+        self.create_calls = []
+        self.update_calls = []
+        self.created_channel = None
+        self.updated_channel = None
+        self.update_error = None
+
+    def create_channel(
+        self,
+        *,
+        name,
+        stream_ids,
+    ):
+        self.create_calls.append(
+            (
+                name,
+                tuple(stream_ids),
+            )
+        )
+
+        assert self.created_channel is not None
+        return self.created_channel
+
+    def update_channel(
+        self,
+        *,
+        channel_id,
+        name=None,
+        stream_ids=None,
+    ):
+        self.update_calls.append(
+            (
+                channel_id,
+                name,
+                tuple(stream_ids)
+                if stream_ids is not None
+                else None,
+            )
+        )
+
+        if self.update_error is not None:
+            raise self.update_error
+
+        assert self.updated_channel is not None
+        return self.updated_channel
+
+
+def _channel_plan():
+    from live_source_orchestration import (
+        LiveSourceProvisioningPlan,
+        ProvisioningSourceStreams,
+    )
+
+    return LiveSourceProvisioningPlan(
+        source_id="thesportsdb-2475374",
+        atlas_channel_id=(
+            "sports-live-thesportsdb-2475374"
+        ),
+        name=(
+            "Seattle Seahawks vs "
+            "New England Patriots"
+        ),
+        provider="thesportsdb",
+        provider_event_id="2475374",
+        match_kind="team_pair",
+        resource_source_ids=(
+            "primary",
+            "later",
+        ),
+        source_streams=(
+            ProvisioningSourceStreams(
+                source_id="primary",
+                stream_ids=(302, 301),
+            ),
+            ProvisioningSourceStreams(
+                source_id="later",
+                stream_ids=(202, 201),
+            ),
+        ),
+    )
+
+
+def test_reconcile_dispatcharr_channel_creates_when_unbound() -> None:
+    from dispatcharr_admin import (
+        SafeDispatcharrChannel,
+    )
+    from live_source_orchestration import (
+        reconcile_dispatcharr_channel,
+    )
+
+    plan = _channel_plan()
+    dispatcharr = FakeChannelDispatcharr()
+    bindings = FakeChannelBindings()
+
+    dispatcharr.created_channel = (
+        SafeDispatcharrChannel(
+            channel_id=42,
+            channel_uuid="uuid-42",
+            name=plan.name,
+            stream_ids=plan.stream_ids,
+        )
+    )
+
+    channel, binding = (
+        reconcile_dispatcharr_channel(
+            plan=plan,
+            dispatcharr=dispatcharr,
+            bindings=bindings,
+        )
+    )
+
+    assert bindings.resolve_calls == [
+        plan.atlas_channel_id
+    ]
+
+    assert dispatcharr.create_calls == [
+        (
+            plan.name,
+            plan.stream_ids,
+        )
+    ]
+
+    assert dispatcharr.update_calls == []
+
+    assert bindings.set_calls == [
+        (
+            plan.atlas_channel_id,
+            42,
+            "uuid-42",
+        )
+    ]
+
+    assert channel.channel_id == 42
+    assert (
+        binding.dispatcharr_channel_id
+        == 42
+    )
+
+
+def test_reconcile_dispatcharr_channel_updates_persisted_identity() -> None:
+    from dispatcharr_admin import (
+        SafeDispatcharrChannel,
+    )
+    from dispatcharr_channel_bindings import (
+        DispatcharrChannelBinding,
+    )
+    from live_source_orchestration import (
+        reconcile_dispatcharr_channel,
+    )
+
+    plan = _channel_plan()
+
+    bindings = FakeChannelBindings(
+        DispatcharrChannelBinding(
+            atlas_channel_id=(
+                plan.atlas_channel_id
+            ),
+            dispatcharr_channel_id=42,
+            dispatcharr_channel_uuid=(
+                "old-uuid"
+            ),
+        )
+    )
+
+    dispatcharr = FakeChannelDispatcharr()
+
+    dispatcharr.updated_channel = (
+        SafeDispatcharrChannel(
+            channel_id=42,
+            channel_uuid="new-uuid",
+            name=plan.name,
+            stream_ids=plan.stream_ids,
+        )
+    )
+
+    channel, binding = (
+        reconcile_dispatcharr_channel(
+            plan=plan,
+            dispatcharr=dispatcharr,
+            bindings=bindings,
+        )
+    )
+
+    assert dispatcharr.create_calls == []
+
+    assert dispatcharr.update_calls == [
+        (
+            42,
+            plan.name,
+            plan.stream_ids,
+        )
+    ]
+
+    assert bindings.set_calls == [
+        (
+            plan.atlas_channel_id,
+            42,
+            "new-uuid",
+        )
+    ]
+
+    assert channel.channel_uuid == (
+        "new-uuid"
+    )
+    assert (
+        binding.dispatcharr_channel_uuid
+        == "new-uuid"
+    )
+
+
+def test_reconcile_dispatcharr_channel_bound_404_fails_closed() -> None:
+    from dispatcharr_admin import (
+        DispatcharrChannelNotFoundError,
+    )
+    from dispatcharr_channel_bindings import (
+        DispatcharrChannelBinding,
+    )
+    from live_source_orchestration import (
+        reconcile_dispatcharr_channel,
+    )
+
+    plan = _channel_plan()
+
+    original_binding = (
+        DispatcharrChannelBinding(
+            atlas_channel_id=(
+                plan.atlas_channel_id
+            ),
+            dispatcharr_channel_id=42,
+            dispatcharr_channel_uuid=(
+                "uuid-42"
+            ),
+        )
+    )
+
+    bindings = FakeChannelBindings(
+        original_binding
+    )
+
+    dispatcharr = FakeChannelDispatcharr()
+    dispatcharr.update_error = (
+        DispatcharrChannelNotFoundError(
+            "Dispatcharr channel was not found."
+        )
+    )
+
+    with pytest.raises(
+        DispatcharrChannelNotFoundError,
+        match="channel was not found",
+    ):
+        reconcile_dispatcharr_channel(
+            plan=plan,
+            dispatcharr=dispatcharr,
+            bindings=bindings,
+        )
+
+    assert dispatcharr.update_calls == [
+        (
+            42,
+            plan.name,
+            plan.stream_ids,
+        )
+    ]
+
+    assert dispatcharr.create_calls == []
+    assert bindings.set_calls == []
+    assert bindings.binding == (
+        original_binding
+    )
+
+
+def test_reconcile_dispatcharr_channel_create_failure_does_not_persist() -> None:
+    from dispatcharr_admin import (
+        DispatcharrAdminError,
+    )
+    from live_source_orchestration import (
+        reconcile_dispatcharr_channel,
+    )
+
+    plan = _channel_plan()
+    bindings = FakeChannelBindings()
+
+    class FailedCreate(
+        FakeChannelDispatcharr
+    ):
+        def create_channel(
+            self,
+            *,
+            name,
+            stream_ids,
+        ):
+            self.create_calls.append(
+                (
+                    name,
+                    tuple(stream_ids),
+                )
+            )
+            raise DispatcharrAdminError(
+                "create failed"
+            )
+
+    dispatcharr = FailedCreate()
+
+    with pytest.raises(
+        DispatcharrAdminError,
+        match="create failed",
+    ):
+        reconcile_dispatcharr_channel(
+            plan=plan,
+            dispatcharr=dispatcharr,
+            bindings=bindings,
+        )
+
+    assert bindings.set_calls == []
+
+
+def test_reconcile_dispatcharr_channel_update_failure_does_not_mutate_binding() -> None:
+    from dispatcharr_admin import (
+        DispatcharrAdminError,
+    )
+    from dispatcharr_channel_bindings import (
+        DispatcharrChannelBinding,
+    )
+    from live_source_orchestration import (
+        reconcile_dispatcharr_channel,
+    )
+
+    plan = _channel_plan()
+
+    original_binding = (
+        DispatcharrChannelBinding(
+            atlas_channel_id=(
+                plan.atlas_channel_id
+            ),
+            dispatcharr_channel_id=42,
+            dispatcharr_channel_uuid=(
+                "uuid-42"
+            ),
+        )
+    )
+
+    bindings = FakeChannelBindings(
+        original_binding
+    )
+
+    dispatcharr = FakeChannelDispatcharr()
+    dispatcharr.update_error = (
+        DispatcharrAdminError(
+            "update failed"
+        )
+    )
+
+    with pytest.raises(
+        DispatcharrAdminError,
+        match="update failed",
+    ):
+        reconcile_dispatcharr_channel(
+            plan=plan,
+            dispatcharr=dispatcharr,
+            bindings=bindings,
+        )
+
+    assert dispatcharr.create_calls == []
+    assert bindings.set_calls == []
+    assert bindings.binding == (
+        original_binding
+    )

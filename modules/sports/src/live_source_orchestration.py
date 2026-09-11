@@ -5,7 +5,12 @@ from dataclasses import dataclass
 
 from dispatcharr_admin import (
     DispatcharrAdminClient,
+    SafeDispatcharrChannel,
     SafeDispatcharrStream,
+)
+from dispatcharr_channel_bindings import (
+    DispatcharrChannelBinding,
+    DispatcharrChannelBindingRegistry,
 )
 from live_source_resolver import (
     DispatcharrStreamCandidate,
@@ -218,6 +223,51 @@ def resolve_event_live_source_content(
         sources=source_tuple,
     )
 
+
+
+def reconcile_dispatcharr_channel(
+    *,
+    plan: LiveSourceProvisioningPlan,
+    dispatcharr: DispatcharrAdminClient,
+    bindings: DispatcharrChannelBindingRegistry,
+) -> tuple[
+    SafeDispatcharrChannel,
+    DispatcharrChannelBinding,
+]:
+    """Create or reconcile one shared Sports channel from desired state.
+
+    The durable Atlas-to-Dispatcharr binding is authoritative for deciding
+    whether reconciliation creates or updates a channel. A missing bound
+    Dispatcharr channel fails closed through DispatcharrChannelNotFoundError;
+    this function does not delete bindings or automatically recreate stale
+    identities.
+    """
+
+    binding = bindings.resolve(
+        plan.atlas_channel_id
+    )
+
+    if binding is None:
+        channel = dispatcharr.create_channel(
+            name=plan.name,
+            stream_ids=plan.stream_ids,
+        )
+    else:
+        channel = dispatcharr.update_channel(
+            channel_id=(
+                binding.dispatcharr_channel_id
+            ),
+            name=plan.name,
+            stream_ids=plan.stream_ids,
+        )
+
+    persisted = bindings.set(
+        plan.atlas_channel_id,
+        channel.channel_id,
+        channel.channel_uuid,
+    )
+
+    return channel, persisted
 
 
 def build_live_source_provisioning_plan(
