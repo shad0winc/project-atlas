@@ -7,6 +7,7 @@ from dispatcharr_admin import (
     SafeDispatcharrStream,
 )
 from live_source_orchestration import (
+    build_live_source_provisioning_plan,
     resolve_event_live_source_content,
 )
 from live_source_resolver import (
@@ -383,3 +384,270 @@ def test_safe_stream_metadata_is_forwarded_without_backend_secrets() -> None:
     assert "server_url" not in rendered
     assert "backend_reference" not in rendered
     assert "token" not in rendered
+
+
+
+def test_build_provisioning_plan_uses_canonical_shared_event_identity() -> None:
+    dispatcharr = FakeDispatcharr(
+        {
+            2: (
+                _stream(
+                    900,
+                    (
+                        "NFL Seattle Seahawks vs "
+                        "New England Patriots"
+                    ),
+                    2,
+                ),
+            ),
+        }
+    )
+
+    event = _event()
+
+    resolution = (
+        resolve_event_live_source_content(
+            event=event,
+            sources=(
+                _source(
+                    "primary",
+                    2,
+                ),
+            ),
+            dispatcharr=dispatcharr,  # type: ignore[arg-type]
+        )
+    )
+
+    assert resolution is not None
+
+    plan = (
+        build_live_source_provisioning_plan(
+            event=event,
+            resolution=resolution,
+        )
+    )
+
+    assert plan.source_id == (
+        "thesportsdb-2475374"
+    )
+
+    assert plan.atlas_channel_id == (
+        "sports-live-thesportsdb-2475374"
+    )
+
+    assert plan.name == (
+        "Seattle Seahawks vs "
+        "New England Patriots"
+    )
+
+    assert plan.provider == "thesportsdb"
+    assert (
+        plan.provider_event_id
+        == "2475374"
+    )
+
+    assert plan.resource_source_ids == (
+        "primary",
+    )
+
+    assert plan.stream_ids == (
+        900,
+    )
+
+
+def test_build_provisioning_plan_preserves_ranked_source_and_stream_order() -> None:
+    dispatcharr = FakeDispatcharr(
+        {
+            2: (
+                _stream(
+                    201,
+                    "NFL PATRIOTS HD",
+                    2,
+                ),
+                _stream(
+                    202,
+                    "NFL SEAHAWKS HD",
+                    2,
+                ),
+            ),
+            3: (
+                _stream(
+                    301,
+                    "NFL PATRIOTS HD",
+                    3,
+                ),
+                _stream(
+                    302,
+                    "NFL SEAHAWKS HD",
+                    3,
+                ),
+            ),
+        }
+    )
+
+    event = _event()
+
+    resolution = (
+        resolve_event_live_source_content(
+            event=event,
+            sources=(
+                _source(
+                    "later",
+                    2,
+                    priority=200,
+                ),
+                _source(
+                    "first",
+                    3,
+                    priority=100,
+                ),
+            ),
+            dispatcharr=dispatcharr,  # type: ignore[arg-type]
+        )
+    )
+
+    assert resolution is not None
+    assert resolution.resource_source_ids == (
+        "first",
+        "later",
+    )
+
+    plan = (
+        build_live_source_provisioning_plan(
+            event=event,
+            resolution=resolution,
+        )
+    )
+
+    assert [
+        item.source_id
+        for item
+        in plan.source_streams
+    ] == [
+        "first",
+        "later",
+    ]
+
+    assert [
+        item.stream_ids
+        for item
+        in plan.source_streams
+    ] == [
+        (302, 301),
+        (202, 201),
+    ]
+
+    assert plan.stream_ids == (
+        302,
+        301,
+        202,
+        201,
+    )
+
+
+def test_build_provisioning_plan_rejects_mismatched_event_identity() -> None:
+    dispatcharr = FakeDispatcharr(
+        {
+            2: (
+                _stream(
+                    900,
+                    (
+                        "NFL Seattle Seahawks vs "
+                        "New England Patriots"
+                    ),
+                    2,
+                ),
+            ),
+        }
+    )
+
+    event = _event()
+
+    resolution = (
+        resolve_event_live_source_content(
+            event=event,
+            sources=(
+                _source(
+                    "primary",
+                    2,
+                ),
+            ),
+            dispatcharr=dispatcharr,  # type: ignore[arg-type]
+        )
+    )
+
+    assert resolution is not None
+
+    wrong_event = dict(event)
+    wrong_event[
+        "provider_event_id"
+    ] = "different-event"
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "resolution event identity "
+            "does not match event"
+        ),
+    ):
+        build_live_source_provisioning_plan(
+            event=wrong_event,
+            resolution=resolution,
+        )
+
+
+def test_provisioning_plan_is_secret_and_url_free() -> None:
+    dispatcharr = FakeDispatcharr(
+        {
+            2: (
+                _stream(
+                    900,
+                    (
+                        "NFL Seattle Seahawks vs "
+                        "New England Patriots"
+                    ),
+                    2,
+                ),
+            ),
+        }
+    )
+
+    event = _event()
+
+    resolution = (
+        resolve_event_live_source_content(
+            event=event,
+            sources=(
+                _source(
+                    "primary",
+                    2,
+                ),
+            ),
+            dispatcharr=dispatcharr,  # type: ignore[arg-type]
+        )
+    )
+
+    assert resolution is not None
+
+    plan = (
+        build_live_source_provisioning_plan(
+            event=event,
+            resolution=resolution,
+        )
+    )
+
+    rendered = repr(
+        plan.to_mapping()
+    ).casefold()
+
+    for forbidden in (
+        "password",
+        "username",
+        "server_url",
+        "backend_reference",
+        "access_token",
+        "api_key",
+        "http://",
+        "https://",
+    ):
+        assert forbidden not in rendered
