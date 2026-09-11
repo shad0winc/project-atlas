@@ -293,6 +293,146 @@ def _validate_sports_live_tv_bindings(path: Path) -> str:
     return f"{len(bindings)} bindings"
 
 
+def _validate_sports_dispatcharr_channel_bindings(
+    path: Path,
+) -> str:
+    import json
+
+    if not path.is_file() or path.is_symlink():
+        raise ValueError(
+            "Sports Dispatcharr channel binding "
+            "state is unavailable"
+        )
+
+    try:
+        document = json.loads(
+            path.read_text(encoding="utf-8")
+        )
+    except (
+        OSError,
+        json.JSONDecodeError,
+    ) as exc:
+        raise ValueError(
+            "Sports Dispatcharr channel binding "
+            "state is invalid JSON"
+        ) from exc
+
+    if not isinstance(document, dict):
+        raise ValueError(
+            "Sports Dispatcharr channel binding "
+            "state root must be an object"
+        )
+
+    if set(document) != {
+        "version",
+        "bindings",
+    }:
+        raise ValueError(
+            "Sports Dispatcharr channel binding "
+            "state fields are invalid"
+        )
+
+    if document.get("version") != 1:
+        raise ValueError(
+            "Sports Dispatcharr channel binding "
+            "state version is invalid"
+        )
+
+    bindings = document.get("bindings")
+
+    if not isinstance(bindings, dict):
+        raise ValueError(
+            "Sports Dispatcharr channel bindings "
+            "must be an object"
+        )
+
+    seen_ids: set[int] = set()
+    seen_uuids: set[str] = set()
+
+    for atlas_channel_id, entry in bindings.items():
+        if (
+            not isinstance(atlas_channel_id, str)
+            or not atlas_channel_id.strip()
+            or len(atlas_channel_id.strip()) > 256
+            or any(
+                ord(character) < 32
+                for character in atlas_channel_id.strip()
+            )
+        ):
+            raise ValueError(
+                "Sports Dispatcharr Atlas channel "
+                "identity is invalid"
+            )
+
+        if not isinstance(entry, dict):
+            raise ValueError(
+                "Sports Dispatcharr channel binding "
+                "entry must be an object"
+            )
+
+        if set(entry) != {
+            "dispatcharr_channel_id",
+            "dispatcharr_channel_uuid",
+        }:
+            raise ValueError(
+                "Sports Dispatcharr channel binding "
+                "entry fields are invalid"
+            )
+
+        channel_id = entry.get(
+            "dispatcharr_channel_id"
+        )
+
+        if (
+            isinstance(channel_id, bool)
+            or not isinstance(channel_id, int)
+            or channel_id <= 0
+        ):
+            raise ValueError(
+                "Sports Dispatcharr channel ID "
+                "is invalid"
+            )
+
+        channel_uuid = entry.get(
+            "dispatcharr_channel_uuid"
+        )
+
+        if (
+            not isinstance(channel_uuid, str)
+            or not channel_uuid.strip()
+            or len(channel_uuid.strip()) > 256
+            or any(
+                ord(character) < 32
+                for character in channel_uuid.strip()
+            )
+        ):
+            raise ValueError(
+                "Sports Dispatcharr channel UUID "
+                "is invalid"
+            )
+
+        normalized_uuid = (
+            channel_uuid.strip()
+        )
+
+        if channel_id in seen_ids:
+            raise ValueError(
+                "Sports Dispatcharr channel ID "
+                "is duplicated"
+            )
+
+        if normalized_uuid in seen_uuids:
+            raise ValueError(
+                "Sports Dispatcharr channel UUID "
+                "is duplicated"
+            )
+
+        seen_ids.add(channel_id)
+        seen_uuids.add(normalized_uuid)
+
+    return f"{len(bindings)} bindings"
+
+
 def validate(root: Path, project_root: Path) -> list[tuple[str, str, str]]:
     _require(root.is_dir() and not root.is_symlink(), "staged recovery root is invalid")
     policies = _policies(root)
@@ -339,6 +479,16 @@ def validate(root: Path, project_root: Path) -> list[tuple[str, str, str]]:
             "PASS",
             _validate_sports_live_tv_bindings(
                 state / "sports/live-tv-bindings.json"
+            ),
+        )
+    )
+
+    results.append(
+        (
+            "sports-dispatcharr-channel-bindings",
+            "PASS",
+            _validate_sports_dispatcharr_channel_bindings(
+                state / "sports/dispatcharr-channel-bindings.json"
             ),
         )
     )

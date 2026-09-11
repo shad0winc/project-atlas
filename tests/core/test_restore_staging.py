@@ -24,6 +24,7 @@ SURFACES = (
     ("retention", "state/retention", "required", "directory", True),
     ("sports-subscriptions", "state/sports/subscriptions.json", "required", "file", True),
     ("sports-live-tv-bindings", "state/sports/live-tv-bindings.json", "required", "file", True),
+    ("sports-dispatcharr-channel-bindings", "state/sports/dispatcharr-channel-bindings.json", "required", "file", True),
     ("sports-live-sources", "state/sports/live-sources.json", "required", "file", True),
     ("sports-source-lifecycle", "state/sports/source-lifecycle.json", "required", "file", True),
     ("sports-recordings", "state/sports/recordings.json", "required", "file", True),
@@ -73,6 +74,7 @@ def _build_archive(tmp_path: Path) -> tuple[Path, dict[str, str]]:
         "state/sports/recordings.json": "recordings-v1\n",
         "state/sports/scheduler.json": "sports-scheduler-v1\n",
         "state/sports/live-tv-bindings.json": '{"version":1,"bindings":{}}\n',
+        "state/sports/dispatcharr-channel-bindings.json": '{"version":1,"bindings":{}}\n',
         "state/sports/live-sources.json": '{"version":1,"sources":[]}\n',
         "state/sports/source-lifecycle.json": '{"version":1,"sources":[]}\n',
     }
@@ -334,7 +336,7 @@ def test_restore_plan_maps_only_declared_surfaces(tmp_path: Path) -> None:
 
         assert result.returncode == 0, result.stderr
         rows = [line.split("\t") for line in result.stdout.splitlines() if line]
-        assert len(rows) == 14
+        assert len(rows) == 15
         by_surface = {row[0]: row for row in rows}
         assert set(by_surface) == {surface for surface, *_ in SURFACES}
         assert by_surface["users"][1] == "replace"
@@ -345,6 +347,7 @@ def test_restore_plan_maps_only_declared_surfaces(tmp_path: Path) -> None:
         assert by_surface["runtime-subscribers"][3] == "runtime-events"
         assert by_surface["sports-recordings"][3] == "sports"
         assert by_surface["sports-live-tv-bindings"][3] == "sports"
+        assert by_surface["sports-dispatcharr-channel-bindings"][3] == "sports"
         assert by_surface["sports-live-sources"][3] == "sports"
         assert by_surface["users"][5] == env["ATLAS_USERS_DIR"]
         assert by_surface["scheduler"][5] == env["ATLAS_SCHEDULER_STATE_FILE"]
