@@ -148,7 +148,7 @@ def test_identity_network_is_not_shared_with_public_ingress_services() -> None:
     identity_writer = _service_block(
         content,
         "identity-writer",
-        "caddy",
+        "jellyfin-writer",
     )
 
     identity_network = "      - atlas-identity\n"

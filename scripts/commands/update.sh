@@ -238,7 +238,8 @@ atlas_update_wait_for_ingress_readiness() {
       atlas-api \
       atlas-portal \
       atlas-caddy \
-      atlas-sports-writer
+      atlas-sports-writer \
+      atlas-jellyfin-writer
     do
       state="$(
         atlas_update_ingress_container_state "$container"

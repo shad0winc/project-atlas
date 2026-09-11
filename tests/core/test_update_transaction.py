@@ -714,10 +714,12 @@ def test_readiness_already_healthy_succeeds_immediately(
         "readiness-probe:atlas-portal:running:healthy",
         "readiness-probe:atlas-caddy:running:healthy",
         "readiness-probe:atlas-sports-writer:running:healthy",
+        "readiness-probe:atlas-jellyfin-writer:running:healthy",
         "readiness-probe:atlas-api:running:healthy",
         "readiness-probe:atlas-portal:running:healthy",
         "readiness-probe:atlas-caddy:running:healthy",
         "readiness-probe:atlas-sports-writer:running:healthy",
+        "readiness-probe:atlas-jellyfin-writer:running:healthy",
     ]
 
     assert not any(
