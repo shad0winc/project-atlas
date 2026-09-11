@@ -130,6 +130,17 @@ def prepare_runtime(tmp_path: Path, *, branch: str = "main") -> dict[str, str]:
     )
 
     write_executable(
+        project / "scripts" / "lib" / "sports-dispatcharr-binding-bootstrap.sh",
+        """
+        #!/usr/bin/env bash
+        atlas_sports_dispatcharr_binding_bootstrap_provision() {
+          echo sports-dispatcharr-binding-bootstrap:provision >> "$ATLAS_TEST_EVENTS"
+          return "${ATLAS_TEST_SPORTS_DISPATCHARR_BINDING_BOOTSTRAP_STATUS:-0}"
+        }
+        """,
+    )
+
+    write_executable(
         bin_dir / "git",
         f"""
         #!/usr/bin/env bash
@@ -1154,5 +1165,68 @@ def test_core_update_does_not_run_sports_live_source_bootstrap(
 
     assert (
         "sports-live-source-bootstrap:provision"
+        not in event_lines(environment)
+    )
+
+
+def test_sports_dispatcharr_binding_bootstrap_failure_aborts_before_maintenance(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment[
+        "ATLAS_TEST_SPORTS_DISPATCHARR_BINDING_BOOTSTRAP_STATUS"
+    ] = "1"
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode != 0
+    assert (
+        "Sports Dispatcharr binding bootstrap failed before maintenance"
+        in result.stderr
+    )
+
+    events = event_lines(environment)
+
+    assert "sports-live-source-bootstrap:provision" in events
+    assert "sports-dispatcharr-binding-bootstrap:provision" in events
+    assert "maintenance:enable" not in events
+    assert "backup" not in events
+    assert not lock_path(environment).exists()
+
+
+def test_ingress_dispatcharr_binding_bootstrap_precedes_maintenance_and_backup(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode == 0, result.stderr
+
+    events = event_lines(environment)
+
+    live_source = events.index(
+        "sports-live-source-bootstrap:provision"
+    )
+    binding = events.index(
+        "sports-dispatcharr-binding-bootstrap:provision"
+    )
+    maintenance = events.index("maintenance:enable")
+    backup = events.index("backup")
+
+    assert live_source < binding < maintenance < backup
+
+
+def test_core_update_does_not_run_sports_dispatcharr_binding_bootstrap(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+
+    result = run_update(environment, "core")
+
+    assert result.returncode == 0, result.stderr
+
+    assert (
+        "sports-dispatcharr-binding-bootstrap:provision"
         not in event_lines(environment)
     )
