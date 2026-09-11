@@ -13,6 +13,7 @@ from typing import Any
 from atlas.events import publish_event
 from controller import load_state, process_games
 from feed import generate_feed
+from jellyfin_writer_client import JellyfinWriterClient
 from dispatcharr_admin import DispatcharrAdminClient
 from dispatcharr_channel_bindings import (
     DispatcharrChannelBindingRegistry,
@@ -620,6 +621,15 @@ def run_live_source_provisioning_pipeline(
 
     return reconciled
 
+def refresh_jellyfin_live_tv() -> None:
+    """Refresh Jellyfin Live TV through the private writer."""
+    (
+        JellyfinWriterClient
+        .from_environment()
+        .refresh_live_tv()
+    )
+
+
 def run_operations_pipeline(
     provider_result: dict[str, Any],
     recordings: dict[str, dict[str, Any]],
@@ -676,6 +686,8 @@ def run_operations_pipeline(
         raise RuntimeError(
             "Sports feed generation failed"
         )
+
+    refresh_jellyfin_live_tv()
 
     write_provider_health(
         provider_health
