@@ -37,7 +37,7 @@ services:
 
   atlas-sports-controller:
     build:
-      context: /opt/project-atlas
+      context: "${ATLAS_PROJECT_DIR:-/opt/project-atlas}"
       dockerfile: modules/sports/Dockerfile
       args:
         PUID: "${PUID:?PUID is required}"
@@ -86,7 +86,7 @@ services:
       SPORTS_RECORDING_METADATA_RETENTION_DAYS: "${SPORTS_RECORDING_METADATA_RETENTION_DAYS:-30}"
 
     volumes:
-      - /opt/project-atlas:/opt/project-atlas:ro
+      - "${ATLAS_PROJECT_DIR:-/opt/project-atlas}:/opt/project-atlas:ro"
       - /mnt/storage/configs/sportyfin:/mnt/storage/configs/sportyfin
       - /mnt/storage/media/Sports:/mnt/storage/media/Sports
       - /mnt/storage/configs/atlas/runtime/events.jsonl:/mnt/storage/configs/atlas/runtime/events.jsonl
