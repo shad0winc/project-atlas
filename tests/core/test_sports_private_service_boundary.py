@@ -93,6 +93,13 @@ def _load_private_sports_api_for_failure_test(monkeypatch):
     registry_module = types.ModuleType("providers.registry")
     registry_module.enabled_providers = lambda: []
 
+    dispatcharr_channel_bindings_module = types.ModuleType(
+        "dispatcharr_channel_bindings"
+    )
+    dispatcharr_channel_bindings_module.default_dispatcharr_channel_binding_registry = (
+        lambda: None
+    )
+
     live_tv_bindings_module = types.ModuleType("live_tv_bindings")
 
     class LiveTvBindingError(Exception):
@@ -205,6 +212,11 @@ def _load_private_sports_api_for_failure_test(monkeypatch):
 
     monkeypatch.setitem(sys.modules, "providers", providers_package)
     monkeypatch.setitem(sys.modules, "providers.registry", registry_module)
+    monkeypatch.setitem(
+        sys.modules,
+        "dispatcharr_channel_bindings",
+        dispatcharr_channel_bindings_module,
+    )
     monkeypatch.setitem(sys.modules, "live_tv_bindings", live_tv_bindings_module)
     monkeypatch.setitem(
         sys.modules,

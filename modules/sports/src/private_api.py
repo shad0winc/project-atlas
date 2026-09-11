@@ -10,6 +10,9 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
+from dispatcharr_channel_bindings import (
+    default_dispatcharr_channel_binding_registry,
+)
 from live_tv_bindings import (
     LiveTvBindingError,
     default_live_tv_binding_registry,
@@ -2587,6 +2590,7 @@ def main() -> int:
         )
 
     default_live_source_registry().ensure()
+    default_dispatcharr_channel_binding_registry().ensure()
     default_live_tv_binding_registry().ensure()
     SourceLifecycleStore().ensure()
 

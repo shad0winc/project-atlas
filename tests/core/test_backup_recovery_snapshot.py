@@ -40,6 +40,16 @@ def _write_state(tmp_path: Path) -> dict[str, str]:
         encoding="utf-8",
     )
 
+    dispatcharr_channel_bindings = (
+        Path(env["SPORTS_CONFIG_DIR"])
+        / "state"
+        / "dispatcharr-channel-bindings.json"
+    )
+    dispatcharr_channel_bindings.write_text(
+        '{"version":1,"bindings":{}}\n',
+        encoding="utf-8",
+    )
+
     live_sources = (
         Path(env["SPORTS_CONFIG_DIR"])
         / "state"
@@ -112,6 +122,7 @@ def test_snapshot_captures_every_required_surface(tmp_path: Path) -> None:
         "state/retention/state.json",
         "state/sports/subscriptions.json",
         "state/sports/live-tv-bindings.json",
+        "state/sports/dispatcharr-channel-bindings.json",
         "state/sports/live-sources.json",
         "state/sports/source-lifecycle.json",
         "state/sports/recordings.json",
