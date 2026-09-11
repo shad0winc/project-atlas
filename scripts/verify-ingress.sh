@@ -188,7 +188,8 @@ for container in \
   atlas-caddy \
   atlas-api \
   atlas-portal \
-  atlas-sports-writer
+  atlas-sports-writer \
+  atlas-jellyfin-writer
 do
   if docker inspect "$container" >/dev/null 2>&1; then
     pass "$container container present"

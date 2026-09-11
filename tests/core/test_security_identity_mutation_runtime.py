@@ -27,7 +27,7 @@ def test_identity_writer_is_private_and_least_privileged() -> None:
     writer = _service_block(
         content,
         "identity-writer",
-        "caddy",
+        "jellyfin-writer",
     )
 
     assert "      - atlas-identity\n" in writer
@@ -74,7 +74,7 @@ def test_identity_writer_uses_canonical_identity_paths() -> None:
     writer = _service_block(
         content,
         "identity-writer",
-        "caddy",
+        "jellyfin-writer",
     )
 
     assert (
@@ -97,7 +97,7 @@ def test_identity_writer_requires_dedicated_service_authentication() -> None:
     writer = _service_block(
         content,
         "identity-writer",
-        "caddy",
+        "jellyfin-writer",
     )
 
     assert (
