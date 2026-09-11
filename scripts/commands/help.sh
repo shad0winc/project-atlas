@@ -88,6 +88,7 @@ Maintenance
   atlas update <core|ingress|all> --migration none
   atlas deployment status
   atlas deployment baseline
+  atlas deployment recover-failed-before-apply <deployment-id>
   atlas deployment rollback <deployment-id>
   atlas maintenance status
   atlas maintenance enable
