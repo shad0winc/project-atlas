@@ -150,6 +150,7 @@ class DispatcharrAdminClient:
         self._timeout_seconds = (
             timeout_seconds
         )
+        self._cached_access_token: str | None = None
 
         if not self._base_url:
             raise DispatcharrAdminError(
@@ -266,6 +267,9 @@ class DispatcharrAdminClient:
             ) from error
 
     def _access_token(self) -> str:
+        if self._cached_access_token is not None:
+            return self._cached_access_token
+
         payload = self._json_request(
             "POST",
             "/api/accounts/auth/login/",
@@ -301,6 +305,7 @@ class DispatcharrAdminClient:
                 "did not return an access token."
             )
 
+        self._cached_access_token = access
         return access
 
     def _raw_account(
