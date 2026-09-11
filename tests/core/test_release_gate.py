@@ -104,7 +104,7 @@ def test_procedure_records_reconciled_v1_tag_state() -> None:
 # M-023.24.5 clean-runner portability contracts
 
 
-def test_atlas_cli_supports_explicit_project_root() -> None:
+def test_atlas_cli_defaults_to_invoked_checkout_and_supports_override() -> None:
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[2]
@@ -112,9 +112,15 @@ def test_atlas_cli_supports_explicit_project_root() -> None:
         encoding="utf-8",
     )
 
+    assert 'if [[ -n "${ATLAS_PROJECT_DIR:-}" ]]; then' in content
+    assert 'PROJECT_DIR="$ATLAS_PROJECT_DIR"' in content
+    assert (
+        'cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."'
+        in content
+    )
     assert (
         'PROJECT_DIR="${ATLAS_PROJECT_DIR:-/opt/project-atlas}"'
-        in content
+        not in content
     )
 
 
