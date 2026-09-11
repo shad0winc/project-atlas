@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import html
 import json
 import os
@@ -11,6 +10,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from jellyfin_channel_identity import (
+    ATLAS_JELLYFIN_CHANNEL_NUMBER_BASE,
+    ATLAS_JELLYFIN_CHANNEL_NUMBER_SLOTS,
+    atlas_jellyfin_channel_number,
+)
 from lifecycle import should_surface_game
 from live_sources import (
     LiveSourceCatalog,
@@ -196,41 +200,6 @@ def programme_stop(game: dict[str, Any]) -> str:
     ).strftime("%Y%m%d%H%M%S +0000")
 
 
-ATLAS_JELLYFIN_CHANNEL_NUMBER_BASE = 900_000_000
-ATLAS_JELLYFIN_CHANNEL_NUMBER_SLOTS = 100_000_000
-
-
-def atlas_jellyfin_channel_number(
-    atlas_channel_id: str,
-) -> str:
-    """Return a stable reserved Jellyfin channel number."""
-
-    normalized = str(atlas_channel_id).strip()
-
-    if not normalized:
-        raise ValueError(
-            "atlas_channel_id is required"
-        )
-
-    digest = hashlib.sha256(
-        normalized.encode("utf-8")
-    ).digest()
-
-    slot = (
-        int.from_bytes(
-            digest[:8],
-            byteorder="big",
-            signed=False,
-        )
-        % ATLAS_JELLYFIN_CHANNEL_NUMBER_SLOTS
-    )
-
-    return str(
-        ATLAS_JELLYFIN_CHANNEL_NUMBER_BASE
-        + slot
-    )
-
-
 def render_m3u(
     games: list[dict[str, Any]],
 ) -> str:
@@ -358,7 +327,46 @@ def write_atomic(
     temporary.replace(destination)
 
 
-def generate_feed() -> int:
+def published_atlas_channel_ids(
+    games: list[dict[str, Any]],
+) -> tuple[str, ...]:
+    """Return the exact Atlas channels represented in the M3U."""
+
+    channel_ids: list[str] = []
+    seen: set[str] = set()
+
+    for game in games:
+        if not stream_url(game):
+            continue
+
+        channel_id = str(
+            game.get("_atlas_channel_id")
+            or f"sports-{game['id']}"
+        ).strip()
+
+        if not channel_id:
+            raise ValueError(
+                "Atlas Sports channel identity is required"
+            )
+
+        if channel_id in seen:
+            raise ValueError(
+                "duplicate Atlas Sports channel identity"
+            )
+
+        seen.add(
+            channel_id
+        )
+        channel_ids.append(
+            channel_id
+        )
+
+    return tuple(
+        channel_ids
+    )
+
+
+def generate_feed_snapshot() -> tuple[int, tuple[str, ...]]:
     OUTPUT_DIR.mkdir(
         parents=True,
         exist_ok=True,
@@ -402,7 +410,22 @@ def generate_feed() -> int:
         f"{len(games)} authorized live channel(s)"
     )
 
-    return 0
+    return (
+        0,
+        published_atlas_channel_ids(
+            games
+        ),
+    )
+
+
+def generate_feed() -> int:
+    """Generate the public Sports feed using the legacy status API."""
+
+    status_code, _channel_ids = (
+        generate_feed_snapshot()
+    )
+
+    return status_code
 
 
 def main() -> int:

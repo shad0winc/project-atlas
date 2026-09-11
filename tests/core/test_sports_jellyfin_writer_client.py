@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import importlib
 import sys
 import urllib.error
@@ -402,10 +403,13 @@ def test_operations_refresh_after_feed_before_health(
 
     monkeypatch.setattr(
         worker,
-        "generate_feed",
+        "generate_feed_snapshot",
         lambda: (
             order.append("feed")
-            or 0
+            or (
+                0,
+                ("sports-live-current",),
+            )
         ),
     )
 
@@ -414,6 +418,14 @@ def test_operations_refresh_after_feed_before_health(
         "refresh_jellyfin_live_tv",
         lambda: order.append(
             "refresh"
+        ),
+    )
+
+    monkeypatch.setattr(
+        worker,
+        "converge_jellyfin_live_tv_bindings",
+        lambda channel_ids: (
+            order.append("bind")
         ),
     )
 
@@ -461,6 +473,7 @@ def test_operations_refresh_after_feed_before_health(
         "provision",
         "feed",
         "refresh",
+        "bind",
         "provider-health",
         "heartbeat",
         "health-report",
@@ -497,8 +510,11 @@ def test_writer_failure_prevents_health_and_heartbeat(
 
     monkeypatch.setattr(
         worker,
-        "generate_feed",
-        lambda: 0,
+        "generate_feed_snapshot",
+        lambda: (
+            0,
+            ("sports-live-current",),
+        ),
     )
 
     def fail_refresh() -> None:
@@ -549,3 +565,219 @@ def test_writer_failure_prevents_health_and_heartbeat(
         )
 
     assert later_calls == []
+
+
+def test_inventory_get_returns_only_safe_channel_identity() -> None:
+    import jellyfin_writer_client as module
+
+    seen: dict[str, object] = {}
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def read(self):
+            return json.dumps(
+                {
+                    "channels": [
+                        {
+                            "item_id": "jellyfin-one",
+                            "channel_number": "912345678",
+                        },
+                        {
+                            "item_id": "jellyfin-two",
+                            "channel_number": None,
+                        },
+                    ]
+                }
+            ).encode()
+
+    def opener(request, *, timeout):
+        seen["url"] = request.full_url
+        seen["method"] = request.get_method()
+        seen["authorization"] = request.get_header(
+            "Authorization"
+        )
+        seen["timeout"] = timeout
+        return Response()
+
+    client = module.JellyfinWriterClient(
+        base_url="http://writer:8004",
+        token="writer-token",
+        timeout_seconds=19,
+        opener=opener,
+    )
+
+    channels = client.list_live_tv_channels()
+
+    assert channels == (
+        module.JellyfinLiveTvChannel(
+            item_id="jellyfin-one",
+            channel_number="912345678",
+        ),
+        module.JellyfinLiveTvChannel(
+            item_id="jellyfin-two",
+            channel_number=None,
+        ),
+    )
+
+    assert seen == {
+        "url": (
+            "http://writer:8004"
+            "/internal/v1/jellyfin/live-tv/channels"
+        ),
+        "method": "GET",
+        "authorization": "Bearer writer-token",
+        "timeout": 19.0,
+    }
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        {"channels": {}},
+        {"channels": [{"item_id": "one"}]},
+        {
+            "channels": [
+                {
+                    "item_id": "",
+                    "channel_number": "900000001",
+                }
+            ]
+        },
+        {
+            "channels": [
+                {
+                    "item_id": "one",
+                    "channel_number": 900000001,
+                }
+            ]
+        },
+        {
+            "channels": [
+                {
+                    "item_id": "one",
+                    "channel_number": "",
+                }
+            ]
+        },
+        {
+            "channels": [
+                {
+                    "item_id": "one",
+                    "channel_number": "900000001",
+                    "name": "must-not-be-accepted",
+                }
+            ]
+        },
+    ],
+)
+def test_inventory_rejects_invalid_response_shape(
+    payload,
+) -> None:
+    import jellyfin_writer_client as module
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def read(self):
+            return json.dumps(
+                payload
+            ).encode()
+
+    client = module.JellyfinWriterClient(
+        base_url="http://writer:8004",
+        token="writer-token",
+        opener=lambda *_args, **_kwargs: Response(),
+    )
+
+    with pytest.raises(
+        module.JellyfinWriterClientError,
+        match="invalid Live TV inventory",
+    ):
+        client.list_live_tv_channels()
+
+
+def test_inventory_rejects_duplicate_jellyfin_item_ids() -> None:
+    import jellyfin_writer_client as module
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def read(self):
+            return json.dumps(
+                {
+                    "channels": [
+                        {
+                            "item_id": "ABC",
+                            "channel_number": "900000001",
+                        },
+                        {
+                            "item_id": "abc",
+                            "channel_number": "900000002",
+                        },
+                    ]
+                }
+            ).encode()
+
+    client = module.JellyfinWriterClient(
+        base_url="http://writer:8004",
+        token="writer-token",
+        opener=lambda *_args, **_kwargs: Response(),
+    )
+
+    with pytest.raises(
+        module.JellyfinWriterClientError,
+        match="duplicate Live TV item identity",
+    ):
+        client.list_live_tv_channels()
+
+
+def test_inventory_http_failure_is_sanitized() -> None:
+    import urllib.error
+    import jellyfin_writer_client as module
+
+    secret = "upstream-secret-detail"
+
+    def opener(*_args, **_kwargs):
+        raise urllib.error.HTTPError(
+            "http://writer:8004/"
+            + secret,
+            502,
+            secret,
+            {},
+            None,
+        )
+
+    client = module.JellyfinWriterClient(
+        base_url="http://writer:8004",
+        token="writer-token",
+        opener=opener,
+    )
+
+    with pytest.raises(
+        module.JellyfinWriterClientError
+    ) as captured:
+        client.list_live_tv_channels()
+
+    message = str(
+        captured.value
+    )
+
+    assert secret not in message
+    assert (
+        message
+        == "Jellyfin writer request failed."
+    )

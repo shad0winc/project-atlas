@@ -140,3 +140,150 @@ def test_ensure_creates_versioned_empty_state(
         "version": 1,
         "bindings": {},
     }
+
+
+def test_set_many_commits_complete_mapping(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "bindings.json"
+    registry = LiveTvBindingRegistry(
+        path
+    )
+
+    result = registry.set_many(
+        {
+            "sports-a": "jellyfin-a",
+            "sports-b": "jellyfin-b",
+        }
+    )
+
+    assert tuple(
+        binding.safe_dict()
+        for binding in result
+    ) == (
+        {
+            "atlas_channel_id": "sports-a",
+            "jellyfin_item_id": "jellyfin-a",
+        },
+        {
+            "atlas_channel_id": "sports-b",
+            "jellyfin_item_id": "jellyfin-b",
+        },
+    )
+
+    assert registry.resolve(
+        "sports-a"
+    ) == "jellyfin-a"
+
+    assert registry.resolve(
+        "sports-b"
+    ) == "jellyfin-b"
+
+
+def test_set_many_preserves_unrelated_existing_bindings(
+    tmp_path: Path,
+) -> None:
+    registry = LiveTvBindingRegistry(
+        tmp_path / "bindings.json"
+    )
+
+    registry.set(
+        "existing",
+        "jellyfin-existing",
+    )
+
+    registry.set_many(
+        {
+            "sports-a": "jellyfin-a",
+            "sports-b": "jellyfin-b",
+        }
+    )
+
+    assert registry.resolve(
+        "existing"
+    ) == "jellyfin-existing"
+
+
+def test_set_many_rejects_duplicate_proposed_jellyfin_items_without_write(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "bindings.json"
+    registry = LiveTvBindingRegistry(
+        path
+    )
+
+    registry.set(
+        "existing",
+        "jellyfin-existing",
+    )
+
+    before = path.read_bytes()
+
+    with pytest.raises(
+        LiveTvBindingError,
+        match="cannot bind to multiple",
+    ):
+        registry.set_many(
+            {
+                "sports-a": "jellyfin-same",
+                "sports-b": "jellyfin-same",
+            }
+        )
+
+    assert path.read_bytes() == before
+    assert registry.resolve(
+        "sports-a"
+    ) is None
+    assert registry.resolve(
+        "sports-b"
+    ) is None
+
+
+def test_set_many_rejects_existing_cross_channel_conflict_without_write(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "bindings.json"
+    registry = LiveTvBindingRegistry(
+        path
+    )
+
+    registry.set(
+        "existing",
+        "jellyfin-existing",
+    )
+
+    before = path.read_bytes()
+
+    with pytest.raises(
+        LiveTvBindingError,
+        match="already bound",
+    ):
+        registry.set_many(
+            {
+                "sports-a": "jellyfin-existing",
+                "sports-b": "jellyfin-b",
+            }
+        )
+
+    assert path.read_bytes() == before
+    assert registry.resolve(
+        "sports-a"
+    ) is None
+    assert registry.resolve(
+        "sports-b"
+    ) is None
+
+
+def test_set_many_empty_mapping_is_noop(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "bindings.json"
+    registry = LiveTvBindingRegistry(
+        path
+    )
+
+    assert registry.set_many(
+        {}
+    ) == ()
+
+    assert not path.exists()

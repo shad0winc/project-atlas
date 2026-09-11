@@ -380,13 +380,26 @@ def test_operations_provisions_only_current_subscribed_games(
     )
     monkeypatch.setattr(
         worker,
-        "generate_feed",
-        lambda: order.append("feed") or 0,
+        "generate_feed_snapshot",
+        lambda: (
+            order.append("feed")
+            or (
+                0,
+                ("sports-live-current",),
+            )
+        ),
     )
     monkeypatch.setattr(
         worker,
         "refresh_jellyfin_live_tv",
         lambda: order.append("refresh"),
+    )
+    monkeypatch.setattr(
+        worker,
+        "converge_jellyfin_live_tv_bindings",
+        lambda channel_ids: (
+            order.append("bind")
+        ),
     )
     monkeypatch.setattr(
         worker,
@@ -425,6 +438,7 @@ def test_operations_provisions_only_current_subscribed_games(
         "provision",
         "feed",
         "refresh",
+        "bind",
     ]
 
 
@@ -690,7 +704,7 @@ def test_operations_do_not_generate_feed_when_provisioning_fails(
 
     monkeypatch.setattr(
         worker,
-        "generate_feed",
+        "generate_feed_snapshot",
         unexpected_feed,
     )
 
@@ -739,13 +753,339 @@ def test_operations_propagate_feed_generation_failure_after_provisioning(
     )
     monkeypatch.setattr(
         worker,
-        "generate_feed",
-        lambda: 1,
+        "generate_feed_snapshot",
+        lambda: (1, ()),
     )
 
     with pytest.raises(
         RuntimeError,
         match="Sports feed generation failed",
+    ):
+        worker.run_operations_pipeline(
+            provider_result,
+            {},
+        )
+
+
+def test_binding_plan_matches_exact_numeric_identity() -> None:
+    worker = _worker()
+
+    atlas_id = "sports-live-authorized-game"
+
+    expected_number = (
+        worker.atlas_jellyfin_channel_number(
+            atlas_id
+        )
+    )
+
+    result = (
+        worker.build_jellyfin_live_tv_binding_plan(
+            (atlas_id,),
+            (
+                worker.JellyfinLiveTvChannel(
+                    item_id="jellyfin-exact",
+                    channel_number=expected_number,
+                ),
+                worker.JellyfinLiveTvChannel(
+                    item_id="jellyfin-other",
+                    channel_number="900000001",
+                ),
+            ),
+        )
+    )
+
+    assert result == {
+        atlas_id: "jellyfin-exact"
+    }
+
+
+def test_binding_plan_fails_when_numeric_identity_is_missing() -> None:
+    worker = _worker()
+
+    with pytest.raises(
+        worker.JellyfinLiveTvBindingConvergenceError,
+        match="missing",
+    ):
+        worker.build_jellyfin_live_tv_binding_plan(
+            ("sports-live-missing",),
+            (),
+        )
+
+
+def test_binding_plan_fails_when_numeric_identity_is_ambiguous() -> None:
+    worker = _worker()
+
+    atlas_id = "sports-live-ambiguous"
+
+    expected_number = (
+        worker.atlas_jellyfin_channel_number(
+            atlas_id
+        )
+    )
+
+    with pytest.raises(
+        worker.JellyfinLiveTvBindingConvergenceError,
+        match="ambiguous",
+    ):
+        worker.build_jellyfin_live_tv_binding_plan(
+            (atlas_id,),
+            (
+                worker.JellyfinLiveTvChannel(
+                    item_id="jellyfin-one",
+                    channel_number=expected_number,
+                ),
+                worker.JellyfinLiveTvChannel(
+                    item_id="jellyfin-two",
+                    channel_number=expected_number,
+                ),
+            ),
+        )
+
+
+def test_binding_plan_fails_on_projected_number_collision(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    worker = _worker()
+
+    monkeypatch.setattr(
+        worker,
+        "atlas_jellyfin_channel_number",
+        lambda _atlas_id: "900000001",
+    )
+
+    with pytest.raises(
+        worker.JellyfinLiveTvBindingConvergenceError,
+        match="collision",
+    ):
+        worker.build_jellyfin_live_tv_binding_plan(
+            (
+                "sports-live-one",
+                "sports-live-two",
+            ),
+            (),
+        )
+
+
+def test_binding_plan_rejects_duplicate_atlas_identity() -> None:
+    worker = _worker()
+
+    with pytest.raises(
+        worker.JellyfinLiveTvBindingConvergenceError,
+        match="duplicated",
+    ):
+        worker.build_jellyfin_live_tv_binding_plan(
+            (
+                "sports-live-one",
+                "sports-live-one",
+            ),
+            (),
+        )
+
+
+def test_convergence_preflights_then_performs_one_batch_write() -> None:
+    worker = _worker()
+
+    atlas_one = "sports-live-one"
+    atlas_two = "sports-live-two"
+
+    number_one = (
+        worker.atlas_jellyfin_channel_number(
+            atlas_one
+        )
+    )
+    number_two = (
+        worker.atlas_jellyfin_channel_number(
+            atlas_two
+        )
+    )
+
+    calls: list[object] = []
+
+    class Client:
+        def list_live_tv_channels(self):
+            calls.append("inventory")
+
+            return (
+                worker.JellyfinLiveTvChannel(
+                    item_id="jellyfin-one",
+                    channel_number=number_one,
+                ),
+                worker.JellyfinLiveTvChannel(
+                    item_id="jellyfin-two",
+                    channel_number=number_two,
+                ),
+            )
+
+    class Registry:
+        def set_many(self, proposed):
+            calls.append(
+                ("set-many", dict(proposed))
+            )
+
+    result = worker.converge_jellyfin_live_tv_bindings(
+        (
+            atlas_one,
+            atlas_two,
+        ),
+        client=Client(),
+        bindings=Registry(),
+    )
+
+    assert result == 2
+    assert calls == [
+        "inventory",
+        (
+            "set-many",
+            {
+                atlas_one: "jellyfin-one",
+                atlas_two: "jellyfin-two",
+            },
+        ),
+    ]
+
+
+def test_ambiguous_inventory_never_writes_binding_batch() -> None:
+    worker = _worker()
+
+    atlas_id = "sports-live-one"
+
+    number = (
+        worker.atlas_jellyfin_channel_number(
+            atlas_id
+        )
+    )
+
+    class Client:
+        def list_live_tv_channels(self):
+            return (
+                worker.JellyfinLiveTvChannel(
+                    item_id="jellyfin-one",
+                    channel_number=number,
+                ),
+                worker.JellyfinLiveTvChannel(
+                    item_id="jellyfin-two",
+                    channel_number=number,
+                ),
+            )
+
+    class Registry:
+        def set_many(self, _proposed):
+            raise AssertionError(
+                "binding state must not mutate "
+                "after ambiguous inventory"
+            )
+
+    with pytest.raises(
+        worker.JellyfinLiveTvBindingConvergenceError,
+        match="ambiguous",
+    ):
+        worker.converge_jellyfin_live_tv_bindings(
+            (atlas_id,),
+            client=Client(),
+            bindings=Registry(),
+        )
+
+
+def test_empty_published_feed_skips_inventory_and_binding_write() -> None:
+    worker = _worker()
+
+    class Client:
+        def list_live_tv_channels(self):
+            raise AssertionError(
+                "empty published feed must not read inventory"
+            )
+
+    class Registry:
+        def set_many(self, _proposed):
+            raise AssertionError(
+                "empty published feed must not write bindings"
+            )
+
+    assert (
+        worker.converge_jellyfin_live_tv_bindings(
+            (),
+            client=Client(),
+            bindings=Registry(),
+        )
+        == 0
+    )
+
+
+def test_binding_failure_occurs_before_provider_health(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    worker = _worker()
+
+    current = _live_game(
+        "current-game"
+    )
+
+    provider_result = {
+        "previous_games": {},
+        "subscribed_previous_games": {},
+        "provider_games": [current],
+        "provider_health": {},
+        "subscribed_games": [current],
+        "degraded_count": 0,
+    }
+
+    monkeypatch.setattr(
+        worker,
+        "prune_unmanaged_games",
+        lambda *args, **kwargs: 0,
+    )
+    monkeypatch.setattr(
+        worker,
+        "process_games",
+        lambda games, *, publish_feed: {
+            "current-game": current,
+        },
+    )
+    monkeypatch.setattr(
+        worker,
+        "run_live_source_provisioning_pipeline",
+        lambda games: 1,
+    )
+    monkeypatch.setattr(
+        worker,
+        "generate_feed_snapshot",
+        lambda: (
+            0,
+            ("sports-live-current",),
+        ),
+    )
+    monkeypatch.setattr(
+        worker,
+        "refresh_jellyfin_live_tv",
+        lambda: None,
+    )
+
+    def fail_binding(_channel_ids):
+        raise RuntimeError(
+            "synthetic binding convergence failure"
+        )
+
+    monkeypatch.setattr(
+        worker,
+        "converge_jellyfin_live_tv_bindings",
+        fail_binding,
+    )
+
+    def unexpected_health(*_args, **_kwargs):
+        raise AssertionError(
+            "provider health must not publish after "
+            "binding convergence failure"
+        )
+
+    monkeypatch.setattr(
+        worker,
+        "write_provider_health",
+        unexpected_health,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="synthetic binding convergence failure",
     ):
         worker.run_operations_pipeline(
             provider_result,
