@@ -39,42 +39,47 @@ def prepare_cli(tmp_path: Path) -> tuple[Path, Path]:
         PROJECT_ROOT / "scripts" / "commands" / "help.sh",
         commands / "help.sh",
     )
-    shutil.copy2(
-        PROJECT_ROOT / "scripts" / "lib" / "common.sh",
-        lib / "common.sh",
-    )
+    for library_name in (
+        "common.sh",
+        "config.sh",
+        "output.sh",
+        "modules.sh",
+        "events.sh",
+        "health.sh",
+    ):
+        shutil.copy2(
+            PROJECT_ROOT / "scripts" / "lib" / library_name,
+            lib / library_name,
+        )
 
     # The root dispatcher sources every registered command module.
     # Stub unrelated modules so this fixture owns only Sustained Use.
-    command_names = (
-        "version",
-        "status",
-        "services",
-        "service",
-        "urls",
-        "git",
-        "restart",
-        "logs",
-        "ari",
-        "module",
-        "event",
-        "verify",
-        "doctor",
-        "update",
-        "maintenance",
-        "deployment",
-        "backup",
-        "restore",
-        "test",
-        "health",
-        "scheduler",
-        "user",
-        "invite",
-        "favorite",
-        "retention",
-        "cleanup",
-        "discovery",
-        "operations",
+    dispatcher = (
+        PROJECT_ROOT / "scripts" / "atlas"
+    ).read_text(
+        encoding="utf-8",
+    ).splitlines()
+
+    source_prefix = (
+        'source "$ATLAS_CLI_ROOT/commands/'
+    )
+    source_suffix = '.sh"'
+
+    command_names = tuple(
+        line[
+            len(source_prefix):
+            -len(source_suffix)
+        ]
+        for line in dispatcher
+        if (
+            line.startswith(source_prefix)
+            and line.endswith(source_suffix)
+            and line[
+                len(source_prefix):
+                -len(source_suffix)
+            ]
+            not in {"help", "sustained-use"}
+        )
     )
 
     for command_name in command_names:
