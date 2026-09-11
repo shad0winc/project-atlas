@@ -9,12 +9,22 @@ def test_playback_origin_uses_internal_forward_auth() -> None:
     assert "playback.shadowinc.co {" in source
     assert "forward_auth atlas-api:8000" in source
     assert "uri /_atlas/playback/authorize" in source
-    assert "copy_headers X-Atlas-Jellyfin-Token" in source
+    assert (
+        "copy_headers X-Atlas-Jellyfin-Authorization"
+        in source
+    )
     assert "reverse_proxy jellyfin:8096" in source
     assert (
-        "header_up X-Emby-Token "
-        "{http.request.header.X-Atlas-Jellyfin-Token}"
+        "header_up Authorization "
+        "{http.request.header."
+        "X-Atlas-Jellyfin-Authorization}"
     ) in source
+    assert (
+        "header_up -X-Atlas-Jellyfin-Authorization"
+        in source
+    )
+    assert "X-Emby-Token" not in source
+    assert "X-Atlas-Jellyfin-Token" not in source
     assert "header_down -Access-Control-Allow-Origin" in source
     assert "header_down -Access-Control-Allow-Credentials" in source
 
