@@ -66,12 +66,17 @@ def test_recovery_verifies_runtime_before_disabling_maintenance() -> None:
     assert verify_index < disable_index
 
 
-def test_recovery_reverifies_after_public_reopen() -> None:
+def test_recovery_reverifies_baseline_after_public_reopen() -> None:
     section = recovery_section()
 
     assert section.count("atlas_deployment_verify_runtime") >= 2
-    assert "atlas_command_doctor" in section
-    assert "atlas_command_verify" in section
+    assert section.count("atlas_command_doctor") >= 2
+
+    # Failed-before-apply recovery certifies the recorded previous
+    # baseline. Current-main release readiness can legitimately require
+    # services that did not exist in that baseline.
+    assert "atlas_command_verify" not in section
+    assert "verify-ingress.sh" not in section
 
 
 def test_recovery_reenables_maintenance_if_public_verification_fails() -> None:
@@ -193,7 +198,8 @@ def _run_recovery_behavior(
     verify_ingress.write_text(
         """#!/usr/bin/env bash
 set -euo pipefail
-printf '%s\\n' 'ingress' >> "$ATLAS_TEST_EVENTS"
+printf '%s\\n' 'CURRENT_RELEASE_INGRESS_VERIFIER_CALLED' >> "$ATLAS_TEST_EVENTS"
+exit 97
 """,
         encoding="utf-8",
     )
@@ -280,18 +286,8 @@ printf '%s\\n' 'ingress' >> "$ATLAS_TEST_EVENTS"
     }
 
     atlas_command_verify() {
-      printf '%s\n' 'verify' >> "$ATLAS_TEST_EVENTS"
-
-      verify_command_count="$(
-        awk '$0 == "verify" {count++} END {print count + 0}' \
-          "$ATLAS_TEST_EVENTS"
-      )"
-
-      if [[ "$verify_command_count" -gt 1 ]]; then
-        return "$ATLAS_TEST_POST_VERIFY_RESULT"
-      fi
-
-      return 0
+      printf '%s\n' 'CURRENT_RELEASE_VERIFY_CALLED' >> "$ATLAS_TEST_EVENTS"
+      return 96
     }
 
     atlas_command_maintenance() {
@@ -458,33 +454,22 @@ def test_recovery_behavior_runtime_failure_keeps_maintenance_and_lock(
     ).read_text(encoding="utf-8").strip() == "failed"
 
 
-def test_recovery_behavior_public_verification_failure_restores_maintenance(
+def test_recovery_behavior_ignores_current_release_readiness(
     tmp_path: Path,
 ) -> None:
-    result, events, root = _run_recovery_behavior(
-        tmp_path,
-        post_verify_result=1,
-    )
+    result, events, root = _run_recovery_behavior(tmp_path)
 
-    assert result.returncode != 0
+    assert result.returncode == 0, result.stderr
 
-    assert events == [
-        "runtime:1",
-        "doctor",
-        "verify",
-        "ingress",
-        "maintenance:disable",
-        "doctor",
-        "verify",
-        "maintenance:enable",
-    ]
+    assert "CURRENT_RELEASE_VERIFY_CALLED" not in events
+    assert "CURRENT_RELEASE_INGRESS_VERIFIER_CALLED" not in events
 
-    assert (root / "update.lock").is_dir()
-    assert (tmp_path / "maintenance.flag").is_file()
+    assert not (root / "update.lock").exists()
+    assert not (tmp_path / "maintenance.flag").exists()
 
     assert (
         root / "records" / "update-test" / "status"
-    ).read_text(encoding="utf-8").strip() == "failed"
+    ).read_text(encoding="utf-8").strip() == "recovered_pre_apply"
 
 
 def test_recovery_behavior_success_orders_reopen_finalize_and_release(
@@ -497,12 +482,8 @@ def test_recovery_behavior_success_orders_reopen_finalize_and_release(
     assert events == [
         "runtime:1",
         "doctor",
-        "verify",
-        "ingress",
         "maintenance:disable",
         "doctor",
-        "verify",
-        "ingress",
         "runtime:2",
         "status:recovered_pre_apply",
         "release",
