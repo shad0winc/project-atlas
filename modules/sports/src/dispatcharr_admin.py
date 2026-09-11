@@ -6,6 +6,8 @@ this module. Atlas lifecycle metadata must not contain these values.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 import json
 import os
 import urllib.error
@@ -27,6 +29,14 @@ class DispatcharrAccountNotFoundError(
     DispatcharrAdminError
 ):
     """Requested Dispatcharr account does not exist."""
+
+
+
+
+class DispatcharrChannelNotFoundError(
+    DispatcharrAdminError
+):
+    """Requested Dispatcharr channel does not exist."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +80,28 @@ class SafeDispatcharrStream:
             "m3u_account_id": self.m3u_account_id,
             "group_name": self.group_name,
             "is_stale": self.is_stale,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SafeDispatcharrChannel:
+    """Secret-free Dispatcharr channel identity."""
+
+    channel_id: int
+    channel_uuid: str
+    name: str
+    stream_ids: tuple[int, ...]
+
+    def to_mapping(
+        self,
+    ) -> dict[str, Any]:
+        return {
+            "channel_id": self.channel_id,
+            "channel_uuid": self.channel_uuid,
+            "name": self.name,
+            "stream_ids": list(
+                self.stream_ids
+            ),
         }
 
 
@@ -942,6 +974,243 @@ class DispatcharrAdminClient:
 
         return streams
 
+    @classmethod
+    def _channel_stream_ids(
+        cls,
+        values: object,
+    ) -> tuple[int, ...]:
+        """Normalize one non-empty ordered Dispatcharr stream list."""
+
+        if (
+            isinstance(
+                values,
+                (str, bytes, Mapping),
+            )
+            or not isinstance(
+                values,
+                Iterable,
+            )
+        ):
+            raise DispatcharrAdminError(
+                "Dispatcharr channel streams "
+                "must be an ordered collection."
+            )
+
+        normalized: list[int] = []
+        seen: set[int] = set()
+
+        for value in values:
+            stream_id = cls._positive_identifier(
+                value,
+                field="stream identifier",
+            )
+
+            if stream_id in seen:
+                raise DispatcharrAdminError(
+                    "Dispatcharr channel streams "
+                    "must not contain duplicates."
+                )
+
+            seen.add(stream_id)
+            normalized.append(
+                stream_id
+            )
+
+        if not normalized:
+            raise DispatcharrAdminError(
+                "Dispatcharr channel requires "
+                "at least one stream."
+            )
+
+        return tuple(normalized)
+
+    @classmethod
+    def _safe_channel(
+        cls,
+        payload: object,
+    ) -> SafeDispatcharrChannel:
+        """Return only safe channel identity and ordered stream IDs."""
+
+        if not isinstance(
+            payload,
+            Mapping,
+        ):
+            raise DispatcharrAdminError(
+                "Dispatcharr returned an invalid "
+                "channel response."
+            )
+
+        channel_id = cls._positive_identifier(
+            payload.get("id"),
+            field="channel identifier",
+        )
+
+        raw_uuid = payload.get(
+            "uuid"
+        )
+
+        if (
+            not isinstance(raw_uuid, str)
+            or not raw_uuid.strip()
+        ):
+            raise DispatcharrAdminError(
+                "Dispatcharr returned an invalid "
+                "channel UUID."
+            )
+
+        raw_name = payload.get(
+            "name"
+        )
+
+        if (
+            not isinstance(raw_name, str)
+            or not raw_name.strip()
+        ):
+            raise DispatcharrAdminError(
+                "Dispatcharr returned an invalid "
+                "channel name."
+            )
+
+        stream_ids = (
+            cls._channel_stream_ids(
+                payload.get(
+                    "streams",
+                    (),
+                )
+            )
+        )
+
+        return SafeDispatcharrChannel(
+            channel_id=channel_id,
+            channel_uuid=(
+                raw_uuid.strip()
+            ),
+            name=raw_name.strip(),
+            stream_ids=stream_ids,
+        )
+
+    def create_channel(
+        self,
+        *,
+        name: str,
+        stream_ids: Iterable[int],
+    ) -> SafeDispatcharrChannel:
+        """Create one shared Atlas Sports channel in Dispatcharr."""
+
+        normalized_name = str(
+            name
+            or ""
+        ).strip()
+
+        if not normalized_name:
+            raise DispatcharrAdminError(
+                "Channel name cannot be blank."
+            )
+
+        normalized_stream_ids = (
+            self._channel_stream_ids(
+                stream_ids
+            )
+        )
+
+        token = self._access_token()
+
+        payload = self._json_request(
+            "POST",
+            "/api/channels/channels/",
+            {
+                "name": normalized_name,
+                "streams": list(
+                    normalized_stream_ids
+                ),
+                # Dispatcharr sentinel 0 means all
+                # channel profiles. This is explicit
+                # shared-event exposure, not a
+                # per-user entitlement decision.
+                "channel_profile_ids": [0],
+            },
+            access_token=token,
+        )
+
+        return self._safe_channel(
+            payload
+        )
+
+    def update_channel(
+        self,
+        *,
+        channel_id: int,
+        name: str | None = None,
+        stream_ids: Iterable[int] | None = None,
+    ) -> SafeDispatcharrChannel:
+        """Reconcile one existing shared Sports channel."""
+
+        normalized_channel_id = (
+            self._positive_identifier(
+                channel_id,
+                field="channel identifier",
+            )
+        )
+
+        body: dict[str, Any] = {}
+
+        if name is not None:
+            normalized_name = str(
+                name
+            ).strip()
+
+            if not normalized_name:
+                raise DispatcharrAdminError(
+                    "Channel name cannot be blank."
+                )
+
+            body["name"] = (
+                normalized_name
+            )
+
+        if stream_ids is not None:
+            normalized_stream_ids = (
+                self._channel_stream_ids(
+                    stream_ids
+                )
+            )
+
+            body["streams"] = list(
+                normalized_stream_ids
+            )
+
+        if not body:
+            raise DispatcharrAdminError(
+                "Channel update requires at "
+                "least one field."
+            )
+
+        token = self._access_token()
+
+        try:
+            payload = self._json_request(
+                "PATCH",
+                (
+                    "/api/channels/channels/"
+                    f"{normalized_channel_id}/"
+                ),
+                body,
+                access_token=token,
+            )
+        except DispatcharrAccountNotFoundError as error:
+            # _json_request predates channel support
+            # and maps every HTTP 404 to the account
+            # exception. Translate only at this
+            # channel-specific boundary so existing
+            # account behavior remains unchanged.
+            raise DispatcharrChannelNotFoundError(
+                "Dispatcharr channel was not found."
+            ) from error
+
+        return self._safe_channel(
+            payload
+        )
+
     def test_connection(
         self,
         *,
@@ -1175,10 +1444,12 @@ class DispatcharrAdminClient:
 
 __all__ = [
     "DispatcharrAccountNotFoundError",
+    "DispatcharrChannelNotFoundError",
     "DispatcharrAdminClient",
     "DispatcharrAdminError",
     "DispatcharrAuthError",
     "SafeConnectionTest",
     "SafeDispatcharrAccount",
+    "SafeDispatcharrChannel",
     "SafeDispatcharrStream",
 ]
