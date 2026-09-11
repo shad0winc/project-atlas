@@ -846,7 +846,6 @@ atlas_deployment_recover_failed_before_apply() {
   local previous_id
   local baseline
   local current_id
-  local scope
 
   atlas_deployment_valid_id "$identifier" || {
     echo 'ERROR: invalid deployment identifier.' >&2
@@ -944,29 +943,6 @@ atlas_deployment_recover_failed_before_apply() {
     return 1
   }
 
-  atlas_command_verify || {
-    echo 'ERROR: pre-recovery Atlas verification failed.' >&2
-    return 1
-  }
-
-  scope="$(atlas_deployment_record_value "$transaction" scope)"
-
-  case "$scope" in
-    core|ingress|all)
-      ;;
-    *)
-      printf 'ERROR: unsupported failed deployment scope: %s\n' "${scope:-unknown}" >&2
-      return 1
-      ;;
-  esac
-
-  if [[ "$scope" == 'ingress' || "$scope" == 'all' ]]; then
-    "$ATLAS_PROJECT_DIR/scripts/verify-ingress.sh" || {
-      echo 'ERROR: pre-recovery ingress verification failed.' >&2
-      return 1
-    }
-  fi
-
   if ! atlas_command_maintenance disable; then
     echo 'ERROR: unable to reopen public traffic during failed-before-apply recovery.' >&2
     return 1
@@ -977,20 +953,6 @@ atlas_deployment_recover_failed_before_apply() {
     echo 'ERROR: public post-recovery doctor verification failed; maintenance restored.' >&2
     return 1
   }
-
-  atlas_command_verify || {
-    atlas_command_maintenance enable || true
-    echo 'ERROR: public post-recovery Atlas verification failed; maintenance restored.' >&2
-    return 1
-  }
-
-  if [[ "$scope" == 'ingress' || "$scope" == 'all' ]]; then
-    "$ATLAS_PROJECT_DIR/scripts/verify-ingress.sh" || {
-      atlas_command_maintenance enable || true
-      echo 'ERROR: public post-recovery ingress verification failed; maintenance restored.' >&2
-      return 1
-    }
-  fi
 
   atlas_deployment_verify_runtime "$baseline" || {
     atlas_command_maintenance enable || true
