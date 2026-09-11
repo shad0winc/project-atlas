@@ -12,6 +12,7 @@ from typing import Any
 
 from atlas.events import publish_event
 from controller import load_state, process_games
+from feed import generate_feed
 from dispatcharr_admin import DispatcharrAdminClient
 from dispatcharr_channel_bindings import (
     DispatcharrChannelBindingRegistry,
@@ -649,7 +650,8 @@ def run_operations_pipeline(
     )
 
     next_games = process_games(
-        subscribed_games
+        subscribed_games,
+        publish_feed=False,
     )
 
     current_game_ids = {
@@ -667,6 +669,13 @@ def run_operations_pipeline(
     run_live_source_provisioning_pipeline(
         current_games
     )
+
+    feed_result = generate_feed()
+
+    if feed_result != 0:
+        raise RuntimeError(
+            "Sports feed generation failed"
+        )
 
     write_provider_health(
         provider_health
