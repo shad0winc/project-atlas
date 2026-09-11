@@ -6,6 +6,7 @@ import os
 from fastapi import APIRouter, Cookie, Header, HTTPException, Request, status
 from fastapi.responses import JSONResponse, Response
 
+from atlas.media.jellyfin_auth import build_jellyfin_authorization
 from atlas_api.dependencies import get_settings
 from atlas_api.playback_capabilities import (
     PlaybackCapabilityError,
@@ -26,6 +27,12 @@ def _jellyfin_key() -> str:
     if not value:
         raise RuntimeError("ATLAS_JELLYFIN_API_KEY is required.")
     return value
+
+
+def _jellyfin_authorization() -> str:
+    return build_jellyfin_authorization(
+        token=_jellyfin_key(),
+    )
 
 
 @router.post("/bootstrap")
@@ -90,6 +97,8 @@ def authorize_playback(
         ) from error
 
     response = Response(status_code=status.HTTP_200_OK)
-    response.headers["X-Atlas-Jellyfin-Token"] = _jellyfin_key()
+    response.headers[
+        "X-Atlas-Jellyfin-Authorization"
+    ] = _jellyfin_authorization()
     response.headers["Cache-Control"] = "no-store"
     return response

@@ -71,12 +71,12 @@ playback.shadowinc.co {
         handle @playback_media {
                 forward_auth atlas-api:8000 {
                         uri /_atlas/playback/authorize
-                        copy_headers X-Atlas-Jellyfin-Token
+                        copy_headers X-Atlas-Jellyfin-Authorization
                 }
 
                 reverse_proxy jellyfin:8096 {
-                        header_up X-Emby-Token {http.request.header.X-Atlas-Jellyfin-Token}
-                        header_up -X-Atlas-Jellyfin-Token
+                        header_up Authorization {http.request.header.X-Atlas-Jellyfin-Authorization}
+                        header_up -X-Atlas-Jellyfin-Authorization
 
                         # Atlas owns browser CORS on the dedicated playback
                         # origin. Do not expose Jellyfin's wildcard CORS
