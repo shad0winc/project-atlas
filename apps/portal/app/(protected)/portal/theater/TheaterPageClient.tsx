@@ -9,6 +9,9 @@ import { MediaCatalogView } from "../../../../features/media";
 import { loadPlaybackSession } from "../../../../features/playback/api/session";
 import { AtlasTheaterPlayer } from "../../../../features/playback/components/AtlasTheaterPlayer";
 import type { PlaybackSession } from "../../../../features/playback/types/session";
+import { useAuth } from "../../../../lib/auth/use-auth";
+import { ATLAS_PERMISSIONS } from "../../../../lib/authorization/permissions";
+import { usePermission } from "../../../../lib/authorization/use-permission";
 import { PORTAL_ROUTES } from "../../../../lib/navigation/portal";
 
 const theaterRoute = PORTAL_ROUTES.theater;
@@ -17,6 +20,31 @@ type TheaterState =
   | Readonly<{ status: "loading" }>
   | Readonly<{ status: "ready"; session: PlaybackSession }>
   | Readonly<{ status: "error"; message: string }>;
+
+function AuthorizedTheaterPlayer({
+  session
+}: Readonly<{
+  session: PlaybackSession;
+}>): React.ReactElement {
+  const { user } = useAuth();
+  const { can } = usePermission();
+
+  const canDislike =
+    user !== null &&
+    can(ATLAS_PERMISSIONS.dislikesWrite);
+
+  return (
+    <AtlasTheaterPlayer
+      canDislike={canDislike}
+      dislikeExpectedUserId={
+        canDislike && user !== null
+          ? user.user_id
+          : undefined
+      }
+      session={session}
+    />
+  );
+}
 
 export function TheaterPageClient(): React.ReactElement {
   const searchParams = useSearchParams();
@@ -120,7 +148,7 @@ export function TheaterPageClient(): React.ReactElement {
               </p>
             </div>
           </div>
-          <AtlasTheaterPlayer
+          <AuthorizedTheaterPlayer
             key={[
               state.session.provider,
               state.session.requestedTargetId,

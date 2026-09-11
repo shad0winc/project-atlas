@@ -63,6 +63,7 @@ def _write_state(tmp_path: Path) -> dict[str, str]:
     paths = {
         "users": Path(env["ATLAS_USERS_DIR"]) / "users.json",
         "favorites": Path(env["ATLAS_IDENTITY_DIR"]) / "favorites" / "favorites.json",
+        "dislikes": Path(env["ATLAS_IDENTITY_DIR"]) / "dislikes" / "dislikes.json",
         "scheduler": Path(env["ATLAS_SCHEDULER_STATE_FILE"]),
         "events": Path(env["ATLAS_RUNTIME_CONFIG_DIR"]) / "runtime" / "events.jsonl",
         "cursor": Path(env["ATLAS_RUNTIME_CONFIG_DIR"]) / "runtime" / "subscribers" / "user.cursor",
@@ -116,6 +117,7 @@ def test_snapshot_captures_every_required_surface(tmp_path: Path) -> None:
     required = (
         "state/users/users.json",
         "state/identity/favorites/favorites.json",
+        "state/identity/dislikes/dislikes.json",
         "state/scheduler/tasks.json",
         "state/runtime/events.jsonl",
         "state/runtime/subscribers/user.cursor",

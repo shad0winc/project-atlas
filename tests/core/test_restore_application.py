@@ -13,6 +13,7 @@ SURFACES = (
     ("users", "state/users", "required", "captured"),
     ("identity-invitations", "state/identity/invitations", "optional", "absent-optional"),
     ("favorites", "state/identity/favorites", "required", "captured"),
+    ("dislikes", "state/identity/dislikes", "required", "captured"),
     ("requests", "state/requests/requests.json", "optional", "absent-optional"),
     ("scheduler", "state/scheduler/tasks.json", "required", "captured"),
     ("runtime-events", "state/runtime/events.jsonl", "required", "captured"),
@@ -57,6 +58,7 @@ def _stage(tmp_path: Path) -> Path:
     files = {
         "state/users/users.json": "new-users\n",
         "state/identity/favorites/favorites.json": "new-favorites\n",
+        "state/identity/dislikes/dislikes.json": "new-dislikes\n",
         "state/scheduler/tasks.json": "new-scheduler\n",
         "state/runtime/events.jsonl": "new-event\n",
         "state/runtime/subscribers/test.cursor": "1\n",
@@ -98,6 +100,7 @@ def _destinations(env: dict[str, str]) -> dict[str, Path]:
         "users": Path(env["ATLAS_USERS_DIR"]),
         "identity-invitations": Path(env["ATLAS_IDENTITY_DIR"]) / "invitations",
         "favorites": Path(env["ATLAS_IDENTITY_DIR"]) / "favorites",
+        "dislikes": Path(env["ATLAS_IDENTITY_DIR"]) / "dislikes",
         "requests": Path(env["ATLAS_REQUESTS_DIR"]) / "requests.json",
         "scheduler": Path(env["ATLAS_SCHEDULER_STATE_FILE"]),
         "runtime-events": atlas / "runtime/events.jsonl",
@@ -119,6 +122,7 @@ def _populate_live(env: dict[str, str]) -> dict[str, Path]:
         "users": "users.json",
         "identity-invitations": "invite.json",
         "favorites": "favorites.json",
+        "dislikes": "dislikes.json",
         "runtime-subscribers": "test.cursor",
         "retention": "latest.json",
     }

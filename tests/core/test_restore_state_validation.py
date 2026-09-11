@@ -16,6 +16,7 @@ SURFACES = (
     ("users", "state/users", "required", "captured"),
     ("identity-invitations", "state/identity/invitations", "optional", "absent-optional"),
     ("favorites", "state/identity/favorites", "required", "captured"),
+    ("dislikes", "state/identity/dislikes", "required", "captured"),
     ("requests", "state/requests/requests.json", "optional", "absent-optional"),
     ("scheduler", "state/scheduler/tasks.json", "required", "captured"),
     ("runtime-events", "state/runtime/events.jsonl", "required", "captured"),
@@ -48,6 +49,10 @@ def _staged_root(tmp_path: Path) -> Path:
     _write_json(
         root / "state/identity/favorites/favorites.json",
         {"schema_version": 1, "favorites": {}},
+    )
+    _write_json(
+        root / "state/identity/dislikes/dislikes.json",
+        {"schema_version": 1, "dislikes": {}},
     )
     _write_json(
         root / "state/scheduler/tasks.json",
@@ -106,6 +111,7 @@ def test_consumer_validation_accepts_structurally_valid_state(tmp_path: Path) ->
     assert result.returncode == 0, result.stderr
     assert "PASS users" in result.stdout
     assert "PASS favorites" in result.stdout
+    assert "PASS dislikes" in result.stdout
     assert "PASS scheduler" in result.stdout
     assert "PASS runtime" in result.stdout
     assert "PASS retention" in result.stdout

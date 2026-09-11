@@ -43,6 +43,7 @@ def test_media_administrator_is_focused_to_media_operations() -> None:
             "cleanup.*",
             "downloads.*",
             "favorites.*",
+            "dislikes.*",
             "media.*",
             "monitoring.read",
             "requests.*",

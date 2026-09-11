@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { DislikeAction } from "../../dislikes";
+
 import { resolvePlaybackSession } from "../services/session";
 import type { SubtitleSelection } from "../services/session";
 import { bootstrapPlaybackStream } from "../services/stream";
@@ -50,9 +52,13 @@ function parseSubtitleSelection(
 }
 
 export function AtlasTheaterPlayer({
-  session
+  session,
+  canDislike = false,
+  dislikeExpectedUserId
 }: {
   session: PlaybackSession;
+  canDislike?: boolean;
+  dislikeExpectedUserId?: string;
 }): React.ReactElement {
   const videoRef = useRef<HTMLVideoElement>(null);
   const resumeAtRef = useRef<number | null>(null);
@@ -289,6 +295,15 @@ export function AtlasTheaterPlayer({
 
       <div className="atlas-theater-player-meta">
         <span>Powered by Jellyfin</span>
+
+        {canDislike && dislikeExpectedUserId ? (
+          <DislikeAction
+            expectedUserId={dislikeExpectedUserId}
+            itemId={activeSession.playableTargetId}
+            provider={activeSession.provider}
+            title={activeSession.title}
+          />
+        ) : null}
 
         {activeSession.canSeek ? (
           <span>Seeking available</span>

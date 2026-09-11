@@ -411,6 +411,7 @@ def _write_recovery_state(project: Path) -> None:
     files = {
         Path(env["ATLAS_USERS_DIR"]) / "users.json": '{"users": []}\n',
         Path(env["ATLAS_IDENTITY_DIR"]) / "favorites" / "favorites.json": '{}\n',
+        Path(env["ATLAS_IDENTITY_DIR"]) / "dislikes" / "dislikes.json": '{"schema_version":1,"dislikes":{}}\n',
         Path(env["ATLAS_SCHEDULER_STATE_FILE"]): '{"tasks": []}\n',
         Path(env["ATLAS_RUNTIME_CONFIG_DIR"]) / "runtime" / "events.jsonl": "",
         Path(env["ATLAS_RUNTIME_CONFIG_DIR"]) / "runtime" / "subscribers" / "test.cursor": "0\n",

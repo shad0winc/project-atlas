@@ -13,6 +13,7 @@ from .dashboard import router as dashboard_router
 from .dashboard_media import router as dashboard_media_router
 from .downloads import router as downloads_router
 from .favorites import router as favorites_router
+from .dislikes import router as dislikes_router
 from .media_catalog import router as media_catalog_router
 from .media_discovery import router as media_discovery_router
 from .media_libraries import router as media_libraries_router
@@ -42,6 +43,7 @@ router.include_router(dashboard_router)
 router.include_router(dashboard_media_router)
 router.include_router(downloads_router)
 router.include_router(favorites_router)
+router.include_router(dislikes_router)
 router.include_router(media_catalog_router)
 router.include_router(media_discovery_router)
 router.include_router(media_libraries_router)

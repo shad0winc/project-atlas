@@ -68,13 +68,14 @@ def test_registry_is_structurally_valid(tmp_path: Path) -> None:
 
 def test_registry_declares_exact_recovery_surfaces(tmp_path: Path) -> None:
     rows = _rows(tmp_path)
-    assert len(rows) == 15
+    assert len(rows) == 16
     assert all(len(row) == 6 for row in rows)
 
     assert [row[0] for row in rows] == [
         "users",
         "identity-invitations",
         "favorites",
+        "dislikes",
         "requests",
         "scheduler",
         "runtime-events",

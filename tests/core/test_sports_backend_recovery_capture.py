@@ -193,11 +193,11 @@ def test_format_two_does_not_expand_canonical_surface_registry() -> None:
     )
 
     assert (
-        "expected 15 recovery surfaces"
+        "expected 16 recovery surfaces"
         in recovery
     )
 
     assert (
-        "restore plan expected 15 surfaces"
+        "restore plan expected 16 surfaces"
         in recovery
     )

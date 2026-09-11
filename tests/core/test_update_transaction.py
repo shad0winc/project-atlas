@@ -97,6 +97,17 @@ def prepare_runtime(tmp_path: Path, *, branch: str = "main") -> dict[str, str]:
     )
 
     write_executable(
+        project / "scripts" / "lib" / "dislikes-runtime.sh",
+        """
+        #!/usr/bin/env bash
+        atlas_dislikes_runtime_provision() {
+          echo dislikes-runtime:provision >> "$ATLAS_TEST_EVENTS"
+          return "${ATLAS_TEST_DISLIKES_RUNTIME_STATUS:-0}"
+        }
+        """,
+    )
+
+    write_executable(
         project / "scripts" / "lib" / "password-recovery-runtime.sh",
         """
         #!/usr/bin/env bash
@@ -1085,6 +1096,7 @@ def test_sports_runtime_provisioning_failure_aborts_before_ingress_apply(
         "audit-runtime:provision",
         "identity-writer-runtime:provision",
         "favorites-runtime:provision",
+        "dislikes-runtime:provision",
         "password-recovery-runtime:provision",
         "sports-runtime:provision",
     )
