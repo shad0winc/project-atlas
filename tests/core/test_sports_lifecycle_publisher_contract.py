@@ -131,6 +131,11 @@ def test_process_games_can_defer_feed_generation(
 
     monkeypatch.setattr(
         controller,
+        "publish_event",
+        lambda *args: None,
+    )
+    monkeypatch.setattr(
+        controller,
         "generate_feed",
         lambda: feed_calls.append("feed") or 0,
     )
@@ -164,6 +169,11 @@ def test_process_games_generates_feed_by_default(
 
     feed_calls: list[str] = []
 
+    monkeypatch.setattr(
+        controller,
+        "publish_event",
+        lambda *args: None,
+    )
     monkeypatch.setattr(
         controller,
         "generate_feed",
