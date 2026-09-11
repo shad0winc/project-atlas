@@ -18,6 +18,8 @@ from fastapi import (
     status,
 )
 
+from atlas.media.jellyfin import JellyfinProvider
+from atlas.media.provider import MediaProviderError
 from atlas.media.jellyfin_admin import (
     JellyfinAdminClient,
     JellyfinAdminError,
@@ -117,6 +119,14 @@ def _require_service_token(
         )
 
 
+def _jellyfin_provider() -> JellyfinProvider:
+    return JellyfinProvider(
+        JELLYFIN_URL,
+        JELLYFIN_API_KEY,
+        timeout=JELLYFIN_TIMEOUT_SECONDS,
+    )
+
+
 def _jellyfin_admin_client() -> JellyfinAdminClient:
     return JellyfinAdminClient(
         JELLYFIN_URL,
@@ -201,6 +211,41 @@ app = FastAPI(
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "healthy"}
+
+
+@app.get(
+    "/internal/v1/jellyfin/live-tv/channels",
+    dependencies=[Depends(_require_service_token)],
+)
+def list_live_tv_channels() -> dict[
+    str,
+    list[dict[str, str | None]],
+]:
+    """Return safe Live TV identity for convergence."""
+    try:
+        channels = (
+            _jellyfin_provider()
+            .list_live_tv_channels()
+        )
+    except MediaProviderError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Jellyfin Live TV inventory is unavailable."
+            ),
+        ) from error
+
+    return {
+        "channels": [
+            {
+                "item_id": channel["item_id"],
+                "channel_number": channel[
+                    "channel_number"
+                ],
+            }
+            for channel in channels
+        ]
+    }
 
 
 @app.post(

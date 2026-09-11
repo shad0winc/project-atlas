@@ -143,3 +143,112 @@ def test_ingress_verification_requires_jellyfin_writer() -> None:
         encoding="utf-8"
     )
     assert "atlas-jellyfin-writer" in content
+
+
+def test_jellyfin_writer_inventory_route_is_private_and_read_only(
+) -> None:
+    source = (
+        ROOT
+        / "apps"
+        / "api"
+        / "atlas_api"
+        / "jellyfin_writer.py"
+    ).read_text(
+        encoding="utf-8"
+    )
+
+    route = (
+        '@app.get(\n'
+        '    "/internal/v1/jellyfin/live-tv/channels",'
+    )
+
+    assert route in source
+
+    start = source.index(
+        route
+    )
+
+    end = source.index(
+        "\n\n@app.post(",
+        start,
+    )
+
+    inventory = source[
+        start:end
+    ]
+
+    assert (
+        "dependencies=[Depends(_require_service_token)]"
+        in inventory
+    )
+
+    assert (
+        ".list_live_tv_channels()"
+        in inventory
+    )
+
+    assert '"item_id"' in inventory
+    assert '"channel_number"' in inventory
+
+    for forbidden in (
+        '"name"',
+        '"type"',
+        "ChannelId",
+        "MediaSources",
+        '"Path"',
+        "start_scheduled_task",
+        "find_scheduled_task_by_key",
+    ):
+        assert forbidden not in inventory
+
+
+def test_jellyfin_writer_inventory_reuses_safe_provider_boundary(
+) -> None:
+    source = (
+        ROOT
+        / "apps"
+        / "api"
+        / "atlas_api"
+        / "jellyfin_writer.py"
+    ).read_text(
+        encoding="utf-8"
+    )
+
+    assert (
+        "from atlas.media.jellyfin import "
+        "JellyfinProvider"
+        in source
+    )
+
+    assert (
+        "from atlas.media.provider import "
+        "MediaProviderError"
+        in source
+    )
+
+    assert (
+        "def _jellyfin_provider() "
+        "-> JellyfinProvider:"
+        in source
+    )
+
+
+def test_jellyfin_writer_inventory_does_not_add_sports_credentials(
+) -> None:
+    sports = (
+        ROOT
+        / "modules"
+        / "sports"
+    )
+
+    content = "\n".join(
+        path.read_text(
+            encoding="utf-8",
+            errors="ignore",
+        )
+        for path in sports.rglob("*")
+        if path.is_file()
+    )
+
+    assert "ATLAS_JELLYFIN_API_KEY" not in content
+    assert "JellyfinProvider" not in content
