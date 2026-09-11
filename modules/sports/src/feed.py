@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import html
 import json
 import os
@@ -195,10 +196,46 @@ def programme_stop(game: dict[str, Any]) -> str:
     ).strftime("%Y%m%d%H%M%S +0000")
 
 
+ATLAS_JELLYFIN_CHANNEL_NUMBER_BASE = 900_000_000
+ATLAS_JELLYFIN_CHANNEL_NUMBER_SLOTS = 100_000_000
+
+
+def atlas_jellyfin_channel_number(
+    atlas_channel_id: str,
+) -> str:
+    """Return a stable reserved Jellyfin channel number."""
+
+    normalized = str(atlas_channel_id).strip()
+
+    if not normalized:
+        raise ValueError(
+            "atlas_channel_id is required"
+        )
+
+    digest = hashlib.sha256(
+        normalized.encode("utf-8")
+    ).digest()
+
+    slot = (
+        int.from_bytes(
+            digest[:8],
+            byteorder="big",
+            signed=False,
+        )
+        % ATLAS_JELLYFIN_CHANNEL_NUMBER_SLOTS
+    )
+
+    return str(
+        ATLAS_JELLYFIN_CHANNEL_NUMBER_BASE
+        + slot
+    )
+
+
 def render_m3u(
     games: list[dict[str, Any]],
 ) -> str:
     lines = ["#EXTM3U", ""]
+    channel_numbers: dict[str, str] = {}
 
     for game in games:
         url = stream_url(game)
@@ -210,10 +247,34 @@ def render_m3u(
             game.get("_atlas_channel_id")
             or f"sports-{game['id']}"
         )
+        channel_number = (
+            atlas_jellyfin_channel_number(
+                channel_id
+            )
+        )
+
+        previous_channel_id = channel_numbers.get(
+            channel_number
+        )
+
+        if (
+            previous_channel_id is not None
+            and previous_channel_id != channel_id
+        ):
+            raise ValueError(
+                "Atlas Sports Jellyfin channel number "
+                "collision"
+            )
+
+        channel_numbers[channel_number] = (
+            channel_id
+        )
+
         name = game_name(game)
 
         lines.append(
             f'#EXTINF:-1 tvg-id="{channel_id}" '
+            f'tvg-chno="{channel_number}" '
             f'tvg-name="{name}" group-title="Sports",'
             f"{name}"
         )
