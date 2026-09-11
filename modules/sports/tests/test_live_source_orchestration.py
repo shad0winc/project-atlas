@@ -1060,3 +1060,116 @@ def test_reconcile_dispatcharr_channel_update_failure_does_not_mutate_binding() 
     assert bindings.binding == (
         original_binding
     )
+
+
+
+def test_build_published_live_source_uses_dispatcharr_channel_uuid() -> None:
+    from dispatcharr_admin import SafeDispatcharrChannel
+    from live_source_orchestration import (
+        build_published_live_source,
+    )
+
+    plan = _channel_plan()
+
+    channel = SafeDispatcharrChannel(
+        channel_id=42,
+        channel_uuid=(
+            "00000000-0000-0000-0000-000000000042"
+        ),
+        name=plan.name,
+        stream_ids=plan.stream_ids,
+    )
+
+    source = build_published_live_source(
+        plan=plan,
+        channel=channel,
+        dispatcharr_base_url=(
+            "http://atlas-dispatcharr:9191"
+        ),
+    )
+
+    assert source.source_id == plan.source_id
+    assert source.name == plan.name
+    assert source.provider == plan.provider
+    assert (
+        source.provider_event_id
+        == plan.provider_event_id
+    )
+    assert (
+        source.resource_source_ids
+        == plan.resource_source_ids
+    )
+    assert source.standalone is False
+    assert (
+        source.atlas_channel_id
+        == plan.atlas_channel_id
+    )
+    assert source.stream_url == (
+        "http://atlas-dispatcharr:9191/"
+        "proxy/ts/stream/"
+        "00000000-0000-0000-0000-000000000042"
+    )
+
+
+def test_build_published_live_source_preserves_dispatcharr_base_path() -> None:
+    from dispatcharr_admin import SafeDispatcharrChannel
+    from live_source_orchestration import (
+        build_published_live_source,
+    )
+
+    plan = _channel_plan()
+
+    source = build_published_live_source(
+        plan=plan,
+        channel=SafeDispatcharrChannel(
+            channel_id=42,
+            channel_uuid="uuid/needs-quoting",
+            name=plan.name,
+            stream_ids=plan.stream_ids,
+        ),
+        dispatcharr_base_url=(
+            "https://dispatcharr.invalid/base/"
+        ),
+    )
+
+    assert source.stream_url == (
+        "https://dispatcharr.invalid/base/"
+        "proxy/ts/stream/uuid%2Fneeds-quoting"
+    )
+
+
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "",
+        "dispatcharr.invalid",
+        "file:///tmp/dispatcharr",
+        "https://user:pass@dispatcharr.invalid",
+        "https://dispatcharr.invalid?token=secret",
+        "https://dispatcharr.invalid/#fragment",
+    ],
+)
+def test_build_published_live_source_rejects_unsafe_base_url(
+    base_url,
+) -> None:
+    from dispatcharr_admin import SafeDispatcharrChannel
+    from live_source_orchestration import (
+        build_published_live_source,
+    )
+
+    plan = _channel_plan()
+
+    with pytest.raises(
+        ValueError,
+        match="Dispatcharr base URL",
+    ):
+        build_published_live_source(
+            plan=plan,
+            channel=SafeDispatcharrChannel(
+                channel_id=42,
+                channel_uuid="uuid-42",
+                name=plan.name,
+                stream_ids=plan.stream_ids,
+            ),
+            dispatcharr_base_url=base_url,
+        )

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
+from urllib.parse import quote, urlsplit, urlunsplit
 
 from dispatcharr_admin import (
     DispatcharrAdminClient,
@@ -16,6 +17,10 @@ from live_source_resolver import (
     DispatcharrStreamCandidate,
     LiveSourceResolution,
     resolve_live_source_content,
+)
+from live_sources import (
+    LiveSource,
+    normalize_live_source,
 )
 from source_lifecycle import SportsSource
 
@@ -269,6 +274,89 @@ def reconcile_dispatcharr_channel(
 
     return channel, persisted
 
+
+
+def build_published_live_source(
+    *,
+    plan: LiveSourceProvisioningPlan,
+    channel: SafeDispatcharrChannel,
+    dispatcharr_base_url: str,
+) -> LiveSource:
+    """Build one authorized LiveSource from a reconciled Dispatcharr channel."""
+
+    base_url = str(
+        dispatcharr_base_url
+        or ""
+    ).strip()
+
+    parsed = urlsplit(base_url)
+
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.netloc
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ValueError(
+            "Dispatcharr base URL must be an absolute "
+            "credential-free http or https URL."
+        )
+
+    channel_uuid = str(
+        channel.channel_uuid
+        or ""
+    ).strip()
+
+    if not channel_uuid:
+        raise ValueError(
+            "Dispatcharr channel UUID is required."
+        )
+
+    base_path = parsed.path.rstrip("/")
+
+    stream_path = (
+        f"{base_path}/proxy/ts/stream/"
+        f"{quote(channel_uuid, safe='')}"
+    )
+
+    stream_url = urlunsplit(
+        (
+            parsed.scheme,
+            parsed.netloc,
+            stream_path,
+            "",
+            "",
+        )
+    )
+
+    source = normalize_live_source(
+        LiveSource(
+            source_id=plan.source_id,
+            name=plan.name,
+            stream_url=stream_url,
+            provider=plan.provider,
+            provider_event_id=(
+                plan.provider_event_id
+            ),
+            standalone=False,
+            resource_source_ids=(
+                plan.resource_source_ids
+            ),
+        ).state_dict()
+    )
+
+    if (
+        source.atlas_channel_id
+        != plan.atlas_channel_id
+    ):
+        raise ValueError(
+            "LiveSource identity does not match "
+            "the provisioning plan."
+        )
+
+    return source
 
 def build_live_source_provisioning_plan(
     *,

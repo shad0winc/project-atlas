@@ -91,8 +91,11 @@ def test_surfaced_game_resolves_plans_and_reconciles_once(
 
     resolution = object()
     plan = object()
+    channel = object()
+    published_source = object()
     dispatcharr = object()
     bindings = object()
+    live_sources = object()
     sources = (object(),)
     calls: list[tuple[str, object]] = []
 
@@ -111,7 +114,20 @@ def test_surfaced_game_resolves_plans_and_reconciles_once(
         calls.append(("reconcile-plan", plan))
         calls.append(("reconcile-dispatcharr", dispatcharr))
         calls.append(("reconcile-bindings", bindings))
-        return object(), object()
+        return channel, object()
+
+    def publish(*, plan, channel, dispatcharr_base_url):
+        calls.append(("publish-plan", plan))
+        calls.append(("publish-channel", channel))
+        calls.append(
+            ("publish-base-url", dispatcharr_base_url)
+        )
+        return published_source
+
+    class Registry:
+        def set(self, source):
+            calls.append(("registry-set", source))
+            return source
 
     monkeypatch.setattr(
         worker,
@@ -128,6 +144,13 @@ def test_surfaced_game_resolves_plans_and_reconciles_once(
         "reconcile_dispatcharr_channel",
         reconcile,
     )
+    monkeypatch.setattr(
+        worker,
+        "build_published_live_source",
+        publish,
+    )
+
+    live_sources = Registry()
 
     game = _live_game()
 
@@ -144,6 +167,7 @@ def test_surfaced_game_resolves_plans_and_reconciles_once(
         dispatcharr=dispatcharr,
         sources=sources,
         bindings=bindings,
+        live_sources=live_sources,
     )
 
     assert result == 1
@@ -156,6 +180,13 @@ def test_surfaced_game_resolves_plans_and_reconciles_once(
         ("reconcile-plan", plan),
         ("reconcile-dispatcharr", dispatcharr),
         ("reconcile-bindings", bindings),
+        ("publish-plan", plan),
+        ("publish-channel", channel),
+        (
+            "publish-base-url",
+            "http://atlas-dispatcharr:9191",
+        ),
+        ("registry-set", published_source),
     ]
 
 
@@ -415,3 +446,167 @@ def test_module_contract_requires_provisioning_dependencies() -> None:
         "src/live_source_orchestration.py",
     ):
         assert path in source
+
+
+
+def test_dispatcharr_failure_never_publishes_live_source(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    worker = _worker()
+
+    monkeypatch.setattr(
+        worker,
+        "resolve_event_live_source_content",
+        lambda **kwargs: object(),
+    )
+    monkeypatch.setattr(
+        worker,
+        "build_live_source_provisioning_plan",
+        lambda **kwargs: object(),
+    )
+
+    def fail_reconcile(**kwargs):
+        raise RuntimeError(
+            "synthetic dispatcharr failure"
+        )
+
+    monkeypatch.setattr(
+        worker,
+        "reconcile_dispatcharr_channel",
+        fail_reconcile,
+    )
+
+    def unexpected_publish(**kwargs):
+        raise AssertionError(
+            "LiveSource must not be built after "
+            "Dispatcharr reconciliation failure"
+        )
+
+    monkeypatch.setattr(
+        worker,
+        "build_published_live_source",
+        unexpected_publish,
+    )
+
+    class Registry:
+        def set(self, source):
+            raise AssertionError(
+                "LiveSource registry must not mutate "
+                "after Dispatcharr failure"
+            )
+
+    with pytest.raises(
+        RuntimeError,
+        match="synthetic dispatcharr failure",
+    ):
+        worker.run_live_source_provisioning_pipeline(
+            [_live_game()],
+            now=datetime(
+                2026,
+                9,
+                11,
+                12,
+                0,
+                tzinfo=timezone.utc,
+            ),
+            dispatcharr=object(),
+            sources=(object(),),
+            bindings=object(),
+            live_sources=Registry(),
+        )
+
+
+def test_live_source_persistence_failure_propagates_after_reconciliation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    worker = _worker()
+
+    resolution = object()
+    plan = object()
+    channel = object()
+    source = object()
+
+    monkeypatch.setattr(
+        worker,
+        "resolve_event_live_source_content",
+        lambda **kwargs: resolution,
+    )
+    monkeypatch.setattr(
+        worker,
+        "build_live_source_provisioning_plan",
+        lambda **kwargs: plan,
+    )
+    monkeypatch.setattr(
+        worker,
+        "reconcile_dispatcharr_channel",
+        lambda **kwargs: (channel, object()),
+    )
+    monkeypatch.setattr(
+        worker,
+        "build_published_live_source",
+        lambda **kwargs: source,
+    )
+
+    class Registry:
+        def set(self, value):
+            assert value is source
+            raise RuntimeError(
+                "synthetic LiveSource persistence failure"
+            )
+
+    with pytest.raises(
+        RuntimeError,
+        match="synthetic LiveSource persistence failure",
+    ):
+        worker.run_live_source_provisioning_pipeline(
+            [_live_game()],
+            now=datetime(
+                2026,
+                9,
+                11,
+                12,
+                0,
+                tzinfo=timezone.utc,
+            ),
+            dispatcharr=object(),
+            sources=(object(),),
+            bindings=object(),
+            live_sources=Registry(),
+        )
+
+
+def test_no_authorized_content_does_not_touch_live_source_registry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    worker = _worker()
+
+    monkeypatch.setattr(
+        worker,
+        "resolve_event_live_source_content",
+        lambda **kwargs: None,
+    )
+
+    class Registry:
+        def set(self, source):
+            raise AssertionError(
+                "LiveSource registry must not mutate "
+                "without authorized content"
+            )
+
+    result = worker.run_live_source_provisioning_pipeline(
+        [_live_game()],
+        now=datetime(
+            2026,
+            9,
+            11,
+            12,
+            0,
+            tzinfo=timezone.utc,
+        ),
+        dispatcharr=object(),
+        sources=(object(),),
+        bindings=object(),
+        live_sources=Registry(),
+    )
+
+    assert result == 0

@@ -20,8 +20,13 @@ from dispatcharr_channel_bindings import (
 from lifecycle import should_surface_game
 from live_source_orchestration import (
     build_live_source_provisioning_plan,
+    build_published_live_source,
     reconcile_dispatcharr_channel,
     resolve_event_live_source_content,
+)
+from live_sources import (
+    LiveSourceRegistry,
+    default_live_source_registry,
 )
 from source_lifecycle import (
     SourceLifecycleStore,
@@ -528,6 +533,7 @@ def run_live_source_provisioning_pipeline(
     dispatcharr: DispatcharrAdminClient | None = None,
     sources: tuple[SportsSource, ...] | None = None,
     bindings: DispatcharrChannelBindingRegistry | None = None,
+    live_sources: LiveSourceRegistry | None = None,
 ) -> int:
     """Reconcile authorized Dispatcharr channels for surfaced games."""
     if now is None:
@@ -584,10 +590,29 @@ def run_live_source_provisioning_pipeline(
             resolution=resolution,
         )
 
-        reconcile_dispatcharr_channel(
+        channel, _binding = reconcile_dispatcharr_channel(
             plan=plan,
             dispatcharr=client,
             bindings=binding_registry,
+        )
+
+        source = build_published_live_source(
+            plan=plan,
+            channel=channel,
+            dispatcharr_base_url=os.getenv(
+                "DISPATCHARR_INTERNAL_URL",
+                "http://atlas-dispatcharr:9191",
+            ),
+        )
+
+        live_source_registry = (
+            live_sources
+            if live_sources is not None
+            else default_live_source_registry()
+        )
+
+        live_source_registry.set(
+            source
         )
 
         reconciled += 1
