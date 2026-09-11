@@ -385,6 +385,11 @@ def test_operations_provisions_only_current_subscribed_games(
     )
     monkeypatch.setattr(
         worker,
+        "refresh_jellyfin_live_tv",
+        lambda: order.append("refresh"),
+    )
+    monkeypatch.setattr(
+        worker,
         "write_provider_health",
         lambda *args, **kwargs: None,
     )
@@ -419,6 +424,7 @@ def test_operations_provisions_only_current_subscribed_games(
         "process",
         "provision",
         "feed",
+        "refresh",
     ]
 
 
