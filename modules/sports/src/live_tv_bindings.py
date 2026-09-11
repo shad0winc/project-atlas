@@ -187,6 +187,87 @@ class LiveTvBindingRegistry:
 
         return LiveTvBinding(atlas_id, jellyfin_id)
 
+    def set_many(
+        self,
+        bindings: dict[str, str],
+    ) -> tuple[LiveTvBinding, ...]:
+        normalized: dict[str, str] = {}
+
+        for atlas_channel_id, jellyfin_item_id in (
+            bindings.items()
+        ):
+            atlas_id = _required_identifier(
+                atlas_channel_id,
+                "atlas_channel_id",
+            )
+            jellyfin_id = _required_identifier(
+                jellyfin_item_id,
+                "jellyfin_item_id",
+            )
+
+            normalized[
+                atlas_id
+            ] = jellyfin_id
+
+        if len(
+            set(normalized.values())
+        ) != len(normalized):
+            raise LiveTvBindingError(
+                "one Jellyfin item cannot bind to "
+                "multiple Atlas channels"
+            )
+
+        if not normalized:
+            return ()
+
+        with _WRITE_LOCK:
+            doc = self._load()
+
+            proposed_jellyfin_ids = set(
+                normalized.values()
+            )
+
+            for (
+                other_atlas_id,
+                entry,
+            ) in doc["bindings"].items():
+                if (
+                    other_atlas_id
+                    not in normalized
+                    and entry["jellyfin_item_id"]
+                    in proposed_jellyfin_ids
+                ):
+                    raise LiveTvBindingError(
+                        "Jellyfin item is already bound "
+                        "to another Atlas channel"
+                    )
+
+            for (
+                atlas_id,
+                jellyfin_id,
+            ) in normalized.items():
+                doc["bindings"][
+                    atlas_id
+                ] = {
+                    "jellyfin_item_id": jellyfin_id
+                }
+
+            # One durable replacement after the full
+            # proposed mapping has validated.
+            self._write(
+                doc
+            )
+
+        return tuple(
+            LiveTvBinding(
+                atlas_channel_id=atlas_id,
+                jellyfin_item_id=jellyfin_id,
+            )
+            for atlas_id, jellyfin_id in sorted(
+                normalized.items()
+            )
+        )
+
     def delete(self, atlas_channel_id: str) -> bool:
         atlas_id = _required_identifier(
             atlas_channel_id, "atlas_channel_id"

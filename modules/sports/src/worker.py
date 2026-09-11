@@ -12,8 +12,18 @@ from typing import Any
 
 from atlas.events import publish_event
 from controller import load_state, process_games
-from feed import generate_feed
-from jellyfin_writer_client import JellyfinWriterClient
+from feed import generate_feed_snapshot
+from jellyfin_channel_identity import (
+    atlas_jellyfin_channel_number,
+)
+from jellyfin_writer_client import (
+    JellyfinLiveTvChannel,
+    JellyfinWriterClient,
+)
+from live_tv_bindings import (
+    LiveTvBindingRegistry,
+    default_live_tv_binding_registry,
+)
 from dispatcharr_admin import DispatcharrAdminClient
 from dispatcharr_channel_bindings import (
     DispatcharrChannelBindingRegistry,
@@ -630,6 +640,166 @@ def refresh_jellyfin_live_tv() -> None:
     )
 
 
+class JellyfinLiveTvBindingConvergenceError(
+    RuntimeError
+):
+    """Jellyfin Live TV identity could not converge safely."""
+
+
+def build_jellyfin_live_tv_binding_plan(
+    atlas_channel_ids: tuple[str, ...],
+    channels: tuple[JellyfinLiveTvChannel, ...],
+) -> dict[str, str]:
+    """Build a complete exact-number binding plan without mutation."""
+
+    normalized_ids: list[str] = []
+    seen_atlas_ids: set[str] = set()
+    number_owners: dict[str, str] = {}
+
+    for raw_atlas_id in atlas_channel_ids:
+        atlas_id = str(
+            raw_atlas_id
+        ).strip()
+
+        if not atlas_id:
+            raise JellyfinLiveTvBindingConvergenceError(
+                "Atlas Live TV channel identity is invalid."
+            )
+
+        if atlas_id in seen_atlas_ids:
+            raise JellyfinLiveTvBindingConvergenceError(
+                "Atlas Live TV channel identity is duplicated."
+            )
+
+        seen_atlas_ids.add(
+            atlas_id
+        )
+        normalized_ids.append(
+            atlas_id
+        )
+
+        number = atlas_jellyfin_channel_number(
+            atlas_id
+        )
+
+        existing_owner = number_owners.get(
+            number
+        )
+
+        if (
+            existing_owner is not None
+            and existing_owner != atlas_id
+        ):
+            raise JellyfinLiveTvBindingConvergenceError(
+                "Atlas Live TV numeric identity collision."
+            )
+
+        number_owners[
+            number
+        ] = atlas_id
+
+    proposed: dict[str, str] = {}
+    proposed_items: set[str] = set()
+
+    for atlas_id in normalized_ids:
+        expected_number = (
+            atlas_jellyfin_channel_number(
+                atlas_id
+            )
+        )
+
+        matches = tuple(
+            channel
+            for channel in channels
+            if (
+                channel.channel_number
+                == expected_number
+            )
+        )
+
+        if len(matches) == 0:
+            raise JellyfinLiveTvBindingConvergenceError(
+                "Jellyfin Live TV channel is missing for "
+                "an Atlas numeric identity."
+            )
+
+        if len(matches) != 1:
+            raise JellyfinLiveTvBindingConvergenceError(
+                "Jellyfin Live TV numeric identity is ambiguous."
+            )
+
+        jellyfin_item_id = matches[
+            0
+        ].item_id
+
+        normalized_item_id = (
+            jellyfin_item_id.casefold()
+        )
+
+        if normalized_item_id in proposed_items:
+            raise JellyfinLiveTvBindingConvergenceError(
+                "Jellyfin Live TV item identity would be "
+                "bound more than once."
+            )
+
+        proposed_items.add(
+            normalized_item_id
+        )
+
+        proposed[
+            atlas_id
+        ] = jellyfin_item_id
+
+    return proposed
+
+
+def converge_jellyfin_live_tv_bindings(
+    atlas_channel_ids: tuple[str, ...],
+    *,
+    client: JellyfinWriterClient | None = None,
+    bindings: LiveTvBindingRegistry | None = None,
+) -> int:
+    """Converge exact numeric Jellyfin identities in one binding write."""
+
+    channel_ids = tuple(
+        atlas_channel_ids
+    )
+
+    if not channel_ids:
+        return 0
+
+    writer = (
+        client
+        if client is not None
+        else JellyfinWriterClient.from_environment()
+    )
+
+    registry = (
+        bindings
+        if bindings is not None
+        else default_live_tv_binding_registry()
+    )
+
+    inventory = (
+        writer.list_live_tv_channels()
+    )
+
+    proposed = (
+        build_jellyfin_live_tv_binding_plan(
+            channel_ids,
+            inventory,
+        )
+    )
+
+    registry.set_many(
+        proposed
+    )
+
+    return len(
+        proposed
+    )
+
+
 def run_operations_pipeline(
     provider_result: dict[str, Any],
     recordings: dict[str, dict[str, Any]],
@@ -680,7 +850,10 @@ def run_operations_pipeline(
         current_games
     )
 
-    feed_result = generate_feed()
+    (
+        feed_result,
+        published_channel_ids,
+    ) = generate_feed_snapshot()
 
     if feed_result != 0:
         raise RuntimeError(
@@ -688,6 +861,10 @@ def run_operations_pipeline(
         )
 
     refresh_jellyfin_live_tv()
+
+    converge_jellyfin_live_tv_bindings(
+        published_channel_ids
+    )
 
     write_provider_health(
         provider_health
