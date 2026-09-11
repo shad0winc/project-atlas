@@ -299,3 +299,285 @@ def test_bounded_refresh_times_out(
         )
 
     assert admin.started == ["task-guide"]
+
+
+def _load_inventory_writer(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import importlib
+
+    monkeypatch.setenv(
+        "ATLAS_JELLYFIN_WRITER_TOKEN",
+        "inventory-writer-test-token",
+    )
+    monkeypatch.setenv(
+        "ATLAS_JELLYFIN_URL",
+        "http://jellyfin:8096",
+    )
+    monkeypatch.setenv(
+        "ATLAS_JELLYFIN_API_KEY",
+        "inventory-test-api-key",
+    )
+    monkeypatch.setenv(
+        "ATLAS_JELLYFIN_TIMEOUT_SECONDS",
+        "10",
+    )
+
+    module = importlib.import_module(
+        "atlas_api.jellyfin_writer"
+    )
+
+    return importlib.reload(
+        module
+    )
+
+
+def _inventory_auth() -> dict[str, str]:
+    return {
+        "Authorization": (
+            "Bearer inventory-writer-test-token"
+        )
+    }
+
+
+class _InventoryProviderDouble:
+    def __init__(
+        self,
+        channels,
+    ) -> None:
+        self.channels = channels
+        self.calls = 0
+
+    def list_live_tv_channels(
+        self,
+    ):
+        self.calls += 1
+        return self.channels
+
+
+def test_live_tv_inventory_requires_service_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from fastapi.testclient import TestClient
+
+    module = _load_inventory_writer(
+        monkeypatch
+    )
+
+    provider = _InventoryProviderDouble(
+        ()
+    )
+
+    monkeypatch.setattr(
+        module,
+        "_jellyfin_provider",
+        lambda: provider,
+    )
+
+    client = TestClient(
+        module.app
+    )
+
+    missing = client.get(
+        "/internal/v1/jellyfin/live-tv/channels"
+    )
+
+    wrong = client.get(
+        "/internal/v1/jellyfin/live-tv/channels",
+        headers={
+            "Authorization": "Bearer wrong-token",
+        },
+    )
+
+    assert missing.status_code == 401
+    assert wrong.status_code == 401
+    assert provider.calls == 0
+
+
+def test_live_tv_inventory_returns_only_item_id_and_channel_number(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from fastapi.testclient import TestClient
+
+    module = _load_inventory_writer(
+        monkeypatch
+    )
+
+    provider = _InventoryProviderDouble(
+        (
+            {
+                "item_id": "jellyfin-channel-1",
+                "name": "Atlas Event One",
+                "channel_number": "912345678",
+                "type": "TvChannel",
+            },
+            {
+                "item_id": "jellyfin-channel-2",
+                "name": "Atlas Event Two",
+                "channel_number": None,
+                "type": "LiveTvChannel",
+            },
+        )
+    )
+
+    monkeypatch.setattr(
+        module,
+        "_jellyfin_provider",
+        lambda: provider,
+    )
+
+    response = TestClient(
+        module.app
+    ).get(
+        "/internal/v1/jellyfin/live-tv/channels",
+        headers=_inventory_auth(),
+    )
+
+    assert response.status_code == 200
+
+    assert response.json() == {
+        "channels": [
+            {
+                "item_id": "jellyfin-channel-1",
+                "channel_number": "912345678",
+            },
+            {
+                "item_id": "jellyfin-channel-2",
+                "channel_number": None,
+            },
+        ]
+    }
+
+    assert provider.calls == 1
+
+    serialized = response.text
+
+    for forbidden in (
+        "Atlas Event One",
+        "Atlas Event Two",
+        '"name"',
+        '"type"',
+        "ChannelId",
+        "MediaSources",
+        "Path",
+    ):
+        assert forbidden not in serialized
+
+
+def test_live_tv_inventory_preserves_duplicate_channel_numbers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from fastapi.testclient import TestClient
+
+    module = _load_inventory_writer(
+        monkeypatch
+    )
+
+    provider = _InventoryProviderDouble(
+        (
+            {
+                "item_id": "one",
+                "name": "One",
+                "channel_number": "955555555",
+                "type": "TvChannel",
+            },
+            {
+                "item_id": "two",
+                "name": "Two",
+                "channel_number": "955555555",
+                "type": "TvChannel",
+            },
+        )
+    )
+
+    monkeypatch.setattr(
+        module,
+        "_jellyfin_provider",
+        lambda: provider,
+    )
+
+    response = TestClient(
+        module.app
+    ).get(
+        "/internal/v1/jellyfin/live-tv/channels",
+        headers=_inventory_auth(),
+    )
+
+    assert response.status_code == 200
+
+    assert response.json() == {
+        "channels": [
+            {
+                "item_id": "one",
+                "channel_number": "955555555",
+            },
+            {
+                "item_id": "two",
+                "channel_number": "955555555",
+            },
+        ]
+    }
+
+
+def test_live_tv_inventory_provider_failure_is_sanitized(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from fastapi.testclient import TestClient
+    from atlas.media.provider import MediaProviderError
+
+    module = _load_inventory_writer(
+        monkeypatch
+    )
+
+    secret_detail = (
+        "secret-jellyfin-upstream-detail"
+    )
+
+    class FailingProvider:
+        def list_live_tv_channels(
+            self,
+        ):
+            raise MediaProviderError(
+                secret_detail
+            )
+
+    monkeypatch.setattr(
+        module,
+        "_jellyfin_provider",
+        lambda: FailingProvider(),
+    )
+
+    response = TestClient(
+        module.app
+    ).get(
+        "/internal/v1/jellyfin/live-tv/channels",
+        headers=_inventory_auth(),
+    )
+
+    assert response.status_code == 502
+
+    assert response.json() == {
+        "detail": (
+            "Jellyfin Live TV inventory is unavailable."
+        )
+    }
+
+    assert secret_detail not in response.text
+
+
+def test_inventory_provider_uses_writer_owned_jellyfin_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_inventory_writer(
+        monkeypatch
+    )
+
+    provider = module._jellyfin_provider()
+
+    assert provider.base_url == (
+        "http://jellyfin:8096"
+    )
+    assert provider.api_key == (
+        "inventory-test-api-key"
+    )
+    assert provider.timeout == 10.0
