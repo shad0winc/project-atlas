@@ -202,3 +202,87 @@ def test_invalid_configured_catalog_clears_stale_feed_and_reraises(
 
     assert stale_url not in m3u_file.read_text(encoding="utf-8")
     assert "sports-old" not in xmltv
+
+def test_jellyfin_channel_number_is_stable_and_reserved() -> None:
+    first = feed.atlas_jellyfin_channel_number(
+        "sports-live-authorized-game"
+    )
+    second = feed.atlas_jellyfin_channel_number(
+        "sports-live-authorized-game"
+    )
+
+    assert first == second
+    assert first.isdigit()
+
+    number = int(first)
+
+    assert (
+        feed.ATLAS_JELLYFIN_CHANNEL_NUMBER_BASE
+        <= number
+        < (
+            feed.ATLAS_JELLYFIN_CHANNEL_NUMBER_BASE
+            + feed.ATLAS_JELLYFIN_CHANNEL_NUMBER_SLOTS
+        )
+    )
+
+
+def test_m3u_emits_stable_jellyfin_channel_number() -> None:
+    games = [
+        {
+            "id": "event-1",
+            "name": "Atlas United vs Atlas City",
+            "stream_url": (
+                "https://authorized.invalid/game.m3u8"
+            ),
+            "_atlas_channel_id": (
+                "sports-live-authorized-game"
+            ),
+        }
+    ]
+
+    expected = feed.atlas_jellyfin_channel_number(
+        "sports-live-authorized-game"
+    )
+
+    m3u = render_m3u(games)
+
+    assert (
+        'tvg-id="sports-live-authorized-game"'
+        in m3u
+    )
+    assert f'tvg-chno="{expected}"' in m3u
+
+
+def test_m3u_rejects_jellyfin_channel_number_collision(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        feed,
+        "atlas_jellyfin_channel_number",
+        lambda _channel_id: "900000001",
+    )
+
+    games = [
+        {
+            "id": "event-1",
+            "name": "One",
+            "stream_url": (
+                "https://authorized.invalid/one.m3u8"
+            ),
+            "_atlas_channel_id": "sports-live-one",
+        },
+        {
+            "id": "event-2",
+            "name": "Two",
+            "stream_url": (
+                "https://authorized.invalid/two.m3u8"
+            ),
+            "_atlas_channel_id": "sports-live-two",
+        },
+    ]
+
+    with pytest.raises(
+        ValueError,
+        match="channel number collision",
+    ):
+        render_m3u(games)
