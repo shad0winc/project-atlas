@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_DIR="/opt/project-atlas"
+PROJECT_DIR="${ATLAS_PROJECT_DIR:-/opt/project-atlas}"
 MODULE_DIR="$PROJECT_DIR/modules/sports"
 MODULE_ENV_FILE="$MODULE_DIR/.env"
 OPERATOR_ENV_FILE="$PROJECT_DIR/.env"
