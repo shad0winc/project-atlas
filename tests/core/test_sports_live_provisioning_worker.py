@@ -348,18 +348,26 @@ def test_operations_provisions_only_current_subscribed_games(
         "prune_unmanaged_games",
         lambda *args, **kwargs: 0,
     )
+    order: list[str] = []
+
+    def process(games, *, publish_feed):
+        assert publish_feed is False
+        order.append("process")
+        return {
+            "current-game": current,
+            "preserved-game": preserved,
+        }
+
     monkeypatch.setattr(
         worker,
         "process_games",
-        lambda games: {
-            "current-game": current,
-            "preserved-game": preserved,
-        },
+        process,
     )
 
     seen: list[list[str]] = []
 
     def provision(games):
+        order.append("provision")
         seen.append(
             [str(game["id"]) for game in games]
         )
@@ -369,6 +377,11 @@ def test_operations_provisions_only_current_subscribed_games(
         worker,
         "run_live_source_provisioning_pipeline",
         provision,
+    )
+    monkeypatch.setattr(
+        worker,
+        "generate_feed",
+        lambda: order.append("feed") or 0,
     )
     monkeypatch.setattr(
         worker,
@@ -402,6 +415,11 @@ def test_operations_provisions_only_current_subscribed_games(
 
     assert result == 0
     assert seen == [["current-game"]]
+    assert order == [
+        "process",
+        "provision",
+        "feed",
+    ]
 
 
 def test_controller_compose_exposes_required_runtime_contract() -> None:
@@ -610,3 +628,120 @@ def test_no_authorized_content_does_not_touch_live_source_registry(
     )
 
     assert result == 0
+
+
+
+def test_operations_do_not_generate_feed_when_provisioning_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    worker = _worker()
+
+    current = _live_game("current-game")
+
+    provider_result = {
+        "previous_games": {},
+        "subscribed_previous_games": {},
+        "provider_games": [current],
+        "provider_health": {},
+        "subscribed_games": [current],
+        "degraded_count": 0,
+    }
+
+    monkeypatch.setattr(
+        worker,
+        "prune_unmanaged_games",
+        lambda *args, **kwargs: 0,
+    )
+
+    def process(games, *, publish_feed):
+        assert publish_feed is False
+        return {
+            "current-game": current,
+        }
+
+    monkeypatch.setattr(
+        worker,
+        "process_games",
+        process,
+    )
+
+    def fail_provision(games):
+        raise RuntimeError(
+            "synthetic provisioning failure"
+        )
+
+    monkeypatch.setattr(
+        worker,
+        "run_live_source_provisioning_pipeline",
+        fail_provision,
+    )
+
+    def unexpected_feed():
+        raise AssertionError(
+            "feed must not regenerate after "
+            "LiveSource provisioning failure"
+        )
+
+    monkeypatch.setattr(
+        worker,
+        "generate_feed",
+        unexpected_feed,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="synthetic provisioning failure",
+    ):
+        worker.run_operations_pipeline(
+            provider_result,
+            {},
+        )
+
+
+def test_operations_propagate_feed_generation_failure_after_provisioning(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    worker = _worker()
+
+    current = _live_game("current-game")
+
+    provider_result = {
+        "previous_games": {},
+        "subscribed_previous_games": {},
+        "provider_games": [current],
+        "provider_health": {},
+        "subscribed_games": [current],
+        "degraded_count": 0,
+    }
+
+    monkeypatch.setattr(
+        worker,
+        "prune_unmanaged_games",
+        lambda *args, **kwargs: 0,
+    )
+    monkeypatch.setattr(
+        worker,
+        "process_games",
+        lambda games, *, publish_feed: {
+            "current-game": current,
+        },
+    )
+    monkeypatch.setattr(
+        worker,
+        "run_live_source_provisioning_pipeline",
+        lambda games: 1,
+    )
+    monkeypatch.setattr(
+        worker,
+        "generate_feed",
+        lambda: 1,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="Sports feed generation failed",
+    ):
+        worker.run_operations_pipeline(
+            provider_result,
+            {},
+        )

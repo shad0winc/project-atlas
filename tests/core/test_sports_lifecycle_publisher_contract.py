@@ -115,3 +115,71 @@ def test_finished_event_uses_atlas_module_publish_contract(
     assert event_name == "sports.game-finished"
     assert payload["game_id"] == "event-001"
     assert payload["status"] == "finished"
+
+
+
+def test_process_games_can_defer_feed_generation(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    controller, state_file = _controller(
+        monkeypatch,
+        tmp_path,
+    )
+
+    feed_calls: list[str] = []
+
+    monkeypatch.setattr(
+        controller,
+        "generate_feed",
+        lambda: feed_calls.append("feed") or 0,
+    )
+
+    result = controller.process_games(
+        [_game("live")],
+        now=datetime(
+            2026,
+            8,
+            7,
+            0,
+            30,
+            tzinfo=timezone.utc,
+        ),
+        publish_feed=False,
+    )
+
+    assert "event-001" in result
+    assert state_file.exists()
+    assert feed_calls == []
+
+
+def test_process_games_generates_feed_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    controller, _state_file = _controller(
+        monkeypatch,
+        tmp_path,
+    )
+
+    feed_calls: list[str] = []
+
+    monkeypatch.setattr(
+        controller,
+        "generate_feed",
+        lambda: feed_calls.append("feed") or 0,
+    )
+
+    controller.process_games(
+        [_game("live")],
+        now=datetime(
+            2026,
+            8,
+            7,
+            0,
+            30,
+            tzinfo=timezone.utc,
+        ),
+    )
+
+    assert feed_calls == ["feed"]

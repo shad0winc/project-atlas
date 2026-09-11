@@ -106,6 +106,8 @@ def normalize_game(
 def process_games(
     provider_games: list[dict[str, Any]],
     now: datetime | None = None,
+    *,
+    publish_feed: bool = True,
 ) -> dict[str, dict[str, Any]]:
     if now is None:
         now = utc_now()
@@ -237,12 +239,13 @@ def process_games(
 
     save_state(next_games)
 
-    feed_result = generate_feed()
+    if publish_feed:
+        feed_result = generate_feed()
 
-    if feed_result != 0:
-        raise RuntimeError(
-            "Sports feed generation failed"
-        )
+        if feed_result != 0:
+            raise RuntimeError(
+                "Sports feed generation failed"
+            )
 
     return next_games
 
