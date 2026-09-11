@@ -245,7 +245,7 @@ def mark_provider_healthy(
     health: dict[str, dict[str, Any]],
     provider_name: str,
     game_count: int,
-) -> None:
+) -> tuple[str, dict[str, Any]] | None:
     previous = health.get(
         provider_name,
         {},
@@ -269,23 +269,25 @@ def mark_provider_healthy(
         "game_count": game_count,
     }
 
-    if previous_status == "degraded":
-        publish_provider_health_event(
-            "sports.provider-recovered",
-            {
-                "provider": provider_name,
-                "status": "healthy",
-                "previous_status": previous_status,
-                "game_count": game_count,
-            },
-        )
+    if previous_status != "degraded":
+        return None
+
+    return (
+        "sports.provider-recovered",
+        {
+            "provider": provider_name,
+            "status": "healthy",
+            "previous_status": previous_status,
+            "game_count": game_count,
+        },
+    )
 
 
 def mark_provider_degraded(
     health: dict[str, dict[str, Any]],
     provider_name: str,
     error: Exception,
-) -> None:
+) -> tuple[str, dict[str, Any]] | None:
     previous = health.get(
         provider_name,
         {},
@@ -319,17 +321,19 @@ def mark_provider_degraded(
         ),
     }
 
-    if previous_status != "degraded":
-        publish_provider_health_event(
-            "sports.provider-degraded",
-            {
-                "provider": provider_name,
-                "status": "degraded",
-                "previous_status": previous_status,
-                "error": str(error),
-                "consecutive_failures": consecutive_failures,
-            },
-        )
+    if previous_status == "degraded":
+        return None
+
+    return (
+        "sports.provider-degraded",
+        {
+            "provider": provider_name,
+            "status": "degraded",
+            "previous_status": previous_status,
+            "error": str(error),
+            "consecutive_failures": consecutive_failures,
+        },
+    )
 
 
 def run_provider_pipeline() -> dict[str, Any] | None:
@@ -361,6 +365,9 @@ def run_provider_pipeline() -> dict[str, Any] | None:
     }
 
     degraded_count = 0
+    provider_health_events: list[
+        tuple[str, dict[str, Any]]
+    ] = []
 
     for provider in providers:
         tracked_ids = tracked_event_ids(
@@ -392,11 +399,18 @@ def run_provider_pipeline() -> dict[str, Any] | None:
         except Exception as exc:
             degraded_count += 1
 
-            mark_provider_degraded(
-                provider_health,
-                provider.name,
-                exc,
+            provider_health_event = (
+                mark_provider_degraded(
+                    provider_health,
+                    provider.name,
+                    exc,
+                )
             )
+
+            if provider_health_event is not None:
+                provider_health_events.append(
+                    provider_health_event
+                )
 
             print(
                 f"Provider {provider.name}: "
@@ -408,11 +422,18 @@ def run_provider_pipeline() -> dict[str, Any] | None:
 
         provider_games.extend(games)
 
-        mark_provider_healthy(
-            provider_health,
-            provider.name,
-            len(games),
+        provider_health_event = (
+            mark_provider_healthy(
+                provider_health,
+                provider.name,
+                len(games),
+            )
         )
+
+        if provider_health_event is not None:
+            provider_health_events.append(
+                provider_health_event
+            )
 
         print(
             f"Provider {provider.name}: "
@@ -437,6 +458,9 @@ def run_provider_pipeline() -> dict[str, Any] | None:
         "provider_health": provider_health,
         "subscribed_games": subscribed_games,
         "degraded_count": degraded_count,
+        "provider_health_events": tuple(
+            provider_health_events
+        ),
     }
 
 
@@ -823,6 +847,10 @@ def run_operations_pipeline(
     degraded_count = provider_result[
         "degraded_count"
     ]
+    provider_health_events = provider_result.get(
+        "provider_health_events",
+        (),
+    )
 
     prune_unmanaged_games(
         previous_games,
@@ -870,6 +898,11 @@ def run_operations_pipeline(
         provider_health
     )
 
+    for event_name, event_payload in provider_health_events:
+        publish_provider_health_event(
+            event_name,
+            event_payload,
+        )
 
     write_heartbeat()
 
