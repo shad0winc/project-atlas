@@ -388,6 +388,16 @@ def _write_recovery_state(project: Path) -> None:
         encoding="utf-8",
     )
 
+    dispatcharr_channel_bindings = (
+        Path(env["SPORTS_CONFIG_DIR"])
+        / "state"
+        / "dispatcharr-channel-bindings.json"
+    )
+    dispatcharr_channel_bindings.write_text(
+        '{"version":1,"bindings":{}}\n',
+        encoding="utf-8",
+    )
+
     live_sources = (
         Path(env["SPORTS_CONFIG_DIR"])
         / "state"
