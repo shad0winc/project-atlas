@@ -837,6 +837,187 @@ atlas_deployment_rollback() {
   printf 'Rollback complete: %s -> %s\n' "$identifier" "$previous_id"
 }
 
+atlas_deployment_recover_failed_before_apply() {
+  local identifier="$1"
+  local transaction
+  local transaction_type
+  local status
+  local migration
+  local previous_id
+  local baseline
+  local current_id
+  local scope
+
+  atlas_deployment_valid_id "$identifier" || {
+    echo 'ERROR: invalid deployment identifier.' >&2
+    return 2
+  }
+
+  atlas_deployment_validate_source || return 1
+
+  transaction="$(atlas_deployment_record_dir "$identifier")" || return 1
+
+  [[ -d "$transaction" && -f "$transaction/metadata" && -f "$transaction/status" ]] || {
+    printf 'ERROR: deployment record is incomplete: %s\n' "$identifier" >&2
+    return 1
+  }
+
+  transaction_type="$(atlas_deployment_record_value "$transaction" type)"
+  status="$(<"$transaction/status")"
+
+  [[ "$transaction_type" == 'update' && "$status" == 'failed' ]] || {
+    printf \
+      'ERROR: deployment %s is not failed-before-apply recovery eligible (type=%s status=%s).\n' \
+      "$identifier" \
+      "${transaction_type:-unknown}" \
+      "${status:-unknown}" >&2
+    return 1
+  }
+
+  migration="$(atlas_deployment_record_value "$transaction" migration)"
+  [[ "$migration" == 'none' ]] || {
+    echo 'ERROR: failed-before-apply recovery requires migration=none.' >&2
+    return 1
+  }
+
+  # In the canonical update transaction, backup_file is recorded before
+  # the runtime apply stage is invoked. Its absence therefore proves that
+  # the canonical apply stage was never entered.
+  [[ ! -e "$transaction/backup_file" ]] || {
+    echo 'ERROR: failed-before-apply recovery refuses a transaction with a recorded pre-update backup.' >&2
+    return 1
+  }
+
+  previous_id="$(atlas_deployment_record_value "$transaction" previous_baseline)"
+
+  atlas_deployment_valid_id "$previous_id" || {
+    echo 'ERROR: failed transaction has an invalid previous baseline identity.' >&2
+    return 1
+  }
+
+  baseline="$(atlas_deployment_record_dir "$previous_id")" || return 1
+
+  [[ -d "$baseline" && -f "$baseline/status" ]] || {
+    echo 'ERROR: previous deployment baseline is unavailable.' >&2
+    return 1
+  }
+
+  [[ "$(<"$baseline/status")" == 'verified' ]] || {
+    echo 'ERROR: previous deployment baseline is not verified.' >&2
+    return 1
+  }
+
+  current_id="$(atlas_deployment_current_id)" || {
+    echo 'ERROR: current deployment baseline cannot be resolved.' >&2
+    return 1
+  }
+
+  [[ "$current_id" == "$previous_id" ]] || {
+    echo 'ERROR: failed deployment no longer points at the current baseline.' >&2
+    return 1
+  }
+
+  [[ -d "$(atlas_deployment_lock_dir)" ]] || {
+    echo 'ERROR: failed-before-apply recovery requires the original deployment lock.' >&2
+    return 1
+  }
+
+  atlas_deployment_lock_matches "$identifier" || {
+    echo 'ERROR: another deployment owns the active lock.' >&2
+    return 1
+  }
+
+  [[ -f "$(atlas_maintenance_flag)" ]] || {
+    echo 'ERROR: failed-before-apply recovery requires maintenance mode to remain enabled.' >&2
+    return 1
+  }
+
+  # The unchanged verified baseline must still describe the live runtime
+  # before public traffic is reopened.
+  atlas_deployment_verify_runtime "$baseline" || {
+    echo 'ERROR: production runtime differs from the verified previous baseline.' >&2
+    return 1
+  }
+
+  atlas_command_doctor || {
+    echo 'ERROR: pre-recovery doctor verification failed.' >&2
+    return 1
+  }
+
+  atlas_command_verify || {
+    echo 'ERROR: pre-recovery Atlas verification failed.' >&2
+    return 1
+  }
+
+  scope="$(atlas_deployment_record_value "$transaction" scope)"
+
+  case "$scope" in
+    core|ingress|all)
+      ;;
+    *)
+      printf 'ERROR: unsupported failed deployment scope: %s\n' "${scope:-unknown}" >&2
+      return 1
+      ;;
+  esac
+
+  if [[ "$scope" == 'ingress' || "$scope" == 'all' ]]; then
+    "$ATLAS_PROJECT_DIR/scripts/verify-ingress.sh" || {
+      echo 'ERROR: pre-recovery ingress verification failed.' >&2
+      return 1
+    }
+  fi
+
+  if ! atlas_command_maintenance disable; then
+    echo 'ERROR: unable to reopen public traffic during failed-before-apply recovery.' >&2
+    return 1
+  fi
+
+  atlas_command_doctor || {
+    atlas_command_maintenance enable || true
+    echo 'ERROR: public post-recovery doctor verification failed; maintenance restored.' >&2
+    return 1
+  }
+
+  atlas_command_verify || {
+    atlas_command_maintenance enable || true
+    echo 'ERROR: public post-recovery Atlas verification failed; maintenance restored.' >&2
+    return 1
+  }
+
+  if [[ "$scope" == 'ingress' || "$scope" == 'all' ]]; then
+    "$ATLAS_PROJECT_DIR/scripts/verify-ingress.sh" || {
+      atlas_command_maintenance enable || true
+      echo 'ERROR: public post-recovery ingress verification failed; maintenance restored.' >&2
+      return 1
+    }
+  fi
+
+  atlas_deployment_verify_runtime "$baseline" || {
+    atlas_command_maintenance enable || true
+    echo 'ERROR: runtime drift detected after reopening public traffic; maintenance restored.' >&2
+    return 1
+  }
+
+  atlas_deployment_set_status "$transaction" recovered_pre_apply || {
+    atlas_command_maintenance enable || true
+    echo 'ERROR: unable to record failed-before-apply recovery status; maintenance restored.' >&2
+    return 1
+  }
+
+  if ! atlas_deployment_release_lock "$identifier"; then
+    atlas_command_maintenance enable || true
+    atlas_deployment_set_status "$transaction" failed || true
+
+    echo 'ERROR: unable to release recovered deployment lock; maintenance restored.' >&2
+    return 1
+  fi
+
+  printf \
+    'Failed-before-apply recovery complete: %s -> %s\n' \
+    "$identifier" \
+    "$previous_id"
+}
+
 atlas_command_deployment() {
   local action="${1:-status}"
   case "$action" in
@@ -845,6 +1026,13 @@ atlas_command_deployment() {
       ;;
     baseline)
       atlas_deployment_baseline
+      ;;
+    recover-failed-before-apply)
+      [[ -n "${2:-}" ]] || {
+        echo 'Usage: atlas deployment recover-failed-before-apply <deployment-id>' >&2
+        return 2
+      }
+      atlas_deployment_recover_failed_before_apply "$2"
       ;;
     rollback)
       [[ -n "${2:-}" ]] || {
@@ -858,10 +1046,13 @@ atlas_command_deployment() {
 Usage:
   atlas deployment status
   atlas deployment baseline
+  atlas deployment recover-failed-before-apply <deployment-id>
   atlas deployment rollback <deployment-id>
 
 Baseline creation records verified production source archives and exact running
-image identities. Rollback restores only a directly related known-good baseline.
+image identities. Failed-before-apply recovery only clears a held failed update
+after proving the previous verified baseline is still current and unchanged.
+Rollback restores only a directly related known-good baseline.
 HELP
       ;;
     *)
