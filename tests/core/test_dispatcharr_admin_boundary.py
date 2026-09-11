@@ -439,3 +439,123 @@ def test_writer_packages_dispatcharr_admin_module_and_private_network() -> None:
         "DISPATCHARR_ADMIN_PASSWORD:"
         in sports_writer
     )
+
+
+def test_access_token_is_reused_within_one_client(
+    monkeypatch,
+) -> None:
+    module = _load_module()
+
+    client = module.DispatcharrAdminClient(
+        base_url="http://dispatcharr.invalid",
+        admin_username="admin",
+        admin_password="admin-secret",
+    )
+
+    calls = []
+
+    def request(
+        method,
+        path,
+        payload=None,
+        *,
+        access_token=None,
+    ):
+        calls.append(
+            (
+                method,
+                path,
+                payload,
+                access_token,
+            )
+        )
+
+        assert path == "/api/accounts/auth/login/"
+
+        return {
+            "access": "opaque-access-token",
+        }
+
+    monkeypatch.setattr(
+        client,
+        "_json_request",
+        request,
+    )
+
+    first = client._access_token()
+    second = client._access_token()
+
+    assert first == "opaque-access-token"
+    assert second == "opaque-access-token"
+
+    assert calls == [
+        (
+            "POST",
+            "/api/accounts/auth/login/",
+            {
+                "username": "admin",
+                "password": "admin-secret",
+            },
+            None,
+        )
+    ]
+
+
+def test_access_token_cache_is_not_shared_between_clients(
+    monkeypatch,
+) -> None:
+    module = _load_module()
+
+    first_client = module.DispatcharrAdminClient(
+        base_url="http://dispatcharr.invalid",
+        admin_username="admin",
+        admin_password="admin-secret",
+    )
+
+    second_client = module.DispatcharrAdminClient(
+        base_url="http://dispatcharr.invalid",
+        admin_username="admin",
+        admin_password="admin-secret",
+    )
+
+    calls = []
+
+    def request(
+        method,
+        path,
+        payload=None,
+        *,
+        access_token=None,
+    ):
+        calls.append(path)
+
+        return {
+            "access": "opaque-access-token",
+        }
+
+    monkeypatch.setattr(
+        first_client,
+        "_json_request",
+        request,
+    )
+
+    monkeypatch.setattr(
+        second_client,
+        "_json_request",
+        request,
+    )
+
+    assert (
+        first_client._access_token()
+        == "opaque-access-token"
+    )
+
+    assert (
+        second_client._access_token()
+        == "opaque-access-token"
+    )
+
+    assert calls == [
+        "/api/accounts/auth/login/",
+        "/api/accounts/auth/login/",
+    ]
