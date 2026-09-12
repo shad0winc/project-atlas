@@ -121,6 +121,35 @@ def test_core_apply_does_not_provision_dislikes_runtime() -> None:
     assert "atlas_dislikes_runtime_provision" not in body
 
 
+
+def test_ingress_update_bootstraps_dislikes_before_maintenance_and_backup() -> None:
+    source = UPDATE_SCRIPT.read_text(encoding="utf-8")
+
+    transaction_start = source.index(
+        "echo 'Target artifact preflight: PASS'"
+    )
+    maintenance = source.index(
+        "if ! atlas_command_maintenance enable",
+        transaction_start,
+    )
+    backup = source.index(
+        "if ! atlas_command_backup --notes",
+        maintenance,
+    )
+
+    premaintenance = source[transaction_start:maintenance]
+
+    assert 'scripts/lib/dislikes-runtime.sh' in premaintenance
+    assert "atlas_dislikes_runtime_provision" in premaintenance
+
+    bootstrap = source.index(
+        "atlas_dislikes_runtime_provision",
+        transaction_start,
+    )
+
+    assert bootstrap < maintenance < backup
+
+
 def test_provision_creates_exact_runtime_contract(
     tmp_path: Path,
 ) -> None:

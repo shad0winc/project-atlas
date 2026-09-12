@@ -562,6 +562,19 @@ atlas_command_update() {
       echo 'ERROR: Sports Dispatcharr binding bootstrap failed before maintenance.' >&2
       return 1
     fi
+
+    source "$ATLAS_PROJECT_DIR/scripts/lib/dislikes-runtime.sh"
+
+    if ! atlas_dislikes_runtime_provision; then
+      atlas_deployment_set_status \
+        "$(atlas_deployment_record_dir "$identifier")" \
+        aborted
+
+      atlas_deployment_release_lock "$identifier"
+
+      echo 'ERROR: Dislikes runtime bootstrap failed before maintenance.' >&2
+      return 1
+    fi
   fi
 
   if ! atlas_command_maintenance enable; then
