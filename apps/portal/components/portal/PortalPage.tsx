@@ -6,6 +6,7 @@ import { RequirePermission } from "../auth/RequirePermission";
 import type { AtlasPermission } from "../../lib/authorization";
 
 import { PortalAccessDenied } from "./PortalAccessDenied";
+import { PortalSectionBanner } from "./PortalSectionBanner";
 
 export type PortalPageProps = Readonly<{
   permission: AtlasPermission;
@@ -51,6 +52,8 @@ export function PortalPage({
       permission={permission}
     >
       <div className="portal-page">
+        <PortalSectionBanner />
+
         <header className="portal-page-header">
           <div className="portal-page-heading">
             <p className="portal-page-eyebrow">{eyebrow}</p>

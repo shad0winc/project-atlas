@@ -2936,3 +2936,44 @@ section[aria-labelledby="service-detail-title"] dd {
 .live-session-detail-list span {
   color: var(--muted);
 }
+
+/* Project Atlas responsive section artwork */
+.portal-section-banner {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow:
+    0 18px 42px rgba(2, 6, 23, 0.24),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+}
+
+.portal-section-banner-image {
+  display: block;
+  width: 100%;
+  height: clamp(10rem, 26vw, 22rem);
+  object-fit: cover;
+  object-position: center;
+}
+
+@media (max-width: 1024px) {
+  .portal-section-banner-image {
+    height: clamp(12rem, 38vw, 24rem);
+  }
+}
+
+@media (max-width: 640px) and (orientation: portrait) {
+  .portal-section-banner-image {
+    height: clamp(17rem, 74vw, 28rem);
+    object-position: center 38%;
+  }
+}
+
+@media (max-width: 960px) and (orientation: landscape) {
+  .portal-section-banner-image {
+    height: clamp(9rem, 34vh, 15rem);
+    object-position: center;
+  }
+}

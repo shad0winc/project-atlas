@@ -19,9 +19,122 @@ atlas.shadowinc.co {
                         }
                 }
 
+                # Maintenance artwork remains available while Portal/API requests
+                # stay isolated behind the HTTP 503 maintenance boundary.
+                handle /maintenance/* {
+                        root * /srv
+                        file_server
+                }
+
                 handle @atlas_maintenance {
                         header Retry-After "300"
-                        respond "Project Atlas is temporarily unavailable for maintenance." 503
+                        header Content-Type "text/html; charset=utf-8"
+                        respond <<HTML
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Project Atlas Maintenance</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #07111f;
+      color: #f8fafc;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+      margin: 0;
+    }
+
+    body {
+      display: grid;
+      min-height: 100vh;
+      min-height: 100dvh;
+      place-items: center;
+      padding: clamp(1rem, 3vw, 2.5rem);
+      background:
+        radial-gradient(circle at top, rgba(30, 64, 175, 0.2), transparent 42rem),
+        #07111f;
+    }
+
+    main {
+      width: min(100%, 72rem);
+    }
+
+    .maintenance-frame {
+      overflow: hidden;
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      border-radius: 1.25rem;
+      background: rgba(15, 23, 42, 0.88);
+      box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, 0.35);
+    }
+
+    picture,
+    img {
+      display: block;
+      width: 100%;
+    }
+
+    img {
+      max-height: min(72vh, 48rem);
+      object-fit: contain;
+      background: #07111f;
+    }
+
+    .maintenance-copy {
+      padding: clamp(1.25rem, 3vw, 2rem);
+      text-align: center;
+    }
+
+    h1 {
+      margin: 0;
+      color: #f8fafc;
+      font-size: clamp(1.5rem, 3vw, 2.35rem);
+      line-height: 1.15;
+    }
+
+    p {
+      max-width: 48rem;
+      margin: 0.85rem auto 0;
+      color: #cbd5e1;
+      font-size: clamp(1rem, 2vw, 1.1rem);
+      line-height: 1.65;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="maintenance-frame" aria-labelledby="maintenance-title">
+      <picture aria-hidden="true">
+        <source
+          media="(max-width: 640px) and (orientation: portrait)"
+          srcset="/maintenance/Maintenance_Phone_Image.png">
+        <source
+          media="(max-width: 1024px)"
+          srcset="/maintenance/Maintenance_Tablet_Image.png">
+        <img
+          src="/maintenance/Maintenance_Desktop_Image.png"
+          alt=""
+          decoding="async">
+      </picture>
+      <div class="maintenance-copy">
+        <h1 id="maintenance-title">Project Atlas is currently under maintenance.</h1>
+        <p>We are working to get it back up and running as soon as possible.</p>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
+HTML 503
                 }
 
                 # API documentation and schema metadata are intentionally
