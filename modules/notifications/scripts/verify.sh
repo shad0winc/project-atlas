@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_DIR="/opt/project-atlas"
+PROJECT_DIR="${ATLAS_PROJECT_DIR:-/opt/project-atlas}"
+export PROJECT_DIR
 ATLAS_CONFIG_FILE="$PROJECT_DIR/config/atlas.conf"
 
 module_id="notifications"
@@ -60,7 +61,7 @@ check "Module compose valid" \
 
 check "Sports audience notification formatting valid" \
   sh -c '
-    cd /opt/project-atlas
+    cd "$PROJECT_DIR"
 
     PYTHONPATH=modules/notifications/src python3 - <<'"'"'PY'"'"'
 from formatter import notification_fields
@@ -119,7 +120,7 @@ PY
 
 check "Media request notification integration valid" \
   sh -c '
-    cd /opt/project-atlas
+    cd "$PROJECT_DIR"
 
     PYTHONPATH=modules/notifications/src python3 - <<'"'"'PYVERIFY'"'"'
 from formatter import (

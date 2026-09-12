@@ -2,6 +2,7 @@
 set -euo pipefail
 
 PROJECT_DIR="${ATLAS_PROJECT_DIR:-/opt/project-atlas}"
+export PROJECT_DIR
 ATLAS_CONFIG_FILE="$PROJECT_DIR/config/atlas.conf"
 MODULE_ENV_FILE="$PROJECT_DIR/modules/sports/.env"
 OPERATOR_ENV_FILE="$PROJECT_DIR/.env"
@@ -82,7 +83,7 @@ check "Sports provider healthy" \
 
 check "Sports visibility policy valid" \
   sh -c '
-    cd /opt/project-atlas
+    cd "$PROJECT_DIR"
 
     PYTHONPATH=modules/sports/src python3 - <<'"'"'PY'"'"'
 from datetime import datetime, timezone
@@ -147,7 +148,7 @@ PY
 
 check "Sports subscription resolver valid" \
   sh -c '
-    cd /opt/project-atlas
+    cd "$PROJECT_DIR"
 
     PYTHONPATH=modules/sports/src python3 - <<'"'"'PY'"'"'
 from resolver import resolve_subscribed_games
@@ -215,7 +216,7 @@ PY
 
 check "Sports recording scheduler valid" \
   sh -c '
-    cd /opt/project-atlas
+    cd "$PROJECT_DIR"
 
     test_file="/tmp/atlas-sports-recording-verify.json"
 
