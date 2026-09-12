@@ -693,6 +693,98 @@ atlas_deployment_wait_for_ingress_readiness() {
   return 1
 }
 
+
+atlas_deployment_rollback_recovery_source() {
+  local transaction="$1"
+  local surface="$2"
+  local candidate
+  local -a candidates=()
+
+  case "$surface" in
+    core|ingress)
+      ;;
+    *)
+      printf \
+        'ERROR: unsupported rollback recovery source surface: %s\n' \
+        "$surface" >&2
+      return 1
+      ;;
+  esac
+
+  [[ -d "$transaction" ]] || {
+    printf \
+      'ERROR: rollback transaction directory is missing: %s\n' \
+      "$transaction" >&2
+    return 1
+  }
+
+  while IFS= read -r candidate; do
+    [[ -n "$candidate" ]] || continue
+    candidates+=("$candidate")
+  done < <(
+    find "$transaction" \
+      -mindepth 1 \
+      -maxdepth 1 \
+      -type d \
+      -name "recovery-${surface}.*" \
+      -print |
+      LC_ALL=C sort
+  )
+
+  [[ "${#candidates[@]}" -eq 1 ]] || {
+    printf \
+      'ERROR: rollback recovery source is ambiguous for %s: found %s candidates.\n' \
+      "$surface" \
+      "${#candidates[@]}" >&2
+    return 1
+  }
+
+  printf '%s\n' "${candidates[0]}"
+}
+
+atlas_deployment_verify_rollback_runtime() {
+  local transaction="$1"
+  local scope="$2"
+  local recovery
+  local ingress_verifier
+
+  atlas_command_doctor || return 1
+
+  case "$scope" in
+    core)
+      atlas_command_verify || return 1
+      ;;
+    ingress|all)
+      recovery="$(
+        atlas_deployment_rollback_recovery_source \
+          "$transaction" \
+          ingress
+      )" || return 1
+
+      ingress_verifier="$recovery/scripts/verify-ingress.sh"
+
+      [[ -f "$ingress_verifier" && -x "$ingress_verifier" ]] || {
+        printf \
+          'ERROR: historical rollback ingress verifier is unavailable: %s\n' \
+          "$ingress_verifier" >&2
+        return 1
+      }
+
+      ATLAS_VERIFY_INGRESS_VERIFIER="$ingress_verifier" \
+        atlas_command_verify || return 1
+
+      ATLAS_PROJECT_DIR="$recovery" \
+        "$ingress_verifier" || return 1
+      ;;
+    *)
+      printf \
+        'ERROR: unsupported rollback verification scope: %s\n' \
+        "$scope" >&2
+      return 1
+      ;;
+  esac
+}
+
 atlas_deployment_rollback() {
   local identifier="$1"
   local transaction
@@ -801,28 +893,14 @@ atlas_deployment_rollback() {
     }
   fi
 
-  atlas_command_doctor || return 1
-  atlas_command_verify || return 1
-  if [[ "$scope" == 'ingress' || "$scope" == 'all' ]]; then
-    "$ATLAS_PROJECT_DIR/scripts/verify-ingress.sh" || return 1
-  fi
+  atlas_deployment_verify_rollback_runtime     "$transaction"     "$scope" || return 1
 
   atlas_command_maintenance disable || return 1
 
-  atlas_command_doctor || {
-    atlas_command_maintenance enable || true
-    return 1
-  }
-  atlas_command_verify || {
-    atlas_command_maintenance enable || true
-    return 1
-  }
-  if [[ "$scope" == 'ingress' || "$scope" == 'all' ]]; then
-    "$ATLAS_PROJECT_DIR/scripts/verify-ingress.sh" || {
+  atlas_deployment_verify_rollback_runtime     "$transaction"     "$scope" || {
       atlas_command_maintenance enable || true
       return 1
     }
-  fi
 
   atlas_deployment_set_current "$previous_id" || {
     atlas_command_maintenance enable || true

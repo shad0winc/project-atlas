@@ -574,17 +574,44 @@ def test_recovery_directory_rejects_transaction_outside_records_namespace(
 
 def test_rollback_reopens_traffic_only_after_verification() -> None:
     content = DEPLOYMENT.read_text(encoding="utf-8")
-    section = content.split("atlas_deployment_rollback() {", 1)[1].split(
-        "atlas_command_deployment() {", 1
+
+    helper_start = content.index(
+        "atlas_deployment_verify_rollback_runtime() {"
+    )
+    rollback_start = content.index(
+        "atlas_deployment_rollback() {",
+        helper_start,
+    )
+    helper = content[helper_start:rollback_start]
+
+    assert "atlas_command_doctor || return 1" in helper
+    assert "atlas_command_verify || return 1" in helper
+
+    section = content[rollback_start:].split(
+        "atlas_command_deployment() {",
+        1,
     )[0]
 
-    doctor = section.index("atlas_command_doctor")
-    verify = section.index("atlas_command_verify")
+    private_verify = section.index(
+        "atlas_deployment_verify_rollback_runtime"
+    )
     disable = section.index("atlas_command_maintenance disable")
-    public_verify = section.index("atlas_command_verify", disable)
+    public_verify = section.index(
+        "atlas_deployment_verify_rollback_runtime",
+        private_verify + 1,
+    )
+    set_current = section.index(
+        'atlas_deployment_set_current "$previous_id"'
+    )
     release = section.rindex("atlas_deployment_release_lock")
-    set_current = section.index("atlas_deployment_set_current", disable)
-    assert doctor < verify < disable < public_verify < set_current < release
+
+    assert (
+        private_verify
+        < disable
+        < public_verify
+        < set_current
+        < release
+    )
 
 
 def test_update_prepares_and_verifies_target_artifacts_before_maintenance() -> None:
@@ -793,11 +820,11 @@ def test_rollback_readiness_is_after_restore_before_verification() -> None:
     readiness = section.index(
         "atlas_deployment_wait_for_ingress_readiness"
     )
-    doctor = section.index(
-        "atlas_command_doctor || return 1"
+    verification = section.index(
+        "atlas_deployment_verify_rollback_runtime"
     )
 
-    assert restore < readiness < doctor
+    assert restore < readiness < verification
 
 
 def test_core_rollback_bypasses_ingress_readiness_by_scope() -> None:
@@ -1096,3 +1123,104 @@ def test_rollback_readiness_behavior_starting_timeout_is_bounded(
     # Three containers, two inspect operations each,
     # across exactly three bounded attempts.
     assert len(events) == 18
+
+
+def test_rollback_verification_uses_transaction_historical_ingress() -> None:
+    content = Path("scripts/commands/deployment.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert "atlas_deployment_rollback_recovery_source() {" in content
+    assert "atlas_deployment_verify_rollback_runtime() {" in content
+
+    start = content.index(
+        "atlas_deployment_verify_rollback_runtime() {"
+    )
+    end = content.index(
+        "\natlas_deployment_rollback() {",
+        start,
+    )
+    helper = content[start:end]
+
+    assert (
+        'atlas_deployment_rollback_recovery_source '
+        in helper
+    )
+    assert (
+        'ingress_verifier="$recovery/scripts/verify-ingress.sh"'
+        in helper
+    )
+    assert (
+        'ATLAS_VERIFY_INGRESS_VERIFIER="$ingress_verifier"'
+        in helper
+    )
+    assert 'atlas_command_verify || return 1' in helper
+    assert (
+        'ATLAS_PROJECT_DIR="$recovery"'
+        in helper
+    )
+    assert '"$ingress_verifier" || return 1' in helper
+
+
+def test_rollback_recovery_source_fails_closed_when_ambiguous() -> None:
+    content = Path("scripts/commands/deployment.sh").read_text(
+        encoding="utf-8"
+    )
+
+    start = content.index(
+        "atlas_deployment_rollback_recovery_source() {"
+    )
+    end = content.index(
+        "\natlas_deployment_verify_rollback_runtime() {",
+        start,
+    )
+    helper = content[start:end]
+
+    assert 'find "$transaction"' in helper
+    assert '-name "recovery-${surface}.*"' in helper
+    assert '"${#candidates[@]}" -eq 1' in helper
+    assert "rollback recovery source is ambiguous" in helper
+
+
+def test_rollback_uses_recovery_aware_verification_before_and_after_reopen() -> None:
+    content = Path("scripts/commands/deployment.sh").read_text(
+        encoding="utf-8"
+    )
+
+    start = content.index("atlas_deployment_rollback() {")
+    section = content[start:]
+
+    calls = (
+        section.count(
+            "atlas_deployment_verify_rollback_runtime"
+        )
+    )
+
+    assert calls == 2
+
+    first_verify = section.index(
+        "atlas_deployment_verify_rollback_runtime"
+    )
+    disable = section.index(
+        "atlas_command_maintenance disable"
+    )
+    second_verify = section.index(
+        "atlas_deployment_verify_rollback_runtime",
+        first_verify + 1,
+    )
+    set_current = section.index(
+        'atlas_deployment_set_current "$previous_id"'
+    )
+
+    assert first_verify < disable < second_verify < set_current
+
+    direct_current_ingress = (
+        '"$ATLAS_PROJECT_DIR/scripts/verify-ingress.sh"'
+    )
+
+    rollback_body = section.split(
+        "atlas_deployment_recover_failed_before_apply() {",
+        1,
+    )[0]
+
+    assert direct_current_ingress not in rollback_body

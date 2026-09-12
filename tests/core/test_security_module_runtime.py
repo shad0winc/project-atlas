@@ -254,3 +254,36 @@ def test_notifications_update_has_explicit_compose_project_boundary() -> None:
         '  -f "$MODULE_DIR/docker-compose.yml" \\\n'
         '  up -d'
     ) in content
+
+
+def test_specialized_module_verifiers_honor_project_root_override() -> None:
+    sports = (
+        PROJECT_ROOT
+        / "modules"
+        / "sports"
+        / "scripts"
+        / "verify.sh"
+    ).read_text(encoding="utf-8")
+
+    notifications = (
+        PROJECT_ROOT
+        / "modules"
+        / "notifications"
+        / "scripts"
+        / "verify.sh"
+    ).read_text(encoding="utf-8")
+
+    project_root = (
+        'PROJECT_DIR="${ATLAS_PROJECT_DIR:-/opt/project-atlas}"'
+    )
+
+    assert project_root in sports
+    assert project_root in notifications
+    assert "export PROJECT_DIR" in sports
+    assert "export PROJECT_DIR" in notifications
+
+    assert "cd /opt/project-atlas" not in sports
+    assert "cd /opt/project-atlas" not in notifications
+
+    assert sports.count('cd "$PROJECT_DIR"') == 3
+    assert notifications.count('cd "$PROJECT_DIR"') == 2
