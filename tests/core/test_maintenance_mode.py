@@ -90,10 +90,16 @@ def test_caddy_maintenance_precedes_public_upstreams() -> None:
     api = content.index("reverse_proxy atlas-api:8000")
     portal = content.index("reverse_proxy atlas-portal:3000")
 
-    assert liveness < maintenance < api < portal
+    static_assets = content.index("handle /maintenance/*")
+
+    assert liveness < static_assets < maintenance < api < portal
     assert "try_files /enabled" in content
+    assert "root * /srv" in content
+    assert "file_server" in content
     assert 'header Retry-After "300"' in content
-    assert "503" in content
+    assert 'header Content-Type "text/html; charset=utf-8"' in content
+    assert "respond <<HTML" in content
+    assert "HTML 503" in content
 
 
 def test_ingress_health_bypasses_upstream_health() -> None:
@@ -110,3 +116,24 @@ def test_ingress_mounts_runtime_maintenance_state_read_only() -> None:
         "/mnt/storage/configs/atlas/maintenance:/etc/atlas-maintenance:ro"
         in content
     )
+
+
+def test_caddy_maintenance_page_uses_responsive_tracked_artwork() -> None:
+    content = CADDY.read_text(encoding="utf-8")
+
+    assert "/maintenance/Maintenance_Desktop_Image.png" in content
+    assert "/maintenance/Maintenance_Tablet_Image.png" in content
+    assert "/maintenance/Maintenance_Phone_Image.png" in content
+    assert 'media="(max-width: 640px) and (orientation: portrait)"' in content
+    assert 'media="(max-width: 1024px)"' in content
+    assert '<h1 id="maintenance-title">' in content
+    assert "Project Atlas is currently under maintenance." in content
+    assert "We are working to get it back up and running as soon as possible." in content
+
+
+def test_caddy_maintenance_artwork_files_exist() -> None:
+    site = PROJECT_ROOT / "infra" / "caddy" / "site" / "maintenance"
+
+    assert (site / "Maintenance_Desktop_Image.png").is_file()
+    assert (site / "Maintenance_Tablet_Image.png").is_file()
+    assert (site / "Maintenance_Phone_Image.png").is_file()
