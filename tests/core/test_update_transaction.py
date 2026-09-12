@@ -1092,7 +1092,7 @@ def test_sports_runtime_provisioning_failure_aborts_before_ingress_apply(
 
     events = event_lines(environment)
 
-    expected_provisioners = (
+    expected_apply_provisioners = (
         "audit-runtime:provision",
         "identity-writer-runtime:provision",
         "favorites-runtime:provision",
@@ -1101,12 +1101,20 @@ def test_sports_runtime_provisioning_failure_aborts_before_ingress_apply(
         "sports-runtime:provision",
     )
 
-    for event in expected_provisioners:
+    for event in expected_apply_provisioners:
         assert event in events
 
+    assert events.count("dislikes-runtime:provision") == 2
+
+    audit_position = events.index("audit-runtime:provision")
+
     positions = [
-        events.index(event)
-        for event in expected_provisioners
+        (
+            events.index(event, audit_position)
+            if event == "dislikes-runtime:provision"
+            else events.index(event)
+        )
+        for event in expected_apply_provisioners
     ]
 
     assert positions == sorted(positions)
@@ -1240,5 +1248,69 @@ def test_core_update_does_not_run_sports_dispatcharr_binding_bootstrap(
 
     assert (
         "sports-dispatcharr-binding-bootstrap:provision"
+        not in event_lines(environment)
+    )
+
+
+
+def test_dislikes_prebackup_bootstrap_failure_aborts_before_maintenance(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_DISLIKES_RUNTIME_STATUS"] = "1"
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode != 0
+    assert (
+        "Dislikes runtime bootstrap failed before maintenance"
+        in result.stderr
+    )
+
+    events = event_lines(environment)
+
+    assert events.count("dislikes-runtime:provision") == 1
+    assert "maintenance:enable" not in events
+    assert "backup" not in events
+    assert not lock_path(environment).exists()
+
+
+def test_ingress_dislikes_prebackup_bootstrap_precedes_maintenance_and_backup(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode == 0, result.stderr
+
+    events = event_lines(environment)
+
+    dislikes_positions = [
+        index
+        for index, event in enumerate(events)
+        if event == "dislikes-runtime:provision"
+    ]
+
+    assert len(dislikes_positions) == 2
+
+    bootstrap, apply_provision = dislikes_positions
+    maintenance = events.index("maintenance:enable")
+    backup = events.index("backup")
+
+    assert bootstrap < maintenance < backup < apply_provision
+
+
+def test_core_update_does_not_run_dislikes_prebackup_bootstrap(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+
+    result = run_update(environment, "core")
+
+    assert result.returncode == 0, result.stderr
+
+    assert (
+        "dislikes-runtime:provision"
         not in event_lines(environment)
     )
