@@ -167,6 +167,30 @@ class CleanupHistoryEntry:
         )
 
     @property
+    def delete_succeeded_count(self) -> int:
+        """Return the number of confirmed successful deletes."""
+
+        return self._count_status(
+            CleanupExecutionEventStatus.DELETE_SUCCEEDED
+        )
+
+    @property
+    def delete_failed_count(self) -> int:
+        """Return the number of confirmed failed deletes."""
+
+        return self._count_status(
+            CleanupExecutionEventStatus.DELETE_FAILED
+        )
+
+    @property
+    def delete_indeterminate_count(self) -> int:
+        """Return the number of deletes needing reconciliation."""
+
+        return self._count_status(
+            CleanupExecutionEventStatus.DELETE_INDETERMINATE
+        )
+
+    @property
     def modified_count(self) -> int:
         """Return the number of events that modified media."""
 
@@ -229,6 +253,9 @@ class CleanupHistoryEntry:
             "skipped": self.skipped_count,
             "preview_succeeded": self.preview_succeeded_count,
             "preview_failed": self.preview_failed_count,
+            "delete_succeeded": self.delete_succeeded_count,
+            "delete_failed": self.delete_failed_count,
+            "delete_indeterminate": self.delete_indeterminate_count,
             "modified": self.modified_count,
             "successful": self.successful_count,
             "failed": self.failed_count,

@@ -360,6 +360,9 @@ class CleanupHistoryEntryTests(unittest.TestCase):
                 "skipped": 0,
                 "preview_succeeded": 1,
                 "preview_failed": 1,
+                "delete_succeeded": 0,
+                "delete_failed": 0,
+                "delete_indeterminate": 0,
                 "modified": 0,
                 "successful": 1,
                 "failed": 1,
@@ -392,6 +395,60 @@ class CleanupHistoryEntryTests(unittest.TestCase):
                 ],
             },
         )
+
+    def test_exposes_execute_event_counts(self) -> None:
+        entry = CleanupHistoryEntry(
+            execution_id=EXECUTION_ID,
+            provider="jellyfin",
+            mode=CleanupExecutionMode.EXECUTE,
+            events=(
+                CleanupExecutionEvent(
+                    execution_id=EXECUTION_ID,
+                    provider="jellyfin",
+                    item_id="movie-1",
+                    action=CleanupAction.DELETE,
+                    mode=CleanupExecutionMode.EXECUTE,
+                    status=(
+                        CleanupExecutionEventStatus.DELETE_SUCCEEDED
+                    ),
+                    message="Item deleted",
+                    modified=True,
+                    occurred_at=EARLY,
+                ),
+                CleanupExecutionEvent(
+                    execution_id=EXECUTION_ID,
+                    provider="jellyfin",
+                    item_id="movie-2",
+                    action=CleanupAction.DELETE,
+                    mode=CleanupExecutionMode.EXECUTE,
+                    status=CleanupExecutionEventStatus.DELETE_FAILED,
+                    message="Delete failed",
+                    modified=False,
+                    occurred_at=LATE,
+                ),
+                CleanupExecutionEvent(
+                    execution_id=EXECUTION_ID,
+                    provider="jellyfin",
+                    item_id="movie-3",
+                    action=CleanupAction.DELETE,
+                    mode=CleanupExecutionMode.EXECUTE,
+                    status=(
+                        CleanupExecutionEventStatus.DELETE_INDETERMINATE
+                    ),
+                    message="Delete outcome requires reconciliation",
+                    modified=False,
+                    occurred_at=LATE,
+                ),
+            ),
+        )
+
+        self.assertEqual(entry.delete_succeeded_count, 1)
+        self.assertEqual(entry.delete_failed_count, 1)
+        self.assertEqual(entry.delete_indeterminate_count, 1)
+        self.assertEqual(entry.successful_count, 1)
+        self.assertEqual(entry.failed_count, 2)
+        self.assertEqual(entry.modified_count, 1)
+        self.assertTrue(entry.has_failures)
 
 
 if __name__ == "__main__":

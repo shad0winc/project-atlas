@@ -14,6 +14,14 @@ from atlas.cleanup.audit_config import (
 from atlas.cleanup.default_executor import (
     DefaultCleanupExecutor,
 )
+from atlas.cleanup.deletion_intents import (
+    CleanupDeletionIntent,
+)
+from atlas.cleanup.deletion_intent_repository import (
+    CleanupDeletionIntentConflictError,
+    CleanupDeletionIntentRepositoryError,
+    JsonCleanupDeletionIntentRepository,
+)
 from atlas.cleanup.execution_events import (
     CleanupExecutionEvent,
     CleanupExecutionEventStatus,
@@ -63,6 +71,9 @@ __all__ = [
     "CleanupAuditError",
     "CleanupAuditWriter",
     "CleanupDecision",
+    "CleanupDeletionIntent",
+    "CleanupDeletionIntentConflictError",
+    "CleanupDeletionIntentRepositoryError",
     "CleanupError",
     "CleanupExecutionError",
     "CleanupExecutionEvent",
@@ -84,6 +95,7 @@ __all__ = [
     "CleanupService",
     "CleanupWorkflowService",
     "DefaultCleanupExecutor",
+    "JsonCleanupDeletionIntentRepository",
     "JsonlCleanupAuditWriter",
     "JsonlCleanupHistoryStore",
     "DEFAULT_ATLAS_STATE_DIR",
