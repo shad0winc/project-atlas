@@ -460,6 +460,350 @@ atlas_deployment_status() {
   printf 'Ingress source: %s\n' "$(atlas_deployment_record_value "$record" ingress_commit)"
 }
 
+atlas_deployment_publish_reconciliation_baseline() {
+  local failed_identifier="$1"
+  local transaction="$2"
+  local previous_id="$3"
+  local baseline="$4"
+  local scope="$5"
+  local identifier
+  local record
+  local temporary
+  local source_commit
+  local core_commit
+  local ingress_commit
+  local recovery_source='none'
+
+  identifier="$(atlas_deployment_new_id baseline-reconciliation)"
+  record="$(atlas_deployment_record_dir "$identifier")" || return 1
+
+  [[ ! -e "$record" ]] || {
+    printf 'ERROR: reconciliation baseline already exists: %s\n' \
+      "$identifier" >&2
+    return 1
+  }
+
+  temporary="$(
+    mktemp -d \
+      "$(atlas_deployment_records_dir)/.${identifier}.XXXXXX"
+  )" || return 1
+
+  source_commit="$(
+    atlas_deployment_record_value "$baseline" source_commit
+  )"
+
+  if [[ -z "$source_commit" ]]; then
+    source_commit="$(
+      atlas_deployment_record_value "$baseline" target_commit
+    )"
+  fi
+
+  core_commit="$(
+    atlas_deployment_record_value "$baseline" core_commit
+  )"
+
+  ingress_commit="$(
+    atlas_deployment_record_value "$baseline" ingress_commit
+  )"
+
+  [[ -n "$source_commit" ]] || {
+    echo 'ERROR: previous baseline source identity is unavailable.' >&2
+    rm -rf -- "$temporary"
+    return 1
+  }
+
+  [[ -n "$core_commit" && -n "$ingress_commit" ]] || {
+    echo 'ERROR: previous baseline component identity is unavailable.' >&2
+    rm -rf -- "$temporary"
+    return 1
+  }
+
+  [[ -f "$baseline/core-source.tar.gz" ]] || {
+    echo 'ERROR: previous baseline core source archive is unavailable.' >&2
+    rm -rf -- "$temporary"
+    return 1
+  }
+
+  [[ -f "$baseline/ingress-source.tar.gz" ]] || {
+    echo 'ERROR: previous baseline ingress source archive is unavailable.' >&2
+    rm -rf -- "$temporary"
+    return 1
+  }
+
+  case "$scope" in
+    core)
+      ;;
+    ingress|all)
+      recovery_source="$(
+        atlas_deployment_rollback_recovery_source \
+          "$transaction" \
+          ingress
+      )" || {
+        rm -rf -- "$temporary"
+        return 1
+      }
+      ;;
+    *)
+      printf \
+        'ERROR: unsupported reconciliation scope: %s\n' \
+        "$scope" >&2
+      rm -rf -- "$temporary"
+      return 1
+      ;;
+  esac
+
+  cp -- \
+    "$baseline/core-source.tar.gz" \
+    "$temporary/core-source.tar.gz" || {
+      rm -rf -- "$temporary"
+      return 1
+    }
+
+  cp -- \
+    "$baseline/ingress-source.tar.gz" \
+    "$temporary/ingress-source.tar.gz" || {
+      rm -rf -- "$temporary"
+      return 1
+    }
+
+  cat > "$temporary/metadata" <<EOF
+type=baseline
+deployment_id=$identifier
+baseline_kind=rollback-reconciliation
+previous_baseline=$previous_id
+failed_deployment=$failed_identifier
+source_commit=$source_commit
+core_commit=$core_commit
+ingress_commit=$ingress_commit
+scope=all
+migration=none
+reason=post-rollback-failure-finalization
+source_claim=verified-previous-baseline-plus-observed-runtime
+created_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+EOF
+
+  cat > "$temporary/provenance" <<EOF
+reconciliation_reason=post-rollback-failure-finalization
+failed_deployment=$failed_identifier
+authoritative_previous_baseline=$previous_id
+recovery_scope=$scope
+source_commit=$source_commit
+core_commit=$core_commit
+ingress_commit=$ingress_commit
+historical_recovery_source=$recovery_source
+source_claim=verified-previous-baseline-plus-observed-runtime
+EOF
+
+  atlas_deployment_capture_images "$temporary" || {
+    rm -rf -- "$temporary"
+    return 1
+  }
+
+  atlas_deployment_verify_runtime "$temporary" || {
+    rm -rf -- "$temporary"
+    return 1
+  }
+
+  atlas_deployment_set_status "$temporary" verified || {
+    rm -rf -- "$temporary"
+    return 1
+  }
+
+  (
+    cd "$temporary"
+
+    sha256sum \
+      images.tsv \
+      status \
+      metadata \
+      provenance \
+      core-source.tar.gz \
+      ingress-source.tar.gz \
+      > MANIFEST.sha256
+
+    sha256sum -c MANIFEST.sha256 >&2
+  ) || {
+    rm -rf -- "$temporary"
+    return 1
+  }
+
+  mv -- "$temporary" "$record" || {
+    rm -rf -- "$temporary"
+    return 1
+  }
+
+  printf '%s\n' "$identifier"
+}
+
+
+atlas_deployment_recover_failed_rollback() {
+  local identifier="$1"
+  local transaction
+  local transaction_type
+  local status
+  local migration
+  local previous_id
+  local baseline
+  local current_id
+  local scope
+  local reconciliation_id
+
+  atlas_deployment_valid_id "$identifier" || {
+    echo 'ERROR: invalid deployment identifier.' >&2
+    return 2
+  }
+
+  atlas_deployment_validate_source || return 1
+
+  transaction="$(atlas_deployment_record_dir "$identifier")" || return 1
+
+  [[ -d "$transaction" && -f "$transaction/metadata" && -f "$transaction/status" ]] || {
+    printf 'ERROR: deployment record is incomplete: %s\n' "$identifier" >&2
+    return 1
+  }
+
+  transaction_type="$(atlas_deployment_record_value "$transaction" type)"
+  status="$(<"$transaction/status")"
+
+  [[ "$transaction_type" == 'update' && "$status" == 'failed' ]] || {
+    printf \
+      'ERROR: deployment %s is not failed-rollback recovery eligible (type=%s status=%s).\n' \
+      "$identifier" \
+      "${transaction_type:-unknown}" \
+      "${status:-unknown}" >&2
+    return 1
+  }
+
+  migration="$(atlas_deployment_record_value "$transaction" migration)"
+
+  [[ "$migration" == 'none' ]] || {
+    echo 'ERROR: failed-rollback recovery requires migration=none.' >&2
+    return 1
+  }
+
+  previous_id="$(
+    atlas_deployment_record_value "$transaction" previous_baseline
+  )"
+
+  atlas_deployment_valid_id "$previous_id" || {
+    echo 'ERROR: failed transaction has an invalid previous baseline identity.' >&2
+    return 1
+  }
+
+  baseline="$(atlas_deployment_record_dir "$previous_id")" || return 1
+
+  [[ -d "$baseline" && -f "$baseline/status" ]] || {
+    echo 'ERROR: previous deployment baseline is unavailable.' >&2
+    return 1
+  }
+
+  [[ "$(<"$baseline/status")" == 'verified' ]] || {
+    echo 'ERROR: previous deployment baseline is not verified.' >&2
+    return 1
+  }
+
+  current_id="$(atlas_deployment_current_id)" || {
+    echo 'ERROR: current deployment baseline cannot be resolved.' >&2
+    return 1
+  }
+
+  [[ "$current_id" == "$previous_id" ]] || {
+    echo 'ERROR: failed deployment no longer points at the current baseline.' >&2
+    return 1
+  }
+
+  [[ -d "$(atlas_deployment_lock_dir)" ]] || {
+    echo 'ERROR: failed-rollback recovery requires the original deployment lock.' >&2
+    return 1
+  }
+
+  atlas_deployment_lock_matches "$identifier" || {
+    echo 'ERROR: another deployment owns the active lock.' >&2
+    return 1
+  }
+
+  [[ -f "$(atlas_maintenance_flag)" ]] || {
+    echo 'ERROR: failed-rollback recovery requires maintenance mode to remain enabled.' >&2
+    return 1
+  }
+
+  scope="$(atlas_deployment_record_value "$transaction" scope)"
+
+  case "$scope" in
+    core)
+      ;;
+    ingress|all)
+      atlas_deployment_rollback_recovery_source \
+        "$transaction" \
+        ingress \
+        >/dev/null || {
+          echo 'ERROR: historical rollback recovery source is unavailable.' >&2
+          return 1
+        }
+      ;;
+    *)
+      printf \
+        'ERROR: unsupported failed-rollback recovery scope: %s\n' \
+        "$scope" >&2
+      return 1
+      ;;
+  esac
+
+  echo 'Private restored-runtime verification:'
+
+  atlas_deployment_verify_rollback_runtime \
+    "$transaction" \
+    "$scope" || {
+      echo 'ERROR: restored rollback runtime verification failed.' >&2
+      return 1
+    }
+
+  if ! atlas_command_maintenance disable; then
+    echo 'ERROR: unable to reopen public traffic during failed-rollback recovery.' >&2
+    return 1
+  fi
+
+  echo 'Public restored-runtime verification:'
+
+  atlas_deployment_verify_rollback_runtime \
+    "$transaction" \
+    "$scope" || {
+      atlas_command_maintenance enable || true
+      echo 'ERROR: public rollback verification failed; maintenance restored.' >&2
+      return 1
+    }
+
+  reconciliation_id="$(
+    atlas_deployment_publish_reconciliation_baseline \
+      "$identifier" \
+      "$transaction" \
+      "$previous_id" \
+      "$baseline" \
+      "$scope"
+  )" || {
+    atlas_command_maintenance enable || true
+    echo 'ERROR: unable to publish verified reconciliation baseline; maintenance restored.' >&2
+    return 1
+  }
+
+  atlas_deployment_set_current "$reconciliation_id" || {
+    atlas_command_maintenance enable || true
+    echo 'ERROR: unable to publish reconciliation baseline as current; maintenance restored.' >&2
+    return 1
+  }
+
+  if ! atlas_deployment_release_lock "$identifier"; then
+    atlas_command_maintenance enable || true
+    echo 'ERROR: unable to release failed deployment lock; maintenance restored.' >&2
+    return 1
+  fi
+
+  printf \
+    'Failed-rollback recovery complete: %s -> %s\n' \
+    "$identifier" \
+    "$reconciliation_id"
+}
+
 atlas_deployment_restore_surface() {
   local baseline="$1"
   local transaction="$2"
@@ -1074,6 +1418,13 @@ atlas_command_deployment() {
       }
       atlas_deployment_recover_failed_before_apply "$2"
       ;;
+    recover-failed-rollback)
+      [[ -n "${2:-}" ]] || {
+        echo 'Usage: atlas deployment recover-failed-rollback <deployment-id>' >&2
+        return 2
+      }
+      atlas_deployment_recover_failed_rollback "$2"
+      ;;
     rollback)
       [[ -n "${2:-}" ]] || {
         echo 'Usage: atlas deployment rollback <deployment-id>' >&2
@@ -1087,12 +1438,16 @@ Usage:
   atlas deployment status
   atlas deployment baseline
   atlas deployment recover-failed-before-apply <deployment-id>
+  atlas deployment recover-failed-rollback <deployment-id>
   atlas deployment rollback <deployment-id>
 
 Baseline creation records verified production source archives and exact running
 image identities. Failed-before-apply recovery only clears a held failed update
 after proving the previous verified baseline is still current and unchanged.
-Rollback restores only a directly related known-good baseline.
+Failed-rollback recovery finalizes an already restored failed rollback by
+publishing a separate verified reconciliation baseline while preserving the
+original failed transaction as immutable evidence. Rollback restores only a
+directly related known-good baseline.
 HELP
       ;;
     *)

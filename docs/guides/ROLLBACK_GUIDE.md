@@ -611,7 +611,85 @@ A failed rollback is a new recovery event that requires explicit diagnosis.
 
 ---
 
-## 32. Storage and ENOSPC During Rollback
+## 32. Finalize a Failed Rollback Safely
+
+A rollback can restore the previous runtime successfully and still leave its
+deployment transaction in the fail-closed state if authoritative rollback
+verification fails before transaction finalization.
+
+In that condition, **do not replay rollback** and do not manually remove the
+deployment lock, edit the current pointer, change the failed transaction
+status, or disable Maintenance.
+
+Use the supported finalizer only when all of the following remain true:
+
+- the deployment record is an `update` transaction whose status is still
+  `failed`;
+- `migration=none`;
+- its recorded `previous_baseline` still exists and is `verified`;
+- that previous verified baseline is still the authoritative current
+  deployment baseline;
+- the original deployment lock still exists and is owned by the same failed
+  deployment identifier;
+- Maintenance remains enabled;
+- the rollback-restored runtime is already present;
+- for `ingress` or `all` scope, the transaction's historical rollback recovery
+  source still exists.
+
+The supported command is:
+
+```bash
+atlas deployment recover-failed-rollback <deployment-id>
+```
+
+This command is a **finalizer**, not a second rollback. It does not reacquire
+the deployment lock, restore a deployment surface, replay Compose apply, pull
+or build images, or change the failed transaction's status.
+
+The finalizer performs the following sequence:
+
+1. validates the failed transaction, previous verified baseline, current
+   baseline relationship, original deployment-lock ownership, Maintenance
+   state, scope, and historical rollback recovery evidence;
+2. verifies the already restored runtime while public traffic remains isolated
+   by Maintenance;
+3. disables Maintenance to reopen public traffic;
+4. repeats authoritative rollback verification against the public runtime;
+5. publishes a new verified `baseline-reconciliation-*` record that preserves
+   the previous verified source archives and records the failed deployment as
+   provenance;
+6. publishes that reconciliation baseline as the new current baseline; and
+7. releases the original failed deployment lock **last**.
+
+The original failed deployment remains `failed`. It is immutable audit
+evidence describing the deployment attempt that failed. Successful recovery
+does not rewrite it to `rolled_back`, `verified`, or another success state.
+
+The reconciliation baseline represents the newly verified authoritative state
+after recovery. Its publication is distinct from the failed transaction.
+
+If public verification, reconciliation-baseline publication, or current
+baseline publication fails after traffic has been reopened, Atlas re-enables
+Maintenance and returns failure. The original failed deployment lock remains
+held.
+
+A lock-release failure also re-enables Maintenance and returns failure. Do not
+manually delete the lock as a substitute for successful deterministic
+finalization.
+
+The command must not be used merely because an update failed. A failure that
+occurred before apply has its separate supported recovery path:
+
+```bash
+atlas deployment recover-failed-before-apply <deployment-id>
+```
+
+Choose the recovery path from transaction evidence, not from operator
+preference.
+
+---
+
+## 33. Storage and ENOSPC During Rollback
 
 Rollback must fail closed on storage exhaustion or persistence failure.
 
@@ -626,7 +704,7 @@ If `ENOSPC` or another storage failure occurs:
 
 ---
 
-## 33. Security-Sensitive Rollback
+## 34. Security-Sensitive Rollback
 
 When rolling back security-sensitive changes, verify that the recovered runtime
 still satisfies current accepted security requirements.
@@ -641,7 +719,7 @@ Security acceptance can therefore constrain rollback eligibility.
 
 ---
 
-## 34. Rollback Completion Checklist
+## 35. Rollback Completion Checklist
 
 Rollback is complete only when the applicable checks pass.
 
@@ -670,7 +748,7 @@ Rollback is complete only when the applicable checks pass.
 
 ---
 
-## 35. What Must Not Be Done
+## 36. What Must Not Be Done
 
 Do not:
 
@@ -689,7 +767,7 @@ Do not:
 
 ---
 
-## 36. Relationship to Upgrade
+## 37. Relationship to Upgrade
 
 The Upgrade Guide defines:
 
@@ -704,7 +782,7 @@ evidence beforehand.
 
 ---
 
-## 37. Relationship to Backup/Restore
+## 38. Relationship to Backup/Restore
 
 The Backup/Restore Guide owns authoritative Atlas state restoration.
 
@@ -716,7 +794,7 @@ the Backup/Restore boundary.
 
 ---
 
-## 38. Legacy Recovery Guidance
+## 39. Legacy Recovery Guidance
 
 Older Atlas operations documentation may summarize recovery as restoring the
 latest verified backup, starting services, and running verification.
@@ -742,7 +820,7 @@ Do not use the legacy recovery shorthand as the sole rollback procedure.
 
 ---
 
-## 39. Authoritative References
+## 40. Authoritative References
 
 Primary references:
 
