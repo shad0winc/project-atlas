@@ -69,6 +69,27 @@ class RecordingAuditWriter(CleanupAuditWriter):
         self.events.append(event)
 
 
+class PlannedDeleteCleanupService:
+    """Return a fresh DELETE decision for existing execute contracts."""
+
+    def evaluate(
+        self,
+        provider: str,
+        item_id: str,
+    ):
+        decision = make_item(
+            item_id=item_id,
+            action=CleanupAction.DELETE,
+        ).decision
+
+        if decision.provider != provider:
+            raise AssertionError(
+                "fresh decision provider must match execution provider"
+            )
+
+        return decision
+
+
 class LiveDeleteProvider:
     """Provider double exposing controlled live-delete capability."""
 
@@ -164,6 +185,7 @@ class CleanupExecuteWiringTests(unittest.TestCase):
 
             executor = DefaultCleanupExecutor(
                 provider=provider,
+            cleanup_service=PlannedDeleteCleanupService(),
                 audit_writer=audit,
                 deletion_intent_repository=repository,
                 clock=make_clock(
@@ -217,6 +239,7 @@ class CleanupExecuteWiringTests(unittest.TestCase):
 
             executor = DefaultCleanupExecutor(
                 provider=provider,
+            cleanup_service=PlannedDeleteCleanupService(),
                 audit_writer=audit,
                 deletion_intent_repository=repository,
                 clock=make_clock(
@@ -283,6 +306,7 @@ class CleanupExecuteWiringTests(unittest.TestCase):
 
             executor = DefaultCleanupExecutor(
                 provider=provider,
+            cleanup_service=PlannedDeleteCleanupService(),
                 audit_writer=audit,
                 deletion_intent_repository=repository,
                 clock=make_clock(
@@ -321,6 +345,7 @@ class CleanupExecuteWiringTests(unittest.TestCase):
 
         executor = DefaultCleanupExecutor(
             provider=provider,
+            cleanup_service=PlannedDeleteCleanupService(),
             clock=make_clock(
                 STARTED_AT,
                 COMPLETED_AT,
@@ -346,6 +371,7 @@ class CleanupExecuteWiringTests(unittest.TestCase):
 
             executor = DefaultCleanupExecutor(
                 provider=provider,
+            cleanup_service=PlannedDeleteCleanupService(),
                 deletion_intent_repository=repository,
                 clock=make_clock(
                     STARTED_AT,
@@ -430,6 +456,7 @@ class CleanupExecuteWiringHardeningTests(unittest.TestCase):
 
             executor = DefaultCleanupExecutor(
                 provider=provider,
+            cleanup_service=PlannedDeleteCleanupService(),
                 audit_writer=audit,
                 deletion_intent_repository=repository,
                 clock=make_clock(
@@ -492,6 +519,7 @@ class CleanupExecuteWiringHardeningTests(unittest.TestCase):
 
             executor = DefaultCleanupExecutor(
                 provider=provider,
+            cleanup_service=PlannedDeleteCleanupService(),
                 audit_writer=audit,
                 deletion_intent_repository=repository,
                 clock=make_clock(
@@ -552,6 +580,7 @@ class CleanupExecuteWiringHardeningTests(unittest.TestCase):
 
             executor = DefaultCleanupExecutor(
                 provider=provider,
+            cleanup_service=PlannedDeleteCleanupService(),
                 audit_writer=FailingExecuteAuditWriter(),
                 deletion_intent_repository=repository,
                 clock=make_clock(
@@ -681,6 +710,7 @@ class CleanupExecuteWiringMultiItemTests(unittest.TestCase):
 
             executor = DefaultCleanupExecutor(
                 provider=provider,
+            cleanup_service=PlannedDeleteCleanupService(),
                 audit_writer=audit,
                 deletion_intent_repository=repository,
                 clock=make_clock(
@@ -774,6 +804,7 @@ class CleanupExecuteWiringMultiItemTests(unittest.TestCase):
 
             executor = DefaultCleanupExecutor(
                 provider=provider,
+            cleanup_service=PlannedDeleteCleanupService(),
                 audit_writer=audit,
                 deletion_intent_repository=repository,
                 clock=make_clock(

@@ -32,6 +32,10 @@ from atlas.cleanup.executor import (
     CleanupExecutor,
     CleanupRunStatus,
 )
+from atlas.cleanup.models import (
+    CleanupAction,
+    CleanupDecision,
+)
 from atlas.media.mutations import (
     MediaMutationDispatcher,
     MediaMutationDispatchError,
@@ -74,6 +78,7 @@ class DefaultCleanupExecutor(CleanupExecutor):
         deletion_intent_repository: (
             JsonCleanupDeletionIntentRepository | None
         ) = None,
+        cleanup_service: object | None = None,
         clock: Clock | None = None,
         execution_id_factory: ExecutionIdFactory | None = None,
     ) -> None:
@@ -85,6 +90,8 @@ class DefaultCleanupExecutor(CleanupExecutor):
             mutation_dispatcher: Optional provider mutation dispatcher.
             deletion_intent_repository: Optional durable destructive-mutation
                 replay barrier required for execute mode.
+            cleanup_service: Optional authoritative cleanup evaluator used for
+                fresh policy and retention revalidation before live deletion.
             clock: Optional timezone-aware datetime provider.
             execution_id_factory: Optional execution ID generator.
         """
@@ -122,6 +129,16 @@ class DefaultCleanupExecutor(CleanupExecutor):
             )
 
         if (
+            cleanup_service is not None
+            and not callable(
+                getattr(cleanup_service, "evaluate", None)
+            )
+        ):
+            raise CleanupExecutionError(
+                "cleanup_service must expose callable evaluate"
+            )
+
+        if (
             execution_id_factory is not None
             and not callable(execution_id_factory)
         ):
@@ -138,6 +155,7 @@ class DefaultCleanupExecutor(CleanupExecutor):
         self._deletion_intent_repository = (
             deletion_intent_repository
         )
+        self._cleanup_service = cleanup_service
         self._clock = clock or _utc_now
         self._execution_id_factory = (
             execution_id_factory or new_execution_id
@@ -204,6 +222,16 @@ class DefaultCleanupExecutor(CleanupExecutor):
                     str(exc)
                 ) from exc
 
+        if (
+            report.mode is CleanupExecutionMode.EXECUTE
+            and report.planned_count > 0
+            and self._cleanup_service is None
+        ):
+            raise CleanupExecutionError(
+                "execute mode requires a cleanup service "
+                "for fresh revalidation"
+            )
+
         errors: list[str] = []
         successful = 0
         modified = 0
@@ -235,6 +263,90 @@ class DefaultCleanupExecutor(CleanupExecutor):
                 continue
 
             if report.mode is CleanupExecutionMode.EXECUTE:
+                cleanup_service = self._cleanup_service
+
+                if cleanup_service is None:
+                    raise CleanupExecutionError(
+                        "execute mode requires a cleanup service "
+                        "for fresh revalidation"
+                    )
+
+                evaluate = getattr(
+                    cleanup_service,
+                    "evaluate",
+                    None,
+                )
+
+                if not callable(evaluate):
+                    raise CleanupExecutionError(
+                        "cleanup_service must expose callable evaluate"
+                    )
+
+                try:
+                    fresh_decision = evaluate(
+                        item.provider,
+                        item.item_id,
+                    )
+
+                    if not isinstance(
+                        fresh_decision,
+                        CleanupDecision,
+                    ):
+                        raise CleanupExecutionError(
+                            "fresh cleanup revalidation returned "
+                            "an invalid cleanup decision"
+                        )
+
+                    if (
+                        fresh_decision.provider != item.provider
+                        or fresh_decision.item_id != item.item_id
+                    ):
+                        raise CleanupExecutionError(
+                            "fresh cleanup revalidation decision "
+                            "does not match execution item"
+                        )
+                except Exception as exc:
+                    message = (
+                        "fresh cleanup revalidation failed: "
+                        f"{exc}"
+                    )
+
+                    errors.append(
+                        f"{item.item_id}: {message}"
+                    )
+
+                    self._record_event(
+                        execution_id=execution_id,
+                        item=item,
+                        status=(
+                            CleanupExecutionEventStatus.DELETE_FAILED
+                        ),
+                        message=message,
+                        occurred_at=occurred_at,
+                        errors=errors,
+                    )
+                    continue
+
+                if (
+                    fresh_decision.action
+                    is not CleanupAction.DELETE
+                ):
+                    self._record_event(
+                        execution_id=execution_id,
+                        item=item,
+                        status=CleanupExecutionEventStatus.SKIPPED,
+                        message=(
+                            "Cleanup delete skipped after fresh "
+                            "policy/retention revalidation: "
+                            f"{fresh_decision.action.value}"
+                        ),
+                        occurred_at=occurred_at,
+                        errors=errors,
+                    )
+
+                    successful += 1
+                    continue
+
                 repository = self._deletion_intent_repository
 
                 if repository is None:
