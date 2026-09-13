@@ -10,7 +10,12 @@ from typing import Any, Protocol
 
 from atlas.media.jellyfin import default_jellyfin_provider
 from atlas.policies import PolicyService
-from atlas.retention.models import RetentionDecision
+from atlas.retention.models import (
+    RetentionDecision,
+    RetentionLifecycle,
+    RetentionLifecycleRule,
+    RetentionLifecycleState,
+)
 from atlas.user_profiles import default_store as default_user_store
 
 
@@ -96,6 +101,10 @@ class RetentionService:
                 item_id=policy.item_id,
                 eligible=False,
                 policy=policy,
+                lifecycle=RetentionLifecycle(
+                    state=RetentionLifecycleState.PROTECTED,
+                    rule=RetentionLifecycleRule.POLICY_PROTECTED,
+                ),
             )
 
         # Preserve the established service contract for callers that have
@@ -155,17 +164,28 @@ class RetentionService:
                     timezone.utc
                 )
 
-                eligible = (
-                    now
-                    >= disliked_at
+                delete_at = (
+                    disliked_at
                     + timedelta(hours=24)
                 )
+
+                eligible = now >= delete_at
 
                 return RetentionDecision(
                     provider=policy.provider,
                     item_id=policy.item_id,
                     eligible=eligible,
                     policy=policy,
+                    lifecycle=RetentionLifecycle(
+                        state=(
+                            RetentionLifecycleState.ELIGIBLE
+                            if eligible
+                            else RetentionLifecycleState.SCHEDULED
+                        ),
+                        rule=RetentionLifecycleRule.DISLIKED_24H,
+                        basis_at=_format_timestamp(disliked_at),
+                        delete_at=_format_timestamp(delete_at),
+                    ),
                 )
 
         if (
@@ -179,7 +199,7 @@ class RetentionService:
                 policy=policy,
             )
 
-        eligible = self._timing_eligibility(
+        eligible, lifecycle = self._timing_decision(
             policy.provider,
             policy.item_id,
         )
@@ -189,19 +209,20 @@ class RetentionService:
             item_id=policy.item_id,
             eligible=eligible,
             policy=policy,
+            lifecycle=lifecycle,
         )
 
-    def _timing_eligibility(
+    def _timing_decision(
         self,
         provider: str,
         item_id: str,
-    ) -> bool:
-        """Return timing eligibility, failing closed on ambiguity."""
+    ) -> tuple[bool, RetentionLifecycle]:
+        """Return timing eligibility and lifecycle, failing closed on ambiguity."""
 
         try:
             media_provider = self.media_providers[provider]
         except (KeyError, TypeError):
-            return False
+            return _unavailable_timing_decision()
 
         try:
             user_ids = self._active_linked_user_ids()
@@ -210,10 +231,10 @@ class RetentionService:
                 user_ids=user_ids,
             )
         except Exception:
-            return False
+            return _unavailable_timing_decision()
 
         if not isinstance(state, Mapping):
-            return False
+            return _unavailable_timing_decision()
 
         media_type = state.get("media_type")
 
@@ -221,27 +242,27 @@ class RetentionService:
             not isinstance(media_type, str)
             or media_type.strip().lower() != "movie"
         ):
-            return False
+            return _unavailable_timing_decision()
 
         created_at = _timestamp_or_none(
             state.get("date_created")
         )
 
         if created_at is None:
-            return False
+            return _unavailable_timing_decision()
 
         now = self._now_or_none()
 
         if now is None:
-            return False
+            return _unavailable_timing_decision()
 
         if created_at > now:
-            return False
+            return _unavailable_timing_decision()
 
         users = state.get("users")
 
         if not isinstance(users, (tuple, list)):
-            return False
+            return _unavailable_timing_decision()
 
         parsed_users: list[_UserWatchState] = []
 
@@ -251,10 +272,10 @@ class RetentionService:
             parsed = _parse_user_watch_state(raw_user)
 
             if parsed is None:
-                return False
+                return _unavailable_timing_decision()
 
             if parsed.jellyfin_user_id in seen_user_ids:
-                return False
+                return _unavailable_timing_decision()
 
             seen_user_ids.add(parsed.jellyfin_user_id)
             parsed_users.append(parsed)
@@ -262,7 +283,7 @@ class RetentionService:
         expected_user_ids = set(user_ids)
 
         if set(seen_user_ids) != expected_user_ids:
-            return False
+            return _unavailable_timing_decision()
 
         started = [
             user
@@ -271,9 +292,21 @@ class RetentionService:
         ]
 
         if not started:
+            delete_at = created_at + UNWATCHED_RETENTION
+            eligible = now >= delete_at
+
             return (
-                now - created_at
-                >= UNWATCHED_RETENTION
+                eligible,
+                RetentionLifecycle(
+                    state=(
+                        RetentionLifecycleState.ELIGIBLE
+                        if eligible
+                        else RetentionLifecycleState.SCHEDULED
+                    ),
+                    rule=RetentionLifecycleRule.UNWATCHED_30D,
+                    basis_at=_format_timestamp(created_at),
+                    delete_at=_format_timestamp(delete_at),
+                ),
             )
 
         if any(
@@ -281,26 +314,37 @@ class RetentionService:
             < COMPLETION_THRESHOLD
             for user in started
         ):
-            return False
+            return _unavailable_timing_decision()
 
         completed_at_values: list[datetime] = []
 
         for user in started:
             if user.last_played_at is None:
-                return False
+                return _unavailable_timing_decision()
 
             if user.last_played_at > now:
-                return False
+                return _unavailable_timing_decision()
 
             completed_at_values.append(
                 user.last_played_at
             )
 
         latest_completion = max(completed_at_values)
+        delete_at = latest_completion + COMPLETED_RETENTION
+        eligible = now >= delete_at
 
         return (
-            now - latest_completion
-            >= COMPLETED_RETENTION
+            eligible,
+            RetentionLifecycle(
+                state=(
+                    RetentionLifecycleState.ELIGIBLE
+                    if eligible
+                    else RetentionLifecycleState.SCHEDULED
+                ),
+                rule=RetentionLifecycleRule.WATCHED_72H,
+                basis_at=_format_timestamp(latest_completion),
+                delete_at=_format_timestamp(delete_at),
+            ),
         )
 
     def _active_linked_user_ids(
@@ -370,6 +414,32 @@ class RetentionService:
             return None
 
         return value.astimezone(timezone.utc)
+
+
+def _unavailable_timing_decision() -> tuple[
+    bool,
+    RetentionLifecycle,
+]:
+    """Return the fail-closed lifecycle for ambiguous timing state."""
+
+    return (
+        False,
+        RetentionLifecycle(
+            state=RetentionLifecycleState.UNKNOWN,
+            rule=RetentionLifecycleRule.UNAVAILABLE,
+        ),
+    )
+
+
+def _format_timestamp(value: datetime) -> str:
+    """Return one normalized UTC ISO-8601 timestamp."""
+
+    return (
+        value
+        .astimezone(timezone.utc)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
 
 
 class _UserWatchState:
