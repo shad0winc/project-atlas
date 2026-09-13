@@ -49,12 +49,99 @@ const STATUS_LABELS: Readonly<Record<MediaRequestStatus, string>> = {
   searching: "Searching",
   downloading: "Downloading",
   importing: "Importing",
-  available: "Available",
+  processing: "Processing in Jellyfin",
+  available: "Ready to Watch",
   rejected: "Rejected",
   failed: "Failed",
   cancelling: "Cancelling",
   cancelled: "Cancelled"
 };
+
+type RequestProgressStage =
+  | "requested"
+  | "approved"
+  | "searching"
+  | "downloading"
+  | "importing"
+  | "processing"
+  | "available";
+
+type RequestProgressStageState =
+  | "complete"
+  | "current"
+  | "pending";
+
+const REQUEST_PROGRESS_STAGES: readonly Readonly<{
+  id: RequestProgressStage;
+  label: string;
+}>[] = [
+  {
+    id: "requested",
+    label: "Requested"
+  },
+  {
+    id: "approved",
+    label: "Approved"
+  },
+  {
+    id: "searching",
+    label: "Searching"
+  },
+  {
+    id: "downloading",
+    label: "Downloading"
+  },
+  {
+    id: "importing",
+    label: "Importing"
+  },
+  {
+    id: "processing",
+    label: "Processing in Jellyfin"
+  },
+  {
+    id: "available",
+    label: "Ready to Watch"
+  }
+];
+
+function requestProgressIndex(
+  status: MediaRequestStatus
+): number | null {
+  switch (status) {
+    case "pending":
+      return 0;
+    case "approved":
+      return 1;
+    case "searching":
+      return 2;
+    case "downloading":
+      return 3;
+    case "importing":
+      return 4;
+    case "processing":
+      return 5;
+    case "available":
+      return 6;
+    default:
+      return null;
+  }
+}
+
+function requestProgressStageState(
+  stageIndex: number,
+  currentIndex: number
+): RequestProgressStageState {
+  if (stageIndex < currentIndex) {
+    return "complete";
+  }
+
+  if (stageIndex === currentIndex) {
+    return "current";
+  }
+
+  return "pending";
+}
 
 function requestSubtitle(request: MediaRequest): string {
   const details: string[] = [MEDIA_TYPE_LABELS[request.mediaType]];
@@ -106,6 +193,10 @@ function RequestCard({
 
   const needsAttention = request.recoveryRequired || locallyBlocked;
 
+  const progressIndex = requestProgressIndex(
+    request.status
+  );
+
   return (
     <article className="request-card">
       <header className="request-card-header">
@@ -136,6 +227,36 @@ function RequestCard({
           <dd className="request-id-value">{request.requestId}</dd>
         </div>
       </dl>
+
+      {progressIndex !== null ? (
+        <ol
+          aria-label="Request progress"
+          className="request-progress"
+        >
+          {REQUEST_PROGRESS_STAGES.map(
+            (stage, stageIndex) => {
+              const stageState =
+                requestProgressStageState(
+                  stageIndex,
+                  progressIndex
+                );
+
+              return (
+                <li
+                  className="request-progress-stage"
+                  data-stage={stage.id}
+                  data-stage-state={stageState}
+                  key={stage.id}
+                >
+                  <span className="request-progress-stage-label">
+                    {stage.label}
+                  </span>
+                </li>
+              );
+            }
+          )}
+        </ol>
+      ) : null}
 
       {needsAttention ? (
         <section aria-label="Request requires attention" className="request-recovery-warning">

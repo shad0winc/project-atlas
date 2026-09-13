@@ -2113,6 +2113,65 @@ section[aria-labelledby="service-detail-title"] dd {
   font-size: 0.75rem;
 }
 
+.request-progress {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.request-progress-stage {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 0.4rem;
+  min-width: 0;
+  color: var(--text-muted, #94a3b8);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.request-progress-stage::before {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 0.3rem;
+  border: 1px solid var(--border-subtle, rgba(148, 163, 184, 0.25));
+  border-radius: 999px;
+  background: transparent;
+}
+
+.request-progress-stage[data-stage-state="complete"] {
+  color: inherit;
+}
+
+.request-progress-stage[data-stage-state="complete"]::before {
+  border-color: currentColor;
+  background: currentColor;
+  opacity: 0.55;
+}
+
+.request-progress-stage[data-stage-state="current"] {
+  color: inherit;
+  font-weight: 800;
+}
+
+.request-progress-stage[data-stage-state="current"]::before {
+  border-color: currentColor;
+  background: currentColor;
+}
+
+.request-progress-stage[data-stage-state="pending"] {
+  opacity: 0.55;
+}
+
+.request-progress-stage-label {
+  overflow-wrap: anywhere;
+}
+
 .request-read-only,
 .request-cancel-confirmation p,
 .requests-message-panel p,
@@ -2186,6 +2245,11 @@ section[aria-labelledby="service-detail-title"] dd {
   .requests-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .request-progress {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    row-gap: 0.7rem;
+  }
 }
 
 @media (max-width: 640px) {
@@ -2201,6 +2265,29 @@ section[aria-labelledby="service-detail-title"] dd {
 
   .request-card-meta dd {
     text-align: left;
+  }
+
+  .request-progress {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .request-progress-stage {
+    grid-template-columns: 0.75rem minmax(0, 1fr);
+    align-items: start;
+    gap: 0.65rem;
+    padding-bottom: 0.7rem;
+    font-size: 0.75rem;
+  }
+
+  .request-progress-stage:last-child {
+    padding-bottom: 0;
+  }
+
+  .request-progress-stage::before {
+    width: 0.65rem;
+    height: 0.65rem;
+    margin-top: 0.1rem;
   }
 }
 

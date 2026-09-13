@@ -40,6 +40,7 @@ class MediaRequestStatus(str, Enum):
     SEARCHING = "searching"
     DOWNLOADING = "downloading"
     IMPORTING = "importing"
+    PROCESSING = "processing"
     CANCELLING = "cancelling"
     AVAILABLE = "available"
     REJECTED = "rejected"

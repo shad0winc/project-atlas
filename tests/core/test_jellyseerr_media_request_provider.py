@@ -388,7 +388,7 @@ def test_submit_requires_numeric_tmdb_id(
         (2, 2, MediaRequestStatus.APPROVED),
         (2, 3, MediaRequestStatus.SEARCHING),
         (2, 4, MediaRequestStatus.IMPORTING),
-        (2, 5, MediaRequestStatus.AVAILABLE),
+        (2, 5, MediaRequestStatus.PROCESSING),
         (2, 6, MediaRequestStatus.FAILED),
         (3, 2, MediaRequestStatus.REJECTED),
     ],
@@ -468,7 +468,7 @@ def test_get_status_reads_request_resource() -> None:
     assert result.context is not None
 
 
-def test_get_status_marks_available_at() -> None:
+def test_get_status_marks_processing_until_jellyfin_ready() -> None:
     provider = make_provider()
 
     with patch.object(
@@ -481,8 +481,8 @@ def test_get_status_marks_available_at() -> None:
     ):
         result = provider.get_status("42")
 
-    assert result.status is MediaRequestStatus.AVAILABLE
-    assert result.available_at == UPDATED
+    assert result.status is MediaRequestStatus.PROCESSING
+    assert result.available_at is None
 
 
 def test_get_status_rejects_mismatched_id() -> None:

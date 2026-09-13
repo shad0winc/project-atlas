@@ -519,6 +519,198 @@ class JellyfinProvider:
             "users": tuple(users),
         }
 
+    def find_item_by_tmdb(
+        self,
+        tmdb_id: str,
+        *,
+        media_type: str,
+        page_size: int = 200,
+    ) -> str | None:
+        """Return one Jellyfin Movie/Series ID for an exact TMDB identity."""
+
+        normalized_tmdb_id = _required(
+            tmdb_id,
+            "tmdb_id",
+        )
+
+        if (
+            not normalized_tmdb_id.isdigit()
+            or int(normalized_tmdb_id) <= 0
+        ):
+            raise MediaProviderError(
+                "tmdb_id must be a positive numeric identifier"
+            )
+
+        normalized_media_type = str(
+            media_type
+        ).strip().lower()
+
+        if normalized_media_type == "movie":
+            jellyfin_type = "Movie"
+        elif normalized_media_type == "tv":
+            jellyfin_type = "Series"
+        else:
+            raise MediaProviderError(
+                "media_type must be movie or tv"
+            )
+
+        if (
+            isinstance(page_size, bool)
+            or not isinstance(page_size, int)
+            or page_size <= 0
+        ):
+            raise MediaProviderError(
+                "page_size must be a positive integer"
+            )
+
+        matches: list[str] = []
+        start_index = 0
+
+        while True:
+            query = urlencode(
+                {
+                    "Recursive": "true",
+                    "IncludeItemTypes": jellyfin_type,
+                    "Fields": "ProviderIds",
+                    "StartIndex": start_index,
+                    "Limit": page_size,
+                }
+            )
+
+            payload = self._get_json(
+                f"/Items?{query}"
+            )
+
+            if not isinstance(payload, dict):
+                raise MediaProviderError(
+                    "Jellyfin returned an invalid TMDB lookup response"
+                )
+
+            items = payload.get("Items")
+            total = payload.get("TotalRecordCount")
+
+            if not isinstance(items, list):
+                raise MediaProviderError(
+                    "Jellyfin TMDB lookup item list is invalid"
+                )
+
+            if (
+                isinstance(total, bool)
+                or not isinstance(total, int)
+                or total < 0
+            ):
+                raise MediaProviderError(
+                    "Jellyfin TMDB lookup item count is invalid"
+                )
+
+            for item in items:
+                if not isinstance(item, dict):
+                    raise MediaProviderError(
+                        "Jellyfin returned an invalid TMDB lookup entry"
+                    )
+
+                provider_ids = item.get(
+                    "ProviderIds"
+                )
+
+                if not isinstance(
+                    provider_ids,
+                    dict,
+                ):
+                    continue
+
+                candidate = provider_ids.get(
+                    "Tmdb"
+                )
+
+                if candidate is None:
+                    continue
+
+                if (
+                    str(candidate).strip()
+                    != normalized_tmdb_id
+                ):
+                    continue
+
+                item_id = _required(
+                    item.get("Id"),
+                    "Jellyfin item ID",
+                )
+
+                matches.append(item_id)
+
+                if len(matches) > 1:
+                    raise MediaProviderError(
+                        "multiple Jellyfin items matched TMDB identity"
+                    )
+
+            start_index += len(items)
+
+            if not items or start_index >= total:
+                break
+
+        if not matches:
+            return None
+
+        return matches[0]
+
+    def is_item_playable(
+        self,
+        item_id: str,
+    ) -> bool:
+        """Return whether Jellyfin exposes a usable media source for an item."""
+
+        normalized_id = _required(
+            item_id,
+            "item_id",
+        )
+
+        payload = self._request_json(
+            f"/Items/{quote(normalized_id, safe='')}/PlaybackInfo",
+            method="POST",
+            payload={
+                "EnableDirectPlay": True,
+                "EnableDirectStream": True,
+                "EnableTranscoding": True,
+                "AllowVideoStreamCopy": True,
+                "AllowAudioStreamCopy": True,
+            },
+        )
+
+        if not isinstance(payload, dict):
+            raise MediaProviderError(
+                "Jellyfin returned invalid playback readiness response"
+            )
+
+        sources = payload.get(
+            "MediaSources"
+        )
+
+        if not isinstance(sources, list):
+            raise MediaProviderError(
+                "Jellyfin returned invalid playback readiness response"
+            )
+
+        for source in sources:
+            if not isinstance(source, dict):
+                continue
+
+            source_id = str(
+                source.get("Id") or ""
+            ).strip()
+
+            if not source_id:
+                continue
+
+            if (
+                bool(source.get("SupportsDirectPlay"))
+                or bool(source.get("SupportsDirectStream"))
+                or bool(source.get("SupportsTranscoding"))
+            ):
+                return True
+
+        return False
+
     def get_playback_info(
         self,
         item_id: str,

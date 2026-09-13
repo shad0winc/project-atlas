@@ -13,6 +13,9 @@ from atlas.module_scheduler import sync_module_jobs
 from atlas.operations_scheduler import (
     register_operations_collection,
 )
+from atlas.media_requests.scheduler import (
+    register_media_request_reconciliation,
+)
 from atlas.sustained_use.scheduler import (
     register_sustained_use_sampling,
 )
@@ -101,6 +104,13 @@ def _sync_scheduler_jobs(
         operations_task["name"],
     )
 
+    media_request_task = register_media_request_reconciliation(
+        scheduler,
+    )
+    media_request_name = str(
+        media_request_task["name"],
+    )
+
     sustained_use_task = register_sustained_use_sampling(
         scheduler,
     )
@@ -113,6 +123,7 @@ def _sync_scheduler_jobs(
             {
                 *result["registered"],
                 operations_name,
+                media_request_name,
                 sustained_use_name,
             }
         ),

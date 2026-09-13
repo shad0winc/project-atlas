@@ -9,6 +9,7 @@ export const MEDIA_REQUEST_STATUSES = [
   "searching",
   "downloading",
   "importing",
+  "processing",
   "available",
   "rejected",
   "failed",

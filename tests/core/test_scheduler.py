@@ -708,6 +708,7 @@ class OperationsSchedulerSyncCliTests(unittest.TestCase):
             set(stored["tasks"]),
             {
                 "operations.collect",
+                "requests.reconcile",
                 "sports.sync",
                 "sustained-use.sample",
             },
