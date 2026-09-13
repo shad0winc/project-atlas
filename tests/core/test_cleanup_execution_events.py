@@ -217,6 +217,137 @@ class CleanupExecutionEventTests(unittest.TestCase):
             },
         )
 
+    def test_execute_delete_success_contract(self) -> None:
+        event = make_event(
+            mode=CleanupExecutionMode.EXECUTE,
+            status=CleanupExecutionEventStatus.DELETE_SUCCEEDED,
+            message="Item deleted",
+            modified=True,
+        )
+
+        self.assertTrue(event.successful)
+        self.assertFalse(event.failed)
+        self.assertTrue(event.modified)
+
+    def test_execute_delete_failure_contract(self) -> None:
+        event = make_event(
+            mode=CleanupExecutionMode.EXECUTE,
+            status=CleanupExecutionEventStatus.DELETE_FAILED,
+            message="Delete failed",
+            modified=False,
+        )
+
+        self.assertFalse(event.successful)
+        self.assertTrue(event.failed)
+        self.assertFalse(event.modified)
+
+    def test_execute_delete_indeterminate_contract(self) -> None:
+        event = make_event(
+            mode=CleanupExecutionMode.EXECUTE,
+            status=(
+                CleanupExecutionEventStatus.DELETE_INDETERMINATE
+            ),
+            message="Delete outcome requires reconciliation",
+            modified=False,
+        )
+
+        self.assertFalse(event.successful)
+        self.assertTrue(event.failed)
+        self.assertFalse(event.modified)
+
+    def test_delete_status_requires_execute_mode(self) -> None:
+        for status in (
+            CleanupExecutionEventStatus.DELETE_SUCCEEDED,
+            CleanupExecutionEventStatus.DELETE_FAILED,
+            CleanupExecutionEventStatus.DELETE_INDETERMINATE,
+        ):
+            with self.subTest(status=status):
+                with self.assertRaisesRegex(
+                    CleanupError,
+                    "requires execute mode",
+                ):
+                    make_event(
+                        mode=CleanupExecutionMode.DRY_RUN,
+                        status=status,
+                        modified=False,
+                    )
+
+    def test_preview_status_requires_dry_run_mode(self) -> None:
+        for status in (
+            CleanupExecutionEventStatus.PREVIEW_SUCCEEDED,
+            CleanupExecutionEventStatus.PREVIEW_FAILED,
+        ):
+            with self.subTest(status=status):
+                with self.assertRaisesRegex(
+                    CleanupError,
+                    "requires dry-run mode",
+                ):
+                    make_event(
+                        mode=CleanupExecutionMode.EXECUTE,
+                        status=status,
+                    )
+
+    def test_execute_delete_status_requires_delete_action(
+        self,
+    ) -> None:
+        for status in (
+            CleanupExecutionEventStatus.DELETE_SUCCEEDED,
+            CleanupExecutionEventStatus.DELETE_FAILED,
+            CleanupExecutionEventStatus.DELETE_INDETERMINATE,
+        ):
+            with self.subTest(status=status):
+                with self.assertRaisesRegex(
+                    CleanupError,
+                    "require delete action",
+                ):
+                    make_event(
+                        action=CleanupAction.KEEP,
+                        mode=CleanupExecutionMode.EXECUTE,
+                        status=status,
+                        modified=False,
+                    )
+
+    def test_successful_delete_requires_modified_true(
+        self,
+    ) -> None:
+        with self.assertRaisesRegex(
+            CleanupError,
+            "successful delete event must modify media",
+        ):
+            make_event(
+                mode=CleanupExecutionMode.EXECUTE,
+                status=CleanupExecutionEventStatus.DELETE_SUCCEEDED,
+                modified=False,
+            )
+
+    def test_failed_delete_cannot_claim_modified(
+        self,
+    ) -> None:
+        with self.assertRaisesRegex(
+            CleanupError,
+            "only successful delete events may modify media",
+        ):
+            make_event(
+                mode=CleanupExecutionMode.EXECUTE,
+                status=CleanupExecutionEventStatus.DELETE_FAILED,
+                modified=True,
+            )
+
+    def test_indeterminate_delete_cannot_claim_modified(
+        self,
+    ) -> None:
+        with self.assertRaisesRegex(
+            CleanupError,
+            "only successful delete events may modify media",
+        ):
+            make_event(
+                mode=CleanupExecutionMode.EXECUTE,
+                status=(
+                    CleanupExecutionEventStatus.DELETE_INDETERMINATE
+                ),
+                modified=True,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

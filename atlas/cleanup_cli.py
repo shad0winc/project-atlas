@@ -372,6 +372,9 @@ def render_history_human(
                 f"Skipped: {entry.skipped_count}",
                 f"Preview succeeded: {entry.preview_succeeded_count}",
                 f"Preview failed: {entry.preview_failed_count}",
+                f"Delete succeeded: {entry.delete_succeeded_count}",
+                f"Delete failed: {entry.delete_failed_count}",
+                f"Delete indeterminate: {entry.delete_indeterminate_count}",
                 f"Modified: {entry.modified_count}",
                 f"Has failures: {entry.has_failures}",
             ]

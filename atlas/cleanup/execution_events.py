@@ -23,6 +23,9 @@ class CleanupExecutionEventStatus(str, Enum):
     SKIPPED = "skipped"
     PREVIEW_SUCCEEDED = "preview_succeeded"
     PREVIEW_FAILED = "preview_failed"
+    DELETE_SUCCEEDED = "delete_succeeded"
+    DELETE_FAILED = "delete_failed"
+    DELETE_INDETERMINATE = "delete_indeterminate"
 
 
 def _utc_now() -> datetime:
@@ -183,21 +186,80 @@ class CleanupExecutionEvent:
         if not isinstance(self.modified, bool):
             raise CleanupError("modified must be a boolean")
 
-        if mode is CleanupExecutionMode.DRY_RUN and self.modified:
+        preview_statuses = {
+            CleanupExecutionEventStatus.PREVIEW_SUCCEEDED,
+            CleanupExecutionEventStatus.PREVIEW_FAILED,
+        }
+        delete_statuses = {
+            CleanupExecutionEventStatus.DELETE_SUCCEEDED,
+            CleanupExecutionEventStatus.DELETE_FAILED,
+            CleanupExecutionEventStatus.DELETE_INDETERMINATE,
+        }
+
+        if (
+            status in preview_statuses
+            and mode is not CleanupExecutionMode.DRY_RUN
+        ):
+            raise CleanupError(
+                "preview execution event status requires dry-run mode"
+            )
+
+        if (
+            status in delete_statuses
+            and mode is not CleanupExecutionMode.EXECUTE
+        ):
+            raise CleanupError(
+                "delete execution event status requires execute mode"
+            )
+
+        if (
+            status in preview_statuses
+            and action is not CleanupAction.DELETE
+        ):
+            raise CleanupError(
+                "preview execution events require delete action"
+            )
+
+        if (
+            status in delete_statuses
+            and action is not CleanupAction.DELETE
+        ):
+            raise CleanupError(
+                "delete execution events require delete action"
+            )
+
+        if (
+            status is CleanupExecutionEventStatus.SKIPPED
+            and self.modified
+        ):
+            raise CleanupError(
+                "skipped execution events cannot modify media"
+            )
+
+        if (
+            mode is CleanupExecutionMode.DRY_RUN
+            and self.modified
+        ):
             raise CleanupError(
                 "dry-run execution events cannot modify media"
             )
 
         if (
-            status
-            in {
-                CleanupExecutionEventStatus.PREVIEW_SUCCEEDED,
-                CleanupExecutionEventStatus.PREVIEW_FAILED,
-            }
-            and action is not CleanupAction.DELETE
+            self.modified
+            and status
+            is not CleanupExecutionEventStatus.DELETE_SUCCEEDED
         ):
             raise CleanupError(
-                "preview execution events require delete action"
+                "only successful delete events may modify media"
+            )
+
+        if (
+            status
+            is CleanupExecutionEventStatus.DELETE_SUCCEEDED
+            and not self.modified
+        ):
+            raise CleanupError(
+                "successful delete event must modify media"
             )
 
         object.__setattr__(
@@ -220,16 +282,18 @@ class CleanupExecutionEvent:
         return self.status in {
             CleanupExecutionEventStatus.SKIPPED,
             CleanupExecutionEventStatus.PREVIEW_SUCCEEDED,
+            CleanupExecutionEventStatus.DELETE_SUCCEEDED,
         }
 
     @property
     def failed(self) -> bool:
         """Return whether the event represents a failed outcome."""
 
-        return (
-            self.status
-            is CleanupExecutionEventStatus.PREVIEW_FAILED
-        )
+        return self.status in {
+            CleanupExecutionEventStatus.PREVIEW_FAILED,
+            CleanupExecutionEventStatus.DELETE_FAILED,
+            CleanupExecutionEventStatus.DELETE_INDETERMINATE,
+        }
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize the execution event."""

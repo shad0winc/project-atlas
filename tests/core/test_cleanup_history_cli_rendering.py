@@ -162,6 +162,18 @@ class CleanupHistoryCliRenderingTests(unittest.TestCase):
             output,
         )
         self.assertIn(
+            "Delete succeeded: 0",
+            output,
+        )
+        self.assertIn(
+            "Delete failed: 0",
+            output,
+        )
+        self.assertIn(
+            "Delete indeterminate: 0",
+            output,
+        )
+        self.assertIn(
             "Modified: 0",
             output,
         )
