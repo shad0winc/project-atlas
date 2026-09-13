@@ -56,6 +56,7 @@ _ALLOWED_TRANSITIONS: dict[
             MediaRequestStatus.SEARCHING,
             MediaRequestStatus.DOWNLOADING,
             MediaRequestStatus.IMPORTING,
+            MediaRequestStatus.PROCESSING,
             MediaRequestStatus.CANCELLING,
             MediaRequestStatus.AVAILABLE,
             MediaRequestStatus.REJECTED,
@@ -70,6 +71,7 @@ _ALLOWED_TRANSITIONS: dict[
             MediaRequestStatus.SEARCHING,
             MediaRequestStatus.DOWNLOADING,
             MediaRequestStatus.IMPORTING,
+            MediaRequestStatus.PROCESSING,
             MediaRequestStatus.AVAILABLE,
             MediaRequestStatus.REJECTED,
             MediaRequestStatus.FAILED,
@@ -82,6 +84,7 @@ _ALLOWED_TRANSITIONS: dict[
             MediaRequestStatus.SEARCHING,
             MediaRequestStatus.DOWNLOADING,
             MediaRequestStatus.IMPORTING,
+            MediaRequestStatus.PROCESSING,
             MediaRequestStatus.CANCELLING,
             MediaRequestStatus.AVAILABLE,
             MediaRequestStatus.REJECTED,
@@ -94,6 +97,7 @@ _ALLOWED_TRANSITIONS: dict[
             MediaRequestStatus.SEARCHING,
             MediaRequestStatus.DOWNLOADING,
             MediaRequestStatus.IMPORTING,
+            MediaRequestStatus.PROCESSING,
             MediaRequestStatus.CANCELLING,
             MediaRequestStatus.AVAILABLE,
             MediaRequestStatus.FAILED,
@@ -104,6 +108,7 @@ _ALLOWED_TRANSITIONS: dict[
         {
             MediaRequestStatus.DOWNLOADING,
             MediaRequestStatus.IMPORTING,
+            MediaRequestStatus.PROCESSING,
             MediaRequestStatus.CANCELLING,
             MediaRequestStatus.AVAILABLE,
             MediaRequestStatus.FAILED,
@@ -113,6 +118,16 @@ _ALLOWED_TRANSITIONS: dict[
     MediaRequestStatus.IMPORTING: frozenset(
         {
             MediaRequestStatus.IMPORTING,
+            MediaRequestStatus.PROCESSING,
+            MediaRequestStatus.CANCELLING,
+            MediaRequestStatus.AVAILABLE,
+            MediaRequestStatus.FAILED,
+            MediaRequestStatus.CANCELLED,
+        }
+    ),
+    MediaRequestStatus.PROCESSING: frozenset(
+        {
+            MediaRequestStatus.PROCESSING,
             MediaRequestStatus.CANCELLING,
             MediaRequestStatus.AVAILABLE,
             MediaRequestStatus.FAILED,
@@ -437,6 +452,46 @@ class MediaRequestService:
             )
 
         return updated
+
+    def mark_available(
+        self,
+        request_id: object,
+    ) -> MediaRequest:
+        """Promote one Jellyfin-ready processing request to AVAILABLE."""
+
+        request = self.get_request(request_id)
+
+        if request.status is not MediaRequestStatus.PROCESSING:
+            raise MediaRequestServiceError(
+                "media request must be processing before it can become available"
+            )
+
+        self._validate_transition(
+            request.status,
+            MediaRequestStatus.AVAILABLE,
+        )
+
+        occurred_at = self._occurred_at()
+        timestamp = (
+            occurred_at.isoformat()
+            .replace("+00:00", "Z")
+        )
+
+        updated = replace(
+            request,
+            status=MediaRequestStatus.AVAILABLE,
+            updated_at=timestamp,
+            available_at=timestamp,
+        )
+
+        persisted = self._replace(updated)
+
+        self._publish(
+            MediaRequestEventType.AVAILABLE,
+            persisted,
+        )
+
+        return persisted
 
     def cancel_request(self, request_id: object) -> MediaRequest:
         """Cancel one active provider-side request."""

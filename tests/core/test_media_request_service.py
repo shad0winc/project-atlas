@@ -1044,3 +1044,106 @@ def test_submit_enospc_blocks_provider_and_preserves_pending_state(
     assert repository_error.__cause__.errno == errno.ENOSPC
     assert provider.submissions == []
     assert service.get_request(original.request_id) == original
+
+
+def test_mark_available_promotes_only_processing_request(
+    service: MediaRequestService,
+    provider: FakeProvider,
+) -> None:
+    """Atlas readiness, not provider completion, owns AVAILABLE."""
+
+    submitted_request(service)
+
+    provider.status_result = ProviderStatusResult(
+        provider="example",
+        provider_request_id="provider-001",
+        status="processing",
+        updated_at=UPDATED,
+    )
+
+    processing = service.refresh_request(
+        "request-001"
+    )
+
+    assert (
+        processing.status
+        is MediaRequestStatus.PROCESSING
+    )
+    assert processing.available_at is None
+
+    from datetime import datetime, timezone
+
+    events: list[
+        tuple[str, dict[str, object]]
+    ] = []
+
+    service._clock = lambda: datetime(
+        2026,
+        8,
+        2,
+        21,
+        15,
+        0,
+        tzinfo=timezone.utc,
+    )
+    service._event_publisher = (
+        lambda name, payload: events.append(
+            (
+                name,
+                dict(payload),
+            )
+        )
+    )
+
+    ready = service.mark_available(
+        "request-001"
+    )
+
+    assert (
+        ready.status
+        is MediaRequestStatus.AVAILABLE
+    )
+    assert (
+        ready.updated_at
+        == "2026-08-02T21:15:00Z"
+    )
+    assert (
+        ready.available_at
+        == "2026-08-02T21:15:00Z"
+    )
+    assert ready.terminal is True
+
+    assert len(events) == 1
+    assert events[0][0] == "request.available"
+    assert (
+        events[0][1]["status"]
+        == "available"
+    )
+    assert (
+        events[0][1]["available_at"]
+        == "2026-08-02T21:15:00Z"
+    )
+
+
+def test_mark_available_rejects_non_processing_request(
+    service: MediaRequestService,
+) -> None:
+    submitted_request(service)
+
+    with pytest.raises(
+        MediaRequestServiceError,
+        match="processing",
+    ):
+        service.mark_available(
+            "request-001"
+        )
+
+    persisted = service.get_request(
+        "request-001"
+    )
+
+    assert (
+        persisted.status
+        is MediaRequestStatus.APPROVED
+    )
+    assert persisted.available_at is None

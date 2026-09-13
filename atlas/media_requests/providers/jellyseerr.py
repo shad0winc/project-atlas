@@ -1487,7 +1487,7 @@ def _normalize_status(
         )
 
     if media_status == 5:
-        return MediaRequestStatus.AVAILABLE
+        return MediaRequestStatus.PROCESSING
     if request_status == 3:
         return MediaRequestStatus.REJECTED
     if media_status == 6:

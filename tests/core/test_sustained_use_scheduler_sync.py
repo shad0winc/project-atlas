@@ -57,6 +57,18 @@ def test_unqualified_sync_registers_both_core_jobs(
             "name": "operations.collect",
         }
 
+    def fake_media_requests(received_scheduler):
+        calls.append(
+            (
+                "media-requests",
+                received_scheduler,
+            )
+        )
+
+        return {
+            "name": "requests.reconcile",
+        }
+
     def fake_sustained_use(received_scheduler):
         calls.append(
             (
@@ -81,6 +93,11 @@ def test_unqualified_sync_registers_both_core_jobs(
     )
     monkeypatch.setattr(
         scheduler_cli,
+        "register_media_request_reconciliation",
+        fake_media_requests,
+    )
+    monkeypatch.setattr(
+        scheduler_cli,
         "register_sustained_use_sampling",
         fake_sustained_use,
     )
@@ -98,6 +115,7 @@ def test_unqualified_sync_registers_both_core_jobs(
     assert result == {
         "registered": [
             "operations.collect",
+            "requests.reconcile",
             "sports.sync",
             "sustained-use.sample",
         ],
@@ -121,6 +139,10 @@ def test_unqualified_sync_registers_both_core_jobs(
         ),
         (
             "operations",
+            scheduler,
+        ),
+        (
+            "media-requests",
             scheduler,
         ),
         (
@@ -173,6 +195,11 @@ def test_targeted_module_sync_skips_all_core_jobs(
     )
     monkeypatch.setattr(
         scheduler_cli,
+        "register_media_request_reconciliation",
+        core_job_must_not_run,
+    )
+    monkeypatch.setattr(
+        scheduler_cli,
         "register_sustained_use_sampling",
         core_job_must_not_run,
     )
@@ -202,6 +229,7 @@ def test_core_registration_result_is_deduplicated(
         lambda *args, **kwargs: {
             "registered": [
                 "operations.collect",
+                "requests.reconcile",
                 "sustained-use.sample",
             ],
             "removed": [],
@@ -214,6 +242,14 @@ def test_core_registration_result_is_deduplicated(
         "register_operations_collection",
         lambda received_scheduler: {
             "name": "operations.collect",
+        },
+    )
+
+    monkeypatch.setattr(
+        scheduler_cli,
+        "register_media_request_reconciliation",
+        lambda received_scheduler: {
+            "name": "requests.reconcile",
         },
     )
 
@@ -234,5 +270,6 @@ def test_core_registration_result_is_deduplicated(
 
     assert result["registered"] == [
         "operations.collect",
+        "requests.reconcile",
         "sustained-use.sample",
     ]

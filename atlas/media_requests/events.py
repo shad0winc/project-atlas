@@ -29,6 +29,7 @@ class MediaRequestEventType(str, Enum):
     SEARCHING = "request.searching"
     DOWNLOADING = "request.downloading"
     IMPORTING = "request.importing"
+    PROCESSING = "request.processing"
     AVAILABLE = "request.available"
     REJECTED = "request.rejected"
     FAILED = "request.failed"
@@ -41,6 +42,7 @@ _STATUS_EVENTS: dict[MediaRequestStatus, MediaRequestEventType] = {
     MediaRequestStatus.SEARCHING: MediaRequestEventType.SEARCHING,
     MediaRequestStatus.DOWNLOADING: MediaRequestEventType.DOWNLOADING,
     MediaRequestStatus.IMPORTING: MediaRequestEventType.IMPORTING,
+    MediaRequestStatus.PROCESSING: MediaRequestEventType.PROCESSING,
     MediaRequestStatus.AVAILABLE: MediaRequestEventType.AVAILABLE,
     MediaRequestStatus.REJECTED: MediaRequestEventType.REJECTED,
     MediaRequestStatus.FAILED: MediaRequestEventType.FAILED,
@@ -111,6 +113,7 @@ class MediaRequestEvent:
             MediaRequestEventType.SEARCHING,
             MediaRequestEventType.DOWNLOADING,
             MediaRequestEventType.IMPORTING,
+            MediaRequestEventType.PROCESSING,
             MediaRequestEventType.AVAILABLE,
             MediaRequestEventType.REJECTED,
             MediaRequestEventType.FAILED,
