@@ -3,6 +3,9 @@
 from atlas.retention.models import (
     RetentionDecision,
     RetentionError,
+    RetentionLifecycle,
+    RetentionLifecycleRule,
+    RetentionLifecycleState,
 )
 from atlas.retention.service import (
     RetentionService,
@@ -13,6 +16,9 @@ from atlas.retention.service import (
 __all__ = [
     "RetentionDecision",
     "RetentionError",
+    "RetentionLifecycle",
+    "RetentionLifecycleRule",
+    "RetentionLifecycleState",
     "RetentionService",
     "default_retention_service",
 ]
