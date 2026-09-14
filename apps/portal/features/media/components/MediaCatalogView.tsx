@@ -182,8 +182,10 @@ export function MediaCatalogView(): React.ReactElement {
   const [favoritedItemIds, setFavoritedItemIds] =
     useState<ReadonlySet<string>>(() => new Set());
 
-  const [favoritesReady, setFavoritesReady] =
-    useState(false);
+  const [
+    favoritesLoadedForUserId,
+    setFavoritesLoadedForUserId
+  ] = useState<string | null>(null);
 
   const [retentionByItemId, setRetentionByItemId] =
     useState<ReadonlyMap<string, MediaRetention>>(
@@ -198,6 +200,11 @@ export function MediaCatalogView(): React.ReactElement {
 
   const canDislike =
     can(ATLAS_PERMISSIONS.dislikesWrite);
+
+  const favoritesReady =
+    user !== null &&
+    canReadFavorites &&
+    favoritesLoadedForUserId === user.user_id;
 
   const load = useCallback((): void => {
     setLoading(true);
@@ -225,35 +232,51 @@ export function MediaCatalogView(): React.ReactElement {
       user === null ||
       !canReadFavorites
     ) {
-      setFavoritedItemIds(new Set());
-      setFavoritesReady(false);
-    } else {
-      void loadFavorites({
-        expectedUserId: user.user_id
-      })
-        .then((favorites) => {
-          if (cancelled) {
-            return;
-          }
-
-          setFavoritedItemIds(
-            new Set(
-              favorites.map(
-                (favorite) =>
-                  `${favorite.provider}\u0000${favorite.itemId}`
-              )
-            )
-          );
-
-          setFavoritesReady(true);
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setFavoritedItemIds(new Set());
-            setFavoritesReady(false);
-          }
-        });
+      return () => {
+        cancelled = true;
+      };
     }
+
+    const expectedUserId = user.user_id;
+
+    void loadFavorites({
+      expectedUserId
+    })
+      .then((favorites) => {
+        if (cancelled) {
+          return;
+        }
+
+        setFavoritedItemIds(
+          new Set(
+            favorites.map(
+              (favorite) =>
+                `${favorite.provider}\u0000${favorite.itemId}`
+            )
+          )
+        );
+
+        setFavoritesLoadedForUserId(
+          expectedUserId
+        );
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setFavoritedItemIds(new Set());
+          setFavoritesLoadedForUserId(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    canReadFavorites,
+    user
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
 
     void loadMediaCatalog({
       page: 1,
@@ -266,7 +289,9 @@ export function MediaCatalogView(): React.ReactElement {
       })
       .catch(() => {
         if (!cancelled) {
-          setError("Atlas could not load your Jellyfin library.");
+          setError(
+            "Atlas could not load your Jellyfin library."
+          );
         }
       })
       .finally(() => {
@@ -278,10 +303,7 @@ export function MediaCatalogView(): React.ReactElement {
     return () => {
       cancelled = true;
     };
-  }, [
-    canReadFavorites,
-    user
-  ]);
+  }, []);
 
   const handleFavorite = useCallback(
     async (item: MediaCatalogItem): Promise<void> => {

@@ -46,6 +46,11 @@ function AuthorizedTheaterPlayer({
       "unavailable"
     >("loading");
 
+  const [
+    favoriteStateIdentity,
+    setFavoriteStateIdentity
+  ] = useState<string | null>(null);
+
   const canReadFavorites =
     user !== null &&
     can(ATLAS_PERMISSIONS.favoritesRead);
@@ -58,11 +63,25 @@ function AuthorizedTheaterPlayer({
     user !== null &&
     can(ATLAS_PERMISSIONS.dislikesWrite);
 
+  const currentFavoriteIdentity =
+    user === null
+      ? null
+      : [
+          user.user_id,
+          session.provider,
+          session.playableTargetId
+        ].join("\u0000");
+
+  const effectiveFavoriteState =
+    user === null ||
+    !canReadFavorites
+      ? "unavailable"
+      : favoriteStateIdentity === currentFavoriteIdentity
+        ? favoriteState
+        : "loading";
+
   useEffect(() => {
     const controller = new AbortController();
-
-    setRetention(null);
-    setFavoriteState("loading");
 
     void readMediaRetention(
       session.provider,
@@ -81,11 +100,15 @@ function AuthorizedTheaterPlayer({
       });
 
     if (
-      user === null ||
-      !canReadFavorites
+      user !== null &&
+      canReadFavorites
     ) {
-      setFavoriteState("unavailable");
-    } else {
+      const expectedFavoriteIdentity = [
+        user.user_id,
+        session.provider,
+        session.playableTargetId
+      ].join("\u0000");
+
       void loadFavorites({
         expectedUserId: user.user_id
       })
@@ -100,12 +123,19 @@ function AuthorizedTheaterPlayer({
               favorite.itemId === session.playableTargetId
           );
 
+          setFavoriteStateIdentity(
+            expectedFavoriteIdentity
+          );
+
           setFavoriteState(
             isFavorited ? "complete" : "idle"
           );
         })
         .catch(() => {
           if (!controller.signal.aborted) {
+            setFavoriteStateIdentity(
+              expectedFavoriteIdentity
+            );
             setFavoriteState("unavailable");
           }
         });
@@ -127,6 +157,15 @@ function AuthorizedTheaterPlayer({
         return;
       }
 
+      const expectedFavoriteIdentity = [
+        user.user_id,
+        session.provider,
+        session.playableTargetId
+      ].join("\u0000");
+
+      setFavoriteStateIdentity(
+        expectedFavoriteIdentity
+      );
       setFavoriteState("submitting");
 
       try {
@@ -189,7 +228,7 @@ function AuthorizedTheaterPlayer({
           ? user.user_id
           : undefined
       }
-      favoriteState={favoriteState}
+      favoriteState={effectiveFavoriteState}
       onDisliked={handleDisliked}
       onFavorite={handleFavorite}
       retention={retention}
