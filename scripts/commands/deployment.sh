@@ -100,12 +100,290 @@ atlas_deployment_set_status() {
   mv -f -- "$temporary" "$record/status"
 }
 
+atlas_deployment_runtime_source_root() {
+  printf '%s\n' \
+    "${ATLAS_RUNTIME_CONFIG_DIR:-/mnt/storage/configs/atlas/runtime}/source"
+}
+
+atlas_deployment_runtime_source_generations_dir() {
+  printf '%s/generations\n' \
+    "$(atlas_deployment_runtime_source_root)"
+}
+
+atlas_deployment_runtime_source_generation_dir() {
+  local identifier="$1"
+
+  atlas_deployment_valid_id "$identifier" || return 1
+
+  printf '%s/%s\n' \
+    "$(atlas_deployment_runtime_source_generations_dir)" \
+    "$identifier"
+}
+
+atlas_deployment_publish_runtime_source() {
+  local identifier="$1"
+  local record
+  local archive
+  local root
+  local generations
+  local generation
+  local temporary
+  local archive_sha
+  local existing_sha
+  local env_source
+
+  atlas_deployment_valid_id "$identifier" || {
+    echo 'ERROR: invalid runtime-source deployment identifier.' >&2
+    return 1
+  }
+
+  record="$(atlas_deployment_record_dir "$identifier")" || return 1
+
+  [[ -d "$record" && -f "$record/status" ]] || {
+    printf \
+      'ERROR: runtime-source deployment record is unavailable: %s\n' \
+      "$identifier" >&2
+    return 1
+  }
+
+  [[ "$(<"$record/status")" == 'verified' ]] || {
+    printf \
+      'ERROR: runtime source requires a verified deployment record: %s\n' \
+      "$identifier" >&2
+    return 1
+  }
+
+  archive="$record/core-source.tar.gz"
+
+  [[ -s "$archive" ]] || {
+    printf \
+      'ERROR: runtime-source archive is unavailable: %s\n' \
+      "$archive" >&2
+    return 1
+  }
+
+  root="$(atlas_deployment_runtime_source_root)"
+  generations="$(atlas_deployment_runtime_source_generations_dir)"
+  generation="$(atlas_deployment_runtime_source_generation_dir "$identifier")"
+
+  if [[ -e "$root" || -L "$root" ]]; then
+    [[ -d "$root" && ! -L "$root" ]] || {
+      echo 'ERROR: runtime-source root must be a regular directory.' >&2
+      return 1
+    }
+  else
+    mkdir -p "$root" || return 1
+  fi
+
+  if [[ -e "$generations" || -L "$generations" ]]; then
+    [[ -d "$generations" && ! -L "$generations" ]] || {
+      echo 'ERROR: runtime-source generations must be a regular directory.' >&2
+      return 1
+    }
+  else
+    mkdir "$generations" || return 1
+  fi
+
+  archive_sha="$(sha256sum "$archive" | awk '{print $1}')"
+
+  if [[ -e "$generation" || -L "$generation" ]]; then
+    [[ -d "$generation" && ! -L "$generation" ]] || {
+      printf \
+        'ERROR: runtime-source generation is not a regular directory: %s\n' \
+        "$generation" >&2
+      return 1
+    }
+
+    [[ -f "$generation/.atlas-source-sha256" ]] || {
+      printf \
+        'ERROR: existing runtime-source generation lacks provenance: %s\n' \
+        "$generation" >&2
+      return 1
+    }
+
+    IFS= read -r existing_sha < "$generation/.atlas-source-sha256"
+
+    [[ "$existing_sha" == "$archive_sha" ]] || {
+      printf \
+        'ERROR: existing runtime-source generation archive identity differs: %s\n' \
+        "$identifier" >&2
+      return 1
+    }
+
+    [[ -x "$generation/scripts/atlas" ]] || {
+      printf \
+        'ERROR: existing runtime-source generation lacks executable Atlas CLI: %s\n' \
+        "$identifier" >&2
+      return 1
+    }
+
+    return 0
+  fi
+
+  temporary="$(
+    mktemp -d \
+      "$generations/.${identifier}.XXXXXX"
+  )" || return 1
+
+  if ! python3 - "$archive" "$temporary" <<'PYEXTRACT'
+from pathlib import PurePosixPath
+import sys
+import tarfile
+
+
+archive_path = sys.argv[1]
+destination = sys.argv[2]
+
+try:
+    archive = tarfile.open(
+        archive_path,
+        mode="r:gz",
+    )
+except (OSError, tarfile.TarError) as exc:
+    raise SystemExit(
+        f"ERROR: unable to inspect runtime-source archive: {exc}"
+    )
+
+with archive:
+    members = archive.getmembers()
+    seen = set()
+
+    for member in members:
+        name = member.name
+        path = PurePosixPath(name)
+
+        if (
+            not name
+            or path.is_absolute()
+            or ".." in path.parts
+            or name.startswith("/")
+        ):
+            raise SystemExit(
+                "ERROR: unsafe runtime-source archive member path: "
+                + repr(name)
+            )
+
+        if name in seen:
+            raise SystemExit(
+                "ERROR: duplicate runtime-source archive member: "
+                + name
+            )
+
+        seen.add(name)
+
+        if member.issym() or member.islnk():
+            raise SystemExit(
+                "ERROR: runtime-source archive links are not allowed: "
+                + name
+            )
+
+        if not (member.isfile() or member.isdir()):
+            raise SystemExit(
+                "ERROR: unsupported runtime-source archive member type: "
+                + name
+            )
+
+    try:
+        archive.extractall(
+            path=destination,
+            members=members,
+            filter="data",
+        )
+    except (
+        OSError,
+        tarfile.TarError,
+        ValueError,
+    ) as exc:
+        raise SystemExit(
+            f"ERROR: unable to safely extract runtime-source archive: {exc}"
+        )
+PYEXTRACT
+  then
+    chmod -R u+w "$temporary" 2>/dev/null || true
+    rm -rf -- "$temporary"
+    echo 'ERROR: unable to extract runtime-source archive.' >&2
+    return 1
+  fi
+
+  for required in \
+    VERSION \
+    scripts/atlas \
+    scripts/commands/scheduler.sh \
+    atlas/scheduler.py \
+    atlas/scheduler_cli.py
+  do
+    [[ -f "$temporary/$required" ]] || {
+      printf \
+        'ERROR: runtime-source archive is missing required path: %s\n' \
+        "$required" >&2
+      rm -rf -- "$temporary"
+      return 1
+    }
+  done
+
+  [[ -x "$temporary/scripts/atlas" ]] || {
+    echo 'ERROR: runtime-source Atlas CLI is not executable.' >&2
+    rm -rf -- "$temporary"
+    return 1
+  }
+
+  if [[ -e "$temporary/.env" || -L "$temporary/.env" ]]; then
+    echo 'ERROR: runtime-source archive unexpectedly contains .env.' >&2
+    rm -rf -- "$temporary"
+    return 1
+  fi
+
+  env_source="$ATLAS_PROJECT_DIR/.env"
+
+  if [[ -f "$env_source" && ! -L "$env_source" ]]; then
+    ln -s -- "$env_source" "$temporary/.env" || {
+      rm -rf -- "$temporary"
+      return 1
+    }
+  fi
+
+  printf '%s\n' "$identifier" \
+    > "$temporary/.atlas-deployment-id"
+
+  printf '%s\n' "$archive_sha" \
+    > "$temporary/.atlas-source-sha256"
+
+  chmod -R a-w "$temporary"
+
+  if ! mv -- "$temporary" "$generation"; then
+    chmod -R u+w "$temporary" 2>/dev/null || true
+    rm -rf -- "$temporary"
+    return 1
+  fi
+
+  python3 - "$generations" <<'PYFSYNC'
+import os
+import sys
+
+directory = sys.argv[1]
+flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+descriptor = os.open(directory, flags)
+
+try:
+    os.fsync(descriptor)
+finally:
+    os.close(descriptor)
+PYFSYNC
+}
+
 atlas_deployment_set_current() {
   local identifier="$1"
   local root
   local temporary
 
   atlas_deployment_valid_id "$identifier" || return 1
+
+  # A deployment may become authoritative only after its immutable
+  # scheduler/runtime source generation is present and provenance-verified.
+  # The deployment current file remains the single authoritative pointer;
+  # systemd derives the executable generation from this deployment identity.
+  atlas_deployment_publish_runtime_source "$identifier" || return 1
+
   root="$(atlas_deployment_root)"
   mkdir -p "$root"
   temporary="$(mktemp "$root/.current.XXXXXX")"

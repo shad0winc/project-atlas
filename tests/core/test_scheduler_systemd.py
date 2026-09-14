@@ -35,22 +35,46 @@ def test_scheduler_service_is_oneshot() -> None:
 
 
 def test_scheduler_service_uses_canonical_project_directory() -> None:
+    text = _text(SERVICE)
+
+    assert (
+        "WorkingDirectory="
+        "/mnt/storage/configs/atlas/runtime/source"
+        in text
+    )
+
     assert (
         "WorkingDirectory=/opt/project-atlas"
-        in _text(SERVICE)
+        not in text
     )
 
 
 def test_scheduler_service_uses_public_atlas_cli() -> None:
     text = _text(SERVICE)
 
+    assert "ExecStart=/bin/bash -c " in text
+
     assert (
-        "ExecStart=/bin/atlas scheduler run"
+        "/mnt/storage/configs/atlas/deployments/current"
         in text
     )
 
-    assert "python " not in text
-    assert "python3 " not in text
+    assert (
+        "/mnt/storage/configs/atlas/runtime/source/"
+        "generations/$deployment_id"
+        in text
+    )
+
+    assert (
+        'exec "$runtime/scripts/atlas" scheduler run'
+        in text
+    )
+
+    assert (
+        "ExecStart=/bin/atlas scheduler run"
+        not in text
+    )
+
     assert "scheduler_cli.py" not in text
 
 
@@ -437,9 +461,29 @@ def test_systemd_service_propagates_scheduler_cli_exit_status() -> None:
         if line.startswith("ExecStart=")
     ]
 
-    assert exec_lines == [
-        "ExecStart=/bin/atlas scheduler run",
-    ]
+    assert len(exec_lines) == 1
+
+    exec_line = exec_lines[0]
+
+    assert exec_line.startswith(
+        "ExecStart=/bin/bash -c "
+    )
+
+    assert (
+        "/mnt/storage/configs/atlas/deployments/current"
+        in exec_line
+    )
+
+    assert (
+        "/mnt/storage/configs/atlas/runtime/source/"
+        "generations/$deployment_id"
+        in exec_line
+    )
+
+    assert (
+        'exec "$runtime/scripts/atlas" scheduler run'
+        in exec_line
+    )
 
     assert "SuccessExitStatus=" not in text
     assert "ExecStart=-" not in text
