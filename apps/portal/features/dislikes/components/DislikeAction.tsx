@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 
-import { addDislike } from "../api/dislikes";
+import { addDislikeAndNotify } from "../../media/services/retention-mutations";
 
 export type DislikeActionProps = Readonly<{
   provider: string;
   itemId: string;
   expectedUserId: string;
   title?: string;
+  onDisliked?: () => void | Promise<void>;
 }>;
 
 type DislikeActionState =
@@ -20,7 +21,8 @@ export function DislikeAction({
   provider,
   itemId,
   expectedUserId,
-  title
+  title,
+  onDisliked
 }: DislikeActionProps): React.ReactElement {
   const [state, setState] =
     useState<DislikeActionState>("idle");
@@ -46,14 +48,15 @@ export function DislikeAction({
     setError(null);
 
     try {
-      await addDislike(
+      await addDislikeAndNotify(
         {
           provider,
           itemId
         },
         {
           expectedUserId
-        }
+        },
+        onDisliked
       );
 
       setState("complete");
@@ -71,8 +74,8 @@ export function DislikeAction({
         aria-busy={isSubmitting}
         aria-label={
           isComplete
-            ? `${displayTitle} disliked; cleanup eligible after 24 hours`
-            : `Dislike ${displayTitle}; schedule cleanup after 24 hours`
+            ? `${displayTitle} disliked`
+            : `Dislike ${displayTitle}`
         }
         className="media-discovery-secondary-button"
         disabled={isSubmitting || isComplete}
@@ -82,7 +85,7 @@ export function DislikeAction({
         type="button"
       >
         {isComplete
-          ? "Disliked · delete after 24h"
+          ? "Disliked"
           : isSubmitting
             ? "Disliking…"
             : "Dislike 👎"}

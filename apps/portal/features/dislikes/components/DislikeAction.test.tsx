@@ -15,18 +15,20 @@ const USER_ID =
   "usr_0123456789abcdef0123456789abcdef";
 
 describe("DislikeAction", () => {
-  it("renders the explicit 24-hour cleanup action without exposing owner identity", () => {
+  it("renders the dislike action without inventing cleanup timing or exposing owner identity", () => {
     const markup = renderToStaticMarkup(
       <DislikeAction
         expectedUserId={USER_ID}
         itemId="episode-1"
+        onDisliked={vi.fn()}
         provider="jellyfin"
         title="Example Episode"
       />
     );
 
     expect(markup).toContain("Dislike");
-    expect(markup).toContain("24 hours");
+    expect(markup).not.toContain("24 hours");
+    expect(markup).not.toContain("24h");
     expect(markup).not.toContain(USER_ID);
   });
 });

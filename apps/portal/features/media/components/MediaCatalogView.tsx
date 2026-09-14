@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { addFavorite } from "../../favorites";
 import { DislikeAction } from "../../dislikes";
 import { WatchAction } from "../../playback/components/WatchAction";
+import { MediaRetentionStatus } from "./MediaRetentionStatus";
 
 import { ATLAS_PERMISSIONS } from "../../../lib/authorization/permissions";
 
@@ -14,15 +14,22 @@ import { useAuth } from "../../../lib/auth/use-auth";
 
 import { loadMediaCatalog } from "../api/catalog";
 
+import { applyMediaRetentionRefreshResult } from "../services/retention-integration";
+import { addFavoriteAndRefreshRetention } from "../services/retention-mutations";
+import { refreshMediaRetentionAfterMutation } from "../services/retention-refresh";
+
 import type { MediaCatalogItem, MediaCatalogPage } from "../types/catalog";
+import type { MediaRetention } from "../types/retention";
 
 type MediaCatalogContentProps = Readonly<{
   page: MediaCatalogPage | null;
+  retentionByItemId?: ReadonlyMap<string, MediaRetention>;
   loading: boolean;
   error: string | null;
   canFavorite: boolean;
   canDislike?: boolean;
   dislikeExpectedUserId?: string;
+  onDisliked?: (item: MediaCatalogItem) => void | Promise<void>;
   favoritingItemId: string | null;
   favoritedItemIds: ReadonlySet<string>;
   onFavorite: (item: MediaCatalogItem) => void;
@@ -35,11 +42,13 @@ function itemIdentity(item: MediaCatalogItem): string {
 
 export function MediaCatalogContent({
   page,
+  retentionByItemId,
   loading,
   error,
   canFavorite,
   canDislike = false,
   dislikeExpectedUserId,
+  onDisliked,
   favoritingItemId,
   favoritedItemIds,
   onFavorite,
@@ -84,6 +93,7 @@ export function MediaCatalogContent({
             const identity = itemIdentity(item);
             const isFavoriting = favoritingItemId === identity;
             const isFavorited = favoritedItemIds.has(identity);
+            const retention = retentionByItemId?.get(identity);
 
             return (
               <article className="media-discovery-card" key={identity}>
@@ -102,11 +112,21 @@ export function MediaCatalogContent({
 
                 <p className="media-discovery-status">Provider: {item.provider}</p>
 
+                {retention !== undefined ? (
+                  <MediaRetentionStatus retention={retention} />
+                ) : null}
+
+
                 <WatchAction provider={item.provider} itemId={item.itemId} />
                 {canDislike && dislikeExpectedUserId ? (
                   <DislikeAction
                     expectedUserId={dislikeExpectedUserId}
                     itemId={item.itemId}
+                    onDisliked={
+                      onDisliked === undefined
+                        ? undefined
+                        : () => onDisliked(item)
+                    }
                     provider={item.provider}
                     title={item.title}
                   />
@@ -159,6 +179,11 @@ export function MediaCatalogView(): React.ReactElement {
   const [favoritingItemId, setFavoritingItemId] = useState<string | null>(null);
 
   const [favoritedItemIds, setFavoritedItemIds] = useState<ReadonlySet<string>>(() => new Set());
+
+  const [retentionByItemId, setRetentionByItemId] =
+    useState<ReadonlyMap<string, MediaRetention>>(
+      () => new Map()
+    );
 
   const canFavorite = can(ATLAS_PERMISSIONS.favoritesWrite);
   const canDislike = can(ATLAS_PERMISSIONS.dislikesWrite);
@@ -223,21 +248,31 @@ export function MediaCatalogView(): React.ReactElement {
       setError(null);
 
       try {
-        await addFavorite(
-          {
-            provider: item.provider,
-            itemId: item.itemId
-          },
-          {
-            expectedUserId: user.user_id
-          }
-        );
+        const retentionResult =
+          await addFavoriteAndRefreshRetention(
+            {
+              provider: item.provider,
+              itemId: item.itemId
+            },
+            {
+              expectedUserId: user.user_id
+            }
+          );
 
         setFavoritedItemIds((current) => {
           const next = new Set(current);
           next.add(identity);
           return next;
         });
+
+        setRetentionByItemId((current) =>
+          applyMediaRetentionRefreshResult(
+            current,
+            item.provider,
+            item.itemId,
+            retentionResult
+          )
+        );
       } catch {
         setError(`Atlas could not add ${item.title} to Favorites.`);
       } finally {
@@ -245,6 +280,26 @@ export function MediaCatalogView(): React.ReactElement {
       }
     },
     [user]
+  );
+
+  const handleDisliked = useCallback(
+    async (item: MediaCatalogItem): Promise<void> => {
+      const retentionResult =
+        await refreshMediaRetentionAfterMutation(
+          item.provider,
+          item.itemId
+        );
+
+      setRetentionByItemId((current) =>
+        applyMediaRetentionRefreshResult(
+          current,
+          item.provider,
+          item.itemId,
+          retentionResult
+        )
+      );
+    },
+    []
   );
 
   return (
@@ -260,11 +315,13 @@ export function MediaCatalogView(): React.ReactElement {
       favoritedItemIds={favoritedItemIds}
       favoritingItemId={favoritingItemId}
       loading={loading}
+      onDisliked={handleDisliked}
       onFavorite={(item) => {
         void handleFavorite(item);
       }}
       onRetry={load}
       page={page}
+      retentionByItemId={retentionByItemId}
     />
   );
 }
