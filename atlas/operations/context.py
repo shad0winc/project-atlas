@@ -239,6 +239,13 @@ class HostOperationsContextProvider:
                 check=False,
             )
         except FileNotFoundError as exc:
+            deployment_commit = (
+                self._immutable_deployment_commit()
+            )
+
+            if deployment_commit is not None:
+                return deployment_commit
+
             raise OperationsContextError(
                 "Git executable is unavailable",
             ) from exc
@@ -256,6 +263,13 @@ class HostOperationsContextProvider:
             )
 
         if completed.returncode != 0:
+            deployment_commit = (
+                self._immutable_deployment_commit()
+            )
+
+            if deployment_commit is not None:
+                return deployment_commit
+
             detail = (
                 (completed.stderr or "").strip()
                 or (completed.stdout or "").strip()
@@ -275,6 +289,122 @@ class HostOperationsContextProvider:
             )
 
         return commit
+
+    def _immutable_deployment_commit(
+        self,
+    ) -> str | None:
+        deployment_marker = (
+            self.project_root
+            / ".atlas-deployment-id"
+        )
+
+        if not deployment_marker.is_file():
+            return None
+
+        try:
+            deployment_id = (
+                deployment_marker.read_text(
+                    encoding="utf-8",
+                ).strip()
+            )
+        except OSError as exc:
+            raise OperationsContextError(
+                "Atlas immutable deployment identity "
+                f"could not be read: {exc}",
+            ) from exc
+
+        if (
+            not deployment_id
+            or "/" in deployment_id
+            or ".." in deployment_id
+        ):
+            raise OperationsContextError(
+                "Atlas immutable deployment identity "
+                "is invalid",
+            )
+
+        configured_runtime_root = os.environ.get(
+            "ATLAS_RUNTIME_CONFIG_DIR",
+            "/mnt/storage/configs/atlas",
+        ).strip()
+
+        if not configured_runtime_root:
+            raise OperationsContextError(
+                "ATLAS_RUNTIME_CONFIG_DIR cannot be empty",
+            )
+
+        deployment_root = (
+            Path(configured_runtime_root)
+            / "deployments"
+        )
+
+        current_path = deployment_root / "current"
+        record = (
+            deployment_root
+            / "records"
+            / deployment_id
+        )
+        status_path = record / "status"
+        metadata_path = record / "metadata"
+
+        try:
+            current = current_path.read_text(
+                encoding="utf-8",
+            ).strip()
+
+            status = status_path.read_text(
+                encoding="utf-8",
+            ).strip()
+
+            metadata_lines = metadata_path.read_text(
+                encoding="utf-8",
+            ).splitlines()
+        except OSError as exc:
+            raise OperationsContextError(
+                "Atlas immutable deployment provenance "
+                f"could not be read: {exc}",
+            ) from exc
+
+        if current != deployment_id:
+            raise OperationsContextError(
+                "Atlas immutable deployment provenance "
+                "does not match the current deployment",
+            )
+
+        if status != "verified":
+            raise OperationsContextError(
+                "Atlas immutable deployment provenance "
+                "is not verified",
+            )
+
+        metadata: dict[str, str] = {}
+
+        for line in metadata_lines:
+            key, separator, value = line.partition("=")
+
+            if not separator:
+                continue
+
+            metadata[key.strip()] = value.strip()
+
+        target_commit = metadata.get(
+            "target_commit",
+            "",
+        )
+
+        if (
+            len(target_commit) != 40
+            or any(
+                character not in "0123456789abcdefABCDEF"
+                for character in target_commit
+            )
+        ):
+            raise OperationsContextError(
+                "Atlas immutable deployment target commit "
+                "is invalid",
+            )
+
+        return target_commit[:8]
 
     def _generated_at(self) -> str:
         try:
