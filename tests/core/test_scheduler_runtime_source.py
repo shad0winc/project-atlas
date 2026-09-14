@@ -326,7 +326,7 @@ def test_scheduler_unit_uses_authoritative_deployment_generation() -> None:
 
     assert (
         "WorkingDirectory="
-        "/mnt/storage/configs/atlas/runtime/source"
+        "/mnt/storage/configs/atlas/source"
         in service
     )
 
@@ -336,7 +336,7 @@ def test_scheduler_unit_uses_authoritative_deployment_generation() -> None:
     )
 
     assert (
-        "/mnt/storage/configs/atlas/runtime/source/"
+        "/mnt/storage/configs/atlas/source/"
         "generations/$deployment_id"
         in service
     )

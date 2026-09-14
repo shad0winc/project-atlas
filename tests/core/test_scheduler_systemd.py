@@ -39,7 +39,7 @@ def test_scheduler_service_uses_canonical_project_directory() -> None:
 
     assert (
         "WorkingDirectory="
-        "/mnt/storage/configs/atlas/runtime/source"
+        "/mnt/storage/configs/atlas/source"
         in text
     )
 
@@ -60,7 +60,7 @@ def test_scheduler_service_uses_public_atlas_cli() -> None:
     )
 
     assert (
-        "/mnt/storage/configs/atlas/runtime/source/"
+        "/mnt/storage/configs/atlas/source/"
         "generations/$deployment_id"
         in text
     )
@@ -475,7 +475,7 @@ def test_systemd_service_propagates_scheduler_cli_exit_status() -> None:
     )
 
     assert (
-        "/mnt/storage/configs/atlas/runtime/source/"
+        "/mnt/storage/configs/atlas/source/"
         "generations/$deployment_id"
         in exec_line
     )
