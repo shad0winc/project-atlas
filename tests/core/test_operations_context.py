@@ -244,6 +244,158 @@ def test_host_provider_rejects_git_failure(
         provider.context()
 
 
+def test_host_provider_uses_verified_deployment_provenance_when_gitless(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    project_root = tmp_path / "generation"
+    project_root.mkdir()
+
+    deployment_id = "update-test"
+    commit = "d599ecd7de026364e2f97cf22c2ac1488812e7cc"
+
+    (
+        project_root
+        / ".atlas-deployment-id"
+    ).write_text(
+        f"{deployment_id}\n",
+        encoding="utf-8",
+    )
+
+    runtime_root = tmp_path / "runtime"
+
+    record = (
+        runtime_root
+        / "deployments"
+        / "records"
+        / deployment_id
+    )
+    record.mkdir(
+        parents=True,
+    )
+
+    (
+        runtime_root
+        / "deployments"
+        / "current"
+    ).write_text(
+        f"{deployment_id}\n",
+        encoding="utf-8",
+    )
+
+    (
+        record
+        / "status"
+    ).write_text(
+        "verified\n",
+        encoding="utf-8",
+    )
+
+    (
+        record
+        / "metadata"
+    ).write_text(
+        (
+            f"deployment_id={deployment_id}\n"
+            f"target_commit={commit}\n"
+            f"core_commit={commit}\n"
+            f"ingress_commit={commit}\n"
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv(
+        "ATLAS_RUNTIME_CONFIG_DIR",
+        str(runtime_root),
+    )
+
+    result = context_provider(
+        project_root,
+        executor=lambda command, **kwargs: completed(
+            returncode=128,
+            stderr="not a git repository",
+        ),
+    ).context()
+
+    assert result.git_commit == commit[:8]
+
+
+def test_host_provider_rejects_stale_immutable_deployment_provenance(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    project_root = tmp_path / "generation"
+    project_root.mkdir()
+
+    (
+        project_root
+        / ".atlas-deployment-id"
+    ).write_text(
+        "update-old\n",
+        encoding="utf-8",
+    )
+
+    runtime_root = tmp_path / "runtime"
+
+    record = (
+        runtime_root
+        / "deployments"
+        / "records"
+        / "update-old"
+    )
+    record.mkdir(
+        parents=True,
+    )
+
+    (
+        runtime_root
+        / "deployments"
+        / "current"
+    ).write_text(
+        "update-new\n",
+        encoding="utf-8",
+    )
+
+    (
+        record
+        / "status"
+    ).write_text(
+        "verified\n",
+        encoding="utf-8",
+    )
+
+    (
+        record
+        / "metadata"
+    ).write_text(
+        (
+            "deployment_id=update-old\n"
+            "target_commit="
+            "d599ecd7de026364e2f97cf22c2ac1488812e7cc\n"
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv(
+        "ATLAS_RUNTIME_CONFIG_DIR",
+        str(runtime_root),
+    )
+
+    provider = context_provider(
+        project_root,
+        executor=lambda command, **kwargs: completed(
+            returncode=128,
+            stderr="not a git repository",
+        ),
+    )
+
+    with pytest.raises(
+        OperationsContextError,
+        match="does not match the current deployment",
+    ):
+        provider.context()
+
+
 def test_host_provider_rejects_invalid_git_result(
     tmp_path: Path,
 ) -> None:
