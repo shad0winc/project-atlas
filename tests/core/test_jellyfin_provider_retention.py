@@ -138,7 +138,8 @@ def test_retention_state_normalizes_global_and_user_data() -> None:
 
     assert urls[0] == (
         "http://jellyfin:8096/"
-        "Items?Ids=movie-1&Recursive=true&Limit=1"
+        "Items?Ids=movie-1&Recursive=true"
+        "&Fields=DateCreated%2CRunTimeTicks&Limit=1"
     )
 
     assert urls[1] == (

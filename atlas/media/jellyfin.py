@@ -332,6 +332,7 @@ class JellyfinProvider:
             {
                 "Ids": normalized_id,
                 "Recursive": "true",
+                "Fields": "DateCreated,RunTimeTicks",
                 "Limit": 1,
             }
         )
