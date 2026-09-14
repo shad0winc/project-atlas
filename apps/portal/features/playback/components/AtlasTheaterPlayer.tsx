@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 
 import { DislikeAction } from "../../dislikes";
+import { MediaRetentionStatus } from "../../media/components/MediaRetentionStatus";
+import type { MediaRetention } from "../../media/types/retention";
 
 import { resolvePlaybackSession } from "../services/session";
 import type { SubtitleSelection } from "../services/session";
@@ -51,14 +53,31 @@ function parseSubtitleSelection(
   return index;
 }
 
+type FavoriteState =
+  | "loading"
+  | "idle"
+  | "submitting"
+  | "complete"
+  | "unavailable";
+
 export function AtlasTheaterPlayer({
   session,
+  retention = null,
+  canFavorite = false,
+  favoriteState = "loading",
+  onFavorite,
   canDislike = false,
-  dislikeExpectedUserId
+  dislikeExpectedUserId,
+  onDisliked
 }: {
   session: PlaybackSession;
+  retention?: MediaRetention | null;
+  canFavorite?: boolean;
+  favoriteState?: FavoriteState;
+  onFavorite?: () => void | Promise<void>;
   canDislike?: boolean;
   dislikeExpectedUserId?: string;
+  onDisliked?: () => void | Promise<void>;
 }): React.ReactElement {
   const videoRef = useRef<HTMLVideoElement>(null);
   const resumeAtRef = useRef<number | null>(null);
@@ -296,10 +315,49 @@ export function AtlasTheaterPlayer({
       <div className="atlas-theater-player-meta">
         <span>Powered by Jellyfin</span>
 
+        {retention !== null ? (
+          <MediaRetentionStatus retention={retention} />
+        ) : null}
+
+        {canFavorite && onFavorite !== undefined ? (
+          <button
+            aria-busy={
+              favoriteState === "loading" ||
+              favoriteState === "submitting"
+            }
+            aria-label={
+              favoriteState === "complete"
+                ? `${activeSession.title} added to favorites`
+                : favoriteState === "unavailable"
+                  ? `Favorite state unavailable for ${activeSession.title}`
+                  : `Add ${activeSession.title} to favorites`
+            }
+            className="media-discovery-primary-button"
+            disabled={
+              favoriteState !== "idle"
+            }
+            onClick={() => {
+              void onFavorite();
+            }}
+            type="button"
+          >
+            {favoriteState === "complete"
+              ? "Added to favorites"
+              : favoriteState === "submitting"
+                ? "Adding…"
+                : favoriteState === "loading"
+                  ? "Checking favorites…"
+                  : favoriteState === "unavailable"
+                    ? "Favorites unavailable"
+                    : "Add to favorites"}
+          </button>
+        ) : null}
+
         {canDislike && dislikeExpectedUserId ? (
           <DislikeAction
             expectedUserId={dislikeExpectedUserId}
             itemId={activeSession.playableTargetId}
+            onDisliked={onDisliked}
             provider={activeSession.provider}
             title={activeSession.title}
           />

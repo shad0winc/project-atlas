@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { DislikeAction } from "../../dislikes";
+import { loadFavorites } from "../../favorites";
 import { WatchAction } from "../../playback/components/WatchAction";
 import { MediaRetentionStatus } from "./MediaRetentionStatus";
 
@@ -178,15 +179,25 @@ export function MediaCatalogView(): React.ReactElement {
 
   const [favoritingItemId, setFavoritingItemId] = useState<string | null>(null);
 
-  const [favoritedItemIds, setFavoritedItemIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [favoritedItemIds, setFavoritedItemIds] =
+    useState<ReadonlySet<string>>(() => new Set());
+
+  const [favoritesReady, setFavoritesReady] =
+    useState(false);
 
   const [retentionByItemId, setRetentionByItemId] =
     useState<ReadonlyMap<string, MediaRetention>>(
       () => new Map()
     );
 
-  const canFavorite = can(ATLAS_PERMISSIONS.favoritesWrite);
-  const canDislike = can(ATLAS_PERMISSIONS.dislikesWrite);
+  const canReadFavorites =
+    can(ATLAS_PERMISSIONS.favoritesRead);
+
+  const canFavorite =
+    can(ATLAS_PERMISSIONS.favoritesWrite);
+
+  const canDislike =
+    can(ATLAS_PERMISSIONS.dislikesWrite);
 
   const load = useCallback((): void => {
     setLoading(true);
@@ -209,6 +220,40 @@ export function MediaCatalogView(): React.ReactElement {
 
   useEffect(() => {
     let cancelled = false;
+
+    if (
+      user === null ||
+      !canReadFavorites
+    ) {
+      setFavoritedItemIds(new Set());
+      setFavoritesReady(false);
+    } else {
+      void loadFavorites({
+        expectedUserId: user.user_id
+      })
+        .then((favorites) => {
+          if (cancelled) {
+            return;
+          }
+
+          setFavoritedItemIds(
+            new Set(
+              favorites.map(
+                (favorite) =>
+                  `${favorite.provider}\u0000${favorite.itemId}`
+              )
+            )
+          );
+
+          setFavoritesReady(true);
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setFavoritedItemIds(new Set());
+            setFavoritesReady(false);
+          }
+        });
+    }
 
     void loadMediaCatalog({
       page: 1,
@@ -233,7 +278,10 @@ export function MediaCatalogView(): React.ReactElement {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [
+    canReadFavorites,
+    user
+  ]);
 
   const handleFavorite = useCallback(
     async (item: MediaCatalogItem): Promise<void> => {
@@ -304,7 +352,10 @@ export function MediaCatalogView(): React.ReactElement {
 
   return (
     <MediaCatalogContent
-      canFavorite={canFavorite}
+      canFavorite={
+        canFavorite &&
+        favoritesReady
+      }
       canDislike={canDislike}
       dislikeExpectedUserId={
         canDislike && user !== null
