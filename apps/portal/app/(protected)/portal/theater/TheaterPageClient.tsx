@@ -2,10 +2,15 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { PortalPage } from "../../../../components/portal/PortalPage";
+import { loadFavorites } from "../../../../features/favorites";
 import { MediaCatalogView } from "../../../../features/media";
+import { readMediaRetention } from "../../../../features/media/services/retention";
+import { addFavoriteAndRefreshRetention } from "../../../../features/media/services/retention-mutations";
+import { refreshMediaRetentionAfterMutation } from "../../../../features/media/services/retention-refresh";
+import type { MediaRetention } from "../../../../features/media/types/retention";
 import { loadPlaybackSession } from "../../../../features/playback/api/session";
 import { AtlasTheaterPlayer } from "../../../../features/playback/components/AtlasTheaterPlayer";
 import type { PlaybackSession } from "../../../../features/playback/types/session";
@@ -29,18 +34,204 @@ function AuthorizedTheaterPlayer({
   const { user } = useAuth();
   const { can } = usePermission();
 
+  const [retention, setRetention] =
+    useState<MediaRetention | null>(null);
+
+  const [favoriteState, setFavoriteState] =
+    useState<
+      "loading" |
+      "idle" |
+      "submitting" |
+      "complete" |
+      "unavailable"
+    >("loading");
+
+  const [
+    favoriteStateIdentity,
+    setFavoriteStateIdentity
+  ] = useState<string | null>(null);
+
+  const canReadFavorites =
+    user !== null &&
+    can(ATLAS_PERMISSIONS.favoritesRead);
+
+  const canFavorite =
+    user !== null &&
+    can(ATLAS_PERMISSIONS.favoritesWrite);
+
   const canDislike =
     user !== null &&
     can(ATLAS_PERMISSIONS.dislikesWrite);
 
+  const currentFavoriteIdentity =
+    user === null
+      ? null
+      : [
+          user.user_id,
+          session.provider,
+          session.playableTargetId
+        ].join("\u0000");
+
+  const effectiveFavoriteState =
+    user === null ||
+    !canReadFavorites
+      ? "unavailable"
+      : favoriteStateIdentity === currentFavoriteIdentity
+        ? favoriteState
+        : "loading";
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    void readMediaRetention(
+      session.provider,
+      session.playableTargetId,
+      controller.signal
+    )
+      .then((nextRetention) => {
+        if (!controller.signal.aborted) {
+          setRetention(nextRetention);
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setRetention(null);
+        }
+      });
+
+    if (
+      user !== null &&
+      canReadFavorites
+    ) {
+      const expectedFavoriteIdentity = [
+        user.user_id,
+        session.provider,
+        session.playableTargetId
+      ].join("\u0000");
+
+      void loadFavorites({
+        expectedUserId: user.user_id
+      })
+        .then((favorites) => {
+          if (controller.signal.aborted) {
+            return;
+          }
+
+          const isFavorited = favorites.some(
+            (favorite) =>
+              favorite.provider === session.provider &&
+              favorite.itemId === session.playableTargetId
+          );
+
+          setFavoriteStateIdentity(
+            expectedFavoriteIdentity
+          );
+
+          setFavoriteState(
+            isFavorited ? "complete" : "idle"
+          );
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) {
+            setFavoriteStateIdentity(
+              expectedFavoriteIdentity
+            );
+            setFavoriteState("unavailable");
+          }
+        });
+    }
+
+    return () => {
+      controller.abort();
+    };
+  }, [
+    canReadFavorites,
+    session.playableTargetId,
+    session.provider,
+    user
+  ]);
+
+  const handleFavorite = useCallback(
+    async (): Promise<void> => {
+      if (user === null || !canFavorite) {
+        return;
+      }
+
+      const expectedFavoriteIdentity = [
+        user.user_id,
+        session.provider,
+        session.playableTargetId
+      ].join("\u0000");
+
+      setFavoriteStateIdentity(
+        expectedFavoriteIdentity
+      );
+      setFavoriteState("submitting");
+
+      try {
+        const result =
+          await addFavoriteAndRefreshRetention(
+            {
+              provider: session.provider,
+              itemId: session.playableTargetId
+            },
+            {
+              expectedUserId: user.user_id
+            }
+          );
+
+        setRetention(
+          result.status === "available"
+            ? result.retention
+            : null
+        );
+
+        setFavoriteState("complete");
+      } catch {
+        setFavoriteState("idle");
+      }
+    },
+    [
+      canFavorite,
+      session.playableTargetId,
+      session.provider,
+      user
+    ]
+  );
+
+  const handleDisliked = useCallback(
+    async (): Promise<void> => {
+      const result =
+        await refreshMediaRetentionAfterMutation(
+          session.provider,
+          session.playableTargetId
+        );
+
+      setRetention(
+        result.status === "available"
+          ? result.retention
+          : null
+      );
+    },
+    [
+      session.playableTargetId,
+      session.provider
+    ]
+  );
+
   return (
     <AtlasTheaterPlayer
       canDislike={canDislike}
+      canFavorite={canFavorite}
       dislikeExpectedUserId={
         canDislike && user !== null
           ? user.user_id
           : undefined
       }
+      favoriteState={effectiveFavoriteState}
+      onDisliked={handleDisliked}
+      onFavorite={handleFavorite}
+      retention={retention}
       session={session}
     />
   );

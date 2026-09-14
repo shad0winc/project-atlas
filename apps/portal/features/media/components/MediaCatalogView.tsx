@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { DislikeAction } from "../../dislikes";
+import { loadFavorites } from "../../favorites";
 import { WatchAction } from "../../playback/components/WatchAction";
 import { MediaRetentionStatus } from "./MediaRetentionStatus";
 
@@ -178,15 +179,32 @@ export function MediaCatalogView(): React.ReactElement {
 
   const [favoritingItemId, setFavoritingItemId] = useState<string | null>(null);
 
-  const [favoritedItemIds, setFavoritedItemIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [favoritedItemIds, setFavoritedItemIds] =
+    useState<ReadonlySet<string>>(() => new Set());
+
+  const [
+    favoritesLoadedForUserId,
+    setFavoritesLoadedForUserId
+  ] = useState<string | null>(null);
 
   const [retentionByItemId, setRetentionByItemId] =
     useState<ReadonlyMap<string, MediaRetention>>(
       () => new Map()
     );
 
-  const canFavorite = can(ATLAS_PERMISSIONS.favoritesWrite);
-  const canDislike = can(ATLAS_PERMISSIONS.dislikesWrite);
+  const canReadFavorites =
+    can(ATLAS_PERMISSIONS.favoritesRead);
+
+  const canFavorite =
+    can(ATLAS_PERMISSIONS.favoritesWrite);
+
+  const canDislike =
+    can(ATLAS_PERMISSIONS.dislikesWrite);
+
+  const favoritesReady =
+    user !== null &&
+    canReadFavorites &&
+    favoritesLoadedForUserId === user.user_id;
 
   const load = useCallback((): void => {
     setLoading(true);
@@ -210,6 +228,56 @@ export function MediaCatalogView(): React.ReactElement {
   useEffect(() => {
     let cancelled = false;
 
+    if (
+      user === null ||
+      !canReadFavorites
+    ) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const expectedUserId = user.user_id;
+
+    void loadFavorites({
+      expectedUserId
+    })
+      .then((favorites) => {
+        if (cancelled) {
+          return;
+        }
+
+        setFavoritedItemIds(
+          new Set(
+            favorites.map(
+              (favorite) =>
+                `${favorite.provider}\u0000${favorite.itemId}`
+            )
+          )
+        );
+
+        setFavoritesLoadedForUserId(
+          expectedUserId
+        );
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setFavoritedItemIds(new Set());
+          setFavoritesLoadedForUserId(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    canReadFavorites,
+    user
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+
     void loadMediaCatalog({
       page: 1,
       pageSize: 24
@@ -221,7 +289,9 @@ export function MediaCatalogView(): React.ReactElement {
       })
       .catch(() => {
         if (!cancelled) {
-          setError("Atlas could not load your Jellyfin library.");
+          setError(
+            "Atlas could not load your Jellyfin library."
+          );
         }
       })
       .finally(() => {
@@ -304,7 +374,10 @@ export function MediaCatalogView(): React.ReactElement {
 
   return (
     <MediaCatalogContent
-      canFavorite={canFavorite}
+      canFavorite={
+        canFavorite &&
+        favoritesReady
+      }
       canDislike={canDislike}
       dislikeExpectedUserId={
         canDislike && user !== null

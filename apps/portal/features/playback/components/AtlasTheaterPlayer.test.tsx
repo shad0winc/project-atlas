@@ -96,3 +96,85 @@ describe("AtlasTheaterPlayer", () => {
   });
 
 });
+
+describe("AtlasTheaterPlayer active-item retention lifecycle", () => {
+  const activeMovieSession: PlaybackSession = Object.freeze({
+    available: true,
+    action: "watch_now",
+    label: "Watch Now",
+    backend: "jellyfin",
+    sourceType: "library",
+    provider: "jellyfin",
+    requestedTargetId: "movie-123",
+    playableTargetId: "movie-123",
+    title: "Example Movie",
+    mediaType: "movie",
+    canSeek: true,
+    playbackBootstrapUrl:
+      "https://playback.shadowinc.co/_atlas/playback/bootstrap",
+    playbackCapability: "sensitive-atlas-capability",
+    audioTracks: [],
+    subtitleTracks: []
+  });
+
+  it("renders authoritative retention for the active playback item", () => {
+    const authoritativeDeleteAt =
+      "2031-02-03T04:05:06Z";
+
+    const markup = renderToStaticMarkup(
+      <AtlasTheaterPlayer
+        retention={{
+          provider: "jellyfin",
+          itemId: "movie-123",
+          eligible: false,
+          retained: true,
+          lifecycle: {
+            state: "scheduled",
+            rule: "watched_72h",
+            basisAt: "2031-01-31T04:05:06Z",
+            deleteAt: authoritativeDeleteAt
+          }
+        }}
+        session={activeMovieSession}
+      />
+    );
+
+    expect(markup).toContain("Scheduled for deletion");
+    expect(markup).toContain(authoritativeDeleteAt);
+    expect(markup).toContain(
+      `dateTime="${authoritativeDeleteAt}"`
+    );
+
+    expect(markup).not.toContain(
+      "sensitive-atlas-capability"
+    );
+  });
+
+  it("renders Favorite only when active-item Favorite mutation is authorized", () => {
+    const authorizedMarkup = renderToStaticMarkup(
+      <AtlasTheaterPlayer
+        canFavorite
+        favoriteState="idle"
+        onFavorite={() => undefined}
+        session={activeMovieSession}
+      />
+    );
+
+    expect(authorizedMarkup).toContain(
+      "Add Example Movie to favorites"
+    );
+
+    const unauthorizedMarkup = renderToStaticMarkup(
+      <AtlasTheaterPlayer
+        canFavorite={false}
+        favoriteState="idle"
+        onFavorite={() => undefined}
+        session={activeMovieSession}
+      />
+    );
+
+    expect(unauthorizedMarkup).not.toContain(
+      "Add Example Movie to favorites"
+    );
+  });
+});
