@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import io
 import os
 from pathlib import Path
 import subprocess
+import tarfile
 import textwrap
 
 
@@ -15,6 +17,40 @@ STANDALONE = PROJECT_ROOT / "scripts" / "update.sh"
 def write_executable(path: Path, content: str) -> None:
     path.write_text(textwrap.dedent(content).lstrip(), encoding="utf-8")
     path.chmod(0o755)
+
+
+def write_runtime_source_archive(path: Path) -> None:
+    members = {
+        "VERSION": (b"1.0.0-rc.1\n", 0o644),
+        "scripts/atlas": (
+            b"#!/usr/bin/env bash\nexit 0\n",
+            0o755,
+        ),
+        "scripts/commands/scheduler.sh": (
+            b"#!/usr/bin/env bash\n",
+            0o644,
+        ),
+        "atlas/scheduler.py": (
+            b"# scheduler fixture\n",
+            0o644,
+        ),
+        "atlas/scheduler_cli.py": (
+            b"# scheduler CLI fixture\n",
+            0o644,
+        ),
+    }
+
+    with tarfile.open(path, "w:gz") as archive:
+        for name, (payload, mode) in members.items():
+            info = tarfile.TarInfo(name)
+            info.size = len(payload)
+            info.mode = mode
+            info.mtime = 0
+
+            archive.addfile(
+                info,
+                io.BytesIO(payload),
+            )
 
 
 def prepare_runtime(tmp_path: Path, *, branch: str = "main") -> dict[str, str]:
@@ -243,8 +279,12 @@ def prepare_runtime(tmp_path: Path, *, branch: str = "main") -> dict[str, str]:
         "ingress|stack/ingress.yml|atlas-ingress|caddy|atlas-caddy|caddy:test|sha256:caddy\n",
         encoding="utf-8",
     )
-    (baseline / "core-source.tar.gz").write_bytes(b"archive")
-    (baseline / "ingress-source.tar.gz").write_bytes(b"archive")
+    write_runtime_source_archive(
+        baseline / "core-source.tar.gz"
+    )
+    write_runtime_source_archive(
+        baseline / "ingress-source.tar.gz"
+    )
     return environment
 
 

@@ -5,5 +5,5 @@ Wants=docker.service
 
 [Service]
 Type=oneshot
-WorkingDirectory=/opt/project-atlas
-ExecStart=/bin/atlas scheduler run
+WorkingDirectory=/mnt/storage/configs/atlas/runtime/source
+ExecStart=/bin/bash -c 'set -euo pipefail; current=/mnt/storage/configs/atlas/deployments/current; IFS= read -r deployment_id < "$current"; case "$deployment_id" in ""|*/*|*".."*) echo "ERROR: invalid Atlas deployment identity." >&2; exit 1 ;; esac; runtime="/mnt/storage/configs/atlas/runtime/source/generations/$deployment_id"; test -d "$runtime"; test ! -L "$runtime"; test -x "$runtime/scripts/atlas"; exec "$runtime/scripts/atlas" scheduler run'
