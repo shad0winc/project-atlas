@@ -13,6 +13,7 @@ from typing import Any
 from dispatcharr_channel_bindings import (
     default_dispatcharr_channel_binding_registry,
 )
+from feed import load_games
 from live_tv_bindings import (
     LiveTvBindingError,
     default_live_tv_binding_registry,
@@ -61,6 +62,42 @@ def _live_availability(
     provider: str,
     provider_event_id: str,
 ) -> dict[str, object]:
+    normalized_provider = provider.strip().lower()
+    normalized_event_id = provider_event_id.strip()
+
+    for game in load_games().values():
+        if not isinstance(game, dict):
+            continue
+
+        game_provider = str(
+            game.get("provider", "")
+        ).strip().lower()
+        game_event_id = str(
+            game.get("provider_event_id", "")
+        ).strip()
+
+        if (
+            game_provider != normalized_provider
+            or game_event_id != normalized_event_id
+        ):
+            continue
+
+        if (
+            str(
+                game.get(
+                    "lifecycle_state",
+                    "",
+                )
+            ).strip().lower()
+            == "finished"
+        ):
+            return {
+                "available": False,
+                "atlas_channel_id": None,
+            }
+
+        break
+
     source = load_live_source_catalog().for_event(
         provider,
         provider_event_id,
