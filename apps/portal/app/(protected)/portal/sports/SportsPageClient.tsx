@@ -1,19 +1,33 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState
+} from "react";
 
 import { PortalPage } from "../../../../components/portal/PortalPage";
+import { AtlasTheaterPlayer } from "../../../../features/playback/components/AtlasTheaterPlayer";
+import type { SubtitleSelection } from "../../../../features/playback/services/session";
+import type { PlaybackSession } from "../../../../features/playback/types/session";
 import {
   SportsRequestView,
+  createSportsLiveSession,
   followSports,
+  heartbeatSportsLiveSession,
   loadSportsEvents,
   loadSportsFollows,
+  loadSportsLiveAvailability,
+  releaseSportsLiveSession,
   requestSportsEvent,
   searchSports,
   unfollowSports,
   updateSportsRecordingIntent,
   type SportsEvent,
   type SportsFollow,
+  type SportsLiveAvailability,
+  type SportsLiveSessionResult,
   type SportsRequestInput,
   type SportsSearchResult,
   type SportsSearchType,
@@ -26,10 +40,238 @@ const sportsRoute = PORTAL_ROUTES.sports;
 export function SportsPageClient(): React.ReactElement {
   const [events, setEvents] = useState<readonly SportsEvent[]>([]);
   const [follows, setFollows] = useState<readonly SportsFollow[]>([]);
+  const [
+    liveAvailabilityByEvent,
+    setLiveAvailabilityByEvent
+  ] = useState<Readonly<Record<string, SportsLiveAvailability>>>({});
   const [searchResults, setSearchResults] = useState<readonly SportsSearchResult[]>([]);
   const [searchType, setSearchType] = useState<SportsSearchType>("team");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [
+    activeLiveSession,
+    setActiveLiveSession
+  ] = useState<SportsLiveSessionResult | null>(null);
+
+  const [
+    livePlaybackError,
+    setLivePlaybackError
+  ] = useState<string | null>(null);
+
+  const activeLiveSessionRef =
+    useRef<SportsLiveSessionResult | null>(null);
+
+  const liveHeartbeatTimeoutRef =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const liveRequestVersionRef = useRef(0);
+
+  function clearLiveHeartbeat(): void {
+    if (liveHeartbeatTimeoutRef.current !== null) {
+      clearTimeout(liveHeartbeatTimeoutRef.current);
+      liveHeartbeatTimeoutRef.current = null;
+    }
+  }
+
+  async function releaseLiveSessionBestEffort(
+    liveSessionId: string
+  ): Promise<void> {
+    try {
+      await releaseSportsLiveSession(liveSessionId);
+    } catch {
+      // Server TTL remains the final fail-safe if explicit release fails.
+    }
+  }
+
+  function scheduleLiveHeartbeat(
+    liveSession: SportsLiveSessionResult
+  ): void {
+    clearLiveHeartbeat();
+
+    const { liveSessionId, ttlSeconds } = liveSession;
+
+    const delayMs = Math.max(
+      1_000,
+      Math.floor((ttlSeconds * 1000) / 2)
+    );
+
+    liveHeartbeatTimeoutRef.current = setTimeout(() => {
+      void heartbeatSportsLiveSession(liveSessionId)
+        .then((heartbeat) => {
+          const current = activeLiveSessionRef.current;
+
+          if (
+            current === null ||
+            current.liveSessionId !== liveSessionId
+          ) {
+            return;
+          }
+
+          const refreshed: SportsLiveSessionResult =
+            Object.freeze({
+              ...current,
+              ttlSeconds: heartbeat.ttlSeconds
+            });
+
+          activeLiveSessionRef.current = refreshed;
+          scheduleLiveHeartbeat(refreshed);
+        })
+        .catch(() => {
+          const current = activeLiveSessionRef.current;
+
+          if (
+            current === null ||
+            current.liveSessionId !== liveSessionId
+          ) {
+            return;
+          }
+
+          clearLiveHeartbeat();
+          activeLiveSessionRef.current = null;
+          setActiveLiveSession(null);
+          setLivePlaybackError(
+            "Atlas lost the authenticated live playback lease."
+          );
+
+          void releaseLiveSessionBestEffort(
+            liveSessionId
+          );
+        });
+    }, delayMs);
+  }
+
+  async function handleWatchLive(
+    atlasChannelId: string
+  ): Promise<void> {
+    const requestVersion =
+      liveRequestVersionRef.current + 1;
+
+    liveRequestVersionRef.current = requestVersion;
+    setLivePlaybackError(null);
+
+    let nextLiveSession: SportsLiveSessionResult;
+
+    try {
+      nextLiveSession = await createSportsLiveSession(
+        atlasChannelId
+      );
+    } catch (watchError) {
+      if (
+        liveRequestVersionRef.current === requestVersion
+      ) {
+        setLivePlaybackError(
+          watchError instanceof Error
+            ? watchError.message
+            : "Atlas could not start live playback."
+        );
+      }
+
+      return;
+    }
+
+    if (
+      liveRequestVersionRef.current !== requestVersion
+    ) {
+      void releaseLiveSessionBestEffort(
+        nextLiveSession.liveSessionId
+      );
+      return;
+    }
+
+    const previous =
+      activeLiveSessionRef.current;
+
+    activeLiveSessionRef.current = nextLiveSession;
+    setActiveLiveSession(nextLiveSession);
+    scheduleLiveHeartbeat(nextLiveSession);
+
+    if (
+      previous !== null &&
+      previous.liveSessionId !==
+        nextLiveSession.liveSessionId
+    ) {
+      void releaseLiveSessionBestEffort(
+        previous.liveSessionId
+      );
+    }
+  }
+
+  async function resolveSportsLiveSession(
+    provider: string,
+    itemId: string,
+    signal?: AbortSignal,
+    subtitle: SubtitleSelection = "auto"
+  ): Promise<PlaybackSession> {
+    const current = activeLiveSessionRef.current;
+
+    if (current === null) {
+      throw new Error(
+        "Sports live playback is no longer active."
+      );
+    }
+
+    if (
+      provider !== current.session.provider ||
+      itemId !== current.session.playableTargetId
+    ) {
+      throw new Error(
+        "Sports live playback identity changed unexpectedly."
+      );
+    }
+
+    const requestVersion =
+      liveRequestVersionRef.current + 1;
+
+    liveRequestVersionRef.current = requestVersion;
+
+    const replacement =
+      await createSportsLiveSession(
+        current.atlasChannelId,
+        { signal },
+        subtitle
+      );
+
+    if (
+      liveRequestVersionRef.current !== requestVersion ||
+      activeLiveSessionRef.current?.liveSessionId !==
+        current.liveSessionId
+    ) {
+      void releaseLiveSessionBestEffort(
+        replacement.liveSessionId
+      );
+
+      throw new Error(
+        "Sports live playback changed while updating captions."
+      );
+    }
+
+    activeLiveSessionRef.current = replacement;
+    scheduleLiveHeartbeat(replacement);
+
+    void releaseLiveSessionBestEffort(
+      current.liveSessionId
+    );
+
+    return replacement.session;
+  }
+
+  function closeLivePlayback(): void {
+    liveRequestVersionRef.current += 1;
+    clearLiveHeartbeat();
+
+    const current = activeLiveSessionRef.current;
+
+    activeLiveSessionRef.current = null;
+    setActiveLiveSession(null);
+    setLivePlaybackError(null);
+
+    if (current !== null) {
+      void releaseLiveSessionBestEffort(
+        current.liveSessionId
+      );
+    }
+  }
 
   const load = useCallback(async (): Promise<void> => {
     setLoading(true);
@@ -52,6 +294,24 @@ export function SportsPageClient(): React.ReactElement {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      liveRequestVersionRef.current += 1;
+      clearLiveHeartbeat();
+
+      const current =
+        activeLiveSessionRef.current;
+
+      activeLiveSessionRef.current = null;
+
+      if (current !== null) {
+        void releaseLiveSessionBestEffort(
+          current.liveSessionId
+        );
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -86,6 +346,55 @@ export function SportsPageClient(): React.ReactElement {
       controller.abort();
     };
   }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const eventFollows = follows.filter(
+      (follow) => follow.type === "event"
+    );
+
+    void Promise.all(
+      eventFollows.map(async (follow) => {
+        const identity =
+          `${follow.provider}:${follow.providerId}`;
+
+        try {
+          const availability =
+            await loadSportsLiveAvailability(
+              follow.provider,
+              follow.providerId,
+              { signal: controller.signal }
+            );
+
+          return [identity, availability] as const;
+        } catch {
+          return null;
+        }
+      })
+    ).then((resolved) => {
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      const nextAvailability: Record<
+        string,
+        SportsLiveAvailability
+      > = {};
+
+      for (const entry of resolved) {
+        if (entry !== null) {
+          nextAvailability[entry[0]] = entry[1];
+        }
+      }
+
+      setLiveAvailabilityByEvent(nextAvailability);
+    });
+
+    return () => {
+      controller.abort();
+    };
+  }, [follows]);
 
   async function handleSearch(
     type: SportsSearchType,
@@ -240,6 +549,39 @@ export function SportsPageClient(): React.ReactElement {
       permission={sportsRoute.permission}
       title="Sports"
     >
+      {livePlaybackError !== null ? (
+        <section
+          aria-label="Sports live playback error"
+          className="requests-message-panel"
+        >
+          <p role="alert">{livePlaybackError}</p>
+        </section>
+      ) : null}
+
+      {activeLiveSession !== null ? (
+        <section
+          aria-label="Sports live playback"
+          className="requests-message-panel"
+        >
+          <div className="requests-toolbar">
+            <button
+              aria-label="Close live playback"
+              className="requests-refresh-button"
+              onClick={closeLivePlayback}
+              type="button"
+            >
+              Close live playback
+            </button>
+          </div>
+
+          <AtlasTheaterPlayer
+            key={activeLiveSession.atlasChannelId}
+            session={activeLiveSession.session}
+            sessionResolver={resolveSportsLiveSession}
+          />
+        </section>
+      ) : null}
+
       {loading ? (
         <section
           aria-busy="true"
@@ -268,7 +610,9 @@ export function SportsPageClient(): React.ReactElement {
         <SportsRequestView
           events={events}
           follows={follows}
+          liveAvailabilityByEvent={liveAvailabilityByEvent}
           onBrowse={handleBrowse}
+          onWatchLive={handleWatchLive}
           onFollow={handleFollow}
           onRequestEvent={handleRequestEvent}
           onSetRecording={handleSetRecording}

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
@@ -5,6 +7,29 @@ import { AtlasTheaterPlayer } from "./AtlasTheaterPlayer";
 import type { PlaybackSession } from "../types/session";
 
 describe("AtlasTheaterPlayer", () => {
+  it("supports an injectable session resolver for non-generic playback", () => {
+    const playerSource = readFileSync(
+      new URL("./AtlasTheaterPlayer.tsx", import.meta.url),
+      "utf8"
+    );
+
+    expect(playerSource).toContain(
+      "sessionResolver = resolvePlaybackSession"
+    );
+
+    expect(playerSource).toContain(
+      "sessionResolver?:"
+    );
+
+    expect(playerSource).toContain(
+      "const refreshed = await sessionResolver("
+    );
+
+    expect(playerSource).not.toContain(
+      "const refreshed = await resolvePlaybackSession("
+    );
+  });
+
   it("renders Atlas controls without rendering playback credentials", () => {
     const session: PlaybackSession = Object.freeze({
       available: true,

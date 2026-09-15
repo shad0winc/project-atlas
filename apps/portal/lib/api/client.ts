@@ -21,7 +21,9 @@ import {
 } from "./policy";
 import {
   performAtlasApiRequest,
-  type AtlasApiRequestOptions as AtlasApiTransportRequestOptions
+  performAtlasApiRequestWithMetadata,
+  type AtlasApiRequestOptions as AtlasApiTransportRequestOptions,
+  type AtlasApiResponseWithMetadata
 } from "./request";
 
 export interface AtlasApiRequestOptions extends AtlasApiTransportRequestOptions {
@@ -64,6 +66,85 @@ function authenticationExpired(
     requestId: error.requestId,
     cause
   });
+}
+
+export async function atlasApiRequestWithMetadata<T>(
+  path: string,
+  options: AtlasApiRequestOptions = {}
+): Promise<AtlasApiResponseWithMetadata<T>> {
+  const {
+    retryPolicy: requestedRetryPolicy,
+    retryAuthentication = true,
+    ...requestedTransportOptions
+  } = options;
+
+  const retryPolicy =
+    requestedRetryPolicy === undefined
+      ? ATLAS_API_DEFAULT_RETRY_POLICY
+      : createAtlasApiRetryPolicy(requestedRetryPolicy);
+
+  let transportOptions = requestedTransportOptions;
+  let retryCount = 0;
+  let authenticationRetried = false;
+
+  while (true) {
+    try {
+      return await performAtlasApiRequestWithMetadata<T>(
+        path,
+        transportOptions
+      );
+    } catch (error: unknown) {
+      if (
+        canRetryAuthentication(
+          error,
+          transportOptions,
+          retryAuthentication
+        )
+      ) {
+        if (authenticationRetried) {
+          expireAtlasAuthSession();
+          throw authenticationExpired(error);
+        }
+
+        try {
+          const replacementAccessToken =
+            await refreshAtlasAuthAccessToken();
+
+          transportOptions = {
+            ...transportOptions,
+            accessToken: replacementAccessToken
+          };
+
+          authenticationRetried = true;
+          continue;
+        } catch (refreshError: unknown) {
+          throw authenticationExpired(
+            error,
+            refreshError
+          );
+        }
+      }
+
+      if (
+        !shouldRetryAtlasApiRequest({
+          error,
+          retryCount,
+          policy: retryPolicy
+        })
+      ) {
+        throw error;
+      }
+
+      const delayMs =
+        atlasApiRetryDelayMs(
+          retryCount,
+          retryPolicy
+        );
+
+      await waitForAtlasApiRetry(delayMs);
+      retryCount += 1;
+    }
+  }
 }
 
 export async function atlasApiRequest<T>(

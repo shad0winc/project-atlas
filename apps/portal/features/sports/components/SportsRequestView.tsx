@@ -25,6 +25,16 @@ export type SportsRequestViewProps = Readonly<{
   onUnfollow: (subscriptionId: string) => Promise<void>;
   onBrowse: (type: "team" | "league", providerId: string) => Promise<void>;
   onRequestEvent: (input: SportsRequestInput) => Promise<SportsSubscription>;
+  liveAvailabilityByEvent?: Readonly<
+    Record<
+      string,
+      Readonly<{
+        available: boolean;
+        atlasChannelId: string | null;
+      }>
+    >
+  >;
+  onWatchLive?: (atlasChannelId: string) => void | Promise<void>;
   onSetRecording: (
     event: Pick<SportsEvent, "provider" | "providerEventId">,
     record: boolean
@@ -41,6 +51,8 @@ export function SportsRequestView({
   onUnfollow,
   onBrowse,
   onRequestEvent,
+  liveAvailabilityByEvent,
+  onWatchLive,
   onSetRecording
 }: SportsRequestViewProps): React.ReactElement {
   const [query, setQuery] = useState("");
@@ -318,8 +330,32 @@ export function SportsRequestView({
         </section>
       ) : (
         <section aria-label="Followed Sports" className="requests-grid">
-          {follows.map((follow) => (
-            <article className="request-card" key={follow.subscriptionId}>
+          {follows.map((follow) => {
+            const followedEvent =
+              follow.type === "event"
+                ? events.find(
+                    (event) =>
+                      event.provider === follow.provider &&
+                      event.providerEventId === follow.providerId
+                  )
+                : undefined;
+
+            const liveAvailability =
+              follow.type === "event"
+                ? liveAvailabilityByEvent?.[
+                    `${follow.provider}:${follow.providerId}`
+                  ]
+                : undefined;
+
+            const liveChannelId =
+              liveAvailability?.available === true &&
+              typeof liveAvailability.atlasChannelId === "string" &&
+              liveAvailability.atlasChannelId.trim()
+                ? liveAvailability.atlasChannelId.trim()
+                : null;
+
+            return (
+              <article className="request-card" key={follow.subscriptionId}>
               <div className="request-card-header">
                 <div>
                   <p className="request-card-kind">{follow.type}</p>
@@ -329,8 +365,36 @@ export function SportsRequestView({
               </div>
 
               {follow.type === "event" ? (
-                <button
-                  className="requests-refresh-button"
+                <>
+                  {followedEvent !== undefined ? (
+                    <dl className="request-card-details">
+                      <div>
+                        <dt>Starts</dt>
+                        <dd>
+                          {new Date(
+                            followedEvent.startAt
+                          ).toLocaleString()}
+                        </dd>
+                      </div>
+                    </dl>
+                  ) : null}
+
+                  {liveChannelId !== null &&
+                  onWatchLive !== undefined ? (
+                    <button
+                      className="requests-refresh-button"
+                      data-live-channel-id={liveChannelId}
+                      onClick={() => {
+                        void onWatchLive(liveChannelId);
+                      }}
+                      type="button"
+                    >
+                      Watch Live
+                    </button>
+                  ) : null}
+
+                  <button
+                    className="requests-refresh-button"
                   disabled={pending === `record:${follow.subscriptionId}`}
                   onClick={() => {
                     void mutate(
@@ -347,12 +411,13 @@ export function SportsRequestView({
                   }}
                   type="button"
                 >
-                  {pending === `record:${follow.subscriptionId}`
-                    ? "Updating recording..."
-                    : follow.record
-                      ? "Cancel recording"
-                      : "Record event"}
-                </button>
+                    {pending === `record:${follow.subscriptionId}`
+                      ? "Updating recording..."
+                      : follow.record
+                        ? "Cancel recording"
+                        : "Record event"}
+                  </button>
+                </>
               ) : null}
 
               {follow.type === "team" || follow.type === "league" ? (
@@ -402,8 +467,9 @@ export function SportsRequestView({
               >
                 Unfollow
               </button>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </section>
       )}
 
