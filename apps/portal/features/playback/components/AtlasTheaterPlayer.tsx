@@ -62,6 +62,7 @@ type FavoriteState =
 
 export function AtlasTheaterPlayer({
   session,
+  sessionResolver = resolvePlaybackSession,
   retention = null,
   canFavorite = false,
   favoriteState = "loading",
@@ -71,6 +72,12 @@ export function AtlasTheaterPlayer({
   onDisliked
 }: {
   session: PlaybackSession;
+  sessionResolver?: (
+    provider: string,
+    itemId: string,
+    signal?: AbortSignal,
+    subtitle?: SubtitleSelection
+  ) => Promise<PlaybackSession>;
   retention?: MediaRetention | null;
   canFavorite?: boolean;
   favoriteState?: FavoriteState;
@@ -234,7 +241,7 @@ export function AtlasTheaterPlayer({
     setState({ status: "connecting" });
 
     try {
-      const refreshed = await resolvePlaybackSession(
+      const refreshed = await sessionResolver(
         activeSession.provider,
         activeSession.playableTargetId,
         undefined,

@@ -3,9 +3,13 @@ export { SportsRequestView } from "./components/SportsRequestView";
 export type { SportsRequestInput, SportsRequestViewProps } from "./components/SportsRequestView";
 
 export {
+  createSportsLiveSession,
   followSports,
+  heartbeatSportsLiveSession,
   loadSportsEvents,
   loadSportsFollows,
+  loadSportsLiveAvailability,
+  releaseSportsLiveSession,
   requestSportsEvent,
   searchSports,
   unfollowSports,
@@ -15,6 +19,9 @@ export {
 export type {
   SportsEventFilter,
   SportsEventRequestInput,
+  SportsLiveAvailability,
+  SportsLiveHeartbeatResult,
+  SportsLiveSessionResult,
   SportsRequestOptions
 } from "./services/sports";
 

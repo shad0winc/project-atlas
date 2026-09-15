@@ -6,7 +6,14 @@
  * rotate the session itself.
  */
 
-import { atlasApiRequest, type AtlasApiRequestOptions } from "../api/client";
+import {
+  atlasApiRequest,
+  atlasApiRequestWithMetadata,
+  type AtlasApiRequestOptions
+} from "../api/client";
+import type {
+  AtlasApiResponseWithMetadata
+} from "../api/request";
 import { readAtlasAuthSession } from "../auth/storage";
 
 export type AuthenticatedAtlasApiRequestOptions = Omit<
@@ -29,6 +36,17 @@ export async function authenticatedAtlasApiRequest<T>(
   options: AuthenticatedAtlasApiRequestOptions = {}
 ): Promise<T> {
   return atlasApiRequest<T>(path, {
+    ...options,
+    accessToken: readAuthenticatedAccessToken()
+  });
+}
+
+
+export async function authenticatedAtlasApiRequestWithMetadata<T>(
+  path: string,
+  options: AuthenticatedAtlasApiRequestOptions = {}
+): Promise<AtlasApiResponseWithMetadata<T>> {
+  return atlasApiRequestWithMetadata<T>(path, {
     ...options,
     accessToken: readAuthenticatedAccessToken()
   });

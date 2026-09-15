@@ -33,6 +33,13 @@ export interface AtlasApiRequestOptions extends Omit<RequestInit, "body" | "head
   readonly observers?: readonly AtlasApiObserver[];
 }
 
+export type AtlasApiResponseWithMetadata<T> = Readonly<{
+  data: T;
+  status: number;
+  requestId: string;
+  headers: Headers;
+}>;
+
 type RequestSignalLifecycle = Readonly<{
   signal: AbortSignal;
   didTimeout: () => boolean;
@@ -213,10 +220,10 @@ async function readSuccessResponse<T>({
   }
 }
 
-export async function performAtlasApiRequest<T>(
+export async function performAtlasApiRequestWithMetadata<T>(
   path: string,
   options: AtlasApiRequestOptions = {}
-): Promise<T> {
+): Promise<AtlasApiResponseWithMetadata<T>> {
   const requestPath = atlasApiPath(path);
   const method = requestMethod(options);
   const timeoutMs = normalizeTimeoutMs(options.timeoutMs);
@@ -366,7 +373,12 @@ export async function performAtlasApiRequest<T>(
       status: response.status
     });
 
-    return result;
+    return Object.freeze({
+      data: result,
+      status: response.status,
+      requestId: responseRequestId,
+      headers: new Headers(response.headers)
+    });
   } catch (requestError: unknown) {
     const completedAt = currentTimeMs();
 
@@ -381,4 +393,18 @@ export async function performAtlasApiRequest<T>(
 
     throw requestError;
   }
+}
+
+
+export async function performAtlasApiRequest<T>(
+  path: string,
+  options: AtlasApiRequestOptions = {}
+): Promise<T> {
+  const response =
+    await performAtlasApiRequestWithMetadata<T>(
+      path,
+      options
+    );
+
+  return response.data;
 }
