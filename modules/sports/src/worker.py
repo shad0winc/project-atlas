@@ -882,31 +882,6 @@ def run_operations_pipeline(
         ).strip().lower() != "finished":
             continue
 
-        provider_name = str(
-            previous_game.get(
-                "provider",
-                "",
-            )
-        ).strip()
-
-        provider_state = provider_health.get(
-            provider_name
-        )
-
-        if not isinstance(
-            provider_state,
-            dict,
-        ):
-            continue
-
-        if str(
-            provider_state.get(
-                "status",
-                "",
-            )
-        ).strip().lower() != "degraded":
-            continue
-
         processing_games.append(
             previous_game
         )
