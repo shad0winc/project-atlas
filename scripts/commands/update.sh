@@ -105,6 +105,7 @@ atlas_update_validate_ingress_build_permissions() {
     apps/portal \
     modules/sports/Dockerfile.private-api \
     modules/sports/src/private_api.py \
+    modules/sports/src/games_state.py \
     modules/sports/src/subscriptions.py \
     modules/sports/src/providers
 }
