@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import html
-import json
 import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from games_state import load_games
 from jellyfin_channel_identity import (
     ATLAS_JELLYFIN_CHANNEL_NUMBER_BASE,
     ATLAS_JELLYFIN_CHANNEL_NUMBER_SLOTS,
@@ -29,13 +29,6 @@ PREGAME_WINDOW_MINUTES = int(
     )
 )
 
-STATE_FILE = Path(
-    os.getenv(
-        "SPORTS_STATE_FILE",
-        "/mnt/storage/configs/sportyfin/state/games.json",
-    )
-)
-
 OUTPUT_DIR = Path(
     os.getenv(
         "SPORTS_OUTPUT_DIR",
@@ -45,23 +38,6 @@ OUTPUT_DIR = Path(
 
 M3U_FILE = OUTPUT_DIR / "sports.m3u"
 XMLTV_FILE = OUTPUT_DIR / "sports.xml"
-
-
-def load_games() -> dict[str, dict[str, Any]]:
-    if not STATE_FILE.exists():
-        return {}
-
-    try:
-        data = json.loads(
-            STATE_FILE.read_text(encoding="utf-8")
-        )
-    except (json.JSONDecodeError, OSError):
-        return {}
-
-    if not isinstance(data, dict):
-        return {}
-
-    return data
 
 
 def active_games(
