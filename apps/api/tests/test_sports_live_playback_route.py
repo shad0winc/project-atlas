@@ -93,6 +93,20 @@ class FakeSports:
         }
 
 
+    def get_live_availability(
+        self,
+        *,
+        provider_name: str,
+        provider_event_id: str,
+    ) -> dict[str, object]:
+        assert provider_name == "thesportsdb"
+        assert provider_event_id == "event-001"
+        return {
+            "available": True,
+            "atlas_channel_id": "sports-event-001",
+        }
+
+
 class FakePlayback:
     def __init__(self) -> None:
         self.calls: list[dict[str, object]] = []
@@ -1083,3 +1097,132 @@ def test_watch_live_missing_release_session_remains_404_without_pool_call() -> N
         "Live session was not found."
     )
     assert harness.resource_pool.release_calls == []
+
+
+def test_watch_live_session_rejects_unavailable_event_before_binding_or_admission() -> None:
+    harness = build_harness()
+
+    availability_calls: list[
+        dict[str, str]
+    ] = []
+
+    def unavailable(
+        *,
+        provider_name: str,
+        provider_event_id: str,
+    ) -> dict[str, object]:
+        availability_calls.append(
+            {
+                "provider_name": provider_name,
+                "provider_event_id": provider_event_id,
+            }
+        )
+        return {
+            "available": False,
+            "atlas_channel_id": None,
+        }
+
+    harness.sports.get_live_availability = unavailable  # type: ignore[attr-defined]
+
+    response = harness.client.get(
+        "/api/v1/sports/live/sports-event-001/session"
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == (
+        "Sports live channel is not available."
+    )
+
+    assert availability_calls == [
+        {
+            "provider_name": "thesportsdb",
+            "provider_event_id": "event-001",
+        }
+    ]
+
+    assert harness.sports.binding_calls == []
+    assert harness.resource_pool.acquire_calls == []
+    assert harness.live_sessions.admit_calls == []
+    assert harness.playback.calls == []
+    assert harness.capabilities.calls == []
+
+
+def test_watch_live_session_availability_transport_failure_is_503_before_admission() -> None:
+    harness = build_harness()
+
+    def unavailable(
+        *,
+        provider_name: str,
+        provider_event_id: str,
+    ) -> dict[str, object]:
+        del provider_name
+        del provider_event_id
+        raise SportsWriterTransportError(
+            "private availability diagnostic"
+        )
+
+    harness.sports.get_live_availability = unavailable  # type: ignore[attr-defined]
+
+    response = harness.client.get(
+        "/api/v1/sports/live/sports-event-001/session"
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == (
+        "Sports live availability is unavailable."
+    )
+    assert "private" not in response.text.lower()
+
+    assert harness.sports.binding_calls == []
+    assert harness.resource_pool.acquire_calls == []
+    assert harness.live_sessions.admit_calls == []
+    assert harness.playback.calls == []
+    assert harness.capabilities.calls == []
+
+
+def test_watch_live_session_rejects_mismatched_available_channel_before_admission() -> None:
+    harness = build_harness()
+
+    availability_calls: list[
+        dict[str, str]
+    ] = []
+
+    def mismatched(
+        *,
+        provider_name: str,
+        provider_event_id: str,
+    ) -> dict[str, object]:
+        availability_calls.append(
+            {
+                "provider_name": provider_name,
+                "provider_event_id": provider_event_id,
+            }
+        )
+        return {
+            "available": True,
+            "atlas_channel_id": "sports-different-event",
+        }
+
+    harness.sports.get_live_availability = mismatched  # type: ignore[attr-defined]
+
+    response = harness.client.get(
+        "/api/v1/sports/live/sports-event-001/session"
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == (
+        "Sports live channel is not available."
+    )
+
+    assert availability_calls == [
+        {
+            "provider_name": "thesportsdb",
+            "provider_event_id": "event-001",
+        }
+    ]
+
+    assert harness.sports.binding_calls == []
+    assert harness.resource_pool.acquire_calls == []
+    assert harness.live_sessions.admit_calls == []
+    assert harness.playback.calls == []
+    assert harness.capabilities.calls == []

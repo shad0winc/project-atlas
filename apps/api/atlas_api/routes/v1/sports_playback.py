@@ -404,6 +404,74 @@ def read_sports_live_session(
         )
 
     try:
+        live_sources = sports.list_live_sources()
+    except SportsWriterTransportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Sports live availability is unavailable.",
+        ) from exc
+
+    matching_sources = [
+        source
+        for source in live_sources
+        if source.get("atlas_channel_id")
+        == atlas_channel_id
+    ]
+
+    if len(matching_sources) != 1:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sports live channel is not available.",
+        )
+
+    live_source = matching_sources[0]
+
+    if live_source.get("standalone") is False:
+        provider = live_source.get("provider")
+        provider_event_id = live_source.get(
+            "provider_event_id"
+        )
+
+        if (
+            not isinstance(provider, str)
+            or not provider.strip()
+            or not isinstance(
+                provider_event_id,
+                str,
+            )
+            or not provider_event_id.strip()
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=(
+                    "Sports live availability is unavailable."
+                ),
+            )
+
+        try:
+            availability = sports.get_live_availability(
+                provider_name=provider,
+                provider_event_id=provider_event_id,
+            )
+        except SportsWriterTransportError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=(
+                    "Sports live availability is unavailable."
+                ),
+            ) from exc
+
+        if (
+            availability.get("available") is not True
+            or availability.get("atlas_channel_id")
+            != atlas_channel_id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sports live channel is not available.",
+            )
+
+    try:
         binding = sports.get_live_tv_binding(
             atlas_channel_id=atlas_channel_id
         )
@@ -439,7 +507,6 @@ def read_sports_live_session(
         ) from exc
 
     try:
-        live_sources = sports.list_live_sources()
         source_registry = sports.get_source_registry()
 
         (
