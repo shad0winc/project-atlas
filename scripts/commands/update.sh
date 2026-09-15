@@ -315,6 +315,93 @@ atlas_update_readiness_sleep() {
   sleep "$1"
 }
 
+atlas_update_transient_sports_provider_health_only() {
+  local health_json
+
+  health_json="$(
+    atlas_health_python --format json --compact
+  )" || return 1
+
+  python3 - "$health_json" <<'PY_HEALTH'
+import json
+import sys
+
+try:
+    payload = json.loads(sys.argv[1])
+except (IndexError, json.JSONDecodeError, TypeError):
+    raise SystemExit(1)
+
+if not isinstance(payload, dict):
+    raise SystemExit(1)
+
+if payload.get("status") != "critical":
+    raise SystemExit(1)
+
+checks = payload.get("checks")
+if not isinstance(checks, list):
+    raise SystemExit(1)
+
+non_healthy = [
+    check
+    for check in checks
+    if isinstance(check, dict)
+    and check.get("status") != "healthy"
+]
+
+if len(non_healthy) != 1:
+    raise SystemExit(1)
+
+check = non_healthy[0]
+
+expected = {
+    "category": "module:sports",
+    "name": "Provider Health",
+    "status": "critical",
+    "message": (
+        "Sports provider health is unavailable or degraded"
+    ),
+}
+
+for key, value in expected.items():
+    if check.get(key) != value:
+        raise SystemExit(1)
+
+raise SystemExit(0)
+PY_HEALTH
+}
+
+atlas_update_wait_for_post_apply_health() {
+  local attempt=1
+  local max_attempts=6
+  local retry_seconds=30
+
+  while true; do
+    if atlas_command_doctor; then
+      return 0
+    fi
+
+    if ! atlas_update_transient_sports_provider_health_only; then
+      return 1
+    fi
+
+    if (( attempt >= max_attempts )); then
+      echo \
+        'ERROR: transient Sports provider health grace exhausted.' \
+        >&2
+      return 1
+    fi
+
+    printf \
+      'NOTICE: transient Sports provider degradation detected; retrying post-update doctor in %s seconds (%s/%s).\n' \
+      "$retry_seconds" \
+      "$attempt" \
+      "$max_attempts"
+
+    atlas_update_readiness_sleep "$retry_seconds"
+    attempt=$((attempt + 1))
+  done
+}
+
 atlas_update_core_apply() {
   docker compose \
     --env-file "$ATLAS_PROJECT_DIR/.env" \
@@ -400,7 +487,7 @@ atlas_update_post_verify() {
   fi
 
   echo 'Post-update doctor:'
-  atlas_command_doctor || return 1
+  atlas_update_wait_for_post_apply_health || return 1
 
   echo 'Post-update verify:'
   atlas_command_verify || return 1
