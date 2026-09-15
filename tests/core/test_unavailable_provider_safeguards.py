@@ -203,3 +203,138 @@ def test_sports_provider_failure_is_degraded_not_empty_success(
     assert health["status"] == "degraded"
     assert health["consecutive_failures"] == 1
     assert health["last_error"] == "provider unavailable"
+
+
+def test_degraded_operations_preserve_subscribed_terminal_game(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Provider degradation must not erase subscribed terminal memory."""
+
+    _, _, worker = _sports_modules(monkeypatch)
+
+    terminal = {
+        "id": "event-finished",
+        "provider": "thesportsdb",
+        "provider_event_id": "event-finished",
+        "name": "Atlas Home vs Atlas Away",
+        "status": "final",
+        "lifecycle_state": "finished",
+        "start_at": "2026-08-07T00:00:00+00:00",
+        "final_at": "2026-08-07T01:00:00+00:00",
+        "subscription_count": 1,
+        "subscription_types": ["event"],
+        "subscribed_users": ["user-001"],
+        "subscription_ids": ["subscription-001"],
+    }
+
+    provider_result = {
+        "previous_games": {
+            "event-finished": dict(terminal),
+        },
+        "subscribed_previous_games": {
+            "event-finished": dict(terminal),
+        },
+        "provider_games": [],
+        "provider_health": {
+            "thesportsdb": {
+                "status": "degraded",
+                "consecutive_failures": 1,
+            },
+        },
+        "subscribed_games": [],
+        "degraded_count": 1,
+        "provider_health_events": (),
+    }
+
+    seen: list[list[dict[str, object]]] = []
+
+    def process(
+        games,
+        *,
+        publish_feed,
+    ):
+        assert publish_feed is False
+
+        observed = [
+            dict(game)
+            for game in games
+        ]
+
+        seen.append(observed)
+
+        assert len(observed) == 1
+        assert observed[0]["id"] == "event-finished"
+        assert observed[0]["lifecycle_state"] == "finished"
+        assert observed[0]["final_at"] == (
+            "2026-08-07T01:00:00+00:00"
+        )
+
+        return {
+            "event-finished": dict(terminal),
+        }
+
+    monkeypatch.setattr(
+        worker,
+        "process_games",
+        process,
+    )
+
+    monkeypatch.setattr(
+        worker,
+        "run_live_source_provisioning_pipeline",
+        lambda _games: 0,
+    )
+
+    monkeypatch.setattr(
+        worker,
+        "generate_feed_snapshot",
+        lambda: (0, ()),
+    )
+
+    monkeypatch.setattr(
+        worker,
+        "refresh_jellyfin_live_tv",
+        lambda: None,
+    )
+
+    monkeypatch.setattr(
+        worker,
+        "converge_jellyfin_live_tv_bindings",
+        lambda _channel_ids: None,
+    )
+
+    monkeypatch.setattr(
+        worker,
+        "write_provider_health",
+        lambda _health: None,
+    )
+
+    monkeypatch.setattr(
+        worker,
+        "write_heartbeat",
+        lambda: None,
+    )
+
+    monkeypatch.setattr(
+        worker,
+        "write_health_report",
+        lambda: {"status": "degraded"},
+    )
+
+    monkeypatch.setattr(
+        worker,
+        "recording_counts",
+        lambda _recordings: {
+            "pending": 0,
+            "active": 0,
+            "completed": 0,
+        },
+    )
+
+    result = worker.run_operations_pipeline(
+        provider_result,
+        {},
+    )
+
+    assert result == 0
+    assert len(seen) == 1

@@ -857,8 +857,62 @@ def run_operations_pipeline(
         subscribed_previous_games,
     )
 
+    processing_games = list(
+        subscribed_games
+    )
+
+    current_game_ids = {
+        str(game.get("id", "")).strip()
+        for game in subscribed_games
+        if str(game.get("id", "")).strip()
+    }
+
+    for (
+        previous_game_id,
+        previous_game,
+    ) in subscribed_previous_games.items():
+        if previous_game_id in current_game_ids:
+            continue
+
+        if str(
+            previous_game.get(
+                "lifecycle_state",
+                "",
+            )
+        ).strip().lower() != "finished":
+            continue
+
+        provider_name = str(
+            previous_game.get(
+                "provider",
+                "",
+            )
+        ).strip()
+
+        provider_state = provider_health.get(
+            provider_name
+        )
+
+        if not isinstance(
+            provider_state,
+            dict,
+        ):
+            continue
+
+        if str(
+            provider_state.get(
+                "status",
+                "",
+            )
+        ).strip().lower() != "degraded":
+            continue
+
+        processing_games.append(
+            previous_game
+        )
+
     next_games = process_games(
-        subscribed_games,
+        processing_games,
         publish_feed=False,
     )
 
