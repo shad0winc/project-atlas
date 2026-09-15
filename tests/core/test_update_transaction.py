@@ -299,9 +299,40 @@ def run_update(
 
     atlas_print_header() { :; }
     atlas_command_doctor() {
+      local call=1
+      local count_file="${ATLAS_TEST_DOCTOR_COUNT_FILE:-}"
+
+      if [[ -n "$count_file" ]]; then
+        if [[ -f "$count_file" ]]; then
+          call="$(( $(cat "$count_file") + 1 ))"
+        fi
+        printf '%s\n' "$call" > "$count_file"
+      fi
+
       echo doctor >> "$ATLAS_TEST_EVENTS"
+
+      case ",${ATLAS_TEST_DOCTOR_FAIL_CALLS:-}," in
+        *",$call,"*)
+          return 1
+          ;;
+      esac
+
       return "${ATLAS_TEST_DOCTOR_STATUS:-0}"
     }
+
+    atlas_health_python() {
+      local payload="${ATLAS_TEST_HEALTH_JSON:-}"
+
+      echo health-json >> "$ATLAS_TEST_EVENTS"
+
+      if [[ -z "$payload" ]]; then
+        payload='{"status":"healthy","score":100,"checks":[]}'
+      fi
+
+      printf '%s\n' "$payload"
+      return "${ATLAS_TEST_HEALTH_STATUS:-0}"
+    }
+
     atlas_command_verify() {
       echo verify >> "$ATLAS_TEST_EVENTS"
       if [[ "${ATLAS_TEST_VERIFY_FAIL_AFTER_DISABLE:-0}" == "1" ]] &&
@@ -1354,3 +1385,170 @@ def test_core_update_does_not_run_dislikes_prebackup_bootstrap(
         "dislikes-runtime:provision"
         not in event_lines(environment)
     )
+
+
+def _sports_provider_only_critical_health_json() -> str:
+    return (
+        '{"schema_version":1,"status":"critical","score":97,'
+        '"category_scores":{"module:sports":86},'
+        '"checks":['
+        '{"category":"module:sports",'
+        '"name":"Provider Health",'
+        '"status":"critical",'
+        '"message":"Sports provider health is unavailable or degraded",'
+        '"details":{"module":"sports",'
+        '"path":"/mnt/storage/configs/sportyfin/state/provider-health.json",'
+        '"provider_count":1}}'
+        ']}'
+    )
+
+
+def test_post_apply_transient_sports_provider_health_recovers_within_grace(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+
+    doctor_count = tmp_path / "doctor-count"
+    environment["ATLAS_TEST_DOCTOR_COUNT_FILE"] = str(doctor_count)
+
+    # Call 1 is the pre-update doctor.
+    # Call 2 is the first post-apply doctor and represents the transient
+    # Sports provider degradation observed in production.
+    environment["ATLAS_TEST_DOCTOR_FAIL_CALLS"] = "2"
+    environment["ATLAS_TEST_HEALTH_JSON"] = (
+        _sports_provider_only_critical_health_json()
+    )
+
+    result = run_update(environment)
+
+    assert result.returncode == 0, result.stderr
+
+    events = event_lines(environment)
+
+    # A post-apply failure that is limited to Sports Provider Health must
+    # remain under maintenance and receive at least one bounded retry.
+    assert events.count("doctor") >= 4
+    assert "health-json" in events
+
+    enable = events.index("maintenance:enable")
+    disable = events.index("maintenance:disable")
+
+    assert enable < events.index("health-json") < disable
+    assert events[-3:] == ["maintenance:disable", "doctor", "verify"]
+    assert not lock_path(environment).exists()
+
+
+def test_post_apply_transient_sports_provider_health_grace_exhausts_fail_closed(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+
+    doctor_count = tmp_path / "doctor-count"
+    environment["ATLAS_TEST_DOCTOR_COUNT_FILE"] = str(doctor_count)
+
+    # Pre-update doctor succeeds. Every later doctor remains degraded.
+    environment["ATLAS_TEST_DOCTOR_FAIL_CALLS"] = (
+        "2,3,4,5,6,7,8,9"
+    )
+    environment["ATLAS_TEST_HEALTH_JSON"] = (
+        _sports_provider_only_critical_health_json()
+    )
+
+    result = run_update(environment)
+
+    assert result.returncode != 0
+
+    events = event_lines(environment)
+
+    # The grace path must actually retry, but remain bounded.
+    assert 3 <= events.count("doctor") <= 9
+    assert "health-json" in events
+
+    # Persistent degradation must never reopen public traffic.
+    assert "maintenance:enable" in events
+    assert "maintenance:disable" not in events
+    assert lock_path(environment).is_dir()
+
+    assert "Recovery command: atlas deployment rollback" in result.stderr
+
+
+def test_post_apply_unrelated_health_failure_does_not_receive_sports_grace(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+
+    doctor_count = tmp_path / "doctor-count"
+    environment["ATLAS_TEST_DOCTOR_COUNT_FILE"] = str(doctor_count)
+
+    # Pre-update doctor succeeds; the first post-apply doctor fails.
+    environment["ATLAS_TEST_DOCTOR_FAIL_CALLS"] = "2"
+    environment["ATLAS_TEST_HEALTH_JSON"] = (
+        '{"schema_version":1,"status":"critical","score":90,'
+        '"checks":['
+        '{"category":"services",'
+        '"name":"jellyfin",'
+        '"status":"critical",'
+        '"message":"jellyfin container is not running",'
+        '"details":{"returncode":1}}'
+        ']}'
+    )
+
+    result = run_update(environment)
+
+    assert result.returncode != 0
+
+    events = event_lines(environment)
+
+    # Unrelated critical health is never grace-eligible.
+    assert events.count("doctor") == 2
+    assert events.count("health-json") == 1
+    assert "maintenance:enable" in events
+    assert "maintenance:disable" not in events
+    assert lock_path(environment).is_dir()
+
+    assert "Recovery command: atlas deployment rollback" in result.stderr
+
+
+def test_post_apply_mixed_health_failure_does_not_receive_sports_grace(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+
+    doctor_count = tmp_path / "doctor-count"
+    environment["ATLAS_TEST_DOCTOR_COUNT_FILE"] = str(doctor_count)
+
+    # Sports Provider Health is degraded, but another independent critical
+    # check is also present. This must fail immediately rather than masking
+    # the second failure behind the Sports grace period.
+    environment["ATLAS_TEST_DOCTOR_FAIL_CALLS"] = "2"
+    environment["ATLAS_TEST_HEALTH_JSON"] = (
+        '{"schema_version":1,"status":"critical","score":87,'
+        '"checks":['
+        '{"category":"module:sports",'
+        '"name":"Provider Health",'
+        '"status":"critical",'
+        '"message":"Sports provider health is unavailable or degraded",'
+        '"details":{"module":"sports","provider_count":1}},'
+        '{"category":"services",'
+        '"name":"jellyfin",'
+        '"status":"critical",'
+        '"message":"jellyfin container is not running",'
+        '"details":{"returncode":1}}'
+        ']}'
+    )
+
+    result = run_update(environment)
+
+    assert result.returncode != 0
+
+    events = event_lines(environment)
+
+    # Grace is allowed only when Sports Provider Health is the sole
+    # non-healthy check.
+    assert events.count("doctor") == 2
+    assert events.count("health-json") == 1
+    assert "maintenance:enable" in events
+    assert "maintenance:disable" not in events
+    assert lock_path(environment).is_dir()
+
+    assert "Recovery command: atlas deployment rollback" in result.stderr
