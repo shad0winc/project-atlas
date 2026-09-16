@@ -1224,3 +1224,232 @@ def test_rollback_uses_recovery_aware_verification_before_and_after_reopen() -> 
     )[0]
 
     assert direct_current_ingress not in rollback_body
+
+def test_deployment_transaction_captures_and_restores_sports_surface() -> None:
+    content = DEPLOYMENT.read_text(encoding="utf-8")
+
+    capture_start = content.index(
+        "atlas_deployment_capture_images() {"
+    )
+    capture_end = content.index(
+        "\natlas_deployment_verify_runtime() {",
+        capture_start,
+    )
+    capture = content[capture_start:capture_end]
+
+    assert (
+        "sports|modules/sports/docker-compose.yml"
+        in capture
+    )
+
+    rollback_start = content.index(
+        "atlas_deployment_rollback() {"
+    )
+    rollback_end = content.index(
+        "\natlas_deployment_recover_failed_before_apply() {",
+        rollback_start,
+    )
+    rollback = content[rollback_start:rollback_end]
+
+    all_case = rollback.split(
+        "all)",
+        1,
+    )[1].split(
+        ";;",
+        1,
+    )[0]
+
+    assert (
+        'atlas_deployment_restore_surface '
+        '"$baseline" "$transaction" sports'
+        in all_case.replace("\n", " ")
+    )
+
+
+def test_sports_is_supported_by_rollback_surface_helpers() -> None:
+    content = DEPLOYMENT.read_text(encoding="utf-8")
+
+    create_start = content.index(
+        "atlas_deployment_create_recovery_dir() {"
+    )
+    create_end = content.index(
+        "\natlas_deployment_record_value() {",
+        create_start,
+    )
+    create = content[create_start:create_end]
+
+    recovery_start = content.index(
+        "atlas_deployment_rollback_recovery_source() {"
+    )
+    recovery_end = content.index(
+        "\natlas_deployment_verify_rollback_runtime() {",
+        recovery_start,
+    )
+    recovery = content[recovery_start:recovery_end]
+
+    assert "core|ingress|sports)" in create
+    assert "core|ingress|sports)" in recovery
+
+
+def test_sports_rollback_reuses_external_module_environment() -> None:
+    content = DEPLOYMENT.read_text(encoding="utf-8")
+
+    restore_start = content.index(
+        "atlas_deployment_restore_surface() {"
+    )
+    restore_end = content.index(
+        "\natlas_deployment_ingress_container_state() {",
+        restore_start,
+    )
+    restore = content[restore_start:restore_end]
+
+    assert (
+        '"$ATLAS_PROJECT_DIR/modules/sports/.env"'
+        in restore
+    )
+
+    assert (
+        '"$recovery/modules/sports/.env"'
+        in restore
+    )
+
+
+def test_sports_rollback_apply_is_network_and_build_independent() -> None:
+    content = DEPLOYMENT.read_text(encoding="utf-8")
+
+    restore_start = content.index(
+        "atlas_deployment_restore_surface() {"
+    )
+    restore_end = content.index(
+        "\natlas_deployment_ingress_container_state() {",
+        restore_start,
+    )
+    restore = content[restore_start:restore_end]
+
+    assert "--no-build" in restore
+    assert "--pull never" in restore
+
+def test_baseline_adopts_exact_live_sports_source_and_identity() -> None:
+    content = DEPLOYMENT.read_text(encoding="utf-8")
+
+    baseline_start = content.index(
+        "atlas_deployment_baseline() {"
+    )
+    baseline_end = content.index(
+        "\natlas_deployment_prepare_update() {",
+        baseline_start,
+    )
+    baseline = content[baseline_start:baseline_end]
+
+    assert "sports_commit=" in baseline
+    assert "sports-source.tar.gz" in baseline
+
+    assert "atlas-sports-controller" in baseline
+    assert "/opt/project-atlas" in baseline
+    assert "git -C" in baseline
+    assert "rev-parse HEAD" in baseline
+    assert "status --porcelain" in baseline
+
+
+def test_baseline_sports_capture_uses_exact_compose_environment() -> None:
+    content = DEPLOYMENT.read_text(encoding="utf-8")
+
+    capture_start = content.index(
+        "atlas_deployment_capture_images() {"
+    )
+    capture_end = content.index(
+        "\natlas_deployment_verify_runtime() {",
+        capture_start,
+    )
+    capture = content[capture_start:capture_end]
+
+    assert "modules/sports/docker-compose.yml" in capture
+    assert "modules/sports/.env" in capture
+    assert "--project-name sports" in capture
+
+    # Sports Compose requires both root/operator substitutions and
+    # the module's own private environment.
+    assert capture.count("--env-file") >= 2
+
+
+def test_deployment_status_reports_sports_source_identity() -> None:
+    content = DEPLOYMENT.read_text(encoding="utf-8")
+
+    status_start = content.index(
+        "atlas_deployment_status() {"
+    )
+    status_end = content.index(
+        "\natlas_deployment_publish_reconciliation_baseline() {",
+        status_start,
+    )
+    status = content[status_start:status_end]
+
+    assert "Sports source:" in status
+    assert "sports_commit" in status
+
+
+def test_update_all_tracks_sports_commit_and_source_archive() -> None:
+    content = DEPLOYMENT.read_text(encoding="utf-8")
+
+    prepare_start = content.index(
+        "atlas_deployment_prepare_update() {"
+    )
+    prepare_end = content.index(
+        "\natlas_deployment_record_backup() {",
+        prepare_start,
+    )
+    prepare = content[prepare_start:prepare_end]
+
+    assert "sports_commit" in prepare
+    assert "sports-source.tar.gz" in prepare
+
+    all_case = prepare.split(
+        "all)",
+        1,
+    )[1].split(
+        ";;",
+        1,
+    )[0]
+
+    assert 'sports_commit="$target_commit"' in all_case
+
+
+def test_rollback_reconciliation_preserves_sports_identity_and_source() -> None:
+    content = DEPLOYMENT.read_text(encoding="utf-8")
+
+    start = content.index(
+        "atlas_deployment_publish_reconciliation_baseline() {"
+    )
+    end = content.index(
+        "\natlas_deployment_recover_failed_rollback() {",
+        start,
+    )
+    reconciliation = content[start:end]
+
+    assert "sports_commit" in reconciliation
+    assert "sports-source.tar.gz" in reconciliation
+
+    assert (
+        '"$baseline/sports-source.tar.gz"'
+        in reconciliation
+    )
+
+    assert (
+        '"$temporary/sports-source.tar.gz"'
+        in reconciliation
+    )
+
+
+def test_current_record_requires_sports_recovery_evidence_after_adoption() -> None:
+    content = DEPLOYMENT.read_text(encoding="utf-8")
+
+    start = content.index(
+        "atlas_deployment_require_current_record() {"
+    )
+    end = content.index(
+        "\natlas_deployment_new_id() {",
+        start,
+    )
+    require = content[start:end]
+
+    assert "sports-source.tar.gz" in require

@@ -35,7 +35,7 @@ atlas_deployment_create_recovery_dir() {
   local transaction_id
 
   case "$surface" in
-    core|ingress)
+    core|ingress|sports)
       ;;
     *)
       printf \
@@ -493,22 +493,39 @@ atlas_deployment_capture_images() {
   local identifiers
   local container
   local details
+  local sports_commit
+  local module_env="$ATLAS_PROJECT_DIR/modules/sports/.env"
 
   : > "$temporary"
 
   while IFS='|' read -r surface compose_relative; do
     compose_file="$ATLAS_PROJECT_DIR/$compose_relative"
+
     [[ -f "$compose_file" ]] || return 1
 
-    identifiers="$(docker compose --env-file "$ATLAS_PROJECT_DIR/.env" -f "$compose_file" ps -q)" || return 1
+    identifiers="$(
+      docker compose \
+        --env-file "$ATLAS_PROJECT_DIR/.env" \
+        -f "$compose_file" \
+        ps -q
+    )" || return 1
+
     [[ -n "${identifiers//[[:space:]]/}" ]] || return 1
 
     while IFS= read -r container; do
       [[ -n "$container" ]] || continue
-      details="$(docker inspect --format \
-        '{{index .Config.Labels "com.docker.compose.project"}}|{{index .Config.Labels "com.docker.compose.service"}}|{{.Name}}|{{.Config.Image}}|{{.Image}}' \
-        "$container")" || return 1
-      printf '%s|%s|%s\n' "$surface" "$compose_relative" "$details" \
+
+      details="$(
+        docker inspect \
+          --format \
+          '{{index .Config.Labels "com.docker.compose.project"}}|{{index .Config.Labels "com.docker.compose.service"}}|{{.Name}}|{{.Config.Image}}|{{.Image}}' \
+          "$container"
+      )" || return 1
+
+      printf '%s|%s|%s\n' \
+        "$surface" \
+        "$compose_relative" \
+        "$details" \
         >> "$temporary"
     done <<< "$identifiers"
   done <<'SURFACES'
@@ -516,8 +533,63 @@ core|docker-compose.yml
 ingress|stack/ingress.yml
 SURFACES
 
+  sports_commit="$(
+    atlas_deployment_record_value \
+      "$record" \
+      sports_commit
+  )"
+
+  if [[ -n "$sports_commit" ]]; then
+    compose_relative='modules/sports/docker-compose.yml'
+    compose_file="$ATLAS_PROJECT_DIR/$compose_relative"
+
+    [[ -f "$compose_file" ]] || return 1
+
+    [[ -f "$module_env" ]] || {
+      echo \
+        'ERROR: Sports module environment is unavailable.' \
+        >&2
+      return 1
+    }
+
+    identifiers="$(
+      docker compose \
+        --env-file "$ATLAS_PROJECT_DIR/.env" \
+        --env-file "$ATLAS_PROJECT_DIR/modules/sports/.env" \
+        --project-name sports \
+        -f "$compose_file" \
+        ps -q
+    )" || return 1
+
+    [[ -n "${identifiers//[[:space:]]/}" ]] || {
+      echo \
+        'ERROR: Sports deployment surface has no running containers.' \
+        >&2
+      return 1
+    }
+
+    while IFS= read -r container; do
+      [[ -n "$container" ]] || continue
+
+      details="$(
+        docker inspect \
+          --format \
+          '{{index .Config.Labels "com.docker.compose.project"}}|{{index .Config.Labels "com.docker.compose.service"}}|{{.Name}}|{{.Config.Image}}|{{.Image}}' \
+          "$container"
+      )" || return 1
+
+      printf \
+        'sports|modules/sports/docker-compose.yml|%s\n' \
+        "$details" \
+        >> "$temporary"
+    done <<< "$identifiers"
+  fi
+
   [[ -s "$temporary" ]] || return 1
-  mv -f -- "$temporary" "$output"
+
+  mv -f -- \
+    "$temporary" \
+    "$output"
 }
 
 atlas_deployment_verify_runtime() {
@@ -585,18 +657,47 @@ atlas_deployment_preserve_rollback_images() {
 atlas_deployment_require_current_record() {
   local identifier
   local record
+  local sports_commit
+
   identifier="$(atlas_deployment_current_id)" || {
-    echo 'ERROR: no verified production deployment baseline exists.' >&2
+    echo \
+      'ERROR: no verified production deployment baseline exists.' \
+      >&2
     return 1
   }
-  record="$(atlas_deployment_record_dir "$identifier")" || return 1
-  [[ -f "$record/status" && "$(<"$record/status")" == 'verified' ]] || {
-    echo 'ERROR: current deployment baseline is not verified.' >&2
+
+  record="$(
+    atlas_deployment_record_dir "$identifier"
+  )" || return 1
+
+  [[ -f "$record/status" ]] || return 1
+
+  [[ "$(<"$record/status")" == 'verified' ]] || {
+    echo \
+      'ERROR: current deployment baseline is not verified.' \
+      >&2
     return 1
   }
+
   [[ -s "$record/core-source.tar.gz" ]] || return 1
   [[ -s "$record/ingress-source.tar.gz" ]] || return 1
   [[ -s "$record/images.tsv" ]] || return 1
+
+  sports_commit="$(
+    atlas_deployment_record_value \
+      "$record" \
+      sports_commit
+  )"
+
+  if [[ -n "$sports_commit" ]]; then
+    [[ -s "$record/sports-source.tar.gz" ]] || {
+      echo \
+        'ERROR: Sports recovery source evidence is unavailable.' \
+        >&2
+      return 1
+    }
+  fi
+
   printf '%s\n' "$record"
 }
 
@@ -609,20 +710,87 @@ atlas_deployment_baseline() {
   local identifier
   local record
   local commit
+  local sports_source=''
+  local sports_commit=''
 
   atlas_deployment_validate_source || return 1
 
   echo 'Baseline doctor:'
   atlas_command_doctor || return 1
+
   echo 'Baseline verify:'
   atlas_command_verify || return 1
+
   echo 'Baseline ingress verification:'
   "$ATLAS_PROJECT_DIR/scripts/verify-ingress.sh" || return 1
 
+  if docker inspect \
+    atlas-sports-controller \
+    >/dev/null 2>&1
+  then
+    sports_source="$(
+      docker inspect \
+        atlas-sports-controller \
+        --format \
+        '{{range .Mounts}}{{if eq .Destination "/opt/project-atlas"}}{{.Source}}{{end}}{{end}}'
+    )" || return 1
+
+    [[ -n "$sports_source" ]] || {
+      echo \
+        'ERROR: live Sports controller source mount is unavailable.' \
+        >&2
+      return 1
+    }
+
+    [[ -d "$sports_source" ]] || {
+      echo \
+        'ERROR: live Sports controller source directory is unavailable.' \
+        >&2
+      return 1
+    }
+
+    git -C "$sports_source" \
+      rev-parse \
+      --is-inside-work-tree \
+      >/dev/null 2>&1 || {
+        echo \
+          'ERROR: live Sports source is not a Git worktree.' \
+          >&2
+        return 1
+      }
+
+    [[ -z "$(
+      git -C "$sports_source" status --porcelain
+    )" ]] || {
+      echo \
+        'ERROR: live Sports source worktree is dirty.' \
+        >&2
+      return 1
+    }
+
+    sports_commit="$(
+      git -C "$sports_source" rev-parse HEAD
+    )" || return 1
+
+    [[ "$sports_commit" =~ ^[0-9a-f]{40}$ ]] || {
+      echo \
+        'ERROR: live Sports source commit is invalid.' \
+        >&2
+      return 1
+    }
+  fi
+
   identifier="$(atlas_deployment_new_id baseline)"
-  record="$(atlas_deployment_record_dir "$identifier")"
+
+  record="$(
+    atlas_deployment_record_dir "$identifier"
+  )" || return 1
+
   mkdir -p "$record"
-  commit="$(git -C "$ATLAS_PROJECT_DIR" rev-parse HEAD)"
+
+  commit="$(
+    git -C "$ATLAS_PROJECT_DIR" rev-parse HEAD
+  )"
 
   cat > "$record/metadata" <<EOF
 type=baseline
@@ -630,18 +798,45 @@ deployment_id=$identifier
 source_commit=$commit
 core_commit=$commit
 ingress_commit=$commit
+sports_commit=$sports_commit
 scope=all
 migration=none
 created_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 EOF
 
-  atlas_deployment_create_source_pair "$record" "$commit" || return 1
-  atlas_deployment_capture_images "$record" || return 1
-  atlas_deployment_verify_runtime "$record" || return 1
-  atlas_deployment_set_status "$record" verified
-  atlas_deployment_set_current "$identifier"
+  atlas_deployment_create_source_pair \
+    "$record" \
+    "$commit" || return 1
 
-  printf 'Verified production baseline: %s\n' "$identifier"
+  if [[ -n "$sports_commit" ]]; then
+    git -C "$sports_source" archive \
+      --format=tar.gz \
+      --output="$record/sports-source.tar.gz" \
+      "$sports_commit" || return 1
+
+    [[ -s "$record/sports-source.tar.gz" ]] || return 1
+
+    tar -tzf \
+      "$record/sports-source.tar.gz" \
+      >/dev/null 2>&1 || return 1
+  fi
+
+  atlas_deployment_capture_images \
+    "$record" || return 1
+
+  atlas_deployment_verify_runtime \
+    "$record" || return 1
+
+  atlas_deployment_set_status \
+    "$record" \
+    verified
+
+  atlas_deployment_set_current \
+    "$identifier"
+
+  printf \
+    'Verified production baseline: %s\n' \
+    "$identifier"
 }
 
 atlas_deployment_prepare_update() {
@@ -653,13 +848,37 @@ atlas_deployment_prepare_update() {
   local previous_id
   local core_commit
   local ingress_commit
+  local sports_commit
 
-  record="$(atlas_deployment_record_dir "$identifier")" || return 1
+  record="$(
+    atlas_deployment_record_dir "$identifier"
+  )" || return 1
+
   mkdir -p "$record"
-  target_commit="$(git -C "$ATLAS_PROJECT_DIR" rev-parse HEAD)"
+
+  target_commit="$(
+    git -C "$ATLAS_PROJECT_DIR" rev-parse HEAD
+  )"
+
   previous_id="$(basename "$previous_record")"
-  core_commit="$(atlas_deployment_record_value "$previous_record" core_commit)"
-  ingress_commit="$(atlas_deployment_record_value "$previous_record" ingress_commit)"
+
+  core_commit="$(
+    atlas_deployment_record_value \
+      "$previous_record" \
+      core_commit
+  )"
+
+  ingress_commit="$(
+    atlas_deployment_record_value \
+      "$previous_record" \
+      ingress_commit
+  )"
+
+  sports_commit="$(
+    atlas_deployment_record_value \
+      "$previous_record" \
+      sports_commit
+  )"
 
   case "$scope" in
     core)
@@ -671,6 +890,10 @@ atlas_deployment_prepare_update() {
     all)
       core_commit="$target_commit"
       ingress_commit="$target_commit"
+
+      if [[ -n "$sports_commit" ]]; then
+        sports_commit="$target_commit"
+      fi
       ;;
   esac
 
@@ -681,27 +904,62 @@ previous_baseline=$previous_id
 target_commit=$target_commit
 core_commit=$core_commit
 ingress_commit=$ingress_commit
+sports_commit=$sports_commit
 scope=$scope
 migration=none
 created_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 EOF
 
-  cp -- "$previous_record/images.tsv" "$record/pre-images.tsv"
-  atlas_deployment_preserve_rollback_images "$previous_record" "$record" || return 1
+  cp -- \
+    "$previous_record/images.tsv" \
+    "$record/pre-images.tsv"
+
+  atlas_deployment_preserve_rollback_images \
+    "$previous_record" \
+    "$record" || return 1
 
   if [[ "$scope" == 'core' || "$scope" == 'all' ]]; then
-    atlas_deployment_archive_source "$target_commit" "$record/core-source.tar.gz" || return 1
+    atlas_deployment_archive_source \
+      "$target_commit" \
+      "$record/core-source.tar.gz" || return 1
   else
-    cp -- "$previous_record/core-source.tar.gz" "$record/core-source.tar.gz"
+    cp -- \
+      "$previous_record/core-source.tar.gz" \
+      "$record/core-source.tar.gz"
   fi
 
   if [[ "$scope" == 'ingress' || "$scope" == 'all' ]]; then
-    atlas_deployment_archive_source "$target_commit" "$record/ingress-source.tar.gz" || return 1
+    atlas_deployment_archive_source \
+      "$target_commit" \
+      "$record/ingress-source.tar.gz" || return 1
   else
-    cp -- "$previous_record/ingress-source.tar.gz" "$record/ingress-source.tar.gz"
+    cp -- \
+      "$previous_record/ingress-source.tar.gz" \
+      "$record/ingress-source.tar.gz"
   fi
 
-  atlas_deployment_set_status "$record" prepared
+  if [[ -n "$sports_commit" ]]; then
+    if [[ "$scope" == 'all' ]]; then
+      atlas_deployment_archive_source \
+        "$target_commit" \
+        "$record/sports-source.tar.gz" || return 1
+    else
+      [[ -s "$previous_record/sports-source.tar.gz" ]] || {
+        echo \
+          'ERROR: previous Sports source archive is unavailable.' \
+          >&2
+        return 1
+      }
+
+      cp -- \
+        "$previous_record/sports-source.tar.gz" \
+        "$record/sports-source.tar.gz"
+    fi
+  fi
+
+  atlas_deployment_set_status \
+    "$record" \
+    prepared
 }
 
 atlas_deployment_record_backup() {
@@ -727,15 +985,35 @@ atlas_deployment_complete_update() {
 atlas_deployment_status() {
   local identifier
   local record
+
   if ! identifier="$(atlas_deployment_current_id)"; then
     echo 'Verified production baseline: none'
     return 0
   fi
-  record="$(atlas_deployment_record_dir "$identifier")"
-  printf 'Verified production baseline: %s\n' "$identifier"
-  printf 'Status: %s\n' "$(<"$record/status")"
-  printf 'Core source: %s\n' "$(atlas_deployment_record_value "$record" core_commit)"
-  printf 'Ingress source: %s\n' "$(atlas_deployment_record_value "$record" ingress_commit)"
+
+  record="$(
+    atlas_deployment_record_dir "$identifier"
+  )"
+
+  printf \
+    'Verified production baseline: %s\n' \
+    "$identifier"
+
+  printf \
+    'Status: %s\n' \
+    "$(<"$record/status")"
+
+  printf \
+    'Core source: %s\n' \
+    "$(atlas_deployment_record_value "$record" core_commit)"
+
+  printf \
+    'Ingress source: %s\n' \
+    "$(atlas_deployment_record_value "$record" ingress_commit)"
+
+  printf \
+    'Sports source: %s\n' \
+    "$(atlas_deployment_record_value "$record" sports_commit)"
 }
 
 atlas_deployment_publish_reconciliation_baseline() {
@@ -750,13 +1028,20 @@ atlas_deployment_publish_reconciliation_baseline() {
   local source_commit
   local core_commit
   local ingress_commit
+  local sports_commit
   local recovery_source='none'
 
-  identifier="$(atlas_deployment_new_id baseline-reconciliation)"
-  record="$(atlas_deployment_record_dir "$identifier")" || return 1
+  identifier="$(
+    atlas_deployment_new_id baseline-reconciliation
+  )"
+
+  record="$(
+    atlas_deployment_record_dir "$identifier"
+  )" || return 1
 
   [[ ! -e "$record" ]] || {
-    printf 'ERROR: reconciliation baseline already exists: %s\n' \
+    printf \
+      'ERROR: reconciliation baseline already exists: %s\n' \
       "$identifier" >&2
     return 1
   }
@@ -767,46 +1052,78 @@ atlas_deployment_publish_reconciliation_baseline() {
   )" || return 1
 
   source_commit="$(
-    atlas_deployment_record_value "$baseline" source_commit
+    atlas_deployment_record_value \
+      "$baseline" \
+      source_commit
   )"
 
   if [[ -z "$source_commit" ]]; then
     source_commit="$(
-      atlas_deployment_record_value "$baseline" target_commit
+      atlas_deployment_record_value \
+        "$baseline" \
+        target_commit
     )"
   fi
 
   core_commit="$(
-    atlas_deployment_record_value "$baseline" core_commit
+    atlas_deployment_record_value \
+      "$baseline" \
+      core_commit
   )"
 
   ingress_commit="$(
-    atlas_deployment_record_value "$baseline" ingress_commit
+    atlas_deployment_record_value \
+      "$baseline" \
+      ingress_commit
+  )"
+
+  sports_commit="$(
+    atlas_deployment_record_value \
+      "$baseline" \
+      sports_commit
   )"
 
   [[ -n "$source_commit" ]] || {
-    echo 'ERROR: previous baseline source identity is unavailable.' >&2
+    echo \
+      'ERROR: previous baseline source identity is unavailable.' \
+      >&2
     rm -rf -- "$temporary"
     return 1
   }
 
   [[ -n "$core_commit" && -n "$ingress_commit" ]] || {
-    echo 'ERROR: previous baseline component identity is unavailable.' >&2
+    echo \
+      'ERROR: previous baseline component identity is unavailable.' \
+      >&2
     rm -rf -- "$temporary"
     return 1
   }
 
   [[ -f "$baseline/core-source.tar.gz" ]] || {
-    echo 'ERROR: previous baseline core source archive is unavailable.' >&2
+    echo \
+      'ERROR: previous baseline core source archive is unavailable.' \
+      >&2
     rm -rf -- "$temporary"
     return 1
   }
 
   [[ -f "$baseline/ingress-source.tar.gz" ]] || {
-    echo 'ERROR: previous baseline ingress source archive is unavailable.' >&2
+    echo \
+      'ERROR: previous baseline ingress source archive is unavailable.' \
+      >&2
     rm -rf -- "$temporary"
     return 1
   }
+
+  if [[ -n "$sports_commit" ]]; then
+    [[ -f "$baseline/sports-source.tar.gz" ]] || {
+      echo \
+        'ERROR: previous baseline Sports source archive is unavailable.' \
+        >&2
+      rm -rf -- "$temporary"
+      return 1
+    }
+  fi
 
   case "$scope" in
     core)
@@ -844,6 +1161,15 @@ atlas_deployment_publish_reconciliation_baseline() {
       return 1
     }
 
+  if [[ -n "$sports_commit" ]]; then
+    cp -- \
+      "$baseline/sports-source.tar.gz" \
+      "$temporary/sports-source.tar.gz" || {
+        rm -rf -- "$temporary"
+        return 1
+      }
+  fi
+
   cat > "$temporary/metadata" <<EOF
 type=baseline
 deployment_id=$identifier
@@ -853,6 +1179,7 @@ failed_deployment=$failed_identifier
 source_commit=$source_commit
 core_commit=$core_commit
 ingress_commit=$ingress_commit
+sports_commit=$sports_commit
 scope=all
 migration=none
 reason=post-rollback-failure-finalization
@@ -868,6 +1195,7 @@ recovery_scope=$scope
 source_commit=$source_commit
 core_commit=$core_commit
 ingress_commit=$ingress_commit
+sports_commit=$sports_commit
 historical_recovery_source=$recovery_source
 source_claim=verified-previous-baseline-plus-observed-runtime
 EOF
@@ -882,10 +1210,12 @@ EOF
     return 1
   }
 
-  atlas_deployment_set_status "$temporary" verified || {
-    rm -rf -- "$temporary"
-    return 1
-  }
+  atlas_deployment_set_status \
+    "$temporary" \
+    verified || {
+      rm -rf -- "$temporary"
+      return 1
+    }
 
   (
     cd "$temporary"
@@ -899,20 +1229,30 @@ EOF
       ingress-source.tar.gz \
       > MANIFEST.sha256
 
-    sha256sum -c MANIFEST.sha256 >&2
+    if [[ -f sports-source.tar.gz ]]; then
+      sha256sum \
+        sports-source.tar.gz \
+        >> MANIFEST.sha256
+    fi
+
+    sha256sum \
+      -c \
+      MANIFEST.sha256 \
+      >&2
   ) || {
     rm -rf -- "$temporary"
     return 1
   }
 
-  mv -- "$temporary" "$record" || {
-    rm -rf -- "$temporary"
-    return 1
-  }
+  mv -- \
+    "$temporary" \
+    "$record" || {
+      rm -rf -- "$temporary"
+      return 1
+    }
 
   printf '%s\n' "$identifier"
 }
-
 
 atlas_deployment_recover_failed_rollback() {
   local identifier="$1"
@@ -1116,6 +1456,24 @@ atlas_deployment_restore_surface() {
     ln -s -- "$ATLAS_PROJECT_DIR/.env" "$recovery/.env"
   fi
 
+  if [[ "$surface" == 'sports' ]]; then
+    [[ -f "$ATLAS_PROJECT_DIR/modules/sports/.env" ]] || {
+      echo \
+        'ERROR: external Sports module environment is unavailable.' \
+        >&2
+      return 1
+    }
+
+    mkdir -p \
+      "$recovery/modules/sports"
+
+    if [[ ! -e "$recovery/modules/sports/.env" ]]; then
+      ln -s -- \
+        "$ATLAS_PROJECT_DIR/modules/sports/.env" \
+        "$recovery/modules/sports/.env"
+    fi
+  fi
+
   override="$recovery/rollback-images.yml"
 
   printf 'services:\n' > "$override"
@@ -1190,12 +1548,23 @@ atlas_deployment_restore_surface() {
   (
     cd "$recovery"
 
-    docker compose \
-      --env-file "$recovery/.env" \
-      --project-name "$project" \
-      -f "$recovery/$compose_relative" \
-      -f "$override" \
-      up -d --no-build --pull never
+    if [[ "$surface" == 'sports' ]]; then
+      ATLAS_PROJECT_DIR="$recovery" \
+        docker compose \
+          --env-file "$recovery/.env" \
+          --env-file "$recovery/modules/sports/.env" \
+          --project-name "$project" \
+          -f "$recovery/$compose_relative" \
+          -f "$override" \
+          up -d --no-build --pull never
+    else
+      docker compose \
+        --env-file "$recovery/.env" \
+        --project-name "$project" \
+        -f "$recovery/$compose_relative" \
+        -f "$override" \
+        up -d --no-build --pull never
+    fi
   )
 }
 
@@ -1323,7 +1692,7 @@ atlas_deployment_rollback_recovery_source() {
   local -a candidates=()
 
   case "$surface" in
-    core|ingress)
+    core|ingress|sports)
       ;;
     *)
       printf \
@@ -1496,6 +1865,14 @@ atlas_deployment_rollback() {
     all)
       atlas_deployment_restore_surface "$baseline" "$transaction" core || return 1
       atlas_deployment_restore_surface "$baseline" "$transaction" ingress || return 1
+
+      if [[ -n "$(
+        atlas_deployment_record_value \
+          "$baseline" \
+          sports_commit
+      )" ]]; then
+        atlas_deployment_restore_surface "$baseline" "$transaction" sports || return 1
+      fi
       ;;
     *)
       return 1

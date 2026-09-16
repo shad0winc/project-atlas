@@ -50,18 +50,45 @@ def test_api_lifespan_validates_authentication_settings() -> None:
 
 
 def test_operational_compose_calls_use_explicit_operator_environment() -> None:
-    """Normal update and verification commands must load the root operator env."""
+    """Every operational Compose call must explicitly load the operator env."""
 
-    update = (PROJECT_ROOT / "scripts" / "commands" / "update.sh").read_text(
-        encoding="utf-8"
-    )
-    verify = (PROJECT_ROOT / "scripts" / "verify-ingress.sh").read_text(
-        encoding="utf-8"
-    )
+    update = (
+        PROJECT_ROOT / "scripts" / "commands" / "update.sh"
+    ).read_text(encoding="utf-8")
 
-    assert update.count('--env-file "$ATLAS_PROJECT_DIR/.env"') == 6
+    verify = (
+        PROJECT_ROOT / "scripts" / "verify-ingress.sh"
+    ).read_text(encoding="utf-8")
+
+    lines = update.splitlines()
+
+    compose_indexes = [
+        index
+        for index, line in enumerate(lines)
+        if "docker compose" in line
+    ]
+
+    assert compose_indexes
+
+    for index in compose_indexes:
+        command_lines = [lines[index]]
+        cursor = index
+
+        while command_lines[-1].rstrip().endswith("\\"):
+            cursor += 1
+
+            assert cursor < len(lines)
+
+            command_lines.append(lines[cursor])
+
+        command = "\n".join(command_lines)
+
+        assert (
+            '--env-file "$ATLAS_PROJECT_DIR/.env"'
+            in command
+        )
+
     assert '--env-file "$PROJECT_DIR/.env"' in verify
-
 
 def test_deployment_capture_and_recovery_preserve_operator_environment() -> None:
     """Deployment observation and rollback use the same preserved operator env."""
