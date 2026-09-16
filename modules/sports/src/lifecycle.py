@@ -130,4 +130,24 @@ def should_surface_game(
         minutes=pregame_minutes
     )
 
-    return now >= visible_at
+    if now < visible_at:
+        return False
+
+    raw_duration_minutes = game.get("duration_minutes")
+
+    if raw_duration_minutes is None:
+        return True
+
+    try:
+        duration_minutes = int(raw_duration_minutes)
+    except (TypeError, ValueError):
+        return True
+
+    if duration_minutes <= 0:
+        return True
+
+    visible_until = start_at + timedelta(
+        minutes=duration_minutes
+    )
+
+    return now <= visible_until

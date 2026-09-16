@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
 import feed
@@ -286,3 +288,40 @@ def test_m3u_rejects_jellyfin_channel_number_collision(
         match="channel number collision",
     ):
         render_m3u(games)
+
+
+def test_stale_scheduled_game_stops_surfacing_after_nominal_duration() -> None:
+    start_at = datetime(
+        2026,
+        9,
+        13,
+        17,
+        0,
+        tzinfo=timezone.utc,
+    )
+    duration_minutes = 240
+
+    game = {
+        "id": "stale-scheduled-game",
+        "provider": "thesportsdb",
+        "provider_event_id": "stale-scheduled-event",
+        "name": "Stale Scheduled Game",
+        "status": "scheduled",
+        "lifecycle_state": "scheduled",
+        "start_at": start_at.isoformat(),
+        "duration_minutes": duration_minutes,
+    }
+
+    nominal_end = start_at + timedelta(
+        minutes=duration_minutes,
+    )
+
+    assert feed.active_games(
+        {"stale": game},
+        nominal_end,
+    ) == [game]
+
+    assert feed.active_games(
+        {"stale": game},
+        nominal_end + timedelta(minutes=1),
+    ) == []
