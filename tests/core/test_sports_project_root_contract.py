@@ -95,3 +95,77 @@ def test_sports_compose_project_root_default_is_production_path() -> None:
     assert content.count(
         "${ATLAS_PROJECT_DIR:-/opt/project-atlas}"
     ) == 2
+
+
+def test_update_all_uses_transactional_sports_prepare_and_apply() -> None:
+    update_source = (
+        ROOT / "scripts" / "commands" / "update.sh"
+    ).read_text(encoding="utf-8")
+
+    assert "atlas_update_sports_prepare() {" in update_source
+    assert "atlas_update_sports_apply() {" in update_source
+
+    sports_prepare = update_source.split(
+        "atlas_update_sports_prepare() {",
+        1,
+    )[1].split(
+        "\natlas_update_",
+        1,
+    )[0]
+
+    sports_apply = update_source.split(
+        "atlas_update_sports_apply() {",
+        1,
+    )[1].split(
+        "\natlas_update_",
+        1,
+    )[0]
+
+    assert "\n    pull" in sports_prepare
+    assert "\n    build" in sports_prepare
+
+    assert "up -d" in sports_apply
+    assert "--no-build" in sports_apply
+    assert "--pull never" in sports_apply
+    assert "\n    pull" not in sports_apply
+    assert "\n    build" not in sports_apply
+
+    prepare_scope = update_source.split(
+        "atlas_update_prepare_scope() {",
+        1,
+    )[1].split(
+        "\natlas_update_",
+        1,
+    )[0]
+
+    apply_scope = update_source.split(
+        "atlas_update_apply_scope() {",
+        1,
+    )[1].split(
+        "\natlas_update_",
+        1,
+    )[0]
+
+    prepare_all = prepare_scope.split(
+        "all)",
+        1,
+    )[1].split(
+        ";;",
+        1,
+    )[0]
+
+    apply_all = apply_scope.split(
+        "all)",
+        1,
+    )[1].split(
+        ";;",
+        1,
+    )[0]
+
+    assert "atlas_update_sports_prepare" in prepare_all
+    assert "atlas_update_sports_apply" in apply_all
+
+    assert (
+        'atlas_command_module_run_script "sports" "update"'
+        not in apply_scope
+    )

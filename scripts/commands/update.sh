@@ -149,7 +149,8 @@ atlas_update_prepare_scope() {
       ;;
     all)
       atlas_update_core_prepare &&
-        atlas_update_ingress_prepare
+        atlas_update_ingress_prepare &&
+        atlas_update_sports_prepare
       ;;
   esac
 }
@@ -187,6 +188,64 @@ atlas_update_verify_compose_images() {
   }
 }
 
+atlas_update_verify_sports_images() {
+  local record
+  local sports_commit
+  local compose_file="$ATLAS_PROJECT_DIR/modules/sports/docker-compose.yml"
+  local module_env="$ATLAS_PROJECT_DIR/modules/sports/.env"
+  local image
+  local count=0
+
+  record="$(
+    atlas_deployment_require_current_record
+  )" || return 1
+
+  sports_commit="$(
+    atlas_deployment_record_value \
+      "$record" \
+      sports_commit
+  )"
+
+  [[ -n "$sports_commit" ]] || return 0
+
+  [[ -f "$module_env" ]] || {
+    echo \
+      'ERROR: Sports module environment is unavailable.' \
+      >&2
+    return 1
+  }
+
+  while IFS= read -r image; do
+    [[ -n "$image" ]] || continue
+
+    count=$((count + 1))
+
+    docker image inspect \
+      "$image" \
+      >/dev/null 2>&1 || {
+        printf \
+          'ERROR: Sports target image is not locally available: %s\n' \
+          "$image" >&2
+        return 1
+      }
+  done < <(
+    docker compose \
+      --env-file "$ATLAS_PROJECT_DIR/.env" \
+      --env-file "$module_env" \
+      --project-name sports \
+      -f "$compose_file" \
+      config --images |
+    LC_ALL=C sort -u
+  )
+
+  [[ "$count" -gt 0 ]] || {
+    echo \
+      'ERROR: Sports target image set is empty.' \
+      >&2
+    return 1
+  }
+}
+
 atlas_update_verify_target_images() {
   local scope="$1"
 
@@ -203,7 +262,8 @@ atlas_update_verify_target_images() {
       atlas_update_verify_compose_images \
         "$ATLAS_PROJECT_DIR/docker-compose.yml" &&
         atlas_update_verify_compose_images \
-          "$ATLAS_PROJECT_DIR/stack/ingress.yml"
+          "$ATLAS_PROJECT_DIR/stack/ingress.yml" &&
+        atlas_update_verify_sports_images
       ;;
   esac
 }
@@ -467,12 +527,114 @@ atlas_update_ingress_apply() {
   }
 }
 
+
 atlas_update_apply_scope() {
   case "$1" in
-    core) atlas_update_core_apply ;;
-    ingress) atlas_update_ingress_apply ;;
-    all) atlas_update_core_apply && atlas_update_ingress_apply ;;
+    core)
+      atlas_update_core_apply
+      ;;
+    ingress)
+      atlas_update_ingress_apply
+      ;;
+    all)
+      atlas_update_core_apply &&
+        atlas_update_ingress_apply &&
+        atlas_update_sports_apply
+      ;;
   esac
+}
+
+atlas_update_sports_managed() {
+  local record
+  local sports_commit
+
+  record="$(
+    atlas_deployment_require_current_record
+  )" || return 2
+
+  sports_commit="$(
+    atlas_deployment_record_value \
+      "$record" \
+      sports_commit
+  )"
+
+  [[ -n "$sports_commit" ]]
+}
+
+atlas_update_sports_prepare() {
+  local managed_rc
+  local compose_file="$ATLAS_PROJECT_DIR/modules/sports/docker-compose.yml"
+  local module_env="$ATLAS_PROJECT_DIR/modules/sports/.env"
+
+  if atlas_update_sports_managed; then
+    :
+  else
+    managed_rc=$?
+
+    if [[ "$managed_rc" -eq 1 ]]; then
+      return 0
+    fi
+
+    return "$managed_rc"
+  fi
+
+  [[ -f "$module_env" ]] || {
+    echo \
+      'ERROR: Sports module environment is unavailable.' \
+      >&2
+    return 1
+  }
+
+  docker compose \
+    --env-file "$ATLAS_PROJECT_DIR/.env" \
+    --env-file "$module_env" \
+    --project-name sports \
+    -f "$compose_file" \
+    pull ||
+    return 1
+
+  docker compose \
+    --env-file "$ATLAS_PROJECT_DIR/.env" \
+    --env-file "$module_env" \
+    --project-name sports \
+    -f "$compose_file" \
+    build ||
+    return 1
+}
+
+atlas_update_sports_apply() {
+  local managed_rc
+  local compose_file="$ATLAS_PROJECT_DIR/modules/sports/docker-compose.yml"
+  local module_env="$ATLAS_PROJECT_DIR/modules/sports/.env"
+
+  if atlas_update_sports_managed; then
+    :
+  else
+    managed_rc=$?
+
+    if [[ "$managed_rc" -eq 1 ]]; then
+      return 0
+    fi
+
+    return "$managed_rc"
+  fi
+
+  [[ -f "$module_env" ]] || {
+    echo \
+      'ERROR: Sports module environment is unavailable.' \
+      >&2
+    return 1
+  }
+
+  docker compose \
+    --env-file "$ATLAS_PROJECT_DIR/.env" \
+    --env-file "$module_env" \
+    --project-name sports \
+    -f "$compose_file" \
+    up -d \
+    --no-build \
+    --pull never ||
+    return 1
 }
 
 atlas_update_post_verify() {
