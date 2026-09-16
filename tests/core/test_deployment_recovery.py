@@ -1453,3 +1453,151 @@ def test_current_record_requires_sports_recovery_evidence_after_adoption() -> No
     require = content[start:end]
 
     assert "sports-source.tar.gz" in require
+
+
+def _sports_adoption_body() -> str:
+    content = DEPLOYMENT.read_text(encoding="utf-8")
+
+    start = content.index(
+        "atlas_deployment_adopt_sports() {"
+    )
+
+    end = content.index(
+        "\natlas_deployment_",
+        start + len(
+            "atlas_deployment_adopt_sports() {"
+        ),
+    )
+
+    return content[start:end]
+
+
+def test_sports_adoption_preserves_current_core_ingress_evidence() -> None:
+    adoption = _sports_adoption_body()
+
+    assert "atlas_deployment_require_current_record" in adoption
+
+    assert "core_commit" in adoption
+    assert "ingress_commit" in adoption
+
+    assert (
+        '"$previous_record/core-source.tar.gz"'
+        in adoption
+    )
+    assert (
+        '"$record/core-source.tar.gz"'
+        in adoption
+    )
+
+    assert (
+        '"$previous_record/ingress-source.tar.gz"'
+        in adoption
+    )
+    assert (
+        '"$record/ingress-source.tar.gz"'
+        in adoption
+    )
+
+    # Adoption must preserve the already-deployed source archives.
+    # It must never rebuild Core/Ingress evidence from canonical HEAD.
+    assert "atlas_deployment_create_source_pair" not in adoption
+
+    assert not (
+        'git -C "$ATLAS_PROJECT_DIR" rev-parse HEAD'
+        in adoption
+    )
+
+
+def test_sports_adoption_preserves_deployed_scheduler_identity() -> None:
+    adoption = _sports_adoption_body()
+
+    # Git-less Operations resolves deployment identity from target_commit.
+    # An adoption checkpoint therefore keeps target/source identity on
+    # the already-deployed Core source rather than canonical HEAD.
+    assert "target_commit" in adoption
+    assert "source_commit" in adoption
+    assert "core_commit" in adoption
+
+    assert "target_commit=$source_commit" in adoption
+    assert "source_commit=$source_commit" in adoption
+    assert "core_commit=$core_commit" in adoption
+    assert "ingress_commit=$ingress_commit" in adoption
+    assert "sports_commit=$sports_commit" in adoption
+
+
+def test_sports_adoption_captures_exact_live_sports_source() -> None:
+    adoption = _sports_adoption_body()
+
+    assert "atlas-sports-controller" in adoption
+    assert "/opt/project-atlas" in adoption
+
+    assert 'git -C "$sports_source"' in adoption
+    assert "status --porcelain" in adoption
+    assert "rev-parse HEAD" in adoption
+
+    assert "sports-source.tar.gz" in adoption
+
+    assert (
+        'git -C "$sports_source" archive'
+        in adoption
+    )
+
+    assert (
+        '--output="$record/sports-source.tar.gz"'
+        in adoption
+    )
+
+
+def test_sports_adoption_refuses_existing_sports_managed_record() -> None:
+    adoption = _sports_adoption_body()
+
+    assert "previous_sports_commit" in adoption
+
+    assert (
+        '[[ -z "$previous_sports_commit" ]]'
+        in adoption
+    )
+
+    assert (
+        "already includes Sports recovery evidence"
+        in adoption
+    )
+
+
+def test_sports_adoption_verifies_before_current_pointer_advances() -> None:
+    adoption = _sports_adoption_body()
+
+    capture = adoption.index(
+        "atlas_deployment_capture_images"
+    )
+
+    verify = adoption.index(
+        "atlas_deployment_verify_runtime",
+        capture,
+    )
+
+    verified = adoption.index(
+        "atlas_deployment_set_status"
+    )
+
+    current = adoption.index(
+        "atlas_deployment_set_current"
+    )
+
+    assert capture < verify < verified < current
+
+
+def test_sports_adoption_cli_is_explicit_and_separate_from_baseline() -> None:
+    content = DEPLOYMENT.read_text(encoding="utf-8")
+
+    command_start = content.index(
+        "atlas_command_deployment() {"
+    )
+
+    command = content[command_start:]
+
+    assert "adopt-sports)" in command
+    assert "atlas_deployment_adopt_sports" in command
+
+    assert "atlas deployment adopt-sports" in command
+    assert "atlas deployment baseline" in command

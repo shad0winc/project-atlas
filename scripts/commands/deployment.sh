@@ -839,6 +839,255 @@ EOF
     "$identifier"
 }
 
+
+atlas_deployment_adopt_sports() {
+  local previous_record
+  local previous_id
+  local identifier
+  local record
+  local source_commit
+  local core_commit
+  local ingress_commit
+  local previous_sports_commit
+  local sports_source
+  local sports_commit
+
+  previous_record="$(
+    atlas_deployment_require_current_record
+  )" || return 1
+
+  previous_id="$(basename -- "$previous_record")"
+
+  previous_sports_commit="$(
+    atlas_deployment_record_value \
+      "$previous_record" \
+      sports_commit
+  )"
+
+  [[ -z "$previous_sports_commit" ]] || {
+    echo \
+      'ERROR: current deployment already includes Sports recovery evidence.' \
+      >&2
+    return 1
+  }
+
+  core_commit="$(
+    atlas_deployment_record_value \
+      "$previous_record" \
+      core_commit
+  )"
+
+  ingress_commit="$(
+    atlas_deployment_record_value \
+      "$previous_record" \
+      ingress_commit
+  )"
+
+  source_commit="$(
+    atlas_deployment_record_value \
+      "$previous_record" \
+      source_commit
+  )"
+
+  if [[ -z "$source_commit" ]]; then
+    source_commit="$(
+      atlas_deployment_record_value \
+        "$previous_record" \
+        target_commit
+    )"
+  fi
+
+  if [[ -z "$source_commit" ]]; then
+    source_commit="$core_commit"
+  fi
+
+  [[ "$source_commit" =~ ^[0-9a-f]{40}$ ]] || {
+    echo \
+      'ERROR: deployed source commit is invalid.' \
+      >&2
+    return 1
+  }
+
+  [[ "$core_commit" =~ ^[0-9a-f]{40}$ ]] || {
+    echo \
+      'ERROR: deployed Core commit is invalid.' \
+      >&2
+    return 1
+  }
+
+  [[ "$ingress_commit" =~ ^[0-9a-f]{40}$ ]] || {
+    echo \
+      'ERROR: deployed Ingress commit is invalid.' \
+      >&2
+    return 1
+  }
+
+  atlas_deployment_verify_runtime \
+    "$previous_record" || {
+    echo \
+      'ERROR: current deployment runtime does not match its verified evidence.' \
+      >&2
+    return 1
+  }
+
+  docker inspect \
+    atlas-sports-controller \
+    >/dev/null 2>&1 || {
+    echo \
+      'ERROR: live Sports controller is unavailable.' \
+      >&2
+    return 1
+  }
+
+  sports_source="$(
+    docker inspect \
+      atlas-sports-controller \
+      --format \
+      '{{range .Mounts}}{{if eq .Destination "/opt/project-atlas"}}{{.Source}}{{end}}{{end}}'
+  )" || return 1
+
+  [[ -n "$sports_source" ]] || {
+    echo \
+      'ERROR: live Sports controller source mount is unavailable.' \
+      >&2
+    return 1
+  }
+
+  [[ -d "$sports_source" ]] || {
+    echo \
+      'ERROR: live Sports source directory is unavailable.' \
+      >&2
+    return 1
+  }
+
+  git -C "$sports_source" \
+    rev-parse \
+    --is-inside-work-tree \
+    >/dev/null 2>&1 || {
+    echo \
+      'ERROR: live Sports source is not a Git worktree.' \
+      >&2
+    return 1
+  }
+
+  [[ -z "$(
+    git -C "$sports_source" status --porcelain
+  )" ]] || {
+    echo \
+      'ERROR: live Sports source worktree is dirty.' \
+      >&2
+    return 1
+  }
+
+  sports_commit="$(
+    git -C "$sports_source" rev-parse HEAD
+  )" || return 1
+
+  [[ "$sports_commit" =~ ^[0-9a-f]{40}$ ]] || {
+    echo \
+      'ERROR: live Sports source commit is invalid.' \
+      >&2
+    return 1
+  }
+
+  identifier="$(
+    atlas_deployment_new_id baseline
+  )"
+
+  record="$(
+    atlas_deployment_record_dir "$identifier"
+  )" || return 1
+
+  mkdir -p "$record"
+
+  cat > "$record/metadata" <<EOF
+type=baseline
+deployment_id=$identifier
+previous_baseline=$previous_id
+target_commit=$source_commit
+source_commit=$source_commit
+core_commit=$core_commit
+ingress_commit=$ingress_commit
+sports_commit=$sports_commit
+scope=all
+migration=none
+created_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+EOF
+
+  cp -- \
+    "$previous_record/core-source.tar.gz" \
+    "$record/core-source.tar.gz" || return 1
+
+  cp -- \
+    "$previous_record/ingress-source.tar.gz" \
+    "$record/ingress-source.tar.gz" || return 1
+
+  [[ -s "$record/core-source.tar.gz" ]] || return 1
+  [[ -s "$record/ingress-source.tar.gz" ]] || return 1
+
+  tar -tzf \
+    "$record/core-source.tar.gz" \
+    >/dev/null 2>&1 || return 1
+
+  tar -tzf \
+    "$record/ingress-source.tar.gz" \
+    >/dev/null 2>&1 || return 1
+
+  [[ "$(
+    sha256sum "$previous_record/core-source.tar.gz" |
+      awk '{print $1}'
+  )" == "$(
+    sha256sum "$record/core-source.tar.gz" |
+      awk '{print $1}'
+  )" ]] || {
+    echo \
+      'ERROR: adopted Core source archive identity changed.' \
+      >&2
+    return 1
+  }
+
+  [[ "$(
+    sha256sum "$previous_record/ingress-source.tar.gz" |
+      awk '{print $1}'
+  )" == "$(
+    sha256sum "$record/ingress-source.tar.gz" |
+      awk '{print $1}'
+  )" ]] || {
+    echo \
+      'ERROR: adopted Ingress source archive identity changed.' \
+      >&2
+    return 1
+  }
+
+  git -C "$sports_source" archive \
+    --format=tar.gz \
+    --output="$record/sports-source.tar.gz" \
+    "$sports_commit" || return 1
+
+  [[ -s "$record/sports-source.tar.gz" ]] || return 1
+
+  tar -tzf \
+    "$record/sports-source.tar.gz" \
+    >/dev/null 2>&1 || return 1
+
+  atlas_deployment_capture_images \
+    "$record" || return 1
+
+  atlas_deployment_verify_runtime \
+    "$record" || return 1
+
+  atlas_deployment_set_status \
+    "$record" \
+    verified
+
+  atlas_deployment_set_current \
+    "$identifier" || return 1
+
+  printf \
+    'Verified production baseline: %s\n' \
+    "$identifier"
+}
+
 atlas_deployment_prepare_update() {
   local identifier="$1"
   local scope="$2"
@@ -2066,6 +2315,9 @@ atlas_command_deployment() {
     baseline)
       atlas_deployment_baseline
       ;;
+    adopt-sports)
+      atlas_deployment_adopt_sports
+      ;;
     recover-failed-before-apply)
       [[ -n "${2:-}" ]] || {
         echo 'Usage: atlas deployment recover-failed-before-apply <deployment-id>' >&2
@@ -2092,12 +2344,15 @@ atlas_command_deployment() {
 Usage:
   atlas deployment status
   atlas deployment baseline
+  atlas deployment adopt-sports
   atlas deployment recover-failed-before-apply <deployment-id>
   atlas deployment recover-failed-rollback <deployment-id>
   atlas deployment rollback <deployment-id>
 
 Baseline creation records verified production source archives and exact running
-image identities. Failed-before-apply recovery only clears a held failed update
+image identities. Sports adoption creates a new verified baseline by preserving
+the current Core/Ingress source evidence while adding the exact live Sports
+source and running image identities. Failed-before-apply recovery only clears a held failed update
 after proving the previous verified baseline is still current and unchanged.
 Failed-rollback recovery finalizes an already restored failed rollback by
 publishing a separate verified reconciliation baseline while preserving the
