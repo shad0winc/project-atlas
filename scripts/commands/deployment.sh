@@ -2163,6 +2163,447 @@ atlas_deployment_rollback() {
   printf 'Rollback complete: %s -> %s\n' "$identifier" "$previous_id"
 }
 
+atlas_deployment_recover_failed_after_apply() {
+  local identifier="$1"
+  local transaction
+  local transaction_type
+  local status
+  local migration
+  local previous_id
+  local baseline
+  local current_id
+  local backup_file
+  local target_commit
+  local source_commit
+  local core_commit
+  local ingress_commit
+  local sports_commit
+  local reconciliation_id
+  local reconciliation
+  local temporary
+
+  atlas_deployment_valid_id "$identifier" || {
+    echo 'ERROR: invalid deployment identifier.' >&2
+    return 2
+  }
+
+  atlas_deployment_validate_source || return 1
+
+  transaction="$(
+    atlas_deployment_record_dir "$identifier"
+  )" || return 1
+
+  [[ -d "$transaction" && -f "$transaction/metadata" && -f "$transaction/status" ]] || {
+    printf \
+      'ERROR: deployment record is incomplete: %s\n' \
+      "$identifier" >&2
+    return 1
+  }
+
+  transaction_type="$(
+    atlas_deployment_record_value \
+      "$transaction" \
+      type
+  )"
+
+  status="$(<"$transaction/status")"
+
+  [[ "$transaction_type" == 'update' && "$status" == 'failed' ]] || {
+    printf \
+      'ERROR: deployment %s is not failed-after-apply recovery eligible (type=%s status=%s).\n' \
+      "$identifier" \
+      "${transaction_type:-unknown}" \
+      "${status:-unknown}" >&2
+    return 1
+  }
+
+  migration="$(
+    atlas_deployment_record_value \
+      "$transaction" \
+      migration
+  )"
+
+  [[ "$migration" == 'none' ]] || {
+    echo \
+      'ERROR: failed-after-apply recovery requires migration=none.' \
+      >&2
+    return 1
+  }
+
+  [[ -f "$transaction/backup_file" ]] || {
+    echo \
+      'ERROR: failed-after-apply recovery requires the recorded pre-update backup.' \
+      >&2
+    return 1
+  }
+
+  IFS= read -r backup_file < "$transaction/backup_file"
+
+  [[ -f "$backup_file" ]] &&
+    tar -tzf "$backup_file" >/dev/null 2>&1 || {
+      echo \
+        'ERROR: recorded pre-update backup is unavailable or invalid.' \
+        >&2
+      return 1
+    }
+
+  previous_id="$(
+    atlas_deployment_record_value \
+      "$transaction" \
+      previous_baseline
+  )"
+
+  atlas_deployment_valid_id "$previous_id" || {
+    echo \
+      'ERROR: failed transaction has an invalid previous baseline identity.' \
+      >&2
+    return 1
+  }
+
+  baseline="$(
+    atlas_deployment_record_dir "$previous_id"
+  )" || return 1
+
+  [[ -d "$baseline" && -f "$baseline/status" ]] || {
+    echo \
+      'ERROR: previous deployment baseline is unavailable.' \
+      >&2
+    return 1
+  }
+
+  [[ "$(<"$baseline/status")" == 'verified' ]] || {
+    echo \
+      'ERROR: previous deployment baseline is not verified.' \
+      >&2
+    return 1
+  }
+
+  current_id="$(
+    atlas_deployment_current_id
+  )" || {
+    echo \
+      'ERROR: current deployment baseline cannot be resolved.' \
+      >&2
+    return 1
+  }
+
+  [[ "$current_id" == "$previous_id" ]] || {
+    echo \
+      'ERROR: failed deployment no longer points at the current baseline.' \
+      >&2
+    return 1
+  }
+
+  [[ -d "$(atlas_deployment_lock_dir)" ]] || {
+    echo \
+      'ERROR: failed-after-apply recovery requires the original deployment lock.' \
+      >&2
+    return 1
+  }
+
+  atlas_deployment_lock_matches "$identifier" || {
+    echo \
+      'ERROR: another deployment owns the active lock.' \
+      >&2
+    return 1
+  }
+
+  [[ -f "$(atlas_maintenance_flag)" ]] || {
+    echo \
+      'ERROR: failed-after-apply recovery requires maintenance mode to remain enabled.' \
+      >&2
+    return 1
+  }
+
+  target_commit="$(
+    atlas_deployment_record_value \
+      "$transaction" \
+      target_commit
+  )"
+
+  source_commit="$(
+    atlas_deployment_record_value \
+      "$transaction" \
+      source_commit
+  )"
+
+  if [[ -z "$source_commit" ]]; then
+    source_commit="$target_commit"
+  fi
+
+  core_commit="$(
+    atlas_deployment_record_value \
+      "$transaction" \
+      core_commit
+  )"
+
+  ingress_commit="$(
+    atlas_deployment_record_value \
+      "$transaction" \
+      ingress_commit
+  )"
+
+  sports_commit="$(
+    atlas_deployment_record_value \
+      "$transaction" \
+      sports_commit
+  )"
+
+  for commit in \
+    "$target_commit" \
+    "$source_commit" \
+    "$core_commit" \
+    "$ingress_commit"
+  do
+    [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || {
+      echo \
+        'ERROR: failed transaction target source identity is invalid.' \
+        >&2
+      return 1
+    }
+  done
+
+  if [[ -n "$sports_commit" ]]; then
+    [[ "$sports_commit" =~ ^[0-9a-f]{40}$ ]] || {
+      echo \
+        'ERROR: failed transaction Sports source identity is invalid.' \
+        >&2
+      return 1
+    }
+  fi
+
+  [[ -s "$transaction/core-source.tar.gz" ]] || {
+    echo \
+      'ERROR: failed transaction Core source archive is unavailable.' \
+      >&2
+    return 1
+  }
+
+  [[ -s "$transaction/ingress-source.tar.gz" ]] || {
+    echo \
+      'ERROR: failed transaction Ingress source archive is unavailable.' \
+      >&2
+    return 1
+  }
+
+  if [[ -n "$sports_commit" ]]; then
+    [[ -s "$transaction/sports-source.tar.gz" ]] || {
+      echo \
+        'ERROR: failed transaction Sports source archive is unavailable.' \
+        >&2
+      return 1
+    }
+  fi
+
+  reconciliation_id="$(
+    atlas_deployment_new_id baseline-reconciliation
+  )"
+
+  reconciliation="$(
+    atlas_deployment_record_dir "$reconciliation_id"
+  )" || return 1
+
+  [[ ! -e "$reconciliation" ]] || {
+    printf \
+      'ERROR: reconciliation baseline already exists: %s\n' \
+      "$reconciliation_id" >&2
+    return 1
+  }
+
+  temporary="$(
+    mktemp -d \
+      "$(atlas_deployment_records_dir)/.${reconciliation_id}.XXXXXX"
+  )" || return 1
+
+  cp -- \
+    "$transaction/core-source.tar.gz" \
+    "$temporary/core-source.tar.gz" || {
+      rm -rf -- "$temporary"
+      return 1
+    }
+
+  cp -- \
+    "$transaction/ingress-source.tar.gz" \
+    "$temporary/ingress-source.tar.gz" || {
+      rm -rf -- "$temporary"
+      return 1
+    }
+
+  if [[ -n "$sports_commit" ]]; then
+    cp -- \
+      "$transaction/sports-source.tar.gz" \
+      "$temporary/sports-source.tar.gz" || {
+        rm -rf -- "$temporary"
+        return 1
+      }
+  fi
+
+  cat > "$temporary/metadata" <<EOF
+type=baseline
+deployment_id=$reconciliation_id
+baseline_kind=failed-after-apply-reconciliation
+previous_baseline=$previous_id
+failed_deployment=$identifier
+target_commit=$target_commit
+source_commit=$source_commit
+core_commit=$core_commit
+ingress_commit=$ingress_commit
+sports_commit=$sports_commit
+scope=all
+migration=none
+reason=failed-after-apply-recovery
+source_claim=verified-already-applied-target
+created_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+EOF
+
+  cat > "$temporary/provenance" <<EOF
+reconciliation_reason=failed-after-apply-recovery
+failed_deployment=$identifier
+authoritative_previous_baseline=$previous_id
+target_commit=$target_commit
+source_commit=$source_commit
+core_commit=$core_commit
+ingress_commit=$ingress_commit
+sports_commit=$sports_commit
+source_claim=verified-already-applied-target
+EOF
+
+  atlas_deployment_capture_images "$temporary" || {
+    rm -rf -- "$temporary"
+    return 1
+  }
+
+  echo 'Private applied-target runtime verification:'
+
+  atlas_deployment_verify_runtime "$temporary" || {
+    rm -rf -- "$temporary"
+    echo \
+      'ERROR: live runtime does not match the failed transaction target.' \
+      >&2
+    return 1
+  }
+
+  atlas_command_doctor || {
+    rm -rf -- "$temporary"
+    echo \
+      'ERROR: private failed-after-apply doctor verification failed.' \
+      >&2
+    return 1
+  }
+
+  atlas_command_verify || {
+    rm -rf -- "$temporary"
+    echo \
+      'ERROR: private failed-after-apply Atlas verification failed.' \
+      >&2
+    return 1
+  }
+
+  if ! atlas_command_maintenance disable; then
+    rm -rf -- "$temporary"
+    echo \
+      'ERROR: unable to reopen public traffic during failed-after-apply recovery.' \
+      >&2
+    return 1
+  fi
+
+  echo 'Public applied-target runtime verification:'
+
+  atlas_deployment_verify_runtime "$temporary" || {
+    atlas_command_maintenance enable || true
+    rm -rf -- "$temporary"
+    echo \
+      'ERROR: public applied-target runtime verification failed; maintenance restored.' \
+      >&2
+    return 1
+  }
+
+  atlas_command_doctor || {
+    atlas_command_maintenance enable || true
+    rm -rf -- "$temporary"
+    echo \
+      'ERROR: public failed-after-apply doctor verification failed; maintenance restored.' \
+      >&2
+    return 1
+  }
+
+  atlas_command_verify || {
+    atlas_command_maintenance enable || true
+    rm -rf -- "$temporary"
+    echo \
+      'ERROR: public failed-after-apply Atlas verification failed; maintenance restored.' \
+      >&2
+    return 1
+  }
+
+  atlas_deployment_set_status \
+    "$temporary" \
+    verified || {
+      atlas_command_maintenance enable || true
+      rm -rf -- "$temporary"
+      return 1
+    }
+
+  (
+    cd "$temporary"
+
+    sha256sum \
+      images.tsv \
+      status \
+      metadata \
+      provenance \
+      core-source.tar.gz \
+      ingress-source.tar.gz \
+      > MANIFEST.sha256
+
+    if [[ -f sports-source.tar.gz ]]; then
+      sha256sum \
+        sports-source.tar.gz \
+        >> MANIFEST.sha256
+    fi
+
+    sha256sum \
+      -c \
+      MANIFEST.sha256 \
+      >&2
+  ) || {
+    atlas_command_maintenance enable || true
+    rm -rf -- "$temporary"
+    return 1
+  }
+
+  mv -- \
+    "$temporary" \
+    "$reconciliation" || {
+      atlas_command_maintenance enable || true
+      rm -rf -- "$temporary"
+      return 1
+    }
+
+  atlas_deployment_set_current "$reconciliation_id" || {
+    atlas_command_maintenance enable || true
+    echo \
+      'ERROR: unable to publish failed-after-apply reconciliation baseline as current; maintenance restored.' \
+      >&2
+    return 1
+  }
+
+  if ! atlas_deployment_release_lock "$identifier"; then
+    atlas_command_maintenance enable || true
+    echo \
+      'ERROR: unable to release failed deployment lock; maintenance restored.' \
+      >&2
+    return 1
+  fi
+
+  printf \
+    'Failed-after-apply recovery complete: %s -> %s\n' \
+    "$identifier" \
+    "$reconciliation_id"
+}
+
+
+
 atlas_deployment_recover_failed_before_apply() {
   local identifier="$1"
   local transaction
@@ -2306,6 +2747,7 @@ atlas_deployment_recover_failed_before_apply() {
     "$previous_id"
 }
 
+
 atlas_command_deployment() {
   local action="${1:-status}"
   case "$action" in
@@ -2324,6 +2766,13 @@ atlas_command_deployment() {
         return 2
       }
       atlas_deployment_recover_failed_before_apply "$2"
+      ;;
+    recover-failed-after-apply)
+      [[ -n "${2:-}" ]] || {
+        echo 'Usage: atlas deployment recover-failed-after-apply <deployment-id>' >&2
+        return 2
+      }
+      atlas_deployment_recover_failed_after_apply "$2"
       ;;
     recover-failed-rollback)
       [[ -n "${2:-}" ]] || {
@@ -2346,6 +2795,7 @@ Usage:
   atlas deployment baseline
   atlas deployment adopt-sports
   atlas deployment recover-failed-before-apply <deployment-id>
+  atlas deployment recover-failed-after-apply <deployment-id>
   atlas deployment recover-failed-rollback <deployment-id>
   atlas deployment rollback <deployment-id>
 
@@ -2354,6 +2804,9 @@ image identities. Sports adoption creates a new verified baseline by preserving
 the current Core/Ingress source evidence while adding the exact live Sports
 source and running image identities. Failed-before-apply recovery only clears a held failed update
 after proving the previous verified baseline is still current and unchanged.
+Failed-after-apply recovery verifies an already-applied target without repeating
+runtime apply, publishes a separate verified reconciliation baseline, and preserves
+the original failed transaction as immutable evidence.
 Failed-rollback recovery finalizes an already restored failed rollback by
 publishing a separate verified reconciliation baseline while preserving the
 original failed transaction as immutable evidence. Rollback restores only a
