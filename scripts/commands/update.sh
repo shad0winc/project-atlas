@@ -397,7 +397,16 @@ except (IndexError, json.JSONDecodeError, TypeError):
 if not isinstance(payload, dict):
     raise SystemExit(1)
 
-if payload.get("status") != "critical":
+health_status = payload.get("status")
+
+# Doctor and the structured classifier are separate observations.
+# If Doctor observed a transient failure but the immediately following
+# structured snapshot is already fully healthy, allow the bounded
+# post-apply retry loop to confirm recovery with another Doctor pass.
+if health_status == "healthy":
+    raise SystemExit(0)
+
+if health_status != "critical":
     raise SystemExit(1)
 
 checks = payload.get("checks")
