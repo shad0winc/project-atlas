@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Sequence
+from typing import Iterator, Sequence
 
 from atlas.events import publish_core_event
 from atlas.module_scheduler import sync_module_jobs
@@ -33,6 +35,62 @@ def scheduler_state_file() -> Path:
 def scheduler_lock_file() -> Path | None:
     configured = os.environ.get("ATLAS_SCHEDULER_LOCK_FILE")
     return Path(configured) if configured else None
+
+
+def runtime_config_root() -> Path:
+    return Path(
+        os.environ.get(
+            "ATLAS_RUNTIME_CONFIG_DIR",
+            "/mnt/storage/configs/atlas",
+        )
+    )
+
+
+def deployment_scheduler_lock_file() -> Path:
+    return runtime_config_root() / "deployment-scheduler.lock"
+
+
+def durable_deployment_lock_dir() -> Path:
+    return runtime_config_root() / "deployments" / "update.lock"
+
+
+@contextmanager
+def deployment_scheduler_execution_lock() -> Iterator[None]:
+    path = deployment_scheduler_lock_file()
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    descriptor = os.open(
+        path,
+        os.O_CREAT | os.O_RDWR,
+        0o600,
+    )
+    locked = False
+
+    try:
+        try:
+            fcntl.flock(
+                descriptor,
+                fcntl.LOCK_EX | fcntl.LOCK_NB,
+            )
+            locked = True
+        except BlockingIOError as exc:
+            raise SchedulerLockedError(
+                "deployment or Scheduler execution is already active"
+            ) from exc
+
+        if durable_deployment_lock_dir().exists():
+            raise SchedulerLockedError(
+                "deployment transaction is awaiting completion or recovery"
+            )
+
+        yield
+    finally:
+        if locked:
+            fcntl.flock(
+                descriptor,
+                fcntl.LOCK_UN,
+            )
+        os.close(descriptor)
 
 
 def _publish_scheduler_event(event_name: str, payload: dict[str, object]) -> None:
@@ -199,13 +257,27 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
 
         if args.command == "run":
-            if args.task_name:
-                result = scheduler.run_task(args.task_name, force=not args.due_only)
-                _print_json(result.to_dict())
-                return 0 if result.result == "success" else 1
-            results = scheduler.run_due_tasks()
-            _print_json([result.to_dict() for result in results])
-            return 0 if all(result.result == "success" for result in results) else 1
+            with deployment_scheduler_execution_lock():
+                if args.task_name:
+                    result = scheduler.run_task(
+                        args.task_name,
+                        force=not args.due_only,
+                    )
+                    _print_json(result.to_dict())
+                    return 0 if result.result == "success" else 1
+
+                results = scheduler.run_due_tasks()
+                _print_json(
+                    [result.to_dict() for result in results]
+                )
+                return (
+                    0
+                    if all(
+                        result.result == "success"
+                        for result in results
+                    )
+                    else 1
+                )
 
     except KeyError as error:
         print(f"Scheduler task not found: {error.args[0]}")

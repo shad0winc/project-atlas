@@ -218,6 +218,12 @@ def _isolated_cli(
 
     state_file = tmp_path / "tasks.json"
     lock_file = tmp_path / "tasks.lock"
+    runtime_root = tmp_path / "runtime"
+
+    monkeypatch.setenv(
+        "ATLAS_RUNTIME_CONFIG_DIR",
+        str(runtime_root),
+    )
 
     scheduler = TaskScheduler(
         state_file,
@@ -649,3 +655,121 @@ def test_scheduler_event_publisher_core_route_supports_core_task(
             "scheduler",
         )
     ]
+
+
+
+def test_dispatcher_refuses_execution_while_deployment_scheduler_lock_is_owned(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    """Scheduler run must not execute callbacks while deployment owns exclusion."""
+    import fcntl
+
+    scheduler_cli, scheduler, _, _ = _isolated_cli(
+        tmp_path,
+        monkeypatch,
+    )
+
+    marker = tmp_path / "scheduler-executed"
+
+    scheduler.register(
+        "probe.deployment-exclusion",
+        0,
+        f"/usr/bin/touch {marker}",
+    )
+
+    runtime_root = tmp_path / "runtime"
+    monkeypatch.setenv(
+        "ATLAS_RUNTIME_CONFIG_DIR",
+        str(runtime_root),
+    )
+
+    exclusion_lock = (
+        runtime_root / "deployment-scheduler.lock"
+    )
+    exclusion_lock.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    with exclusion_lock.open("w", encoding="utf-8") as handle:
+        fcntl.flock(
+            handle.fileno(),
+            fcntl.LOCK_EX | fcntl.LOCK_NB,
+        )
+
+        result = scheduler_cli.main(["run"])
+
+    # Match the established SchedulerLockedError dispatcher contract.
+    assert result == 3
+
+    capsys.readouterr()
+
+    # No callback may start while deployment owns the exclusion lock.
+    assert not marker.exists()
+
+    state = scheduler.task_state(
+        "probe.deployment-exclusion"
+    )
+
+    assert state is not None
+    assert state["run_count"] == 0
+    assert state["failure_count"] == 0
+
+
+
+def test_dispatcher_refuses_execution_while_durable_deployment_lock_exists(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    """Scheduler must stay excluded while a deployment awaits recovery."""
+    scheduler_cli, scheduler, _, _ = _isolated_cli(
+        tmp_path,
+        monkeypatch,
+    )
+
+    marker = tmp_path / "scheduler-executed-during-recovery"
+
+    scheduler.register(
+        "probe.durable-deployment-exclusion",
+        0,
+        f"/usr/bin/touch {marker}",
+    )
+
+    runtime_root = tmp_path / "runtime"
+    monkeypatch.setenv(
+        "ATLAS_RUNTIME_CONFIG_DIR",
+        str(runtime_root),
+    )
+
+    deployment_lock = (
+        runtime_root / "deployments" / "update.lock"
+    )
+    deployment_lock.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    (deployment_lock / "owner").write_text(
+        "deployment_id=failed-test-deployment\n"
+        "pid=999999\n"
+        "started_at=2026-09-17T00:00:00Z\n",
+        encoding="utf-8",
+    )
+
+    result = scheduler_cli.main(["run"])
+
+    assert result == 3
+
+    capsys.readouterr()
+
+    assert not marker.exists()
+
+    state = scheduler.task_state(
+        "probe.durable-deployment-exclusion"
+    )
+
+    assert state is not None
+    assert state["run_count"] == 0
+    assert state["failure_count"] == 0

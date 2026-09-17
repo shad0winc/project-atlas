@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/execution-exclusion.sh"
+
 atlas_update_validate_scope() {
   case "$1" in
     core|ingress|all) return 0 ;;
@@ -462,9 +464,53 @@ def sports_docker_starting(check):
 
     return True
 
+controller_starting = any(
+    sports_docker_starting(check)
+    and check.get("details", {}).get("container")
+    == "atlas-sports-controller"
+    for check in non_healthy
+)
+
+controller_startup_correlated = {
+    "Controller Heartbeat": (
+        "Sports controller heartbeat is missing or stale"
+    ),
+    "Sports Health Endpoint": (
+        "Sports health endpoint is unavailable"
+    ),
+}
+
+def controller_startup_transient(check):
+    if not controller_starting:
+        return False
+
+    if check.get("category") != "module:sports":
+        return False
+
+    if check.get("status") != "critical":
+        return False
+
+    details = check.get("details")
+
+    if not isinstance(details, dict):
+        return False
+
+    if details.get("module") != "sports":
+        return False
+
+    expected_message = controller_startup_correlated.get(
+        check.get("name")
+    )
+
+    if expected_message is None:
+        return False
+
+    return check.get("message") == expected_message
+
 if not all(
     provider_transient(check)
     or sports_docker_starting(check)
+    or controller_startup_transient(check)
     for check in non_healthy
 ):
     raise SystemExit(1)
@@ -748,7 +794,7 @@ atlas_update_fail_after_maintenance() {
   return 1
 }
 
-atlas_command_update() {
+atlas_update_execute_locked() {
   local scope="${1:-}"
   local previous_record
   local identifier
@@ -975,4 +1021,27 @@ atlas_command_update() {
 
   echo "Atlas update complete: $identifier"
   echo 'Rollback assets were not pruned.'
+}
+
+atlas_command_update() {
+  local exclusion_fd
+  local status
+
+  atlas_execution_exclusion_acquire exclusion_fd || return 1
+
+  if atlas_update_execute_locked "$@"; then
+    status=0
+  else
+    status=$?
+  fi
+
+  if ! atlas_execution_exclusion_release "$exclusion_fd"; then
+    echo \
+      'CRITICAL: unable to release deployment/Scheduler exclusion lock.' \
+      >&2
+
+    [[ "$status" -ne 0 ]] || status=1
+  fi
+
+  return "$status"
 }

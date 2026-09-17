@@ -1813,3 +1813,115 @@ def test_post_apply_mixed_health_failure_does_not_receive_sports_grace(
     assert lock_path(environment).is_dir()
 
     assert "Recovery command: atlas deployment rollback" in result.stderr
+
+
+
+def _sports_realistic_startup_bundle_critical_json() -> str:
+    """Model correlated Sports failures during controller startup."""
+    return (
+        '{"schema_version":1,"status":"critical","score":90,'
+        '"category_scores":{"module:sports":50},'
+        '"checks":['
+        '{"category":"module:sports",'
+        '"name":"atlas-sports-controller Health",'
+        '"status":"critical",'
+        '"message":"atlas-sports-controller health check is starting",'
+        '"details":{"module":"sports",'
+        '"container":"atlas-sports-controller",'
+        '"container_health":"starting"}},'
+        '{"category":"module:sports",'
+        '"name":"Controller Heartbeat",'
+        '"status":"critical",'
+        '"message":"Sports controller heartbeat is missing or stale",'
+        '"details":{"module":"sports",'
+        '"path":"/mnt/storage/configs/sportyfin/state/controller-heartbeat",'
+        '"age_seconds":null}},'
+        '{"category":"module:sports",'
+        '"name":"Sports Health Endpoint",'
+        '"status":"critical",'
+        '"message":"Sports health endpoint is unavailable",'
+        '"details":{"module":"sports",'
+        '"url":"http://127.0.0.1:8097/health"}}'
+        ']}'
+    )
+
+
+def test_post_apply_realistic_sports_startup_bundle_receives_grace(
+    tmp_path: Path,
+) -> None:
+    """Correlated controller-startup checks must receive bounded startup grace."""
+    environment = prepare_runtime(tmp_path)
+
+    doctor_count = tmp_path / "doctor-count"
+    environment["ATLAS_TEST_DOCTOR_COUNT_FILE"] = str(
+        doctor_count
+    )
+
+    # Call 1 is pre-update.
+    #
+    # Call 2 models the first private post-apply Doctor while the new
+    # Sports controller is still inside Docker's normal startup period.
+    #
+    # Real Sports health evaluates the controller heartbeat and private
+    # health endpoint at the same time as Docker container health. Those
+    # checks may therefore be critical while container_health=starting.
+    environment["ATLAS_TEST_DOCTOR_FAIL_CALLS"] = "2"
+    environment["ATLAS_TEST_HEALTH_JSON"] = (
+        _sports_realistic_startup_bundle_critical_json()
+    )
+
+    result = run_update(environment)
+
+    assert result.returncode == 0, result.stderr
+
+    events = event_lines(environment)
+
+    assert events.count("doctor") >= 4
+    assert events.count("health-json") >= 1
+
+    enable = events.index("maintenance:enable")
+    health_json = events.index("health-json")
+    disable = events.index("maintenance:disable")
+
+    assert enable < health_json < disable
+    assert not lock_path(environment).exists()
+
+
+
+def test_update_refuses_when_scheduler_deployment_execution_lock_is_owned(
+    tmp_path: Path,
+) -> None:
+    """Update must not begin while Scheduler owns the shared execution lock."""
+    import fcntl
+
+    environment = prepare_runtime(tmp_path)
+
+    runtime_root = Path(
+        environment["ATLAS_RUNTIME_CONFIG_DIR"]
+    )
+    exclusion_lock = (
+        runtime_root / "deployment-scheduler.lock"
+    )
+    exclusion_lock.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    with exclusion_lock.open("w", encoding="utf-8") as handle:
+        fcntl.flock(
+            handle.fileno(),
+            fcntl.LOCK_EX | fcntl.LOCK_NB,
+        )
+
+        result = run_update(environment)
+
+    assert result.returncode != 0
+
+    events = event_lines(environment)
+
+    # Exclusion must happen before production mutation/isolation begins.
+    assert "maintenance:enable" not in events
+
+    # The durable deployment transaction lock must not be acquired when
+    # Scheduler already owns the execution exclusion boundary.
+    assert not lock_path(environment).exists()

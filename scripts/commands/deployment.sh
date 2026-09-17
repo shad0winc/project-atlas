@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+source "$(dirname "${BASH_SOURCE[0]}")/../lib/execution-exclusion.sh"
+
 atlas_deployment_root() {
   printf '%s\n' "${ATLAS_DEPLOYMENT_DIR:-$ATLAS_RUNTIME_CONFIG_DIR/deployments}"
 }
@@ -2030,6 +2032,29 @@ atlas_deployment_verify_rollback_runtime() {
 }
 
 atlas_deployment_rollback() {
+  local exclusion_fd
+  local status
+
+  atlas_execution_exclusion_acquire exclusion_fd || return 1
+
+  if atlas_deployment_rollback_locked "$@"; then
+    status=0
+  else
+    status=$?
+  fi
+
+  if ! atlas_execution_exclusion_release "$exclusion_fd"; then
+    echo \
+      'CRITICAL: unable to release deployment/Scheduler exclusion lock.' \
+      >&2
+
+    [[ "$status" -ne 0 ]] || status=1
+  fi
+
+  return "$status"
+}
+
+atlas_deployment_rollback_locked() {
   local identifier="$1"
   local transaction
   local previous_id

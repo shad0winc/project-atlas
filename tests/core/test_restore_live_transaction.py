@@ -311,3 +311,49 @@ atlas_command_restore apply /tmp/project-atlas-restore.example
 
     assert result.returncode == 2
     assert "--confirm-live" in result.stderr
+
+
+
+def test_live_restore_refuses_when_scheduler_deployment_execution_lock_is_owned(
+    tmp_path: Path,
+) -> None:
+    """Live restore must not begin while Scheduler owns shared exclusion."""
+    import fcntl
+
+    script, env = _base(tmp_path)
+
+    runtime_root = Path(env["ATLAS_RUNTIME_CONFIG_DIR"])
+    exclusion_lock = runtime_root / "deployment-scheduler.lock"
+    exclusion_lock.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    script += 'atlas_restore_apply_live "$STAGE"\n'
+
+    with exclusion_lock.open("w", encoding="utf-8") as handle:
+        fcntl.flock(
+            handle.fileno(),
+            fcntl.LOCK_EX | fcntl.LOCK_NB,
+        )
+
+        try:
+            result = _run(script, env)
+        finally:
+            _cleanup_stage(env)
+
+    assert result.returncode != 0
+
+    events_path = Path(env["EVENTS"])
+    events = (
+        events_path.read_text(encoding="utf-8").splitlines()
+        if events_path.exists()
+        else []
+    )
+
+    # Shared exclusion must reject restore before it acquires the durable
+    # deployment transaction lock or enters maintenance.
+    assert "lock:acquire" not in events
+    assert "maintenance:enable" not in events
+    assert "writers:stop" not in events
+    assert "state:apply" not in events

@@ -340,9 +340,13 @@ class SchedulerCliTests(unittest.TestCase):
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary_directory.cleanup)
         self.state_file = Path(self.temporary_directory.name) / "tasks.json"
+        self.runtime_root = Path(self.temporary_directory.name) / "runtime"
         self.environment = patch.dict(
             "os.environ",
-            {"ATLAS_SCHEDULER_STATE_FILE": str(self.state_file)},
+            {
+                "ATLAS_SCHEDULER_STATE_FILE": str(self.state_file),
+                "ATLAS_RUNTIME_CONFIG_DIR": str(self.runtime_root),
+            },
         )
         self.environment.start()
         self.addCleanup(self.environment.stop)

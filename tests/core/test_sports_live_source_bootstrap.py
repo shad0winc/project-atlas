@@ -181,7 +181,7 @@ def test_bootstrap_rejects_symlink_state(
 def test_update_runs_bootstrap_before_maintenance_and_backup() -> None:
     source = UPDATE.read_text(encoding="utf-8")
 
-    command_start = source.index("atlas_command_update()")
+    command_start = source.index("atlas_update_execute_locked()")
     body = source[command_start:]
 
     bootstrap = body.index(
