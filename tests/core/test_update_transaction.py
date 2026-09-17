@@ -1587,6 +1587,45 @@ def test_post_apply_transient_sports_docker_starting_recovers_within_grace(
     assert not lock_path(environment).exists()
 
 
+
+def test_post_apply_failed_doctor_with_recovered_health_snapshot_retries(
+    tmp_path: Path,
+) -> None:
+    """A recovered second health snapshot must not turn startup recovery into failure."""
+    environment = prepare_runtime(tmp_path)
+
+    doctor_count = tmp_path / "doctor-count"
+    environment["ATLAS_TEST_DOCTOR_COUNT_FILE"] = str(
+        doctor_count
+    )
+
+    # Call 1 is the healthy pre-update Doctor.
+    #
+    # Call 2 observes a transient post-apply failure. Before the
+    # classifier takes its independent structured-health snapshot,
+    # the runtime has already recovered. The harness defaults the
+    # structured health payload to:
+    #
+    #   {"status":"healthy","score":100,"checks":[]}
+    #
+    # This reproduces the production two-snapshot race.
+    environment["ATLAS_TEST_DOCTOR_FAIL_CALLS"] = "2"
+
+    result = run_update(environment)
+
+    assert result.returncode == 0, result.stderr
+
+    events = event_lines(environment)
+
+    assert events.count("doctor") >= 4
+    assert events.count("health-json") >= 1
+    assert "maintenance:enable" in events
+    assert "maintenance:disable" in events
+    assert events.index("health-json") < events.index("maintenance:disable")
+    assert not lock_path(environment).exists()
+
+
+
 def test_post_apply_sports_docker_starting_grace_exhausts_fail_closed(
     tmp_path: Path,
 ) -> None:
