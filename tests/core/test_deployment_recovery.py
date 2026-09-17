@@ -616,7 +616,7 @@ def test_rollback_reopens_traffic_only_after_verification() -> None:
 
 def test_update_prepares_and_verifies_target_artifacts_before_maintenance() -> None:
     content = UPDATE.read_text(encoding="utf-8")
-    section = content.split("atlas_command_update() {", 1)[1]
+    section = content.split("atlas_update_execute_locked() {", 1)[1]
 
     doctor = section.index("atlas_command_doctor")
     prepare = section.index('atlas_update_prepare_scope "$scope"')
@@ -630,7 +630,7 @@ def test_update_prepares_and_verifies_target_artifacts_before_maintenance() -> N
 
 def test_update_publishes_dashboard_runtime_before_reopening_traffic() -> None:
     content = UPDATE.read_text(encoding="utf-8")
-    section = content.split("atlas_command_update() {", 1)[1]
+    section = content.split("atlas_update_execute_locked() {", 1)[1]
 
     first_verify = section.index(
         'atlas_update_post_verify "$scope"'
@@ -671,7 +671,7 @@ def test_dashboard_runtime_update_hook_is_bounded_to_ingress_surface() -> None:
 
 def test_dashboard_runtime_publication_failure_uses_maintenance_failure_path() -> None:
     content = UPDATE.read_text(encoding="utf-8")
-    section = content.split("atlas_command_update() {", 1)[1]
+    section = content.split("atlas_update_execute_locked() {", 1)[1]
 
     publish = section.index(
         'if ! atlas_update_publish_dashboard_runtime "$scope"; then'
@@ -1601,3 +1601,25 @@ def test_sports_adoption_cli_is_explicit_and_separate_from_baseline() -> None:
 
     assert "atlas deployment adopt-sports" in command
     assert "atlas deployment baseline" in command
+
+
+
+def test_rollback_enters_scheduler_deployment_exclusion_before_lock_acquisition() -> None:
+    """Rollback must enter shared execution exclusion before durable lock acquisition."""
+    content = DEPLOYMENT.read_text(encoding="utf-8")
+
+    start = content.index("atlas_deployment_rollback() {")
+    end = content.index(
+        "\natlas_deployment_recover_failed_after_apply() {",
+        start,
+    )
+    section = content[start:end]
+
+    exclusion = section.index(
+        "atlas_execution_exclusion_acquire"
+    )
+    durable_lock = section.index(
+        "atlas_deployment_acquire_lock"
+    )
+
+    assert exclusion < durable_lock
