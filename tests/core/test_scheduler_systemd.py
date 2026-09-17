@@ -218,6 +218,12 @@ def _isolated_cli(
 
     state_file = tmp_path / "tasks.json"
     lock_file = tmp_path / "tasks.lock"
+    runtime_root = tmp_path / "runtime"
+
+    monkeypatch.setenv(
+        "ATLAS_RUNTIME_CONFIG_DIR",
+        str(runtime_root),
+    )
 
     scheduler = TaskScheduler(
         state_file,
