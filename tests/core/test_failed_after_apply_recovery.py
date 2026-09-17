@@ -163,13 +163,90 @@ def test_recovery_does_not_repeat_runtime_apply_or_restore() -> None:
         assert phrase not in section
 
 
+
+def test_recovery_requires_failed_transaction_target_image_evidence() -> None:
+    section = recovery_section()
+
+    requirement = '[[ -s "$transaction/images.tsv" ]]'
+    reconciliation = section.index(
+        "atlas_deployment_new_id baseline-reconciliation"
+    )
+
+    assert requirement in section
+    assert section.index(requirement) < reconciliation
+    assert (
+        "failed transaction applied target image evidence"
+        in section.lower()
+        or "failed transaction target image evidence"
+        in section.lower()
+    )
+
+
+def test_recovery_copies_failed_target_images_before_runtime_verification() -> None:
+    section = recovery_section()
+
+    copy_source = '"$transaction/images.tsv"'
+    copy_target = '"$temporary/images.tsv"'
+
+    assert copy_source in section
+    assert copy_target in section
+
+    source_index = section.index(copy_source)
+    target_index = section.index(copy_target, source_index)
+    first_verify = section.index(
+        'atlas_deployment_verify_runtime "$temporary"'
+    )
+
+    assert source_index < target_index < first_verify
+
+
+def test_recovery_does_not_self_attest_by_recapturing_live_images() -> None:
+    section = recovery_section()
+
+    assert "atlas_deployment_capture_images" not in section
+
+
+def test_recovery_verifies_live_runtime_against_failed_transaction_images() -> None:
+    section = recovery_section()
+
+    copy_source = section.index(
+        '"$transaction/images.tsv"'
+    )
+    copy_target = section.index(
+        '"$temporary/images.tsv"',
+        copy_source,
+    )
+    private_verify = section.index(
+        'atlas_deployment_verify_runtime "$temporary"',
+        copy_target,
+    )
+    disable = section.index(
+        "atlas_command_maintenance disable",
+        private_verify,
+    )
+    public_verify = section.index(
+        'atlas_deployment_verify_runtime "$temporary"',
+        disable,
+    )
+
+    assert (
+        copy_source
+        < copy_target
+        < private_verify
+        < disable
+        < public_verify
+    )
+
+
 def test_recovery_publishes_separate_verified_baseline() -> None:
     section = recovery_section()
 
     # The failed transaction remains immutable evidence. Recovery therefore
     # publishes a separately named verified description of the live target.
     assert "reconciliation" in section.lower()
-    assert "atlas_deployment_capture_images" in section
+    assert "atlas_deployment_capture_images" not in section
+    assert '"$transaction/images.tsv"' in section
+    assert '"$temporary/images.tsv"' in section
     assert "atlas_deployment_verify_runtime" in section
     assert "atlas_deployment_set_current" in section
     assert "verified" in section
@@ -227,6 +304,7 @@ def _write_failed_after_apply_fixture(
     core_archive: bool = True,
     ingress_archive: bool = True,
     sports_archive: bool = True,
+    target_images: bool = True,
 ) -> dict[str, object]:
     import io
     import tarfile
@@ -313,6 +391,18 @@ def _write_failed_after_apply_fixture(
             b"sports-target-source\n"
         )
 
+    if target_images:
+        (failed / "images.tsv").write_text(
+            "core|docker-compose.yml|project-atlas|core|/core|"
+            "core:test|sha256:core\n"
+            "ingress|stack/ingress.yml|atlas-ingress|api|/atlas-api|"
+            "api:test|sha256:api\n"
+            "sports|modules/sports/docker-compose.yml|sports|"
+            "atlas-sports-controller|/atlas-sports-controller|"
+            "sports:test|sha256:sports\n",
+            encoding="utf-8",
+        )
+
     backup = tmp_path / "pre-update-backup.tar.gz"
 
     if backup_present:
@@ -388,7 +478,7 @@ def _run_failed_after_apply_recovery(
     core_archive: bool = True,
     ingress_archive: bool = True,
     sports_archive: bool = True,
-    capture_fails: bool = False,
+    target_images: bool = True,
     private_runtime_fails: bool = False,
     private_doctor_fails: bool = False,
     private_atlas_verify_fails: bool = False,
@@ -418,6 +508,7 @@ def _run_failed_after_apply_recovery(
         core_archive=core_archive,
         ingress_archive=ingress_archive,
         sports_archive=sports_archive,
+        target_images=target_images,
     )
 
     event_log = tmp_path / "events.log"
@@ -438,22 +529,6 @@ atlas_deployment_new_id() {
 
 atlas_maintenance_flag() {
   printf '%s\n' "$MAINTENANCE_FLAG"
-}
-
-atlas_deployment_capture_images() {
-  local record="$1"
-
-  printf 'capture\n' >> "$EVENT_LOG"
-
-  if [[ "$CAPTURE_FAILS" == true ]]; then
-    return 1
-  fi
-
-  printf '%s\n' \
-    'core|docker-compose.yml|project-atlas|core|/core|core:test|sha256:core' \
-    'ingress|stack/ingress.yml|atlas-ingress|api|/atlas-api|api:test|sha256:api' \
-    'sports|modules/sports/docker-compose.yml|sports|atlas-sports-controller|/atlas-sports-controller|sports:test|sha256:sports' \
-    > "$record/images.tsv"
 }
 
 atlas_deployment_verify_runtime() {
@@ -593,9 +668,6 @@ atlas_deployment_recover_failed_after_apply "$FAILED_ID"
                 fixture["maintenance_flag"]
             ),
             "EVENT_LOG": str(event_log),
-            "CAPTURE_FAILS": (
-                "true" if capture_fails else "false"
-            ),
             "PRIVATE_RUNTIME_FAILS": (
                 "true" if private_runtime_fails else "false"
             ),
@@ -864,20 +936,25 @@ def test_behavior_requires_target_sports_archive_when_managed(
     assert result.current_id == "baseline-test"
 
 
-def test_behavior_capture_failure_never_reopens_or_publishes(
+def test_behavior_requires_failed_transaction_target_image_evidence(
     tmp_path: Path,
 ) -> None:
     result = _run_failed_after_apply_recovery(
         tmp_path,
-        capture_fails=True,
+        target_images=False,
     )
 
     assert result.returncode != 0
-    assert result.events.splitlines() == ["capture"]
+    assert (
+        "failed transaction applied target image evidence is unavailable"
+        in result.stderr
+    )
+    assert result.events == ""
     assert result.current_id == "baseline-test"
     assert result.maintenance_exists is True
     assert result.lock_exists is True
     assert result.failed_status == "failed"
+    assert result.reconciliation.exists() is False
 
 
 def test_behavior_private_runtime_failure_never_reopens(
@@ -890,7 +967,6 @@ def test_behavior_private_runtime_failure_never_reopens(
 
     assert result.returncode != 0
     assert result.events.splitlines() == [
-        "capture",
         "runtime-verify:1",
     ]
     assert result.current_id == "baseline-test"
@@ -909,7 +985,6 @@ def test_behavior_private_doctor_failure_never_reopens(
 
     assert result.returncode != 0
     assert result.events.splitlines() == [
-        "capture",
         "runtime-verify:1",
         "doctor:1",
     ]
@@ -928,7 +1003,6 @@ def test_behavior_private_atlas_verify_failure_never_reopens(
 
     assert result.returncode != 0
     assert result.events.splitlines() == [
-        "capture",
         "runtime-verify:1",
         "doctor:1",
         "atlas-verify:1",
@@ -949,7 +1023,6 @@ def test_behavior_public_runtime_failure_restores_maintenance(
     assert result.returncode != 0
 
     assert result.events.splitlines() == [
-        "capture",
         "runtime-verify:1",
         "doctor:1",
         "atlas-verify:1",
@@ -976,7 +1049,6 @@ def test_behavior_public_doctor_failure_restores_maintenance(
     assert result.returncode != 0
 
     assert result.events.splitlines() == [
-        "capture",
         "runtime-verify:1",
         "doctor:1",
         "atlas-verify:1",
@@ -1004,7 +1076,6 @@ def test_behavior_public_atlas_verify_failure_restores_maintenance(
     assert result.returncode != 0
 
     assert result.events.splitlines() == [
-        "capture",
         "runtime-verify:1",
         "doctor:1",
         "atlas-verify:1",
@@ -1036,7 +1107,6 @@ def test_behavior_success_publishes_verified_target_reconciliation(
     )
 
     assert result.events.splitlines() == [
-        "capture",
         "runtime-verify:1",
         "doctor:1",
         "atlas-verify:1",

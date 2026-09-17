@@ -1225,7 +1225,11 @@ atlas_deployment_complete_update() {
   local identifier="$1"
   local record
   record="$(atlas_deployment_record_dir "$identifier")" || return 1
-  atlas_deployment_capture_images "$record" || return 1
+
+  # images.tsv is durable post-apply evidence captured before health
+  # verification. Finalization verifies that same evidence instead of
+  # replacing it with a later observation of the live runtime.
+  [[ -s "$record/images.tsv" ]] || return 1
   atlas_deployment_verify_runtime "$record" || return 1
   atlas_deployment_set_status "$record" verified
   atlas_deployment_set_current "$identifier"
@@ -2395,6 +2399,13 @@ atlas_deployment_recover_failed_after_apply() {
     }
   fi
 
+  [[ -s "$transaction/images.tsv" ]] || {
+    echo \
+      'ERROR: failed transaction applied target image evidence is unavailable.' \
+      >&2
+    return 1
+  }
+
   reconciliation_id="$(
     atlas_deployment_new_id baseline-reconciliation
   )"
@@ -2438,6 +2449,13 @@ atlas_deployment_recover_failed_after_apply() {
       }
   fi
 
+  cp -- \
+    "$transaction/images.tsv" \
+    "$temporary/images.tsv" || {
+      rm -rf -- "$temporary"
+      return 1
+    }
+
   cat > "$temporary/metadata" <<EOF
 type=baseline
 deployment_id=$reconciliation_id
@@ -2467,11 +2485,6 @@ ingress_commit=$ingress_commit
 sports_commit=$sports_commit
 source_claim=verified-already-applied-target
 EOF
-
-  atlas_deployment_capture_images "$temporary" || {
-    rm -rf -- "$temporary"
-    return 1
-  }
 
   echo 'Private applied-target runtime verification:'
 

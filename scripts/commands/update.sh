@@ -409,12 +409,10 @@ non_healthy = [
     and check.get("status") != "healthy"
 ]
 
-if len(non_healthy) != 1:
+if not non_healthy:
     raise SystemExit(1)
 
-check = non_healthy[0]
-
-expected = {
+provider_expected = {
     "category": "module:sports",
     "name": "Provider Health",
     "status": "critical",
@@ -423,9 +421,53 @@ expected = {
     ),
 }
 
-for key, value in expected.items():
-    if check.get(key) != value:
-        raise SystemExit(1)
+sports_starting_containers = {
+    "atlas-sports-controller",
+    "atlas-sports-feed",
+}
+
+def provider_transient(check):
+    return all(
+        check.get(key) == value
+        for key, value in provider_expected.items()
+    )
+
+def sports_docker_starting(check):
+    if check.get("category") != "module:sports":
+        return False
+
+    if check.get("status") != "critical":
+        return False
+
+    details = check.get("details")
+
+    if not isinstance(details, dict):
+        return False
+
+    if details.get("module") != "sports":
+        return False
+
+    container = details.get("container")
+
+    if container not in sports_starting_containers:
+        return False
+
+    if details.get("container_health") != "starting":
+        return False
+
+    expected_name = f"{container} Health"
+
+    if check.get("name") != expected_name:
+        return False
+
+    return True
+
+if not all(
+    provider_transient(check)
+    or sports_docker_starting(check)
+    for check in non_healthy
+):
+    raise SystemExit(1)
 
 raise SystemExit(0)
 PY_HEALTH
@@ -868,6 +910,20 @@ atlas_command_update() {
     atlas_update_fail_after_maintenance \
       "$identifier" \
       'update apply failed.'
+
+    return 1
+  fi
+
+  # Persist the exact runtime created by the successful apply before any
+  # post-apply health gate can fail. This makes failed-after-apply
+  # transactions independently attestable without reconstructing image
+  # identity from the later live runtime.
+  if ! atlas_deployment_capture_images \
+    "$(atlas_deployment_record_dir "$identifier")"
+  then
+    atlas_update_fail_after_maintenance \
+      "$identifier" \
+      'applied target image capture failed.'
 
     return 1
   fi

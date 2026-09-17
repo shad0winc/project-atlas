@@ -397,6 +397,7 @@ def run_update(
     }
     atlas_deployment_verify_runtime() { return 0; }
     atlas_deployment_capture_images() {
+      printf 'capture-images:%s\n' "$1" >> "$ATLAS_TEST_EVENTS"
       cp "$ATLAS_TEST_IMAGES" "$1/images.tsv"
     }
     atlas_deployment_record_backup() {
@@ -778,6 +779,145 @@ def test_missing_target_image_aborts_before_maintenance_or_apply(
         "target image completeness verification failed before maintenance"
         in result.stderr
     )
+
+
+
+def deployment_record(
+    environment: dict[str, str],
+) -> Path:
+    captures = [
+        event
+        for event in event_lines(environment)
+        if event.startswith("capture-images:")
+    ]
+
+    assert len(captures) == 1
+
+    record = Path(
+        captures[0].split(":", 1)[1]
+    )
+
+    expected_records = (
+        Path(environment["ATLAS_RUNTIME_CONFIG_DIR"])
+        / "deployments"
+        / "records"
+    )
+
+    assert record.parent == expected_records
+    assert record.name.startswith("update-")
+
+    return record
+
+
+def test_update_captures_applied_target_images_before_private_post_verify(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+
+    result = run_update(environment)
+
+    assert result.returncode == 0, result.stderr
+
+    events = event_lines(environment)
+
+    apply = next(
+        index
+        for index, event in enumerate(events)
+        if event.startswith("docker compose ")
+        and " up " in f" {event} "
+        and "--no-build" in event
+        and "--pull never" in event
+    )
+
+    capture = next(
+        index
+        for index, event in enumerate(events)
+        if event.startswith("capture-images:")
+    )
+
+    private_doctor = events.index("doctor", apply + 1)
+
+    assert apply < capture < private_doctor
+
+    images = deployment_record(environment) / "images.tsv"
+    assert images.is_file()
+    baseline_images = (
+        Path(environment["ATLAS_RUNTIME_CONFIG_DIR"])
+        / "deployments"
+        / "records"
+        / "baseline-test"
+        / "images.tsv"
+    )
+
+    assert images.read_bytes() == baseline_images.read_bytes()
+
+
+def test_private_post_apply_failure_preserves_target_image_attestation(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+
+    doctor_count = tmp_path / "doctor-count"
+    environment["ATLAS_TEST_DOCTOR_COUNT_FILE"] = str(
+        doctor_count
+    )
+
+    # Call 1 is the pre-update doctor.
+    # Call 2 is the first private post-apply doctor.
+    environment["ATLAS_TEST_DOCTOR_FAIL_CALLS"] = "2"
+    environment["ATLAS_TEST_HEALTH_JSON"] = (
+        '{"schema_version":1,"status":"critical","score":90,'
+        '"checks":['
+        '{"category":"services",'
+        '"name":"jellyfin",'
+        '"status":"critical",'
+        '"message":"jellyfin container is not running",'
+        '"details":{"returncode":1}}'
+        ']}'
+    )
+
+    result = run_update(environment)
+
+    assert result.returncode != 0
+
+    record = deployment_record(environment)
+    images = record / "images.tsv"
+
+    # Failed-after-apply evidence must already exist even though
+    # final baseline completion was never reached.
+    assert images.is_file()
+    baseline_images = (
+        Path(environment["ATLAS_RUNTIME_CONFIG_DIR"])
+        / "deployments"
+        / "records"
+        / "baseline-test"
+        / "images.tsv"
+    )
+
+    assert images.read_bytes() == baseline_images.read_bytes()
+
+    events = event_lines(environment)
+
+    apply = next(
+        index
+        for index, event in enumerate(events)
+        if event.startswith("docker compose ")
+        and " up " in f" {event} "
+        and "--no-build" in event
+        and "--pull never" in event
+    )
+
+    capture = next(
+        index
+        for index, event in enumerate(events)
+        if event.startswith("capture-images:")
+    )
+
+    failed_doctor = events.index("doctor", apply + 1)
+
+    assert apply < capture < failed_doctor
+    assert "maintenance:disable" not in events
+    assert lock_path(environment).is_dir()
 
 
 def readiness_events(environment: dict[str, str]) -> list[str]:
@@ -1385,6 +1525,127 @@ def test_core_update_does_not_run_dislikes_prebackup_bootstrap(
         "dislikes-runtime:provision"
         not in event_lines(environment)
     )
+
+
+
+def _sports_docker_health_only_critical_json(
+    health: str,
+) -> str:
+    return (
+        '{"schema_version":1,"status":"critical","score":97,'
+        '"category_scores":{"module:sports":86},'
+        '"checks":['
+        '{"category":"module:sports",'
+        '"name":"atlas-sports-controller Health",'
+        '"status":"critical",'
+        '"message":"atlas-sports-controller health check is '
+        + health
+        + '",'
+        '"details":{"module":"sports",'
+        '"container":"atlas-sports-controller",'
+        '"container_health":"'
+        + health
+        + '"}}'
+        ']}'
+    )
+
+
+def test_post_apply_transient_sports_docker_starting_recovers_within_grace(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+
+    doctor_count = tmp_path / "doctor-count"
+    environment["ATLAS_TEST_DOCTOR_COUNT_FILE"] = str(
+        doctor_count
+    )
+
+    # Call 1 is pre-update. Call 2 is the immediate private
+    # post-apply Doctor while the newly created Sports container
+    # is still inside Docker's normal healthcheck startup period.
+    environment["ATLAS_TEST_DOCTOR_FAIL_CALLS"] = "2"
+    environment["ATLAS_TEST_HEALTH_JSON"] = (
+        _sports_docker_health_only_critical_json("starting")
+    )
+
+    result = run_update(environment)
+
+    assert result.returncode == 0, result.stderr
+
+    events = event_lines(environment)
+
+    # The private verification must remain under maintenance and
+    # receive a bounded retry before public traffic is reopened.
+    assert events.count("doctor") >= 4
+    assert "health-json" in events
+
+    enable = events.index("maintenance:enable")
+    health_json = events.index("health-json")
+    disable = events.index("maintenance:disable")
+
+    assert enable < health_json < disable
+    assert not lock_path(environment).exists()
+
+
+def test_post_apply_sports_docker_starting_grace_exhausts_fail_closed(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+
+    doctor_count = tmp_path / "doctor-count"
+    environment["ATLAS_TEST_DOCTOR_COUNT_FILE"] = str(
+        doctor_count
+    )
+
+    environment["ATLAS_TEST_DOCTOR_FAIL_CALLS"] = (
+        "2,3,4,5,6,7,8,9"
+    )
+    environment["ATLAS_TEST_HEALTH_JSON"] = (
+        _sports_docker_health_only_critical_json("starting")
+    )
+
+    result = run_update(environment)
+
+    assert result.returncode != 0
+
+    events = event_lines(environment)
+
+    # Grace must exist, but remain bounded.
+    assert 3 <= events.count("doctor") <= 9
+    assert "health-json" in events
+
+    assert "maintenance:enable" in events
+    assert "maintenance:disable" not in events
+    assert lock_path(environment).is_dir()
+
+
+def test_post_apply_sports_docker_unhealthy_does_not_receive_startup_grace(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+
+    doctor_count = tmp_path / "doctor-count"
+    environment["ATLAS_TEST_DOCTOR_COUNT_FILE"] = str(
+        doctor_count
+    )
+
+    environment["ATLAS_TEST_DOCTOR_FAIL_CALLS"] = "2"
+    environment["ATLAS_TEST_HEALTH_JSON"] = (
+        _sports_docker_health_only_critical_json("unhealthy")
+    )
+
+    result = run_update(environment)
+
+    assert result.returncode != 0
+
+    events = event_lines(environment)
+
+    # Only Docker's transient `starting` state is grace-eligible.
+    # An actual unhealthy state must retain existing fail-fast behavior.
+    assert events.count("doctor") == 2
+    assert events.count("health-json") == 1
+    assert "maintenance:disable" not in events
+    assert lock_path(environment).is_dir()
 
 
 def _sports_provider_only_critical_health_json() -> str:
