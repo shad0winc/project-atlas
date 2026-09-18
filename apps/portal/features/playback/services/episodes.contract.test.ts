@@ -41,7 +41,7 @@ describe(
           ]
         });
 
-        const module =
+        const sessionModule =
           sessionServices as unknown as {
             resolveSeriesEpisodes?: (
               provider: string,
@@ -59,11 +59,11 @@ describe(
           };
 
         expect(
-          module.resolveSeriesEpisodes
+          sessionModule.resolveSeriesEpisodes
         ).toBeTypeOf("function");
 
         const episodes =
-          await module.resolveSeriesEpisodes!(
+          await sessionModule.resolveSeriesEpisodes!(
             " Jellyfin ",
             " series-1 "
           );

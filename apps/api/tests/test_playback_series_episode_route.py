@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from atlas_api.auth.models import AuthenticatedUser
+from atlas_api.dependencies import clear_dependency_caches
 from atlas_api.routes.v1 import playback
 
 
@@ -111,24 +112,38 @@ def test_series_episode_route_returns_safe_ordered_identities() -> None:
 
 
 def test_series_episode_route_requires_media_read(
+    tmp_path,
     monkeypatch,
 ) -> None:
+    audit_path = tmp_path / "events.jsonl"
+    audit_path.write_text("", encoding="utf-8")
+    audit_path.chmod(0o660)
+
     monkeypatch.setenv(
         "ATLAS_JWT_SECRET",
         "atlas-playback-episode-test-secret-0123456789abcdef",
     )
-
-    app = FastAPI()
-    app.include_router(
-        playback.router,
-        prefix="/api/v1",
+    monkeypatch.setenv(
+        "ATLAS_SECURITY_AUDIT_PATH",
+        str(audit_path),
     )
 
-    client = TestClient(app)
+    clear_dependency_caches()
 
-    response = client.get(
-        "/api/v1/media/playback/jellyfin/series-1/episodes"
-    )
+    try:
+        app = FastAPI()
+        app.include_router(
+            playback.router,
+            prefix="/api/v1",
+        )
 
-    assert response.status_code == 401
-    assert response.headers["www-authenticate"] == "Bearer"
+        client = TestClient(app)
+
+        response = client.get(
+            "/api/v1/media/playback/jellyfin/series-1/episodes"
+        )
+
+        assert response.status_code == 401
+        assert response.headers["www-authenticate"] == "Bearer"
+    finally:
+        clear_dependency_caches()
