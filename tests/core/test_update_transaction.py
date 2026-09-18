@@ -1588,6 +1588,88 @@ def test_post_apply_transient_sports_docker_starting_recovers_within_grace(
 
 
 
+
+def test_post_apply_critical_health_json_is_classified_despite_nonzero_health_exit(
+    tmp_path: Path,
+) -> None:
+    """Critical health JSON must remain classifiable when the health CLI exits 1."""
+    environment = prepare_runtime(tmp_path)
+
+    doctor_count = tmp_path / "doctor-count"
+    environment["ATLAS_TEST_DOCTOR_COUNT_FILE"] = str(
+        doctor_count
+    )
+
+    # Call 1 is the healthy pre-update Doctor.
+    #
+    # Call 2 observes the Sports controller during Docker's normal
+    # startup period.
+    environment["ATLAS_TEST_DOCTOR_FAIL_CALLS"] = "2"
+
+    # This is the production contract of atlas.health:
+    #
+    # * it emits valid structured JSON for a critical report;
+    # * it exits with status 1 because the report is critical.
+    #
+    # The update classifier must inspect that JSON rather than treating
+    # the process status itself as a classifier failure.
+    environment["ATLAS_TEST_HEALTH_JSON"] = (
+        _sports_docker_health_only_critical_json("starting")
+    )
+    environment["ATLAS_TEST_HEALTH_STATUS"] = "1"
+
+    result = run_update(environment)
+
+    assert result.returncode == 0, result.stderr
+
+    events = event_lines(environment)
+
+    assert events.count("doctor") >= 4
+    assert events.count("health-json") >= 1
+    assert "maintenance:enable" in events
+    assert "maintenance:disable" in events
+    assert events.index("health-json") < events.index(
+        "maintenance:disable"
+    )
+    assert not lock_path(environment).exists()
+
+
+
+
+def test_post_apply_unexpected_health_command_failure_remains_fail_closed(
+    tmp_path: Path,
+) -> None:
+    """Unexpected structured-health command failures must not receive grace."""
+    environment = prepare_runtime(tmp_path)
+
+    doctor_count = tmp_path / "doctor-count"
+    environment["ATLAS_TEST_DOCTOR_COUNT_FILE"] = str(
+        doctor_count
+    )
+
+    environment["ATLAS_TEST_DOCTOR_FAIL_CALLS"] = "2"
+    environment["ATLAS_TEST_HEALTH_JSON"] = (
+        _sports_docker_health_only_critical_json("starting")
+    )
+
+    # atlas.health uses 0 for non-critical and 1 for critical.
+    # Any other command status represents an unexpected execution failure.
+    environment["ATLAS_TEST_HEALTH_STATUS"] = "2"
+
+    result = run_update(environment)
+
+    assert result.returncode != 0
+
+    events = event_lines(environment)
+
+    assert events.count("doctor") == 2
+    assert events.count("health-json") == 1
+    assert "maintenance:enable" in events
+    assert "maintenance:disable" not in events
+    assert lock_path(environment).is_dir()
+
+
+
 def test_post_apply_failed_doctor_with_recovered_health_snapshot_retries(
     tmp_path: Path,
 ) -> None:

@@ -380,10 +380,22 @@ atlas_update_readiness_sleep() {
 
 atlas_update_transient_sports_provider_health_only() {
   local health_json
+  local health_rc
 
-  health_json="$(
+  if health_json="$(
     atlas_health_python --format json --compact
-  )" || return 1
+  )"; then
+    health_rc=0
+  else
+    health_rc=$?
+  fi
+
+  # atlas.health intentionally returns 1 for a valid critical report.
+  # Critical JSON is precisely what this classifier needs to inspect.
+  # Any other command failure remains fail-closed.
+  if (( health_rc != 0 && health_rc != 1 )); then
+    return 1
+  fi
 
   python3 - "$health_json" <<'PY_HEALTH'
 import json
