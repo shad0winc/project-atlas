@@ -104,3 +104,97 @@ export async function resolvePlaybackSession(
     ...(response.next_target_id === null ? {} : { nextTargetId: response.next_target_id })
   });
 }
+
+export type SeriesEpisode = Readonly<{
+  id: string;
+  title: string;
+  seriesName?: string;
+  seasonNumber?: number;
+  episodeNumber?: number;
+}>;
+
+type SeriesEpisodeTransport = Readonly<{
+  id: string;
+  title: string;
+  series_name: string | null;
+  season_number: number | null;
+  episode_number: number | null;
+}>;
+
+type SeriesEpisodesTransport = Readonly<{
+  provider: string;
+  series_id: string;
+  episodes: readonly SeriesEpisodeTransport[];
+}>;
+
+export async function resolveSeriesEpisodes(
+  provider: string,
+  itemId: string,
+  signal?: AbortSignal
+): Promise<readonly SeriesEpisode[]> {
+  const normalizedProvider =
+    provider.trim().toLowerCase();
+
+  const normalizedItemId =
+    itemId.trim();
+
+  if (
+    !normalizedProvider ||
+    !normalizedItemId
+  ) {
+    throw new Error(
+      "Series episode identity is incomplete."
+    );
+  }
+
+  const response =
+    await authenticatedAtlasApiRequest<SeriesEpisodesTransport>(
+      `/media/playback/${encodeURIComponent(
+        normalizedProvider
+      )}/${encodeURIComponent(
+        normalizedItemId
+      )}/episodes`,
+      {
+        method: "GET",
+        cache: "no-store",
+        signal
+      }
+    );
+
+  if (
+    response.provider !== normalizedProvider ||
+    response.series_id !== normalizedItemId
+  ) {
+    throw new Error(
+      "Series episode response did not match the requested media identity."
+    );
+  }
+
+  return Object.freeze(
+    response.episodes.map(
+      (episode): SeriesEpisode =>
+        Object.freeze({
+          id: episode.id,
+          title: episode.title,
+          ...(episode.series_name === null
+            ? {}
+            : {
+                seriesName:
+                  episode.series_name
+              }),
+          ...(episode.season_number === null
+            ? {}
+            : {
+                seasonNumber:
+                  episode.season_number
+              }),
+          ...(episode.episode_number === null
+            ? {}
+            : {
+                episodeNumber:
+                  episode.episode_number
+              })
+        })
+    )
+  );
+}
