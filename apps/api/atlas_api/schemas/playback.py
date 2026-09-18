@@ -9,6 +9,28 @@ from pydantic import BaseModel, ConfigDict
 from atlas.media import PlaybackAction, PlaybackSession
 
 
+class PlaybackEpisodeResponse(BaseModel):
+    """Browser-safe episode identity for Series navigation."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str
+    title: str
+    series_name: str | None = None
+    season_number: int | None = None
+    episode_number: int | None = None
+
+
+class PlaybackSeriesEpisodesResponse(BaseModel):
+    """Ordered browser-safe episode collection for one Series."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    provider: str
+    series_id: str
+    episodes: tuple[PlaybackEpisodeResponse, ...]
+
+
 class PlaybackActionResponse(BaseModel):
     """Safe playback capability exposed to authenticated Portal clients."""
 

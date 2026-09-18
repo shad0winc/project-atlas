@@ -6,6 +6,7 @@ import { DislikeAction } from "../../dislikes";
 import { loadFavorites } from "../../favorites";
 import { WatchAction } from "../../playback/components/WatchAction";
 import { MediaRetentionStatus } from "./MediaRetentionStatus";
+import { SeriesEpisodeNavigation } from "./SeriesEpisodeNavigation";
 
 import { ATLAS_PERMISSIONS } from "../../../lib/authorization/permissions";
 
@@ -118,7 +119,19 @@ export function MediaCatalogContent({
                 ) : null}
 
 
-                <WatchAction provider={item.provider} itemId={item.itemId} />
+                {item.mediaType === "tv" ||
+                item.mediaType === "anime_tv" ? (
+                  <SeriesEpisodeNavigation
+                    provider={item.provider}
+                    seriesId={item.itemId}
+                    title={item.title}
+                  />
+                ) : (
+                  <WatchAction
+                    provider={item.provider}
+                    itemId={item.itemId}
+                  />
+                )}
                 {canDislike && dislikeExpectedUserId ? (
                   <DislikeAction
                     expectedUserId={dislikeExpectedUserId}

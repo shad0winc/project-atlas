@@ -35,6 +35,84 @@ class PlaybackService:
         self._jellyfin = jellyfin
         self._jellyfin_public_url = jellyfin_public_url
 
+    def list_library_series_episodes(
+        self,
+        *,
+        provider: str,
+        item_id: str,
+    ) -> tuple[dict[str, object], ...]:
+        """Return browser-safe ordered episode identities for one Series."""
+        normalized_provider = provider.strip().lower()
+
+        if normalized_provider != "jellyfin":
+            raise PlaybackNotFoundError(
+                "unsupported playback provider"
+            )
+
+        normalized_item_id = item_id.strip()
+
+        if not normalized_item_id:
+            raise PlaybackNotFoundError(
+                "playback item is required"
+            )
+
+        try:
+            item = self._jellyfin.get_item(
+                normalized_item_id
+            )
+
+            jellyfin_type = str(
+                item.metadata.get(
+                    "jellyfin_type"
+                )
+                or ""
+            ).strip().lower()
+
+            if jellyfin_type != "series":
+                raise PlaybackNotFoundError(
+                    "playback item is not a series"
+                )
+
+            episodes = (
+                self._jellyfin
+                .list_series_episodes(
+                    normalized_item_id
+                )
+            )
+        except PlaybackNotFoundError:
+            raise
+        except MediaProviderError as exc:
+            raise PlaybackNotFoundError(
+                "series episode navigation is unavailable"
+            ) from exc
+
+        return tuple(
+            {
+                "id": str(
+                    episode["id"]
+                ),
+                "title": str(
+                    episode["title"]
+                ),
+                "series_name": (
+                    episode.get(
+                        "series_name"
+                    )
+                ),
+                "season_number": (
+                    episode.get(
+                        "season_number"
+                    )
+                ),
+                "episode_number": (
+                    episode.get(
+                        "episode_number"
+                    )
+                ),
+            }
+            for episode in episodes
+        )
+
     def resolve_library_session(
         self,
         *,

@@ -13,6 +13,8 @@ from atlas_api.dependencies import get_settings, get_user_profile_store
 from atlas_api.playback_capabilities import PlaybackCapabilityService
 from atlas_api.schemas.playback import (
     PlaybackActionResponse,
+    PlaybackEpisodeResponse,
+    PlaybackSeriesEpisodesResponse,
     PlaybackSessionResponse,
 )
 from atlas_api.security import require_permission
@@ -69,6 +71,71 @@ def get_playback_service() -> PlaybackService:
 @lru_cache(maxsize=1)
 def get_playback_capability_service() -> PlaybackCapabilityService:
     return PlaybackCapabilityService(get_settings())
+
+
+@router.get(
+    "/{provider}/{item_id}/episodes",
+    response_model=PlaybackSeriesEpisodesResponse,
+    status_code=status.HTTP_200_OK,
+    summary="List browser-safe episodes for one Atlas Theater Series",
+)
+def read_series_episodes(
+    _current_user: Annotated[
+        AuthenticatedUser,
+        Depends(require_playback_read),
+    ],
+    service: Annotated[
+        PlaybackService,
+        Depends(get_playback_service),
+    ],
+    provider: Annotated[str, Path(min_length=1, max_length=32)],
+    item_id: Annotated[str, Path(min_length=1, max_length=256)],
+) -> PlaybackSeriesEpisodesResponse:
+    try:
+        episodes = service.list_library_series_episodes(
+            provider=provider,
+            item_id=item_id,
+        )
+    except PlaybackNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Series episodes were not found.",
+        ) from exc
+    except PlaybackUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Playback is not configured.",
+        ) from exc
+
+    normalized_provider = provider.strip().lower()
+    normalized_item_id = item_id.strip()
+
+    return PlaybackSeriesEpisodesResponse(
+        provider=normalized_provider,
+        series_id=normalized_item_id,
+        episodes=tuple(
+            PlaybackEpisodeResponse(
+                id=str(episode["id"]),
+                title=str(episode["title"]),
+                series_name=(
+                    None
+                    if episode.get("series_name") is None
+                    else str(episode["series_name"])
+                ),
+                season_number=(
+                    None
+                    if episode.get("season_number") is None
+                    else int(episode["season_number"])
+                ),
+                episode_number=(
+                    None
+                    if episode.get("episode_number") is None
+                    else int(episode["episode_number"])
+                ),
+            )
+            for episode in episodes
+        ),
+    )
 
 
 @router.get(
