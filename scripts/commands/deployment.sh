@@ -675,6 +675,40 @@ SURFACES
     "$output"
 }
 
+# Historical Notifications records omit source mode. An explicitly
+# declared mode must not bypass the legacy checkout/mount attestation.
+# Managed mode remains unsupported until source publication, apply,
+# recovery, and rollback share a recorded immutable-source contract.
+atlas_deployment_notifications_require_historical_source_mode() {
+  local record="$1"
+  local mode
+  local commit
+
+  mode="$(
+    atlas_deployment_record_value "$record" notifications_source_mode
+  )" || return 1
+
+  commit="$(
+    atlas_deployment_record_value "$record" notifications_commit
+  )" || return 1
+
+  case "$mode" in
+    '')
+      return 0
+      ;;
+    historical)
+      [[ -n "$commit" ]] || {
+        echo 'ERROR: historical Notifications mode requires adoption evidence.' >&2
+        return 1
+      }
+      ;;
+    *)
+      echo 'ERROR: unsupported Notifications source mode; managed source verification is not implemented.' >&2
+      return 1
+      ;;
+  esac
+}
+
 atlas_deployment_verify_runtime() {
   local record="$1"
   local surface
@@ -709,6 +743,8 @@ atlas_deployment_verify_runtime() {
       "$record" \
       notifications_commit
   )" || return 1
+
+  atlas_deployment_notifications_require_historical_source_mode "$record" || return 1
 
   if [[ -n "$notifications_commit" ]]; then
     [[ "$notifications_commit" =~ ^[0-9a-f]{40}$ ]] || {
@@ -1189,6 +1225,8 @@ atlas_deployment_require_current_record() {
       "$record" \
       notifications_commit
   )" || return 1
+
+  atlas_deployment_notifications_require_historical_source_mode "$record" || return 1
 
   if [[ -n "$notifications_commit" ]]; then
     [[ -s "$record/notifications-source.tar.gz" ]] || {
