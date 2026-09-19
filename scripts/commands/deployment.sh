@@ -496,6 +496,17 @@ atlas_deployment_capture_images() {
   local container
   local details
   local sports_commit
+  local notifications_commit
+  local notifications_row
+  local notifications_actual_image
+  local notifications_surface
+  local notifications_compose
+  local notifications_project
+  local notifications_service
+  local notifications_container
+  local notifications_reference
+  local notifications_image
+  local -a notifications_rows=()
   local module_env="$ATLAS_PROJECT_DIR/modules/sports/.env"
 
   : > "$temporary"
@@ -587,6 +598,76 @@ SURFACES
     done <<< "$identifiers"
   fi
 
+  notifications_commit="$(
+    atlas_deployment_record_value \
+      "$record" \
+      notifications_commit
+  )" || return 1
+
+  if [[ -n "$notifications_commit" ]]; then
+    [[ "$notifications_commit" =~ ^[0-9a-f]{40}$ ]] || {
+      echo 'ERROR: recorded Notifications commit is invalid.' >&2
+      return 1
+    }
+
+    [[ -s "$record/notifications-source.tar.gz" ]] &&
+      [[ -s "$record/notifications-image.tsv" ]] &&
+      [[ -s "$record/notifications-source-commit" ]] || {
+        echo 'ERROR: Notifications recovery evidence is missing.' >&2
+        return 1
+      }
+
+    [[ "$(<"$record/notifications-source-commit")" == \
+      "$notifications_commit" ]] || {
+        echo 'ERROR: Notifications source provenance differs.' >&2
+        return 1
+      }
+
+    mapfile -t notifications_rows \
+      < "$record/notifications-image.tsv" || return 1
+
+    [[ "${#notifications_rows[@]}" -eq 1 ]] || {
+      echo 'ERROR: Notifications image evidence must contain one row.' >&2
+      return 1
+    }
+
+    notifications_row="${notifications_rows[0]}"
+
+    IFS='|' read -r \
+      notifications_surface \
+      notifications_compose \
+      notifications_project \
+      notifications_service \
+      notifications_container \
+      notifications_reference \
+      notifications_image <<< "$notifications_row"
+
+    [[ "$notifications_surface" == notifications &&
+      "$notifications_compose" == modules/notifications/docker-compose.yml &&
+      "$notifications_project" == notifications &&
+      "$notifications_service" == atlas-notifications-worker &&
+      "$notifications_container" == /atlas-notifications-worker &&
+      -n "$notifications_reference" &&
+      "$notifications_reference" != *'|'* &&
+      "$notifications_image" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+        echo 'ERROR: recorded Notifications image row is invalid.' >&2
+        return 1
+      }
+
+    notifications_actual_image="$(
+      docker inspect \
+        --format '{{.Image}}' \
+        atlas-notifications-worker
+    )" || return 1
+
+    [[ "$notifications_actual_image" == "$notifications_image" ]] || {
+      echo 'ERROR: Notifications worker image differs from adoption evidence.' >&2
+      return 1
+    }
+
+    printf '%s\n' "$notifications_row" >> "$temporary"
+  fi
+
   [[ -s "$temporary" ]] || return 1
 
   mv -f -- \
@@ -604,6 +685,10 @@ atlas_deployment_verify_runtime() {
   local image_reference
   local expected_image
   local actual_image
+  local notifications_commit
+  local notifications_expected_row
+  local notifications_live_row
+  local -a notifications_rows=()
 
   [[ -s "$record/images.tsv" ]] || return 1
 
@@ -618,7 +703,404 @@ atlas_deployment_verify_runtime() {
       return 1
     }
   done < "$record/images.tsv"
+
+  notifications_commit="$(
+    atlas_deployment_record_value \
+      "$record" \
+      notifications_commit
+  )" || return 1
+
+  if [[ -n "$notifications_commit" ]]; then
+    [[ "$notifications_commit" =~ ^[0-9a-f]{40}$ ]] || {
+      echo 'ERROR: recorded Notifications source commit is invalid.' >&2
+      return 1
+    }
+
+    [[ -s "$record/notifications-source.tar.gz" ]] &&
+      [[ -s "$record/notifications-image.tsv" ]] &&
+      [[ -s "$record/notifications-source-commit" ]] || {
+        echo 'ERROR: Notifications recovery evidence is missing.' >&2
+        return 1
+      }
+
+    [[ "$(<"$record/notifications-source-commit")" == \
+      "$notifications_commit" ]] || {
+        echo 'ERROR: Notifications recovery source commit mismatch.' >&2
+        return 1
+      }
+
+    mapfile -t notifications_rows \
+      < "$record/notifications-image.tsv" || return 1
+
+    [[ "${#notifications_rows[@]}" -eq 1 ]] || {
+      echo 'ERROR: Notifications image evidence must contain one row.' >&2
+      return 1
+    }
+
+    notifications_expected_row="${notifications_rows[0]}"
+
+    [[ "$notifications_expected_row" == \
+      'notifications|modules/notifications/docker-compose.yml|notifications|atlas-notifications-worker|/atlas-notifications-worker|'* ]] || {
+        echo 'ERROR: Notifications image evidence identity is invalid.' >&2
+        return 1
+      }
+
+    [[ "$(grep -c '^notifications|' "$record/images.tsv")" -eq 1 ]] &&
+      [[ "$(grep -Fxc -- \
+        "$notifications_expected_row" \
+        "$record/images.tsv")" -eq 1 ]] || {
+        echo 'ERROR: Notifications image evidence differs from manifest.' >&2
+        return 1
+      }
+
+    # Current adoption contract only. An immutable managed Notifications
+    # generation needs an explicit recorded source-location contract.
+    notifications_live_row="$(
+      atlas_deployment_notifications_live_worker_row \
+        /opt/project-atlas \
+        "$notifications_commit"
+    )" || {
+      echo 'ERROR: Notifications source or worker attestation failed.' >&2
+      return 1
+    }
+
+    [[ "$notifications_live_row" == "$notifications_expected_row" ]] || {
+      echo 'ERROR: Notifications worker differs from recorded evidence.' >&2
+      return 1
+    }
+  fi
 }
+
+# Attest the worker currently executing a specific clean source checkout.
+# The single output row follows the seven-field deployment image manifest.
+# This function only inspects Git and Docker; it does not adopt or mutate
+# any deployment record, image, container, or source directory.
+atlas_deployment_notifications_live_worker_row() (
+  set -euo pipefail
+
+  local checkout="${1:-}"
+  local expected_commit="${2:-}"
+  local checkout_real
+  local git_root
+  local current_commit
+  local status
+
+  [[ -n "$checkout" && "$expected_commit" =~ ^[0-9a-f]{40}$ ]] || {
+    echo 'ERROR: Notifications source checkout and commit are required.' >&2
+    return 1
+  }
+
+  [[ -d "$checkout" && ! -L "$checkout" ]] || {
+    echo 'ERROR: Notifications source checkout is unavailable.' >&2
+    return 1
+  }
+
+  checkout_real="$(realpath -e -- "$checkout")" || return 1
+  git_root="$(git -C "$checkout_real" rev-parse --show-toplevel)" || return 1
+
+  [[ "$(realpath -e -- "$git_root")" == "$checkout_real" ]] || {
+    echo 'ERROR: Notifications source must be a Git checkout root.' >&2
+    return 1
+  }
+
+  current_commit="$(git -C "$checkout_real" rev-parse HEAD)" || return 1
+
+  [[ "$current_commit" == "$expected_commit" ]] || {
+    echo 'ERROR: live Notifications source commit mismatch.' >&2
+    return 1
+  }
+
+  status="$(
+    git -C "$checkout_real" status --porcelain --untracked-files=all
+  )" || return 1
+
+  [[ -z "$status" ]] || {
+    echo 'ERROR: live Notifications source checkout is dirty.' >&2
+    return 1
+  }
+
+  docker inspect atlas-notifications-worker |
+    python3 -c '
+import json
+import re
+import sys
+
+expected_source = sys.argv[1]
+
+try:
+    containers = json.load(sys.stdin)
+    if not isinstance(containers, list) or len(containers) != 1:
+        raise ValueError("Unexpected worker inspection result")
+
+    container = containers[0]
+    state = container["State"]
+    health = state["Health"]
+
+    if state["Status"] != "running" or health["Status"] != "healthy":
+        raise ValueError("Notifications worker is not running and healthy")
+
+    configuration = container["Config"]
+    labels = configuration["Labels"]
+
+    if labels["com.docker.compose.project"] != "notifications":
+        raise ValueError("Unexpected Notifications Compose project")
+
+    if labels["com.docker.compose.service"] != "atlas-notifications-worker":
+        raise ValueError("Unexpected Notifications Compose service")
+
+    if container["Name"] != "/atlas-notifications-worker":
+        raise ValueError("Unexpected Notifications container name")
+
+    image_id = container["Image"]
+    if not isinstance(image_id, str) or not re.fullmatch(
+        r"sha256:[0-9a-f]{64}", image_id
+    ):
+        raise ValueError("Invalid Notifications image identity")
+
+    image_reference = configuration["Image"]
+    if not isinstance(image_reference, str) or not re.fullmatch(
+        r"[A-Za-z0-9][A-Za-z0-9._:/@-]*", image_reference
+    ):
+        raise ValueError("Invalid Notifications image reference")
+
+    mounts = [
+        mount for mount in container["Mounts"]
+        if mount.get("Destination") == "/opt/project-atlas"
+    ]
+
+    if len(mounts) != 1:
+        raise ValueError("Missing or ambiguous application source mount")
+
+    mount = mounts[0]
+    if (
+        mount.get("Type") != "bind"
+        or mount.get("Source") != expected_source
+        or mount.get("RW") is not False
+    ):
+        raise ValueError("Notifications application source mount mismatch")
+
+    fields = [
+        "notifications",
+        "modules/notifications/docker-compose.yml",
+        "notifications",
+        "atlas-notifications-worker",
+        "/atlas-notifications-worker",
+        image_reference,
+        image_id,
+    ]
+
+    print("|".join(fields))
+
+except (KeyError, TypeError, ValueError, AttributeError) as error:
+    print(
+        "ERROR: Notifications worker attestation failed: " + str(error),
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+' "$checkout_real"
+)
+
+# Capture matching historical source and image evidence for an unmanaged
+# Notifications worker. This primitive does not acquire the deployment lock,
+# adopt a baseline, preserve an image tag, or mutate a running container.
+# A future guarded deployment caller must own the transaction lock and must
+# verify that the evidence marker and all recovery assets are intact.
+atlas_deployment_capture_notifications_adoption_evidence() (
+  set -euo pipefail
+
+  local record="${1:-}"
+  local checkout="${2:-}"
+  local expected_commit="${3:-}"
+  local archive
+  local manifest
+  local provenance
+  local staged
+  local first_row
+  local second_row
+  local published_archive=false
+  local published_manifest=false
+  local published_provenance=false
+
+  [[ -d "$record" && ! -L "$record" ]] || {
+    echo 'ERROR: Notifications evidence directory is unavailable.' >&2
+    return 1
+  }
+
+  [[ -n "$checkout" && "$expected_commit" =~ ^[0-9a-f]{40}$ ]] || {
+    echo 'ERROR: Notifications evidence requires a checkout and commit.' >&2
+    return 1
+  }
+
+  archive="$record/notifications-source.tar.gz"
+  manifest="$record/notifications-image.tsv"
+  provenance="$record/notifications-source-commit"
+
+  [[ ! -e "$archive" && ! -L "$archive" ]] &&
+    [[ ! -e "$manifest" && ! -L "$manifest" ]] &&
+    [[ ! -e "$provenance" && ! -L "$provenance" ]] || {
+      echo 'ERROR: Notifications adoption evidence already exists.' >&2
+      return 1
+    }
+
+  # Capture only after successful, complete live-source and worker attestation.
+  first_row="$(
+    atlas_deployment_notifications_live_worker_row \
+      "$checkout" "$expected_commit"
+  )" || return 1
+
+  [[ "$first_row" == notifications\|modules/notifications/docker-compose.yml\|* ]] || {
+    echo 'ERROR: unexpected Notifications image-manifest identity.' >&2
+    return 1
+  }
+
+  staged="$(mktemp -d "$record/.notifications-evidence.XXXXXX")" || return 1
+
+  # The marker is the final published artifact. Remove only files created by
+  # this invocation if any intermediate operation fails.
+  cleanup_notifications_evidence() {
+    local result="$?"
+
+    if (( result != 0 )); then
+      if [[ "$published_provenance" == true ]]; then
+        rm -f -- "$provenance"
+      fi
+      if [[ "$published_manifest" == true ]]; then
+        rm -f -- "$manifest"
+      fi
+      if [[ "$published_archive" == true ]]; then
+        rm -f -- "$archive"
+      fi
+    fi
+
+    rm -rf -- "$staged"
+  }
+  trap cleanup_notifications_evidence EXIT
+
+  atlas_deployment_archive_notifications_checkout \
+    "$checkout" \
+    "$expected_commit" \
+    "$staged/notifications-source.tar.gz" \
+    >/dev/null || return 1
+
+  printf '%s\n' "$first_row" > "$staged/notifications-image.tsv"
+  printf '%s\n' "$expected_commit" > "$staged/notifications-source-commit"
+
+  [[ -s "$staged/notifications-source.tar.gz" ]] &&
+    [[ -s "$staged/notifications-image.tsv" ]] &&
+    [[ -s "$staged/notifications-source-commit" ]] || return 1
+
+  # Re-attest after archiving so changed source, mount, health, or image
+  # identity cannot silently produce a mixed historical recovery set.
+  second_row="$(
+    atlas_deployment_notifications_live_worker_row \
+      "$checkout" "$expected_commit"
+  )" || return 1
+
+  [[ "$second_row" == "$first_row" ]] || {
+    echo 'ERROR: Notifications worker changed during evidence capture.' >&2
+    return 1
+  }
+
+  # Staging and publication occur within the same destination filesystem.
+  # Hard-link creation refuses an existing destination; no prior evidence
+  # is overwritten. The commit marker is published last.
+  ln -- "$staged/notifications-source.tar.gz" "$archive" || return 1
+  published_archive=true
+
+  ln -- "$staged/notifications-image.tsv" "$manifest" || return 1
+  published_manifest=true
+
+  ln -- "$staged/notifications-source-commit" "$provenance" || return 1
+  published_provenance=true
+
+  printf 'Notifications adoption evidence captured: %s\n' "$expected_commit"
+)
+
+# Archive the exact clean checkout used by an unmanaged Notifications worker.
+# This is a source-capture primitive, not an adoption or deployment operation.
+# The caller must separately attest the live container, its image, its mount,
+# and the recovery record before any runtime mutation.
+atlas_deployment_archive_notifications_checkout() (
+  set -euo pipefail
+
+  local checkout="${1:-}"
+  local expected_commit="${2:-}"
+  local output="${3:-}"
+  local checkout_real
+  local git_root
+  local current_commit
+  local temporary=''
+
+  [[ -n "$checkout" && -n "$expected_commit" && -n "$output" ]] || {
+    echo 'ERROR: Notifications checkout, commit, and archive path are required.' >&2
+    return 2
+  }
+
+  [[ "$expected_commit" =~ ^[0-9a-f]{40}$ ]] || {
+    echo 'ERROR: invalid historical Notifications source commit.' >&2
+    return 1
+  }
+
+  [[ -d "$checkout" && ! -L "$checkout" ]] || {
+    echo 'ERROR: historical Notifications checkout is unavailable.' >&2
+    return 1
+  }
+
+  checkout_real="$(realpath -e -- "$checkout")" || return 1
+  git_root="$(git -C "$checkout_real" rev-parse --show-toplevel)" || return 1
+
+  [[ "$(realpath -e -- "$git_root")" == "$checkout_real" ]] || {
+    echo 'ERROR: Notifications source must be a Git checkout root.' >&2
+    return 1
+  }
+
+  current_commit="$(git -C "$checkout_real" rev-parse HEAD)" || return 1
+
+  [[ "$current_commit" == "$expected_commit" ]] || {
+    echo 'ERROR: historical Notifications checkout commit does not match.' >&2
+    return 1
+  }
+
+  [[ -z "$(git -C "$checkout_real" status --porcelain --untracked-files=all)" ]] || {
+    echo 'ERROR: historical Notifications checkout is dirty.' >&2
+    return 1
+  }
+
+  [[ ! -e "$output" && ! -L "$output" ]] || {
+    echo 'ERROR: historical Notifications archive destination already exists.' >&2
+    return 1
+  }
+
+  [[ -d "$(dirname -- "$output")" ]] || {
+    echo 'ERROR: historical Notifications archive parent is unavailable.' >&2
+    return 1
+  }
+
+  temporary="$(mktemp "${output}.partial.XXXXXX")" || return 1
+  trap '[[ -z "$temporary" ]] || rm -f -- "$temporary"' EXIT
+
+  git -C "$checkout_real" archive \
+    --format=tar.gz \
+    --output="$temporary" \
+    "$expected_commit" || return 1
+
+  tar -tzf "$temporary" >/dev/null 2>&1 || {
+    echo 'ERROR: historical Notifications source archive validation failed.' >&2
+    return 1
+  }
+
+  # Same-directory hard-link creation fails if the destination appeared in
+  # the meantime. Never overwrite a prior archive or publish a partial one.
+  ln -- "$temporary" "$output" || {
+    echo 'ERROR: unable to publish historical Notifications archive exclusively.' >&2
+    return 1
+  }
+
+  rm -f -- "$temporary"
+  temporary=''
+
+  printf 'Historical Notifications source archived: %s\n' "$expected_commit"
+)
 
 atlas_deployment_create_source_pair() {
   local record="$1"
@@ -660,6 +1142,8 @@ atlas_deployment_require_current_record() {
   local identifier
   local record
   local sports_commit
+  local notifications_commit
+  local -a notifications_rows
 
   identifier="$(atlas_deployment_current_id)" || {
     echo \
@@ -696,6 +1180,57 @@ atlas_deployment_require_current_record() {
       echo \
         'ERROR: Sports recovery source evidence is unavailable.' \
         >&2
+      return 1
+    }
+  fi
+
+  notifications_commit="$(
+    atlas_deployment_record_value \
+      "$record" \
+      notifications_commit
+  )" || return 1
+
+  if [[ -n "$notifications_commit" ]]; then
+    [[ -s "$record/notifications-source.tar.gz" ]] || {
+      echo 'ERROR: Notifications recovery source is unavailable.' >&2
+      return 1
+    }
+
+    [[ -s "$record/notifications-image.tsv" ]] || {
+      echo 'ERROR: Notifications image evidence is unavailable.' >&2
+      return 1
+    }
+
+    [[ -s "$record/notifications-source-commit" ]] || {
+      echo 'ERROR: Notifications source provenance is unavailable.' >&2
+      return 1
+    }
+
+    [[ "$(<"$record/notifications-source-commit")" == "$notifications_commit" ]] || {
+      echo 'ERROR: Notifications source provenance does not match metadata.' >&2
+      return 1
+    }
+
+    mapfile -t notifications_rows < "$record/notifications-image.tsv" || return 1
+
+    [[ "${#notifications_rows[@]}" -eq 1 ]] || {
+      echo 'ERROR: Notifications image evidence must contain one row.' >&2
+      return 1
+    }
+
+    [[ "${notifications_rows[0]}" == \
+      'notifications|modules/notifications/docker-compose.yml|notifications|atlas-notifications-worker|/atlas-notifications-worker|'* ]] || {
+      echo 'ERROR: Notifications image evidence has an invalid identity.' >&2
+      return 1
+    }
+
+    [[ "$(grep -c '^notifications|' "$record/images.tsv")" -eq 1 ]] || {
+      echo 'ERROR: Notifications manifest row is missing or duplicated.' >&2
+      return 1
+    }
+
+    [[ "$(grep -Fxc -- "${notifications_rows[0]}" "$record/images.tsv")" -eq 1 ]] || {
+      echo 'ERROR: Notifications image evidence differs from the manifest.' >&2
       return 1
     }
   fi
@@ -841,6 +1376,292 @@ EOF
     "$identifier"
 }
 
+
+# Historical-worker adoption only: record and attest the existing,
+# unchanged Notifications worker. This transaction does not launch,
+# upgrade, relocate, or restore the worker. A managed Notifications
+# generation requires a separate source-location, update, and rollback
+# contract before any managed-worker deployment is enabled.
+#
+# Before a record exists, failure releases our own deployment lock. Once a
+# record is created, failure preserves both the record and lock for explicit
+# reconciliation; the operation must never be blindly rerun.
+atlas_deployment_adopt_notifications() {
+  local checkout="${1:-}"
+  local expected_commit="${2:-}"
+  local identifier
+  local previous_record
+  local previous_id
+  local previous_notifications
+  local core_commit
+  local ingress_commit
+  local sports_commit
+  local source_commit
+  local record
+  local first_row
+  local final_row
+  local archive_name
+
+  [[ -n "$checkout" && "$expected_commit" =~ ^[0-9a-f]{40}$ ]] || {
+    echo 'ERROR: Notifications adoption requires source checkout and commit.' >&2
+    return 2
+  }
+
+  identifier="$(atlas_deployment_new_id baseline)" || return 1
+  atlas_deployment_acquire_lock "$identifier" || return 1
+
+  previous_record="$(atlas_deployment_require_current_record)" || {
+    atlas_deployment_release_lock "$identifier" || return 1
+    return 1
+  }
+
+  previous_id="$(basename -- "$previous_record")"
+  previous_notifications="$(
+    atlas_deployment_record_value "$previous_record" notifications_commit
+  )" || {
+    atlas_deployment_release_lock "$identifier" || return 1
+    return 1
+  }
+
+  if [[ -n "$previous_notifications" ]]; then
+    echo 'ERROR: Notifications already has deployment recovery evidence.' >&2
+    atlas_deployment_release_lock "$identifier" || return 1
+    return 1
+  fi
+
+  atlas_deployment_verify_runtime "$previous_record" || {
+    atlas_deployment_release_lock "$identifier" || return 1
+    return 1
+  }
+
+  first_row="$(
+    atlas_deployment_notifications_live_worker_row \
+      "$checkout" "$expected_commit"
+  )" || {
+    atlas_deployment_release_lock "$identifier" || return 1
+    return 1
+  }
+
+  [[ "$first_row" == notifications\|modules/notifications/docker-compose.yml\|* ]] || {
+    echo 'ERROR: unexpected Notifications worker manifest identity.' >&2
+    atlas_deployment_release_lock "$identifier" || return 1
+    return 1
+  }
+
+  record="$(atlas_deployment_record_dir "$identifier")" || {
+    atlas_deployment_release_lock "$identifier" || return 1
+    return 1
+  }
+
+  [[ ! -e "$record" && ! -L "$record" ]] || {
+    echo 'ERROR: Notifications adoption record already exists.' >&2
+    atlas_deployment_release_lock "$identifier" || return 1
+    return 1
+  }
+
+  core_commit="$(
+    atlas_deployment_record_value "$previous_record" core_commit
+  )" || {
+    atlas_deployment_release_lock "$identifier" || return 1
+    return 1
+  }
+
+  ingress_commit="$(
+    atlas_deployment_record_value "$previous_record" ingress_commit
+  )" || {
+    atlas_deployment_release_lock "$identifier" || return 1
+    return 1
+  }
+
+  sports_commit="$(
+    atlas_deployment_record_value "$previous_record" sports_commit
+  )" || {
+    atlas_deployment_release_lock "$identifier" || return 1
+    return 1
+  }
+
+  source_commit="$(
+    atlas_deployment_record_value "$previous_record" source_commit
+  )" || {
+    atlas_deployment_release_lock "$identifier" || return 1
+    return 1
+  }
+
+  if [[ -z "$source_commit" ]]; then
+    source_commit="$(
+      atlas_deployment_record_value "$previous_record" target_commit
+    )" || {
+      atlas_deployment_release_lock "$identifier" || return 1
+      return 1
+    }
+  fi
+
+  if [[ -z "$source_commit" ]]; then
+    source_commit="$core_commit"
+  fi
+
+  [[ "$core_commit" =~ ^[0-9a-f]{40}$ ]] &&
+    [[ "$ingress_commit" =~ ^[0-9a-f]{40}$ ]] &&
+    [[ "$source_commit" =~ ^[0-9a-f]{40}$ ]] || {
+      echo 'ERROR: previous deployment source metadata is invalid.' >&2
+      atlas_deployment_release_lock "$identifier" || return 1
+      return 1
+    }
+
+  if [[ -n "$sports_commit" ]]; then
+    [[ "$sports_commit" =~ ^[0-9a-f]{40}$ ]] || {
+      echo 'ERROR: previous Sports source metadata is invalid.' >&2
+      atlas_deployment_release_lock "$identifier" || return 1
+      return 1
+    }
+  fi
+
+  # From this point onward, failures retain the record and deployment lock.
+  # No production container mutation occurs during adoption.
+  mkdir -- "$record" || return 1
+
+  cat > "$record/metadata" <<EOF
+type=baseline
+deployment_id=$identifier
+previous_baseline=$previous_id
+target_commit=$source_commit
+source_commit=$source_commit
+core_commit=$core_commit
+ingress_commit=$ingress_commit
+sports_commit=$sports_commit
+notifications_commit=$expected_commit
+scope=all
+migration=none
+created_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+EOF
+
+  for archive_name in core-source.tar.gz ingress-source.tar.gz; do
+    [[ -s "$previous_record/$archive_name" ]] || return 1
+    cp -- "$previous_record/$archive_name" "$record/$archive_name" || return 1
+    cmp -s -- \
+      "$previous_record/$archive_name" \
+      "$record/$archive_name" || return 1
+    tar -tzf "$record/$archive_name" >/dev/null 2>&1 || return 1
+  done
+
+  if [[ -n "$sports_commit" ]]; then
+    archive_name='sports-source.tar.gz'
+    [[ -s "$previous_record/$archive_name" ]] || return 1
+    cp -- "$previous_record/$archive_name" "$record/$archive_name" || return 1
+    cmp -s -- \
+      "$previous_record/$archive_name" \
+      "$record/$archive_name" || return 1
+    tar -tzf "$record/$archive_name" >/dev/null 2>&1 || return 1
+  fi
+
+  atlas_deployment_capture_notifications_adoption_evidence \
+    "$record" "$checkout" "$expected_commit" || return 1
+
+  [[ -s "$previous_record/images.tsv" ]] || return 1
+  [[ -s "$record/notifications-image.tsv" ]] || return 1
+
+  cp -- "$previous_record/images.tsv" "$record/images.tsv" || return 1
+
+  # Exactly one new Notifications image row; no duplicate inherited row.
+  if grep -q '^notifications|' "$record/images.tsv"; then
+    echo 'ERROR: previous image manifest already includes Notifications.' >&2
+    return 1
+  fi
+
+  [[ "$(<"$record/notifications-image.tsv")" == "$first_row" ]] || {
+    echo 'ERROR: Notifications evidence differs from original attestation.' >&2
+    return 1
+  }
+
+  printf '%s\n' "$first_row" >> "$record/images.tsv"
+
+  # Preserve image identities before the newly adopted record is published.
+  atlas_deployment_preserve_rollback_images \
+    "$record" "$record" || return 1
+
+  atlas_deployment_verify_runtime "$record" || return 1
+
+  final_row="$(
+    atlas_deployment_notifications_live_worker_row \
+      "$checkout" "$expected_commit"
+  )" || return 1
+
+  [[ "$final_row" == "$first_row" ]] || {
+    echo 'ERROR: Notifications worker drifted during adoption.' >&2
+    return 1
+  }
+
+  [[ "$(<"$record/notifications-source-commit")" == "$expected_commit" ]] || {
+    echo 'ERROR: Notifications historical source provenance changed.' >&2
+    return 1
+  }
+
+  [[ -s "$record/notifications-source.tar.gz" ]] &&
+    [[ -s "$record/rollback-images.tsv" ]] || return 1
+
+  atlas_deployment_set_status "$record" verified || return 1
+  atlas_deployment_set_current "$identifier" || return 1
+
+  atlas_deployment_release_lock "$identifier" || return 1
+
+  printf 'Verified Notifications adoption baseline: %s\n' "$identifier"
+}
+
+# Public entry for the historical, live-mounted Notifications worker.
+# The internal adoption transaction owns its durable deployment lock.
+# This wrapper must not run from a feature branch or an alternate checkout.
+atlas_deployment_adopt_notifications_guarded() {
+  local exclusion_fd
+  local status
+  local canonical_root
+  local checkout='/opt/project-atlas'
+  local expected_commit
+
+  [[ "$#" -eq 0 ]] || {
+    echo 'Usage: atlas deployment adopt-notifications' >&2
+    return 2
+  }
+
+  canonical_root="$(realpath -e -- "$ATLAS_PROJECT_DIR")" || return 1
+
+  [[ "$canonical_root" == '/opt/project-atlas-v1-main' ]] || {
+    echo 'ERROR: Notifications adoption requires the canonical Atlas checkout.' >&2
+    return 1
+  }
+
+  atlas_deployment_validate_source || return 1
+
+  [[ -d "$checkout" && ! -L "$checkout" ]] || {
+    echo 'ERROR: historical Notifications checkout is unavailable.' >&2
+    return 1
+  }
+
+  expected_commit="$(
+    git -C "$checkout" rev-parse HEAD
+  )" || return 1
+
+  [[ "$expected_commit" =~ ^[0-9a-f]{40}$ ]] || {
+    echo 'ERROR: historical Notifications source commit is invalid.' >&2
+    return 1
+  }
+
+  atlas_execution_exclusion_acquire exclusion_fd || return 1
+
+  if atlas_deployment_adopt_notifications \
+    "$checkout" "$expected_commit"
+  then
+    status=0
+  else
+    status=$?
+  fi
+
+  if ! atlas_execution_exclusion_release "$exclusion_fd"; then
+    echo 'CRITICAL: unable to release deployment/Scheduler exclusion lock.' >&2
+    [[ "$status" -ne 0 ]] || status=1
+  fi
+
+  return "$status"
+}
 
 atlas_deployment_adopt_sports() {
   local previous_record
@@ -1100,6 +1921,7 @@ atlas_deployment_prepare_update() {
   local core_commit
   local ingress_commit
   local sports_commit
+  local notifications_commit
 
   record="$(
     atlas_deployment_record_dir "$identifier"
@@ -1131,6 +1953,12 @@ atlas_deployment_prepare_update() {
       sports_commit
   )"
 
+  notifications_commit="$(
+    atlas_deployment_record_value \
+      "$previous_record" \
+      notifications_commit
+  )" || return 1
+
   case "$scope" in
     core)
       core_commit="$target_commit"
@@ -1156,6 +1984,7 @@ target_commit=$target_commit
 core_commit=$core_commit
 ingress_commit=$ingress_commit
 sports_commit=$sports_commit
+notifications_commit=$notifications_commit
 scope=$scope
 migration=none
 created_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -1206,6 +2035,55 @@ EOF
         "$previous_record/sports-source.tar.gz" \
         "$record/sports-source.tar.gz"
     fi
+  fi
+
+  if [[ -n "$notifications_commit" ]]; then
+    [[ "$notifications_commit" =~ ^[0-9a-f]{40}$ ]] || {
+      echo 'ERROR: previous Notifications commit is invalid.' >&2
+      return 1
+    }
+
+    local evidence
+    for evidence in \
+      notifications-source.tar.gz \
+      notifications-image.tsv \
+      notifications-source-commit
+    do
+      [[ -s "$previous_record/$evidence" ]] || {
+        printf 'ERROR: previous Notifications evidence is missing: %s\n' \
+          "$evidence" >&2
+        return 1
+      }
+    done
+
+    [[ "$(<"$previous_record/notifications-source-commit")" == \
+      "$notifications_commit" ]] || {
+      echo 'ERROR: previous Notifications source provenance differs.' >&2
+      return 1
+    }
+
+    [[ "$(
+      grep -Fxc -- \
+        "$(<"$previous_record/notifications-image.tsv")" \
+        "$record/pre-images.tsv"
+    )" -eq 1 ]] || {
+      echo 'ERROR: previous Notifications image evidence differs.' >&2
+      return 1
+    }
+
+    for evidence in \
+      notifications-source.tar.gz \
+      notifications-image.tsv \
+      notifications-source-commit
+    do
+      cp -- \
+        "$previous_record/$evidence" \
+        "$record/$evidence" || return 1
+
+      cmp -s -- \
+        "$previous_record/$evidence" \
+        "$record/$evidence" || return 1
+    done
   fi
 
   atlas_deployment_set_status \
@@ -1284,6 +2162,8 @@ atlas_deployment_publish_reconciliation_baseline() {
   local core_commit
   local ingress_commit
   local sports_commit
+  local notifications_commit
+  local notifications_evidence
   local recovery_source='none'
 
   identifier="$(
@@ -1380,6 +2260,48 @@ atlas_deployment_publish_reconciliation_baseline() {
     }
   fi
 
+  notifications_commit="$(
+    atlas_deployment_record_value \
+      "$baseline" \
+      notifications_commit
+  )" || {
+    rm -rf -- "$temporary"
+    return 1
+  }
+
+  if [[ -n "$notifications_commit" ]]; then
+    [[ "$notifications_commit" =~ ^[0-9a-f]{40}$ ]] || {
+      echo 'ERROR: previous Notifications source identity is invalid.' >&2
+      rm -rf -- "$temporary"
+      return 1
+    }
+
+    [[ -s "$baseline/notifications-source.tar.gz" ]] &&
+      [[ -s "$baseline/notifications-image.tsv" ]] &&
+      [[ -s "$baseline/notifications-source-commit" ]] &&
+      [[ -s "$baseline/images.tsv" ]] || {
+        echo 'ERROR: previous Notifications recovery evidence is missing.' >&2
+        rm -rf -- "$temporary"
+        return 1
+      }
+
+    [[ "$(<"$baseline/notifications-source-commit")" == \
+      "$notifications_commit" ]] || {
+        echo 'ERROR: previous Notifications source provenance differs.' >&2
+        rm -rf -- "$temporary"
+        return 1
+      }
+
+    [[ "$(grep -c '^notifications|' "$baseline/images.tsv")" -eq 1 ]] &&
+      [[ "$(grep -Fxc -- \
+        "$(<"$baseline/notifications-image.tsv")" \
+        "$baseline/images.tsv")" -eq 1 ]] || {
+        echo 'ERROR: previous Notifications image evidence differs.' >&2
+        rm -rf -- "$temporary"
+        return 1
+      }
+  fi
+
   case "$scope" in
     core)
       ;;
@@ -1425,6 +2347,28 @@ atlas_deployment_publish_reconciliation_baseline() {
       }
   fi
 
+  if [[ -n "$notifications_commit" ]]; then
+    for notifications_evidence in \
+      notifications-source.tar.gz \
+      notifications-image.tsv \
+      notifications-source-commit
+    do
+      cp -- \
+        "$baseline/$notifications_evidence" \
+        "$temporary/$notifications_evidence" || {
+          rm -rf -- "$temporary"
+          return 1
+        }
+
+      cmp -s -- \
+        "$baseline/$notifications_evidence" \
+        "$temporary/$notifications_evidence" || {
+          rm -rf -- "$temporary"
+          return 1
+        }
+    done
+  fi
+
   cat > "$temporary/metadata" <<EOF
 type=baseline
 deployment_id=$identifier
@@ -1435,6 +2379,7 @@ source_commit=$source_commit
 core_commit=$core_commit
 ingress_commit=$ingress_commit
 sports_commit=$sports_commit
+notifications_commit=$notifications_commit
 scope=all
 migration=none
 reason=post-rollback-failure-finalization
@@ -1451,6 +2396,7 @@ source_commit=$source_commit
 core_commit=$core_commit
 ingress_commit=$ingress_commit
 sports_commit=$sports_commit
+notifications_commit=$notifications_commit
 historical_recovery_source=$recovery_source
 source_claim=verified-previous-baseline-plus-observed-runtime
 EOF
@@ -1487,6 +2433,14 @@ EOF
     if [[ -f sports-source.tar.gz ]]; then
       sha256sum \
         sports-source.tar.gz \
+        >> MANIFEST.sha256
+    fi
+
+    if [[ -n "$notifications_commit" ]]; then
+      sha256sum \
+        notifications-source.tar.gz \
+        notifications-image.tsv \
+        notifications-source-commit \
         >> MANIFEST.sha256
     fi
 
@@ -1993,6 +2947,9 @@ atlas_deployment_verify_rollback_runtime() {
   local scope="$2"
   local recovery
   local ingress_verifier
+  local previous_id
+  local baseline
+  local notifications_commit
 
   atlas_command_doctor || return 1
 
@@ -2029,6 +2986,39 @@ atlas_deployment_verify_rollback_runtime() {
       return 1
       ;;
   esac
+
+  # Notifications adoption leaves the legacy-mounted worker unchanged.
+  # Check the previous baseline during private and public rollback
+  # verification, without restoring or recreating that worker.
+  previous_id="$(
+    atlas_deployment_record_value "$transaction" previous_baseline
+  )" || return 1
+
+  baseline="$(
+    atlas_deployment_record_dir "$previous_id"
+  )" || return 1
+
+  notifications_commit="$(
+    atlas_deployment_record_value "$baseline" notifications_commit
+  )" || return 1
+
+  if [[ -n "$notifications_commit" ]]; then
+    [[ "$notifications_commit" =~ ^[0-9a-f]{40}$ ]] || {
+      echo 'ERROR: rollback Notifications source identity is invalid.' >&2
+      return 1
+    }
+
+    [[ -f "$baseline/status" &&
+      "$(<"$baseline/status")" == verified ]] || {
+        echo 'ERROR: rollback Notifications baseline is not verified.' >&2
+        return 1
+      }
+
+    atlas_deployment_verify_runtime "$baseline" || {
+      echo 'ERROR: rollback Notifications baseline attestation failed.' >&2
+      return 1
+    }
+  fi
 }
 
 atlas_deployment_rollback() {
@@ -2207,6 +3197,9 @@ atlas_deployment_recover_failed_after_apply() {
   local core_commit
   local ingress_commit
   local sports_commit
+  local notifications_commit
+  local notifications_evidence
+  local -a notifications_rows=()
   local reconciliation_id
   local reconciliation
   local temporary
@@ -2378,6 +3371,19 @@ atlas_deployment_recover_failed_after_apply() {
       sports_commit
   )"
 
+  notifications_commit="$(
+    atlas_deployment_record_value \
+      "$transaction" \
+      notifications_commit
+  )" || return 1
+
+  if [[ -n "$notifications_commit" ]]; then
+    [[ "$notifications_commit" =~ ^[0-9a-f]{40}$ ]] || {
+      echo 'ERROR: failed transaction Notifications commit is invalid.' >&2
+      return 1
+    }
+  fi
+
   for commit in \
     "$target_commit" \
     "$source_commit" \
@@ -2431,6 +3437,43 @@ atlas_deployment_recover_failed_after_apply() {
     return 1
   }
 
+  if [[ -n "$notifications_commit" ]]; then
+    [[ -s "$transaction/notifications-source.tar.gz" ]] &&
+      [[ -s "$transaction/notifications-image.tsv" ]] &&
+      [[ -s "$transaction/notifications-source-commit" ]] || {
+        echo 'ERROR: failed transaction Notifications evidence is missing.' >&2
+        return 1
+      }
+
+    [[ "$(<"$transaction/notifications-source-commit")" == \
+      "$notifications_commit" ]] || {
+        echo 'ERROR: failed transaction Notifications source commit differs.' >&2
+        return 1
+      }
+
+    mapfile -t notifications_rows \
+      < "$transaction/notifications-image.tsv" || return 1
+
+    [[ "${#notifications_rows[@]}" -eq 1 ]] || {
+      echo 'ERROR: failed transaction Notifications image evidence is not a single row.' >&2
+      return 1
+    }
+
+    [[ "${notifications_rows[0]}" == \
+      'notifications|modules/notifications/docker-compose.yml|notifications|atlas-notifications-worker|/atlas-notifications-worker|'* ]] || {
+        echo 'ERROR: failed transaction Notifications image identity is invalid.' >&2
+        return 1
+      }
+
+    [[ "$(grep -c '^notifications|' "$transaction/images.tsv")" -eq 1 ]] &&
+      [[ "$(grep -Fxc -- \
+        "${notifications_rows[0]}" \
+        "$transaction/images.tsv")" -eq 1 ]] || {
+        echo 'ERROR: failed transaction Notifications image evidence differs from manifest.' >&2
+        return 1
+      }
+  fi
+
   reconciliation_id="$(
     atlas_deployment_new_id baseline-reconciliation
   )"
@@ -2481,6 +3524,28 @@ atlas_deployment_recover_failed_after_apply() {
       return 1
     }
 
+  if [[ -n "$notifications_commit" ]]; then
+    for notifications_evidence in \
+      notifications-source.tar.gz \
+      notifications-image.tsv \
+      notifications-source-commit
+    do
+      cp -- \
+        "$transaction/$notifications_evidence" \
+        "$temporary/$notifications_evidence" || {
+          rm -rf -- "$temporary"
+          return 1
+        }
+
+      cmp -s -- \
+        "$transaction/$notifications_evidence" \
+        "$temporary/$notifications_evidence" || {
+          rm -rf -- "$temporary"
+          return 1
+        }
+    done
+  fi
+
   cat > "$temporary/metadata" <<EOF
 type=baseline
 deployment_id=$reconciliation_id
@@ -2492,6 +3557,7 @@ source_commit=$source_commit
 core_commit=$core_commit
 ingress_commit=$ingress_commit
 sports_commit=$sports_commit
+notifications_commit=$notifications_commit
 scope=all
 migration=none
 reason=failed-after-apply-recovery
@@ -2508,6 +3574,7 @@ source_commit=$source_commit
 core_commit=$core_commit
 ingress_commit=$ingress_commit
 sports_commit=$sports_commit
+notifications_commit=$notifications_commit
 source_claim=verified-already-applied-target
 EOF
 
@@ -2597,6 +3664,14 @@ EOF
     if [[ -f sports-source.tar.gz ]]; then
       sha256sum \
         sports-source.tar.gz \
+        >> MANIFEST.sha256
+    fi
+
+    if [[ -n "$notifications_commit" ]]; then
+      sha256sum \
+        notifications-source.tar.gz \
+        notifications-image.tsv \
+        notifications-source-commit \
         >> MANIFEST.sha256
     fi
 
@@ -2798,6 +3873,10 @@ atlas_command_deployment() {
     adopt-sports)
       atlas_deployment_adopt_sports
       ;;
+    adopt-notifications)
+      shift
+      atlas_deployment_adopt_notifications_guarded "$@"
+      ;;
     recover-failed-before-apply)
       [[ -n "${2:-}" ]] || {
         echo 'Usage: atlas deployment recover-failed-before-apply <deployment-id>' >&2
@@ -2832,10 +3911,15 @@ Usage:
   atlas deployment status
   atlas deployment baseline
   atlas deployment adopt-sports
+  atlas deployment adopt-notifications
   atlas deployment recover-failed-before-apply <deployment-id>
   atlas deployment recover-failed-after-apply <deployment-id>
   atlas deployment recover-failed-rollback <deployment-id>
   atlas deployment rollback <deployment-id>
+
+Notifications adoption records and attests the existing historical worker.
+It does not launch, upgrade, relocate, or restore Notifications. Managed
+Notifications deployment requires a separate verified lifecycle contract.
 
 Baseline creation records verified production source archives and exact running
 image identities. Sports adoption creates a new verified baseline by preserving

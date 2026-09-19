@@ -17,7 +17,7 @@ services:
       ATLAS_NOTIFICATIONS_INTERVAL: "5"
 
     volumes:
-      - /opt/project-atlas:/opt/project-atlas:ro
+      - ${ATLAS_NOTIFICATIONS_SOURCE_DIR:?ATLAS_NOTIFICATIONS_SOURCE_DIR is required}:/opt/project-atlas:ro
       - /mnt/storage/configs/atlas/runtime/events.jsonl:/mnt/storage/configs/atlas/runtime/events.jsonl:ro
       - /mnt/storage/configs/atlas/runtime/subscribers/module-notifications.cursor:/mnt/storage/configs/atlas/runtime/subscribers/module-notifications.cursor
       - /mnt/storage/configs/atlas/runtime/subscribers/module-notifications.filter:/mnt/storage/configs/atlas/runtime/subscribers/module-notifications.filter:ro
