@@ -492,3 +492,74 @@ def test_subtitle_selection_fails_closed_if_source_changes() -> None:
             raise AssertionError(
                 "source identity change must fail closed"
             )
+
+
+def test_playback_info_builds_safe_static_stream_for_direct_play_without_url():
+    """Jellyfin may omit URLs when the selected source can direct-play."""
+
+    provider = JellyfinProvider(
+        "http://jellyfin:8096",
+        "server-secret",
+    )
+
+    with patch(
+        "atlas.media.jellyfin.urlopen",
+        return_value=Response(
+            {
+                "MediaSources": [
+                    {
+                        "Id": "abc",
+                        "RunTimeTicks": 123456,
+                        "Container": "mp4",
+                        "Protocol": "File",
+                        "Path": "/media/private/colony.mp4",
+                        "SupportsDirectPlay": True,
+                        "SupportsDirectStream": True,
+                        "SupportsTranscoding": True,
+                        "DirectStreamUrl": None,
+                        "TranscodingUrl": None,
+                        "MediaStreams": [
+                            {
+                                "Index": 0,
+                                "Type": "Video",
+                                "Codec": "h264",
+                                "IsDefault": True,
+                            },
+                            {
+                                "Index": 1,
+                                "Type": "Audio",
+                                "Codec": "aac",
+                                "Language": "eng",
+                                "IsDefault": True,
+                            },
+                        ],
+                    }
+                ]
+            }
+        ),
+    ) as request:
+        result = provider.get_playback_info(
+            "abc",
+            user_id="a" * 32,
+        )
+
+    request.assert_called_once()
+
+    assert result["stream_path"] == (
+        "/Videos/abc/stream"
+        "?Static=true"
+        "&MediaSourceId=abc"
+    )
+
+    assert result["media_source_id"] == "abc"
+    assert result["supports_direct_play"] is True
+    assert result["supports_direct_stream"] is True
+    assert result["supports_transcoding"] is True
+
+    serialized = json.dumps(result)
+
+    assert "server-secret" not in serialized
+    assert "jellyfin:8096" not in serialized
+    assert "/media/private/colony.mp4" not in serialized
+    assert "ApiKey" not in serialized
+    assert "api_key" not in serialized

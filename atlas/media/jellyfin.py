@@ -897,9 +897,27 @@ class JellyfinProvider:
         supports_transcoding = bool(source.get("SupportsTranscoding"))
 
         raw_stream_url = source.get("TranscodingUrl") or source.get("DirectStreamUrl")
+
         if not isinstance(raw_stream_url, str) or not raw_stream_url.strip():
-            raise MediaProviderError("Jellyfin did not return a browser stream URL")
-        stream_path = _safe_playback_stream_path(raw_stream_url, normalized_id)
+            if supports_direct_play:
+                raw_stream_url = (
+                    f"/Videos/{quote(normalized_id, safe='')}/stream?"
+                    + urlencode(
+                        {
+                            "Static": "true",
+                            "MediaSourceId": media_source_id,
+                        }
+                    )
+                )
+            else:
+                raise MediaProviderError(
+                    "Jellyfin did not return a browser stream URL"
+                )
+
+        stream_path = _safe_playback_stream_path(
+            raw_stream_url,
+            normalized_id,
+        )
 
         tracks: list[dict[str, Any]] = []
         streams = source.get("MediaStreams")
