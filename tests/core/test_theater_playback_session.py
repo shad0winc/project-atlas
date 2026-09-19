@@ -546,7 +546,7 @@ def test_playback_info_builds_safe_static_stream_for_direct_play_without_url():
     request.assert_called_once()
 
     assert result["stream_path"] == (
-        "/Videos/abc/stream"
+        "/videos/abc/stream"
         "?Static=true"
         "&MediaSourceId=abc"
     )
