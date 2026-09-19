@@ -1371,7 +1371,18 @@ def _safe_playback_stream_path(raw_url: str, expected_item_id: str) -> str:
         for name, value in parse_qsl(parsed.query, keep_blank_values=True)
         if name.lower() not in forbidden
     ]
-    return urlunsplit(("", "", parsed.path, urlencode(safe_query), ""))
+
+    path_parts = parsed.path.split("/")
+    for index, part in enumerate(path_parts):
+        if part:
+            path_parts[index] = "videos"
+            break
+
+    canonical_path = "/".join(path_parts)
+
+    return urlunsplit(
+        ("", "", canonical_path, urlencode(safe_query), "")
+    )
 
 def default_jellyfin_provider() -> JellyfinProvider:
     """Build the configured Jellyfin provider."""
