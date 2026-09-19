@@ -27,6 +27,7 @@ def invoke(
     *,
     adopted: bool,
     mode: str = "match",
+    source_mode: str | None = None,
 ):
     record = tmp_path / "record"
     record.mkdir()
@@ -34,7 +35,11 @@ def invoke(
     (record / "metadata").write_text(
         "type=baseline\n"
         "deployment_id=test\n"
-        + (f"notifications_commit={COMMIT}\n" if adopted else ""),
+        + (f"notifications_commit={COMMIT}\n" if adopted else "")
+        + (
+            f"notifications_source_mode={source_mode}\n"
+            if source_mode is not None else ""
+        ),
         encoding="utf-8",
     )
 
@@ -147,5 +152,42 @@ def test_adopted_runtime_verification_rejects_worker_row_drift(
 ) -> None:
     result = invoke(
         tmp_path, adopted=True, mode="row-drift"
+    )
+    assert result.returncode != 0
+
+
+def test_explicit_historical_source_mode_accepts_adopted_worker(
+    tmp_path: Path,
+) -> None:
+    result = invoke(
+        tmp_path, adopted=True, source_mode="historical"
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_explicit_historical_mode_requires_adoption(
+    tmp_path: Path,
+) -> None:
+    result = invoke(
+        tmp_path, adopted=False, source_mode="historical"
+    )
+    assert result.returncode != 0
+
+
+def test_managed_source_mode_fails_closed_before_launch_support(
+    tmp_path: Path,
+) -> None:
+    result = invoke(
+        tmp_path, adopted=True, source_mode="managed"
+    )
+    assert result.returncode != 0
+    assert "unsupported Notifications source mode" in result.stderr
+
+
+def test_unrecognized_source_mode_fails_closed(
+    tmp_path: Path,
+) -> None:
+    result = invoke(
+        tmp_path, adopted=True, source_mode="unknown"
     )
     assert result.returncode != 0

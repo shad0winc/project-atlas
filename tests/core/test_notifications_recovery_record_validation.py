@@ -70,6 +70,19 @@ def invoke(tmp_path: Path, scenario: str):
         COMMIT + "\n", encoding="utf-8"
     )
 
+    if scenario in ("explicit-historical", "managed-mode"):
+        mode = (
+            "historical"
+            if scenario == "explicit-historical"
+            else "managed"
+        )
+        with (record / "metadata").open(
+            "a", encoding="utf-8"
+        ) as metadata:
+            metadata.write(
+                f"notifications_source_mode={mode}\n"
+            )
+
     if scenario == "missing-source":
         (record / "notifications-source.tar.gz").unlink()
     elif scenario == "missing-image-evidence":
@@ -99,8 +112,10 @@ def invoke(tmp_path: Path, scenario: str):
             f"/core-service|core:test|{IMAGE}\n",
             encoding="utf-8",
         )
-    else:
-        assert scenario == "complete"
+    elif scenario not in (
+        "complete", "explicit-historical", "managed-mode"
+    ):
+        raise AssertionError(f"Unexpected scenario: {scenario}")
 
     script = r"""
 set -euo pipefail
@@ -161,3 +176,18 @@ def test_accepts_historical_record_without_notifications_adoption(
     result = invoke(tmp_path, "historical")
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == str(tmp_path / "baseline-test")
+
+
+def test_current_record_accepts_explicit_historical_source_mode(
+    tmp_path: Path,
+) -> None:
+    result = invoke(tmp_path, "explicit-historical")
+    assert result.returncode == 0, result.stderr
+
+
+def test_current_record_rejects_unsupported_managed_source_mode(
+    tmp_path: Path,
+) -> None:
+    result = invoke(tmp_path, "managed-mode")
+    assert result.returncode != 0
+    assert "unsupported Notifications source mode" in result.stderr
