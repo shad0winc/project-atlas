@@ -61,6 +61,7 @@ def notification_title(notification: dict[str, Any]) -> str:
         "request.searching": "Media Search Started",
         "request.downloading": "Media Download Started",
         "request.importing": "Media Import Started",
+        "request.processing": "Media Processing Started",
         "request.available": "Ready to Watch",
         "request.rejected": "Media Request Rejected",
         "request.failed": "Media Request Failed",
@@ -113,6 +114,9 @@ def notification_description(notification: dict[str, Any]) -> str:
             ),
             "request.importing": (
                 f"{display_title} is being imported."
+            ),
+            "request.processing": (
+                f"{display_title} is being processed in Jellyfin."
             ),
             "request.available": (
                 f"{display_title} is ready to watch."

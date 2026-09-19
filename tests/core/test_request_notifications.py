@@ -176,6 +176,36 @@ def test_request_lifecycle_titles_are_explicit() -> None:
         assert notification_title(notification) == title
 
 
+def test_processing_notification_title() -> None:
+    notification = build_notification(
+        request_event("request.processing")
+    )
+
+    assert (
+        notification_title(notification)
+        == "Media Processing Started"
+    )
+
+
+def test_processing_notification_description() -> None:
+    notification = build_notification(
+        request_event("request.processing")
+    )
+
+    assert (
+        notification_description(notification)
+        == "Fight Club (1999) is being processed in Jellyfin."
+    )
+
+
+def test_processing_notification_severity() -> None:
+    notification = build_notification(
+        request_event("request.processing")
+    )
+
+    assert notification["severity"] == "info"
+
+
 def test_request_terminal_failure_severity_is_warning() -> None:
     for event_name in (
         "request.failed",
