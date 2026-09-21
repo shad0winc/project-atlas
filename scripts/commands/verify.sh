@@ -117,11 +117,16 @@ atlas_verify_line_list_contains() {
 atlas_verify_configuration() {
   local variable
 
+  # Existing installations without a separate data root retain the
+  # original containment contract.
+  : "${ATLAS_DATA_ROOT:=$ATLAS_STORAGE_ROOT}"
+
   atlas_section "Configuration"
 
   for variable in \
     ATLAS_PROJECT_DIR \
     ATLAS_STORAGE_ROOT \
+    ATLAS_DATA_ROOT \
     ATLAS_MEDIA_ROOT \
     ATLAS_DOWNLOADS_ROOT \
     ATLAS_BACKUP_DIR \
@@ -162,16 +167,16 @@ atlas_verify_configuration() {
     ATLAS_INVITE_EXPIRATION_DAYS
 
   atlas_verify_check \
-    "ATLAS_MEDIA_ROOT within ATLAS_STORAGE_ROOT" \
+    "ATLAS_MEDIA_ROOT within ATLAS_DATA_ROOT" \
     atlas_verify_path_within \
     ATLAS_MEDIA_ROOT \
-    ATLAS_STORAGE_ROOT
+    ATLAS_DATA_ROOT
 
   atlas_verify_check \
-    "ATLAS_DOWNLOADS_ROOT within ATLAS_STORAGE_ROOT" \
+    "ATLAS_DOWNLOADS_ROOT within ATLAS_DATA_ROOT" \
     atlas_verify_path_within \
     ATLAS_DOWNLOADS_ROOT \
-    ATLAS_STORAGE_ROOT
+    ATLAS_DATA_ROOT
 
   atlas_verify_check \
     "ATLAS_BACKUP_DIR within ATLAS_STORAGE_ROOT" \
