@@ -186,6 +186,44 @@ class CleanupExecutionServiceTests(unittest.TestCase):
             CleanupExecutionMode.DRY_RUN,
         )
 
+    def test_accepts_execute_mode(self) -> None:
+        report = self.service.plan(
+            make_scan(),
+            mode=CleanupExecutionMode.EXECUTE,
+        )
+
+        self.assertEqual(
+            report.mode,
+            CleanupExecutionMode.EXECUTE,
+        )
+        self.assertTrue(
+            all(
+                item.mode is CleanupExecutionMode.EXECUTE
+                for item in report.items
+            )
+        )
+        self.assertEqual(report.total, 3)
+        self.assertEqual(report.planned_count, 1)
+        self.assertEqual(report.skipped_count, 2)
+        self.assertEqual(report.modified_count, 0)
+
+    def test_accepts_string_execute_mode(self) -> None:
+        report = self.service.plan(
+            make_scan(),
+            mode="execute",
+        )
+
+        self.assertEqual(
+            report.mode,
+            CleanupExecutionMode.EXECUTE,
+        )
+        self.assertTrue(
+            all(
+                item.mode is CleanupExecutionMode.EXECUTE
+                for item in report.items
+            )
+        )
+
     def test_rejects_invalid_scan_type(self) -> None:
         with self.assertRaisesRegex(
             CleanupError,

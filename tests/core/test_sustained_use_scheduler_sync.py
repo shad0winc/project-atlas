@@ -45,6 +45,18 @@ def test_unqualified_sync_registers_both_core_jobs(
             ],
         }
 
+    def fake_cleanup(received_scheduler):
+        calls.append(
+            (
+                "cleanup",
+                received_scheduler,
+            )
+        )
+
+        return {
+            "name": "cleanup.execute",
+        }
+
     def fake_operations(received_scheduler):
         calls.append(
             (
@@ -88,6 +100,11 @@ def test_unqualified_sync_registers_both_core_jobs(
     )
     monkeypatch.setattr(
         scheduler_cli,
+        "register_cleanup_execution",
+        fake_cleanup,
+    )
+    monkeypatch.setattr(
+        scheduler_cli,
         "register_operations_collection",
         fake_operations,
     )
@@ -114,6 +131,7 @@ def test_unqualified_sync_registers_both_core_jobs(
 
     assert result == {
         "registered": [
+            "cleanup.execute",
             "operations.collect",
             "requests.reconcile",
             "sports.sync",
@@ -136,6 +154,10 @@ def test_unqualified_sync_registers_both_core_jobs(
                 registry,
                 None,
             ),
+        ),
+        (
+            "cleanup",
+            scheduler,
         ),
         (
             "operations",
@@ -190,6 +212,11 @@ def test_targeted_module_sync_skips_all_core_jobs(
     )
     monkeypatch.setattr(
         scheduler_cli,
+        "register_cleanup_execution",
+        core_job_must_not_run,
+    )
+    monkeypatch.setattr(
+        scheduler_cli,
         "register_operations_collection",
         core_job_must_not_run,
     )
@@ -228,12 +255,21 @@ def test_core_registration_result_is_deduplicated(
         "sync_module_jobs",
         lambda *args, **kwargs: {
             "registered": [
+                "cleanup.execute",
                 "operations.collect",
                 "requests.reconcile",
                 "sustained-use.sample",
             ],
             "removed": [],
             "skipped": [],
+        },
+    )
+
+    monkeypatch.setattr(
+        scheduler_cli,
+        "register_cleanup_execution",
+        lambda received_scheduler: {
+            "name": "cleanup.execute",
         },
     )
 
@@ -269,6 +305,7 @@ def test_core_registration_result_is_deduplicated(
     )
 
     assert result["registered"] == [
+        "cleanup.execute",
         "operations.collect",
         "requests.reconcile",
         "sustained-use.sample",

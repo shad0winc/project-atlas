@@ -11,6 +11,9 @@ from pathlib import Path
 from typing import Iterator, Sequence
 
 from atlas.events import publish_core_event
+from atlas.cleanup.scheduler import (
+    register_cleanup_execution,
+)
 from atlas.module_scheduler import sync_module_jobs
 from atlas.operations_scheduler import (
     register_operations_collection,
@@ -155,6 +158,13 @@ def _sync_scheduler_jobs(
     if module_name is not None:
         return result
 
+    cleanup_task = register_cleanup_execution(
+        scheduler,
+    )
+    cleanup_name = str(
+        cleanup_task["name"],
+    )
+
     operations_task = register_operations_collection(
         scheduler,
     )
@@ -180,6 +190,7 @@ def _sync_scheduler_jobs(
         "registered": sorted(
             {
                 *result["registered"],
+                cleanup_name,
                 operations_name,
                 media_request_name,
                 sustained_use_name,

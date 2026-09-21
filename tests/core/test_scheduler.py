@@ -711,6 +711,7 @@ class OperationsSchedulerSyncCliTests(unittest.TestCase):
         self.assertEqual(
             set(stored["tasks"]),
             {
+                "cleanup.execute",
                 "operations.collect",
                 "requests.reconcile",
                 "sports.sync",

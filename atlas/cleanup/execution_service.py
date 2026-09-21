@@ -1,4 +1,4 @@
-"""Dry-run cleanup execution planning for Project Atlas."""
+"""Controlled cleanup execution planning for Project Atlas."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ def _utc_now() -> datetime:
 
 
 class CleanupExecutionService:
-    """Convert cleanup scans into non-destructive execution plans."""
+    """Convert cleanup scans into normalized execution plans."""
 
     def __init__(
         self,
@@ -45,7 +45,7 @@ class CleanupExecutionService:
             CleanupExecutionMode.DRY_RUN
         ),
     ) -> CleanupExecutionReport:
-        """Create a dry-run execution plan from one cleanup scan."""
+        """Create a normalized execution plan from one cleanup scan."""
 
         if not isinstance(scan, CleanupScanReport):
             raise CleanupError(
@@ -62,11 +62,6 @@ class CleanupExecutionService:
             raise CleanupError(
                 f"invalid cleanup execution mode: {mode}"
             ) from exc
-
-        if normalized_mode is not CleanupExecutionMode.DRY_RUN:
-            raise CleanupError(
-                "only dry-run cleanup execution is supported"
-            )
 
         planned_at = self._now()
 
