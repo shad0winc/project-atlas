@@ -5,6 +5,7 @@ PROJECT_DIR="${ATLAS_PROJECT_DIR:-/opt/project-atlas}"
 MODULE_DIR="$PROJECT_DIR/modules/sports"
 MODULE_ENV_FILE="$MODULE_DIR/.env"
 OPERATOR_ENV_FILE="$PROJECT_DIR/.env"
+ATLAS_CONFIG_FILE="$PROJECT_DIR/config/atlas.conf"
 
 if [[ ! -f "$MODULE_ENV_FILE" || -L "$MODULE_ENV_FILE" ]]; then
   echo "ERROR: Sports module environment must be a regular non-symlink file." >&2
@@ -17,6 +18,9 @@ if [[ ! -f "$OPERATOR_ENV_FILE" || -L "$OPERATOR_ENV_FILE" ]]; then
 fi
 
 chmod 0600 "$MODULE_ENV_FILE"
+
+source "$ATLAS_CONFIG_FILE"
+export ATLAS_MEDIA_ROOT
 
 puid="$(sed -n 's/^PUID=//p' "$OPERATOR_ENV_FILE" | tail -1)"
 pgid="$(sed -n 's/^PGID=//p' "$OPERATOR_ENV_FILE" | tail -1)"
@@ -32,7 +36,7 @@ required_writable_paths=(
   /mnt/storage/configs/sportyfin/logs
   /mnt/storage/configs/sportyfin/state
   /mnt/storage/configs/sportyfin/recordings
-  /mnt/storage/media/Sports
+  "$ATLAS_MEDIA_ROOT/Sports"
 )
 
 source_lifecycle_file="/mnt/storage/configs/sportyfin/state/source-lifecycle.json"

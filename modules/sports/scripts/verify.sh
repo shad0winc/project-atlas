@@ -8,6 +8,7 @@ MODULE_ENV_FILE="$PROJECT_DIR/modules/sports/.env"
 OPERATOR_ENV_FILE="$PROJECT_DIR/.env"
 
 source "$ATLAS_CONFIG_FILE"
+export ATLAS_MEDIA_ROOT
 
 pass=true
 
