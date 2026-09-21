@@ -54,10 +54,12 @@ check "Module install script present" test -x "$MODULE_DIR/scripts/install.sh"
 check "Module uninstall script present" test -x "$MODULE_DIR/scripts/uninstall.sh"
 check "Module update script present" test -x "$MODULE_DIR/scripts/update.sh"
 check "Module compose valid" \
-  docker compose \
-    --env-file "$OPERATOR_ENV_FILE" \
-    -f "$MODULE_DIR/docker-compose.yml" \
-    config
+  env \
+    ATLAS_NOTIFICATIONS_SOURCE_DIR=/__atlas_notifications_verify_source__ \
+    docker compose \
+      --env-file "$OPERATOR_ENV_FILE" \
+      -f "$MODULE_DIR/docker-compose.yml" \
+      config
 
 check "Sports audience notification formatting valid" \
   sh -c '
