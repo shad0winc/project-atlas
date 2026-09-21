@@ -20,7 +20,10 @@ from atlas.cleanup.deletion_intent_repository import (
 )
 from atlas.cleanup.execution_models import CleanupExecutionMode
 from atlas.cleanup.execution_service import CleanupExecutionService
-from atlas.cleanup.executor import CleanupExecutionSummary
+from atlas.cleanup.executor import (
+    CleanupExecutionSummary,
+    CleanupRunStatus,
+)
 from atlas.cleanup.scanner import CleanupScanner
 from atlas.cleanup.service import CleanupService
 from atlas.cleanup.workflow import CleanupWorkflowService
@@ -32,6 +35,15 @@ from atlas.media.jellyfin import (
 
 DEFAULT_PAGE_SIZE = 200
 DEFAULT_CLEANUP_STATE_RELATIVE_PATH = Path("cleanup")
+CLEANUP_ACTIVATION_ENV = "ATLAS_CLEANUP_EXECUTION_ENABLED"
+
+
+def cleanup_execution_enabled(
+    environment: Mapping[str, str] | None = None,
+) -> bool:
+    """Require exact, explicit activation for live cleanup."""
+    environ = os.environ if environment is None else environment
+    return environ.get(CLEANUP_ACTIVATION_ENV) == "true"
 
 
 def default_cleanup_state_root(
@@ -122,6 +134,9 @@ def execute_scheduled_cleanup(
 ) -> CleanupExecutionSummary:
     """Execute one production cleanup cycle."""
 
+    if not cleanup_execution_enabled():
+        raise RuntimeError("scheduled cleanup execution is not activated")
+
     resolved_provider, workflow = (
         build_scheduled_cleanup_workflow(
             provider=provider,
@@ -161,17 +176,19 @@ def main(
         )
         return 2
 
+    if not cleanup_execution_enabled():
+        print(
+            "Scheduled cleanup execution is not activated",
+            file=errors,
+        )
+        return 1
+
     try:
         summary = execute_scheduled_cleanup()
-    except Exception as exc:
-        detail = (
-            str(exc).strip()
-            or exc.__class__.__name__
-        )
-
+    except Exception:
         print(
-            "Scheduled cleanup execution failed: "
-            f"{detail}",
+            "Scheduled cleanup execution failed; "
+            "inspect the protected cleanup audit and state",
             file=errors,
         )
         return 1
@@ -184,6 +201,14 @@ def main(
         ),
         file=output,
     )
+
+    if summary.status is not CleanupRunStatus.SUCCESS:
+        print(
+            "Scheduled cleanup execution did not complete "
+            "successfully",
+            file=errors,
+        )
+        return 1
 
     return 0
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
@@ -14,7 +15,9 @@ from atlas.cleanup.executor import (
     CleanupRunStatus,
 )
 from atlas.cleanup.scheduled_execution import (
+    cleanup_execution_enabled,
     default_cleanup_state_root,
+    execute_scheduled_cleanup,
     main,
 )
 
@@ -52,7 +55,11 @@ def test_default_cleanup_state_root_uses_canonical_default() -> None:
     )
 
 
-def test_main_executes_once_and_renders_summary() -> None:
+def test_main_executes_once_and_renders_summary(monkeypatch) -> None:
+    monkeypatch.setenv(
+        "ATLAS_CLEANUP_EXECUTION_ENABLED",
+        "true",
+    )
     stdout = StringIO()
     stderr = StringIO()
 
@@ -101,7 +108,11 @@ def test_main_rejects_arguments_before_execution() -> None:
     )
 
 
-def test_main_fails_closed_on_execution_error() -> None:
+def test_main_fails_closed_on_execution_error(monkeypatch) -> None:
+    monkeypatch.setenv(
+        "ATLAS_CLEANUP_EXECUTION_ENABLED",
+        "true",
+    )
     stdout = StringIO()
     stderr = StringIO()
 
@@ -122,6 +133,105 @@ def test_main_fails_closed_on_execution_error() -> None:
     execute.assert_called_once_with()
     assert stdout.getvalue() == ""
     assert (
-        "intent persistence unavailable"
+        "Scheduled cleanup execution failed"
         in stderr.getvalue()
     )
+    assert "intent persistence unavailable" not in stderr.getvalue()
+
+
+def test_activation_requires_exact_true() -> None:
+    assert cleanup_execution_enabled({}) is False
+    assert cleanup_execution_enabled(
+        {"ATLAS_CLEANUP_EXECUTION_ENABLED": ""}
+    ) is False
+    assert cleanup_execution_enabled(
+        {"ATLAS_CLEANUP_EXECUTION_ENABLED": "TRUE"}
+    ) is False
+    assert cleanup_execution_enabled(
+        {"ATLAS_CLEANUP_EXECUTION_ENABLED": "1"}
+    ) is False
+    assert cleanup_execution_enabled(
+        {"ATLAS_CLEANUP_EXECUTION_ENABLED": "true"}
+    ) is True
+
+
+def test_main_without_activation_never_invokes_cleanup(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv(
+        "ATLAS_CLEANUP_EXECUTION_ENABLED",
+        raising=False,
+    )
+    stdout = StringIO()
+    stderr = StringIO()
+
+    with patch(
+        "atlas.cleanup.scheduled_execution."
+        "execute_scheduled_cleanup"
+    ) as execute:
+        result = main([], stdout=stdout, stderr=stderr)
+
+    assert result == 1
+    execute.assert_not_called()
+    assert stdout.getvalue() == ""
+    assert "not activated" in stderr.getvalue()
+
+
+def test_direct_execution_without_activation_never_builds_workflow(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv(
+        "ATLAS_CLEANUP_EXECUTION_ENABLED",
+        raising=False,
+    )
+
+    with patch(
+        "atlas.cleanup.scheduled_execution."
+        "build_scheduled_cleanup_workflow"
+    ) as build:
+        try:
+            execute_scheduled_cleanup()
+        except RuntimeError as exc:
+            assert "not activated" in str(exc)
+        else:
+            raise AssertionError("inactive direct execution was allowed")
+
+    build.assert_not_called()
+
+
+def test_main_non_success_summaries_return_failure(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "ATLAS_CLEANUP_EXECUTION_ENABLED",
+        "true",
+    )
+
+    for status in (
+        CleanupRunStatus.PARTIAL,
+        CleanupRunStatus.FAILED,
+    ):
+        summary = replace(
+            SUMMARY,
+            status=status,
+            modified=0,
+            errors=("synthetic cleanup failure",),
+        )
+        stdout = StringIO()
+        stderr = StringIO()
+
+        with patch(
+            "atlas.cleanup.scheduled_execution."
+            "execute_scheduled_cleanup",
+            return_value=summary,
+        ) as execute:
+            result = main(
+                [],
+                stdout=stdout,
+                stderr=stderr,
+            )
+
+        assert result == 1
+        execute.assert_called_once_with()
+        assert f'"status": "{status.value}"' in stdout.getvalue()
+        assert "did not complete successfully" in stderr.getvalue()
