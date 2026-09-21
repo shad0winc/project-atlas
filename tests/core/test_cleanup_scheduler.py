@@ -6,6 +6,8 @@ from typing import Any
 
 import pytest
 
+from atlas.scheduler import TaskScheduler
+
 from atlas.cleanup.scheduler import (
     CLEANUP_EXECUTION_CALLBACK,
     CLEANUP_EXECUTION_DESCRIPTION,
@@ -72,7 +74,7 @@ def test_register_cleanup_execution_uses_core_scheduler() -> None:
             "Execute eligible Atlas media cleanup with "
             "retention revalidation"
         ),
-        "enabled": True,
+        "enabled": False,
         "module": None,
     }
 
@@ -85,11 +87,11 @@ def test_register_cleanup_execution_accepts_overrides() -> None:
     registered = register_cleanup_execution(
         scheduler,
         interval_seconds=1800,
-        enabled=False,
+        enabled=True,
     )
 
     assert registered["interval_seconds"] == 1800
-    assert registered["enabled"] is False
+    assert registered["enabled"] is True
     assert registered["module"] is None
 
 
@@ -155,3 +157,83 @@ def test_register_cleanup_execution_requires_register() -> None:
         register_cleanup_execution(
             object(),  # type: ignore[arg-type]
         )
+
+
+def test_routine_registration_disables_previously_enabled_task() -> None:
+    """An ordinary sync must not preserve accidental live activation."""
+
+    scheduler = RecordingScheduler()
+
+    explicitly_enabled = register_cleanup_execution(
+        scheduler,
+        enabled=True,
+    )
+
+    assert explicitly_enabled["enabled"] is True
+
+    routine_registration = register_cleanup_execution(
+        scheduler,
+    )
+
+    assert routine_registration["enabled"] is False
+
+    assert scheduler.calls[0]["enabled"] is True
+    assert scheduler.calls[1]["enabled"] is False
+
+    assert scheduler.calls[0]["name"] == scheduler.calls[1]["name"]
+    assert scheduler.calls[0]["callback"] == scheduler.calls[1]["callback"]
+
+
+def test_real_scheduler_resync_disables_persisted_cleanup_task(
+    tmp_path,
+) -> None:
+    """Routine registration must disable a persisted live task."""
+
+    state_file = tmp_path / "scheduler.json"
+
+    scheduler = TaskScheduler(state_file=state_file)
+
+    enabled_task = register_cleanup_execution(
+        scheduler,
+        enabled=True,
+    )
+
+    assert enabled_task["enabled"] is True
+
+    enabled_state = scheduler.task_state(
+        CLEANUP_EXECUTION_TASK_NAME,
+    )
+
+    assert enabled_state["enabled"] is True
+
+    # Reopen the same isolated state through a new scheduler instance.
+    scheduler = TaskScheduler(state_file=state_file)
+
+    disabled_task = register_cleanup_execution(scheduler)
+
+    assert disabled_task["enabled"] is False
+
+    disabled_state = scheduler.task_state(
+        CLEANUP_EXECUTION_TASK_NAME,
+    )
+
+    assert disabled_state["enabled"] is False
+    assert disabled_state["due"] is False
+    assert disabled_state["next_run"] is None
+
+    assert (
+        disabled_state["callback"]
+        == enabled_state["callback"]
+    )
+
+    scheduler = TaskScheduler(state_file=state_file)
+
+    register_cleanup_execution(scheduler)
+
+    final_state = scheduler.task_state(
+        CLEANUP_EXECUTION_TASK_NAME,
+    )
+
+    assert final_state["enabled"] is False
+    assert final_state["due"] is False
+    assert final_state["next_run"] is None

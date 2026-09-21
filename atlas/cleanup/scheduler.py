@@ -45,7 +45,7 @@ def register_cleanup_execution(
     scheduler: CleanupTaskRegistrar,
     *,
     interval_seconds: int = CLEANUP_EXECUTION_INTERVAL_SECONDS,
-    enabled: bool = True,
+    enabled: bool = False,
 ) -> Mapping[str, Any]:
     """Register the canonical Core cleanup-execution task."""
 
