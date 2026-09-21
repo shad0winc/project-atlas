@@ -1371,6 +1371,23 @@ def test_baseline_sports_capture_uses_exact_compose_environment() -> None:
     # the module's own private environment.
     assert capture.count("--env-file") >= 2
 
+    # Atlas configuration is sourced by the launcher but atlas.conf values
+    # are not automatically exported into Compose subprocesses. Image
+    # capture must inject the already-loaded canonical media root explicitly.
+    assert '[[ -z "${ATLAS_MEDIA_ROOT:-}" ||' in capture
+    assert '"$ATLAS_MEDIA_ROOT" != /*' in capture
+
+    assert (
+        'ATLAS_MEDIA_ROOT="$ATLAS_MEDIA_ROOT" \\\n'
+        '        docker compose'
+        in capture
+    )
+
+    assert (
+        "ATLAS_MEDIA_ROOT must be an absolute path for Sports image capture"
+        in capture
+    )
+
 
 def test_deployment_status_reports_sports_source_identity() -> None:
     content = DEPLOYMENT.read_text(encoding="utf-8")

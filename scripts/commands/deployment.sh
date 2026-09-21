@@ -565,13 +565,23 @@ SURFACES
       return 1
     }
 
+    if [[ -z "${ATLAS_MEDIA_ROOT:-}" ||
+      "$ATLAS_MEDIA_ROOT" != /* ]]
+    then
+      echo \
+        'ERROR: ATLAS_MEDIA_ROOT must be an absolute path for Sports image capture.' \
+        >&2
+      return 1
+    fi
+
     identifiers="$(
-      docker compose \
-        --env-file "$ATLAS_PROJECT_DIR/.env" \
-        --env-file "$ATLAS_PROJECT_DIR/modules/sports/.env" \
-        --project-name sports \
-        -f "$compose_file" \
-        ps -q
+      ATLAS_MEDIA_ROOT="$ATLAS_MEDIA_ROOT" \
+        docker compose \
+          --env-file "$ATLAS_PROJECT_DIR/.env" \
+          --env-file "$ATLAS_PROJECT_DIR/modules/sports/.env" \
+          --project-name sports \
+          -f "$compose_file" \
+          ps -q
     )" || return 1
 
     [[ -n "${identifiers//[[:space:]]/}" ]] || {
