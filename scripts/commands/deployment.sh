@@ -711,6 +711,7 @@ atlas_deployment_notifications_require_historical_source_mode() {
 
 atlas_deployment_verify_runtime() {
   local record="$1"
+  local excluded_surface="${2:-}"
   local surface
   local compose_relative
   local project
@@ -726,10 +727,28 @@ atlas_deployment_verify_runtime() {
 
   [[ -s "$record/images.tsv" ]] || return 1
 
+  case "$excluded_surface" in
+    ''|sports)
+      ;;
+    *)
+      printf \
+        'ERROR: unsupported runtime verification exclusion: %s\n' \
+        "$excluded_surface" >&2
+      return 1
+      ;;
+  esac
+
   while IFS='|' read -r \
     surface compose_relative project service container_name image_reference expected_image
   do
     [[ -n "$container_name" && -n "$expected_image" ]] || return 1
+
+    if [[ -n "$excluded_surface" &&
+      "$surface" == "$excluded_surface" ]]
+    then
+      continue
+    fi
+
     actual_image="$(docker inspect --format '{{.Image}}' "$container_name")" || return 1
     [[ "$actual_image" == "$expected_image" ]] || {
       printf 'ERROR: runtime drift detected for %s (%s).\n' \
@@ -1710,6 +1729,9 @@ atlas_deployment_adopt_sports() {
   local core_commit
   local ingress_commit
   local previous_sports_commit
+  local notifications_commit
+  local notifications_source_mode
+  local notifications_evidence
   local sports_source
   local sports_commit
 
@@ -1725,12 +1747,14 @@ atlas_deployment_adopt_sports() {
       sports_commit
   )"
 
-  [[ -z "$previous_sports_commit" ]] || {
+  if [[ -n "$previous_sports_commit" &&
+    ! "$previous_sports_commit" =~ ^[0-9a-f]{40}$ ]]
+  then
     echo \
-      'ERROR: current deployment already includes Sports recovery evidence.' \
+      'ERROR: previous Sports recovery identity is invalid.' \
       >&2
     return 1
-  }
+  fi
 
   core_commit="$(
     atlas_deployment_record_value \
@@ -1743,6 +1767,18 @@ atlas_deployment_adopt_sports() {
       "$previous_record" \
       ingress_commit
   )"
+
+  notifications_commit="$(
+    atlas_deployment_record_value \
+      "$previous_record" \
+      notifications_commit
+  )" || return 1
+
+  notifications_source_mode="$(
+    atlas_deployment_record_value \
+      "$previous_record" \
+      notifications_source_mode
+  )" || return 1
 
   source_commit="$(
     atlas_deployment_record_value \
@@ -1784,9 +1820,10 @@ atlas_deployment_adopt_sports() {
   }
 
   atlas_deployment_verify_runtime \
-    "$previous_record" || {
+    "$previous_record" \
+    sports || {
     echo \
-      'ERROR: current deployment runtime does not match its verified evidence.' \
+      'ERROR: non-Sports runtime differs from the current verified baseline.' \
       >&2
     return 1
   }
@@ -1870,6 +1907,8 @@ source_commit=$source_commit
 core_commit=$core_commit
 ingress_commit=$ingress_commit
 sports_commit=$sports_commit
+notifications_commit=$notifications_commit
+notifications_source_mode=$notifications_source_mode
 scope=all
 migration=none
 created_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -1919,6 +1958,41 @@ EOF
       >&2
     return 1
   }
+
+  if [[ -n "$notifications_commit" ]]; then
+    [[ "$notifications_commit" =~ ^[0-9a-f]{40}$ ]] || {
+      echo \
+        'ERROR: existing Notifications source identity is invalid.' \
+        >&2
+      return 1
+    }
+
+    for notifications_evidence in \
+      notifications-source.tar.gz \
+      notifications-image.tsv \
+      notifications-source-commit
+    do
+      [[ -s "$previous_record/$notifications_evidence" ]] || {
+        echo \
+          'ERROR: existing Notifications recovery evidence is incomplete.' \
+          >&2
+        return 1
+      }
+
+      cp -- \
+        "$previous_record/$notifications_evidence" \
+        "$record/$notifications_evidence" || return 1
+
+      cmp -s -- \
+        "$previous_record/$notifications_evidence" \
+        "$record/$notifications_evidence" || {
+        echo \
+          'ERROR: adopted Notifications evidence identity changed.' \
+          >&2
+        return 1
+      }
+    done
+  fi
 
   git -C "$sports_source" archive \
     --format=tar.gz \

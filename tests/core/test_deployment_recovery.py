@@ -1548,20 +1548,90 @@ def test_sports_adoption_captures_exact_live_sports_source() -> None:
     )
 
 
-def test_sports_adoption_refuses_existing_sports_managed_record() -> None:
+def test_sports_adoption_supports_guarded_readoption() -> None:
     adoption = _sports_adoption_body()
 
     assert "previous_sports_commit" in adoption
+    assert "previous Sports recovery identity is invalid" in adoption
+
+    assert "already includes Sports recovery evidence" not in adoption
 
     assert (
-        '[[ -z "$previous_sports_commit" ]]'
+        'atlas_deployment_verify_runtime \\\n'
+        '    "$previous_record" \\\n'
+        '    sports'
         in adoption
     )
 
     assert (
-        "already includes Sports recovery evidence"
+        "non-Sports runtime differs from the current verified baseline"
         in adoption
     )
+
+
+def test_sports_readoption_preserves_notifications_evidence() -> None:
+    adoption = _sports_adoption_body()
+
+    assert "notifications_commit" in adoption
+    assert "notifications_source_mode" in adoption
+
+    assert "notifications-source.tar.gz" in adoption
+    assert "notifications-image.tsv" in adoption
+    assert "notifications-source-commit" in adoption
+
+    assert (
+        '"$previous_record/$notifications_evidence"'
+        in adoption
+    )
+
+    assert (
+        '"$record/$notifications_evidence"'
+        in adoption
+    )
+
+    assert "cmp -s" in adoption
+
+    assert (
+        "notifications_commit=$notifications_commit"
+        in adoption
+    )
+
+    assert (
+        "notifications_source_mode=$notifications_source_mode"
+        in adoption
+    )
+
+
+def test_runtime_verification_allows_only_explicit_sports_exclusion() -> None:
+    content = DEPLOYMENT.read_text(encoding="utf-8")
+
+    start = content.index(
+        "atlas_deployment_verify_runtime() {"
+    )
+
+    end = content.find(
+        "\natlas_deployment_",
+        start + len("atlas_deployment_verify_runtime() {"),
+    )
+
+    assert end > start
+
+    verify = content[start:end]
+
+    assert 'local excluded_surface="${2:-}"' in verify
+    assert "''|sports)" in verify
+
+    assert (
+        "unsupported runtime verification exclusion"
+        in verify
+    )
+
+    assert (
+        '"$surface" == "$excluded_surface"'
+        in verify
+    )
+
+    assert "runtime drift detected" in verify
 
 
 def test_sports_adoption_verifies_before_current_pointer_advances() -> None:
