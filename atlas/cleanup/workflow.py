@@ -13,6 +13,7 @@ from atlas.cleanup.executor import (
     CleanupExecutionSummary,
     CleanupExecutor,
 )
+from atlas.cleanup.models import CleanupError
 from atlas.cleanup.scan_models import CleanupScanReport
 from atlas.cleanup.scanner import CleanupScanner
 from atlas.media.capabilities import (
@@ -56,6 +57,26 @@ class CleanupWorkflowService:
         provider_name = self._provider_name(provider)
         self._validate_page_size(page_size)
 
+        try:
+            normalized_mode = (
+                mode
+                if isinstance(mode, CleanupExecutionMode)
+                else CleanupExecutionMode(mode)
+            )
+        except (TypeError, ValueError) as exc:
+            raise CleanupExecutionError(
+                f"invalid cleanup execution mode: {mode}"
+            ) from exc
+
+        if (
+            normalized_mode is CleanupExecutionMode.EXECUTE
+            and self._executor is None
+        ):
+            raise CleanupError(
+                "only dry-run cleanup execution is supported "
+                "without an explicit executor"
+            )
+
         capabilities = self._provider_capabilities(
             provider,
         )
@@ -95,7 +116,7 @@ class CleanupWorkflowService:
 
         execution_report = self._planner.plan(
             scan_report,
-            mode=mode,
+            mode=normalized_mode,
         )
 
         if not isinstance(

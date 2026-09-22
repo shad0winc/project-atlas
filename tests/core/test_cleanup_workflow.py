@@ -170,6 +170,64 @@ class CleanupWorkflowServiceTests(unittest.TestCase):
             execution_report,
         )
 
+    def test_execute_mode_allows_explicit_executor(
+        self,
+    ) -> None:
+        provider = make_provider()
+
+        scan_report = make_scan_report()
+
+        execution_report = CleanupExecutionReport(
+            provider="jellyfin",
+            items=(),
+            mode=CleanupExecutionMode.EXECUTE,
+            created_at=NOW,
+        )
+
+        summary = CleanupExecutionSummary(
+            execution_id=EXECUTION_ID,
+            provider="jellyfin",
+            mode=CleanupExecutionMode.EXECUTE,
+            status=CleanupRunStatus.SUCCESS,
+            started_at="2026-07-20T12:00:00Z",
+            completed_at="2026-07-20T12:00:01Z",
+            total=0,
+            planned=0,
+            skipped=0,
+            modified=0,
+        )
+
+        scanner = Mock()
+        scanner.scan.return_value = scan_report
+
+        planner = Mock()
+        planner.plan.return_value = execution_report
+
+        executor = Mock()
+        executor.execute.return_value = summary
+
+        workflow = CleanupWorkflowService(
+            scanner=scanner,
+            planner=planner,
+            executor=executor,
+        )
+
+        result = workflow.execute(
+            provider,
+            mode=CleanupExecutionMode.EXECUTE,
+        )
+
+        self.assertIs(result, summary)
+
+        planner.plan.assert_called_once_with(
+            scan_report,
+            mode=CleanupExecutionMode.EXECUTE,
+        )
+
+        executor.execute.assert_called_once_with(
+            execution_report,
+        )
+
     def test_execute_uses_default_page_size_and_mode(
         self,
     ) -> None:
