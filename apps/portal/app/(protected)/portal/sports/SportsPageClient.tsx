@@ -34,6 +34,7 @@ import {
   type SportsSubscription
 } from "../../../../features/sports";
 import { reconcileFollowedEventMetadata } from "../../../../features/sports/services/followedEventMetadata";
+import { startLiveAvailabilityRefresh } from "../../../../features/sports/services/liveAvailabilityRefresh";
 import { PORTAL_ROUTES } from "../../../../lib/navigation/portal";
 
 const sportsRoute = PORTAL_ROUTES.sports;
@@ -401,52 +402,11 @@ export function SportsPageClient(): React.ReactElement {
   }, [follows]);
 
   useEffect(() => {
-    const controller = new AbortController();
-
-    const eventFollows = follows.filter(
-      (follow) => follow.type === "event"
-    );
-
-    void Promise.all(
-      eventFollows.map(async (follow) => {
-        const identity =
-          `${follow.provider}:${follow.providerId}`;
-
-        try {
-          const availability =
-            await loadSportsLiveAvailability(
-              follow.provider,
-              follow.providerId,
-              { signal: controller.signal }
-            );
-
-          return [identity, availability] as const;
-        } catch {
-          return null;
-        }
-      })
-    ).then((resolved) => {
-      if (controller.signal.aborted) {
-        return;
-      }
-
-      const nextAvailability: Record<
-        string,
-        SportsLiveAvailability
-      > = {};
-
-      for (const entry of resolved) {
-        if (entry !== null) {
-          nextAvailability[entry[0]] = entry[1];
-        }
-      }
-
-      setLiveAvailabilityByEvent(nextAvailability);
+    return startLiveAvailabilityRefresh({
+      follows,
+      load: loadSportsLiveAvailability,
+      publish: setLiveAvailabilityByEvent
     });
-
-    return () => {
-      controller.abort();
-    };
   }, [follows]);
 
   async function handleSearch(
