@@ -33,12 +33,15 @@ import {
   type SportsSearchType,
   type SportsSubscription
 } from "../../../../features/sports";
+import { reconcileFollowedEventMetadata } from "../../../../features/sports/services/followedEventMetadata";
 import { PORTAL_ROUTES } from "../../../../lib/navigation/portal";
 
 const sportsRoute = PORTAL_ROUTES.sports;
 
 export function SportsPageClient(): React.ReactElement {
   const [events, setEvents] = useState<readonly SportsEvent[]>([]);
+  const [followedEvents, setFollowedEvents] =
+    useState<readonly SportsEvent[]>([]);
   const [follows, setFollows] = useState<readonly SportsFollow[]>([]);
   const [
     liveAvailabilityByEvent,
@@ -349,6 +352,56 @@ export function SportsPageClient(): React.ReactElement {
 
   useEffect(() => {
     const controller = new AbortController();
+    const eventIdsByProvider = new Map<string, Set<string>>();
+
+    for (const follow of follows) {
+      if (follow.type !== "event" || !follow.enabled) {
+        continue;
+      }
+
+      const eventIds =
+        eventIdsByProvider.get(follow.provider) ?? new Set<string>();
+
+      eventIds.add(follow.providerId);
+      eventIdsByProvider.set(follow.provider, eventIds);
+    }
+
+    const providers = Array.from(eventIdsByProvider.keys());
+
+    const requests = providers.map((provider) =>
+      loadSportsEvents(
+        { signal: controller.signal },
+        {
+          provider,
+          eventIds: Array.from(
+            eventIdsByProvider.get(provider) ?? []
+          )
+        }
+      )
+    );
+
+    void Promise.allSettled(requests).then((results) => {
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      setFollowedEvents((current) =>
+        reconcileFollowedEventMetadata(
+          current,
+          follows,
+          providers,
+          results
+        )
+      );
+    });
+
+    return () => {
+      controller.abort();
+    };
+  }, [follows]);
+
+  useEffect(() => {
+    const controller = new AbortController();
 
     const eventFollows = follows.filter(
       (follow) => follow.type === "event"
@@ -609,6 +662,7 @@ export function SportsPageClient(): React.ReactElement {
       ) : (
         <SportsRequestView
           events={events}
+          followedEvents={followedEvents}
           follows={follows}
           liveAvailabilityByEvent={liveAvailabilityByEvent}
           onBrowse={handleBrowse}

@@ -40,7 +40,12 @@ export type SportsRequestOptions = Readonly<{
   signal?: AbortSignal;
 }>;
 
-export type SportsEventFilter = Readonly<{ teamIds?: readonly string[]; leagueIds?: readonly string[]; }>;
+export type SportsEventFilter = Readonly<{
+  provider?: string;
+  eventIds?: readonly string[];
+  teamIds?: readonly string[];
+  leagueIds?: readonly string[];
+}>;
 
 export type SportsLiveAvailability = Readonly<{
   available: boolean;
@@ -173,7 +178,12 @@ function mapSportsLivePlaybackSession(
 }
 
 export async function loadSportsEvents(options: SportsRequestOptions = {}, filter: SportsEventFilter = {}): Promise<readonly SportsEvent[]> {
-  const params = new URLSearchParams({ provider: "thesportsdb" });
+  const params = new URLSearchParams({
+    provider: filter.provider?.trim() || "thesportsdb"
+  });
+  for (const id of filter.eventIds ?? []) {
+    if (id.trim()) params.append("provider_event_id", id.trim());
+  }
   for (const id of filter.teamIds ?? []) if (id.trim()) params.append("team_id", id.trim());
   for (const id of filter.leagueIds ?? []) if (id.trim()) params.append("league_id", id.trim());
   const response = await authenticatedAtlasApiRequest<SportsEventCollectionTransport>(

@@ -173,6 +173,49 @@ describe("SportsRequestView", () => {
     expect(markup).toContain("Unfollow");
   });
 
+  it("retains a followed event kickoff outside the discovery list", () => {
+    const startAt = "2026-09-20T20:25:00.000Z";
+    const expectedStart = new Date(startAt).toLocaleString();
+
+    const markup = renderToStaticMarkup(
+      <SportsRequestView
+        {...baseProps}
+        events={[]}
+        followedEvents={[
+          {
+            provider: "thesportsdb",
+            providerEventId: "event-late",
+            name: "Atlas Rams vs Atlas Giants",
+            sport: "American Football",
+            league: "NFL",
+            startAt,
+            status: "scheduled",
+            requested: true
+          }
+        ]}
+        follows={[
+          {
+            subscriptionId: "sub-event-late",
+            type: "event",
+            provider: "thesportsdb",
+            providerId: "event-late",
+            name: "Atlas Rams vs Atlas Giants",
+            userId: "usr-001",
+            enabled: true,
+            record: false,
+            createdAt: "2026-09-19T20:00:00.000Z"
+          }
+        ]}
+      />
+    );
+
+    expect(markup).toContain("Atlas Rams vs Atlas Giants");
+    expect(markup).toContain("Last reported start");
+    expect(markup).toContain(expectedStart);
+    expect(markup).toContain("Record event");
+    expect(markup).toContain("Unfollow");
+  });
+
   it("shows Watch Live only for an authoritatively available followed event", () => {
     const markup = renderToStaticMarkup(
       <SportsRequestView

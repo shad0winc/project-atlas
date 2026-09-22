@@ -58,6 +58,30 @@ describe("Sports Portal service", () => {
     expect(events[0]?.providerEventId).toBe("event-001");
   });
 
+  it("loads exact followed-event metadata by provider event ID", async () => {
+    mocks.authenticatedAtlasApiRequest.mockResolvedValue({
+      events: []
+    });
+
+    await loadSportsEvents(
+      {},
+      {
+        provider: "thesportsdb",
+        eventIds: ["event-001", "event-002"]
+      }
+    );
+
+    expect(mocks.authenticatedAtlasApiRequest).toHaveBeenCalledWith(
+      "/sports/events?provider=thesportsdb"
+        + "&provider_event_id=event-001"
+        + "&provider_event_id=event-002",
+      expect.objectContaining({
+        method: "GET",
+        cache: "no-store"
+      })
+    );
+  });
+
   it("loads authoritative Sports live availability", async () => {
     mocks.authenticatedAtlasApiRequest.mockResolvedValue({
       available: true,
