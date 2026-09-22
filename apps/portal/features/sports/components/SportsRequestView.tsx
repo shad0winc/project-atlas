@@ -17,6 +17,7 @@ export type SportsRequestInput = Readonly<{
 
 export type SportsRequestViewProps = Readonly<{
   events: readonly SportsEvent[];
+  followedEvents?: readonly SportsEvent[];
   follows: readonly SportsFollow[];
   searchResults: readonly SportsSearchResult[];
   searchType: SportsSearchType;
@@ -43,6 +44,7 @@ export type SportsRequestViewProps = Readonly<{
 
 export function SportsRequestView({
   events,
+  followedEvents = [],
   follows,
   searchResults,
   searchType,
@@ -333,11 +335,16 @@ export function SportsRequestView({
           {follows.map((follow) => {
             const followedEvent =
               follow.type === "event"
-                ? events.find(
+                ? (followedEvents.find(
                     (event) =>
                       event.provider === follow.provider &&
                       event.providerEventId === follow.providerId
-                  )
+                  ) ??
+                  events.find(
+                    (event) =>
+                      event.provider === follow.provider &&
+                      event.providerEventId === follow.providerId
+                  ))
                 : undefined;
 
             const liveAvailability =
@@ -369,7 +376,7 @@ export function SportsRequestView({
                   {followedEvent !== undefined ? (
                     <dl className="request-card-details">
                       <div>
-                        <dt>Starts</dt>
+                        <dt>Last reported start</dt>
                         <dd>
                           {new Date(
                             followedEvent.startAt
