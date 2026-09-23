@@ -77,3 +77,44 @@ def test_playback_diagnostic_does_not_change_media_routing() -> None:
     assert "read_timeout" not in site
     assert "write_timeout" not in site
     assert "flush_interval" not in site
+
+
+def test_playback_diagnostic_uses_only_fixed_request_type_labels() -> None:
+    site = _playback_site()
+    log = _logging_block()
+
+    expected = {
+        "HLS_PLAYLIST": (
+            r"@playback_diagnostic_playlist "
+            r"path_regexp ^/videos/[^/]+/.*\.m3u8$"
+        ),
+        "HLS_SEGMENT": (
+            r"@playback_diagnostic_segment "
+            r"path_regexp ^/videos/[^/]+/.*\.(ts|m4s|mp4)$"
+        ),
+        "PLAYBACK_BOOTSTRAP": (
+            "@playback_diagnostic_bootstrap "
+            "path /_atlas/playback/bootstrap"
+        ),
+    }
+
+    for label, matcher in expected.items():
+        assert matcher in site
+        matcher_name = matcher.split()[0]
+        assert (
+            f"log_append {matcher_name} "
+            f"playback_request_type {label}"
+        ) in site
+
+    assert site.count(
+        "log_append @playback_diagnostic_"
+    ) == len(expected)
+
+    # Classification must not preserve request.uri or any other
+    # portion of the request object in the diagnostic output.
+    assert "request delete" in log
+    assert "resp_headers delete" in log
+    assert "log_credentials" not in site
+    assert "import atlas_access_log" not in site
+    assert "log_append request" not in site
+    assert "log_append uri" not in site
