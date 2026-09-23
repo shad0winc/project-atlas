@@ -160,6 +160,27 @@ HTML 503
 playback.shadowinc.co {
         encode zstd gzip
 
+        # Temporary origin-side playback diagnostic. The entire
+        # request object is discarded before log encoding, not
+        # merely redacted when operators read the log. Do not
+        # import the general Atlas access-log snippet here.
+        log {
+                output file /var/log/caddy/atlas-playback-diagnostic.log {
+                        roll_size 1MiB
+                        roll_keep 2
+                        roll_keep_for 24h
+                }
+
+                format filter {
+                        request delete
+                        resp_headers delete
+                        user_id delete
+                        err_id delete
+                        err_trace delete
+                        wrap json
+                }
+        }
+
         header Access-Control-Allow-Origin "https://atlas.shadowinc.co"
         header Access-Control-Allow-Credentials "true"
         header Vary "Origin"
