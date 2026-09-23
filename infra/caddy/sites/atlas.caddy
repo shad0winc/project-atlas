@@ -181,6 +181,18 @@ playback.shadowinc.co {
                 }
         }
 
+        # Fixed diagnostic labels only. Caddy evaluates path matchers
+        # without persisting the path, query, headers, or identifiers.
+        # The privacy-filtered logger continues deleting the entire
+        # request object before writing the diagnostic.
+        @playback_diagnostic_playlist path_regexp ^/videos/[^/]+/.*\.m3u8$
+        @playback_diagnostic_segment path_regexp ^/videos/[^/]+/.*\.(ts|m4s|mp4)$
+        @playback_diagnostic_bootstrap path /_atlas/playback/bootstrap
+
+        log_append @playback_diagnostic_playlist playback_request_type HLS_PLAYLIST
+        log_append @playback_diagnostic_segment playback_request_type HLS_SEGMENT
+        log_append @playback_diagnostic_bootstrap playback_request_type PLAYBACK_BOOTSTRAP
+
         header Access-Control-Allow-Origin "https://atlas.shadowinc.co"
         header Access-Control-Allow-Credentials "true"
         header Vary "Origin"
