@@ -655,18 +655,21 @@ health_check_library_paths() {
 }
 
 health_check_library_synchronization() {
-  local movies_count tv_count jellyfin_movies jellyfin_series failed=0
+  local movies_count anime_movies_count tv_count anime_tv_count
+  local jellyfin_movies jellyfin_series failed=0
 
   movies_count="$(jq -r '.libraries.movies.count // 0' "$LATEST_FILE")"
+  anime_movies_count="$(jq -r '.libraries.anime_movies.count // 0' "$LATEST_FILE")"
   tv_count="$(jq -r '.libraries.tv.count // 0' "$LATEST_FILE")"
+  anime_tv_count="$(jq -r '.libraries.anime_tv.count // 0' "$LATEST_FILE")"
   jellyfin_movies="$(jq -r '.jellyfin.counts.movies // 0' "$LATEST_FILE")"
   jellyfin_series="$(jq -r '.jellyfin.counts.series // 0' "$LATEST_FILE")"
 
-  if [[ "$movies_count" != "$jellyfin_movies" ]]; then
+  if (( movies_count + anime_movies_count != jellyfin_movies )); then
     failed=1
   fi
 
-  if [[ "$tv_count" != "$jellyfin_series" ]]; then
+  if (( tv_count + anime_tv_count != jellyfin_series )); then
     failed=1
   fi
 
@@ -1057,8 +1060,8 @@ print_library_synchronization() {
   local filesystem_movies filesystem_tv
   local jellyfin_movies jellyfin_series
 
-  filesystem_movies="$(jq -r '.libraries.movies.count // 0' "$LATEST_FILE")"
-  filesystem_tv="$(jq -r '.libraries.tv.count // 0' "$LATEST_FILE")"
+  filesystem_movies="$(jq -r '(.libraries.movies.count // 0) + (.libraries.anime_movies.count // 0)' "$LATEST_FILE")"
+  filesystem_tv="$(jq -r '(.libraries.tv.count // 0) + (.libraries.anime_tv.count // 0)' "$LATEST_FILE")"
 
   jellyfin_movies="$(jq -r '.jellyfin.counts.movies // 0' "$LATEST_FILE")"
   jellyfin_series="$(jq -r '.jellyfin.counts.series // 0' "$LATEST_FILE")"
@@ -1068,17 +1071,17 @@ print_library_synchronization() {
   echo "-----------------------"
 
   if [[ "$filesystem_movies" == "$jellyfin_movies" ]]; then
-    echo "✓ Movies synchronized"
+    echo "✓ Movies + Anime Movies synchronized"
   else
-    echo "✗ Movies out of sync"
+    echo "✗ Movies + Anime Movies out of sync"
     echo "    Filesystem: $filesystem_movies"
     echo "    Jellyfin:   $jellyfin_movies"
   fi
 
   if [[ "$filesystem_tv" == "$jellyfin_series" ]]; then
-    echo "✓ TV synchronized"
+    echo "✓ TV + Anime TV synchronized"
   else
-    echo "✗ TV out of sync"
+    echo "✗ TV + Anime TV out of sync"
     echo "    Filesystem: $filesystem_tv"
     echo "    Jellyfin:   $jellyfin_series"
   fi
@@ -1227,21 +1230,27 @@ get_jellyfin_library_path() {
 ###############################################################################
 
 get_previous_snapshot() {
-  ls -1 "$ARI_SNAPSHOT_DIR"/*.json 2>/dev/null \
-    | sort \
-    | tail -2 \
-    | head -1
+  local snapshots=()
+  mapfile -t snapshots < <(get_recent_snapshots 2)
+  if (( ${#snapshots[@]} >= 2 )); then
+    printf '%s\n' "${snapshots[0]}"
+  fi
 }
 
 get_recent_snapshots() {
   local count="${1:-5}"
+  [[ "$count" =~ ^[1-9][0-9]*$ ]] || return 2
 
-  find "$ARI_SNAPSHOT_DIR" \
-    -maxdepth 1 \
-    -type f \
-    -name '*.json' \
-    | sort \
-    | tail -n "$count"
+  find "$ARI_SNAPSHOT_DIR" -maxdepth 1 -type f -name '*.json' -print \
+    | sort -r \
+    | while IFS= read -r snapshot; do
+        if jq -e 'type == "object" and (.timestamp | type == "string")' \
+          "$snapshot" >/dev/null 2>&1; then
+          printf '%s\n' "$snapshot"
+        fi
+      done \
+    | awk -v limit="$count" 'NR <= limit' \
+    | sort
 }
 
 get_snapshot_count() {
