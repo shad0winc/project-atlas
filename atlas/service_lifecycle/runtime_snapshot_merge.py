@@ -2,10 +2,22 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from .models import ServiceLifecycleError
+
+
+def sports_backend_installed(container_names: Iterable[str]) -> bool:
+    """Distinguish an optional absent module from a partial installation."""
+
+    expected = {"atlas-dispatcharr", "atlas-teamarr"}
+    found = expected.intersection(container_names)
+    if not found:
+        return False
+    if found != expected:
+        raise ServiceLifecycleError("Sports Backend installation is partial")
+    return True
 
 
 def merge_runtime_snapshots(

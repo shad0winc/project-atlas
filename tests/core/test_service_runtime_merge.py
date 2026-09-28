@@ -5,7 +5,10 @@ from __future__ import annotations
 import pytest
 
 from atlas.service_lifecycle.models import ServiceLifecycleError
-from atlas.service_lifecycle.runtime_snapshot_merge import merge_runtime_snapshots
+from atlas.service_lifecycle.runtime_snapshot_merge import (
+    merge_runtime_snapshots,
+    sports_backend_installed,
+)
 
 
 def snapshot(*names: str) -> dict:
@@ -43,3 +46,16 @@ def test_duplicate_service_refuses_publication() -> None:
 def test_missing_backend_service_refuses_partial_publication() -> None:
     with pytest.raises(ServiceLifecycleError, match="atlas-teamarr"):
         merge_runtime_snapshots(snapshot("jellyfin"), snapshot("atlas-dispatcharr"))
+
+
+def test_optional_backend_absence() -> None:
+    assert not sports_backend_installed(())
+
+
+def test_installed_backend_including_stopped_containers() -> None:
+    assert sports_backend_installed(("atlas-dispatcharr", "atlas-teamarr"))
+
+
+def test_partial_backend_is_not_silently_hidden() -> None:
+    with pytest.raises(ServiceLifecycleError, match="partial"):
+        sports_backend_installed(("atlas-dispatcharr",))

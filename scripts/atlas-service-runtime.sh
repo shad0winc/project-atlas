@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import subprocess
 
 from atlas.service_lifecycle.providers import (
     DockerComposeProvider,
@@ -36,7 +37,9 @@ from atlas.service_lifecycle.runtime_snapshot import (
 )
 from atlas.service_lifecycle.runtime_snapshot_merge import (
     merge_runtime_snapshots,
+    sports_backend_installed,
 )
+from atlas.service_lifecycle.models import ServiceLifecycleError
 from atlas.service_lifecycle.runtime_snapshot_publish import (
     publish_runtime_snapshot,
 )
@@ -83,8 +86,27 @@ sports_provider = DockerComposeProvider(
     project_directory=sports_file.parent,
     environment=os.environ,
 )
-sports_payload = build_runtime_snapshot(sports_provider)
-payload = merge_runtime_snapshots(core_payload, sports_payload)
+inspection = subprocess.run(
+    [
+        "docker", "container", "ls", "--all",
+        "--filter", "label=com.docker.compose.project=sports-backend",
+        "--format", "{{.Names}}",
+    ],
+    capture_output=True,
+    text=True,
+    check=False,
+    timeout=15,
+)
+if inspection.returncode != 0:
+    raise ServiceLifecycleError(
+        "unable to inspect Sports Backend container inventory"
+    )
+
+if sports_backend_installed(inspection.stdout.splitlines()):
+    sports_payload = build_runtime_snapshot(sports_provider)
+    payload = merge_runtime_snapshots(core_payload, sports_payload)
+else:
+    payload = core_payload
 
 published = publish_runtime_snapshot(
     payload,
