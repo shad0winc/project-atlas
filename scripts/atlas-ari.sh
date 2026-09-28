@@ -82,6 +82,34 @@ ARI_DAYS_REMAINING=0
 # Collection
 ###############################################################################
 
+jellyfin_json_request() {
+  local endpoint="$1"
+  local expected_type="$2"
+  local response
+
+  if [[ -z "${ATLAS_JELLYFIN_API_KEY:-}" ]]; then
+    echo "ARI collection requires a Jellyfin API key" >&2
+    return 1
+  fi
+
+  if ! response="$(curl --fail --silent --show-error \
+    --connect-timeout 5 --max-time 20 \
+    -H "Authorization: MediaBrowser Token=\"$ATLAS_JELLYFIN_API_KEY\"" \
+    "$ATLAS_JELLYFIN_URL$endpoint")"; then
+    echo "ARI Jellyfin request failed: $endpoint" >&2
+    return 1
+  fi
+
+  if ! printf '%s' "$response" | jq -e -s \
+    --arg expected "$expected_type" \
+    'length == 1 and (.[0] | type) == $expected' >/dev/null; then
+    echo "ARI Jellyfin response invalid: $endpoint" >&2
+    return 1
+  fi
+
+  printf '%s\n' "$response"
+}
+
 collect() {
   mkdir -p "$ARI_SNAPSHOT_DIR"
 
@@ -116,22 +144,10 @@ collect() {
   storage_available_bytes="$(df -B1 "$MEDIA_ROOT" 2>/dev/null | awk 'NR==2 {print $4}')"
 
   local jellyfin_info jellyfin_server_name jellyfin_version jellyfin_id
-  jellyfin_info="{}"
-
-  if [[ -n "${ATLAS_JELLYFIN_API_KEY:-}" ]]; then
-  jellyfin_info="$(curl -s \
-    -H "X-Emby-Token: $ATLAS_JELLYFIN_API_KEY" \
-    "$ATLAS_JELLYFIN_URL/System/Info" || echo "{}")"
-  fi
+  jellyfin_info="$(jellyfin_json_request '/System/Info' object)" || return 1
 
   local jellyfin_libraries jellyfin_library_summary
-  jellyfin_libraries="[]"
-
-  if [[ -n "${ATLAS_JELLYFIN_API_KEY:-}" ]]; then
-  jellyfin_libraries="$(curl -s \
-    -H "X-Emby-Token: $ATLAS_JELLYFIN_API_KEY" \
-    "$ATLAS_JELLYFIN_URL/Library/VirtualFolders" || echo "[]")"
-  fi
+  jellyfin_libraries="$(jellyfin_json_request '/Library/VirtualFolders' array)" || return 1
 
   jellyfin_library_summary="$(
   echo "$jellyfin_libraries" | jq '
@@ -144,13 +160,7 @@ collect() {
   )"
 
   local jellyfin_users jellyfin_user_summary
-  jellyfin_users="[]"
-
-  if [[ -n "${ATLAS_JELLYFIN_API_KEY:-}" ]]; then
-  jellyfin_users="$(curl -s \
-    -H "X-Emby-Token: $ATLAS_JELLYFIN_API_KEY" \
-    "$ATLAS_JELLYFIN_URL/Users" || echo "[]")"
-  fi
+  jellyfin_users="$(jellyfin_json_request '/Users' array)" || return 1
 
   jellyfin_user_summary="$(
   echo "$jellyfin_users" | jq '
@@ -165,13 +175,7 @@ collect() {
 )"
 
   local jellyfin_counts jellyfin_count_summary
-  jellyfin_counts="{}"
-
-  if [[ -n "${ATLAS_JELLYFIN_API_KEY:-}" ]]; then
-    jellyfin_counts="$(curl -s \
-      -H "X-Emby-Token: $ATLAS_JELLYFIN_API_KEY" \
-      "$ATLAS_JELLYFIN_URL/Items/Counts" || echo "{}")"
-  fi
+  jellyfin_counts="$(jellyfin_json_request '/Items/Counts' object)" || return 1
 
   jellyfin_count_summary="$(
   echo "$jellyfin_counts" | jq '{
@@ -196,7 +200,10 @@ collect() {
   anime_movie_count="$(find "$MEDIA_ROOT/Anime Movies" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)"
   anime_tv_count="$(find "$MEDIA_ROOT/Anime TV" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)"
 
-  cat > "$snapshot_file" <<EOF
+  local snapshot_temp latest_temp
+  snapshot_temp="$(mktemp "$ARI_SNAPSHOT_DIR/.snapshot.XXXXXX")" || return 1
+
+  cat > "$snapshot_temp" <<EOF
 {
   "timestamp": "$timestamp",
 
@@ -243,10 +250,46 @@ collect() {
 }
 EOF
 
-  echo "ARI collection complete."
+  if ! python3 - "$snapshot_temp" "$ATLAS_PROJECT_DIR" <<'PY'
+import json
+import sys
 
-  cp "$snapshot_file" "$LATEST_FILE"
+sys.path.insert(0, sys.argv[2])
+from atlas.ari.models import ARIReport
+
+try:
+    with open(sys.argv[1], encoding="utf-8") as handle:
+        ARIReport.from_dict(json.load(handle))
+except (OSError, ValueError, TypeError) as exc:
+    print(f"ARI snapshot validation failed: {type(exc).__name__}", file=sys.stderr)
+    raise SystemExit(1)
+PY
+  then
+    rm -f -- "$snapshot_temp"
+    return 1
+  fi
+
+  if [[ -e "$snapshot_file" ]]; then
+    rm -f -- "$snapshot_temp"
+    echo "ARI snapshot already exists: $snapshot_file" >&2
+    return 1
+  fi
+
+  mv -- "$snapshot_temp" "$snapshot_file"
+
+  latest_temp="$(mktemp "$ARI_DATA_DIR/.latest.json.XXXXXX")" || return 1
+  if ! cp -- "$snapshot_file" "$latest_temp"; then
+    rm -f -- "$latest_temp"
+    return 1
+  fi
+  if ! mv -f -- "$latest_temp" "$LATEST_FILE"; then
+    rm -f -- "$latest_temp"
+    return 1
+  fi
+
   publish_api_runtime_snapshot "$LATEST_FILE"
+
+  echo "ARI collection complete."
 
   ari_publish_event \
     "ari.snapshot-created" \

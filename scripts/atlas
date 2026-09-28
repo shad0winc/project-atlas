@@ -5,7 +5,7 @@ if [[ -n "${ATLAS_PROJECT_DIR:-}" ]]; then
   PROJECT_DIR="$ATLAS_PROJECT_DIR"
 else
   PROJECT_DIR="$(
-    cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." &&
+    cd -- "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")/.." &&
     pwd
   )"
 fi

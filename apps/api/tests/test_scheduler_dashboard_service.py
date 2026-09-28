@@ -99,6 +99,43 @@ def test_failure_results_are_bounded() -> None:
         PORTAL_RECENT_FAILURE_LIMIT
     )
 
+
+def test_recovered_task_does_not_report_historical_failure() -> None:
+    class RecoveredScheduler:
+        def list_tasks(self):
+            return [{
+                "name": "operations.collect",
+                "status": "healthy",
+                "failure_count": 70,
+                "consecutive_failures": 0,
+                "last_failure": "2026-09-21T23:09:00Z",
+                "last_success": "2026-09-28T17:34:48Z",
+                "last_error": None,
+            }]
+
+    response = SchedulerDashboardService(RecoveredScheduler()).read_summary()
+    assert response.status == "available"
+    assert response.failed_count == 0
+    assert response.recent_failures == ()
+
+
+def test_current_failure_with_missing_error_has_readable_message() -> None:
+    class CurrentFailureScheduler:
+        def list_tasks(self):
+            return [{
+                "name": "operations.collect",
+                "status": "failed",
+                "failure_count": 1,
+                "consecutive_failures": 1,
+                "last_error": None,
+                "last_failure": "2026-09-28T17:34:48Z",
+            }]
+
+    response = SchedulerDashboardService(CurrentFailureScheduler()).read_summary()
+    assert response.failed_count == 1
+    assert len(response.recent_failures) == 1
+    assert response.recent_failures[0].error == "Scheduler task failed."
+
 def test_runtime_scheduler_provider_missing_snapshot_is_unavailable(tmp_path):
     from atlas_api.services.scheduler_dashboard import RuntimeSchedulerProvider
     response = SchedulerDashboardService(
