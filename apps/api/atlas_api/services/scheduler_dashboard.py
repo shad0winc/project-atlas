@@ -174,15 +174,22 @@ class SchedulerDashboardService:
         return sum(
             1
             for task in tasks
-            if int(
-                task.get(
-                    "failure_count",
-                    0,
-                )
-                or 0
-            )
-            > 0
+            if SchedulerDashboardService._is_active_failure(task)
         )
+
+    @staticmethod
+    def _is_active_failure(task: dict[str, Any]) -> bool:
+        """Historical failures do not make a recovered task unhealthy."""
+
+        status = task.get("status")
+        if status == "failed":
+            return True
+        if isinstance(status, str) and status in {
+            "healthy", "running", "disabled"
+        }:
+            return False
+        count = task.get("consecutive_failures", 0)
+        return type(count) is int and count > 0
 
     @staticmethod
     def _latest_timestamp(
@@ -217,16 +224,12 @@ class SchedulerDashboardService:
         ] = []
 
         for task in tasks:
-            failure_count = int(
-                task.get(
-                    "failure_count",
-                    0,
-                )
-                or 0
-            )
-
-            if failure_count <= 0:
+            if not SchedulerDashboardService._is_active_failure(task):
                 continue
+
+            error = task.get("last_error")
+            if not isinstance(error, str) or not error.strip():
+                error = "Scheduler task failed."
 
             failures.append(
                 PortalSchedulerFailureResponse(
@@ -241,20 +244,12 @@ class SchedulerDashboardService:
                             "last_failure",
                         )
                     ),
-                    error=str(
-                        task.get(
-                            "last_error",
-                            "Scheduler task failed.",
-                        )
-                    ),
+                    error=error,
                 )
             )
 
-        return tuple(
-            failures[
-                :PORTAL_RECENT_FAILURE_LIMIT
-            ]
-        )
+        failures.sort(key=lambda failure: failure.failed_at or "", reverse=True)
+        return tuple(failures[:PORTAL_RECENT_FAILURE_LIMIT])
 
 
 __all__ = [

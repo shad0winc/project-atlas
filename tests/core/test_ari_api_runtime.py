@@ -64,7 +64,7 @@ def test_runtime_projection_has_bounded_permissions() -> None:
 def test_collection_publishes_after_canonical_latest() -> None:
     script = ARI_SCRIPT.read_text()
 
-    canonical = '  cp "$snapshot_file" "$LATEST_FILE"'
+    canonical = '  if ! mv -f -- "$latest_temp" "$LATEST_FILE"; then'
     runtime = '  publish_api_runtime_snapshot "$LATEST_FILE"'
 
     assert script.count(runtime) == 1
