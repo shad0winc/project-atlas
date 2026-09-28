@@ -34,6 +34,9 @@ from atlas.service_lifecycle.providers import (
 from atlas.service_lifecycle.runtime_snapshot import (
     build_runtime_snapshot,
 )
+from atlas.service_lifecycle.runtime_snapshot_merge import (
+    merge_runtime_snapshots,
+)
 from atlas.service_lifecycle.runtime_snapshot_publish import (
     publish_runtime_snapshot,
 )
@@ -72,7 +75,16 @@ provider = DockerComposeProvider(
     environment=os.environ,
 )
 
-payload = build_runtime_snapshot(provider)
+core_payload = build_runtime_snapshot(provider)
+
+sports_file = project_root / "modules/sports-backend/docker-compose.yml"
+sports_provider = DockerComposeProvider(
+    compose_file=sports_file,
+    project_directory=sports_file.parent,
+    environment=os.environ,
+)
+sports_payload = build_runtime_snapshot(sports_provider)
+payload = merge_runtime_snapshots(core_payload, sports_payload)
 
 published = publish_runtime_snapshot(
     payload,

@@ -4,6 +4,26 @@ services:
     container_name: atlas-dispatcharr
     restart: unless-stopped
 
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import json
+          import urllib.request
+          with urllib.request.urlopen("http://127.0.0.1:9191/api/core/version/", timeout=5) as response:
+              body = response.read(8193)
+              if response.status != 200 or response.headers.get_content_type() != "application/json" or len(body) > 8192:
+                  raise SystemExit(1)
+              value = json.loads(body)
+              if not isinstance(value, dict) or not isinstance(value.get("version"), str) or not value["version"]:
+                  raise SystemExit(1)
+      interval: 30s
+      timeout: 8s
+      retries: 3
+      start_period: 60s
+
     environment:
       TZ: "${SPORTS_BACKEND_TIMEZONE:-America/New_York}"
       DISPATCHARR_ENV: "aio"

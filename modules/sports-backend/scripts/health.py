@@ -45,6 +45,9 @@ for name, display in SERVICES:
     elif status != "running":
         state = "critical"
         message = f"container state is {status}"
+    elif name == "atlas-dispatcharr" and not health:
+        state = "warning"
+        message = "container has no Docker health check"
     elif health and health != "healthy":
         state = "warning"
         message = f"container health is {health}"
