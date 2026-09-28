@@ -50,31 +50,32 @@ def test_classification_requires_policy_auth_and_matches_one_binding():
         namespace["do_GET"](fixture)
     assert fixture.responses[0][0] == HTTPStatus.UNAUTHORIZED
 
-    binding = SimpleNamespace(dispatcharr_channel_uuid=identity)
     fixture = Fixture(identity)
     with patch.dict(namespace, {"default_dispatcharr_channel_binding_registry":
             lambda: SimpleNamespace(path=SimpleNamespace(is_file=lambda: True),
-                list_bindings=lambda: (binding,))}):
+                classify_channel_uuid=lambda value: value == identity)}):
         namespace["do_GET"](fixture)
     assert fixture.responses == [(HTTPStatus.OK,
         {"channel_uuid": identity, "managed": True})]
 
     fixture = Fixture(identity)
-    namespace["do_GET"](fixture)
+    with patch.dict(namespace, {"default_dispatcharr_channel_binding_registry":
+            lambda: SimpleNamespace(path=SimpleNamespace(is_file=lambda: True),
+                classify_channel_uuid=lambda value: False)}):
+        namespace["do_GET"](fixture)
     assert fixture.responses == [(HTTPStatus.OK,
         {"channel_uuid": identity, "managed": False})]
 
 
 def test_classification_blocks_missing_corrupt_ambiguous_binding_state():
     identity = str(uuid4())
-    binding = SimpleNamespace(dispatcharr_channel_uuid=identity)
     variants = (
         SimpleNamespace(path=SimpleNamespace(is_file=lambda: False),
-                        list_bindings=lambda: ()),
+                        classify_channel_uuid=lambda _: False),
         SimpleNamespace(path=SimpleNamespace(is_file=lambda: True),
-                        list_bindings=lambda: (binding, binding)),
+                        classify_channel_uuid=lambda _: (_ for _ in ()).throw(ValueError())),
         SimpleNamespace(path=SimpleNamespace(is_file=lambda: True),
-                        list_bindings=lambda: (_ for _ in ()).throw(ValueError())),
+                        classify_channel_uuid=lambda _: (_ for _ in ()).throw(ValueError())),
     )
     for registry in variants:
         fixture = Fixture(identity)

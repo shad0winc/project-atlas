@@ -380,17 +380,13 @@ class Handler(BaseHTTPRequestHandler):
                 # store reader represents it as an empty initial document.
                 if not registry.path.is_file():
                     raise OSError("Channel binding registry unavailable")
-                bindings = registry.list_bindings()
-                matches = [binding for binding in bindings
-                           if binding.dispatcharr_channel_uuid == channel_uuid]
-                if len(matches) > 1:
-                    raise ValueError("ambiguous managed channel")
+                managed = registry.classify_channel_uuid(channel_uuid)
             except (OSError, ValueError, TypeError, AttributeError):
                 self._backend_unavailable()
                 return
             self._json(HTTPStatus.OK, {
                 "channel_uuid": channel_uuid,
-                "managed": len(matches) == 1,
+                "managed": managed,
             })
             return
         live_policy_prefix = "/internal/v1/live-policy/"
