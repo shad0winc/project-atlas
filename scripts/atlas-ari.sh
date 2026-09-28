@@ -94,7 +94,7 @@ jellyfin_json_request() {
 
   if ! response="$(curl --fail --silent --show-error \
     --connect-timeout 5 --max-time 20 \
-    -H "X-Emby-Token: $ATLAS_JELLYFIN_API_KEY" \
+    -H "Authorization: MediaBrowser Token=\"$ATLAS_JELLYFIN_API_KEY\"" \
     "$ATLAS_JELLYFIN_URL$endpoint")"; then
     echo "ARI Jellyfin request failed: $endpoint" >&2
     return 1

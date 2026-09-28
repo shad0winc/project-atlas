@@ -36,6 +36,16 @@ def _collect(tmp_path: Path, mode: str) -> tuple[subprocess.CompletedProcess[str
         + "\n"
         + r'''
 curl() {
+  local expected='Authorization: MediaBrowser Token="fixture"'
+  local previous=''
+  local authorized=0
+  for argument in "$@"; do
+    if [[ "$previous" == '-H' && "$argument" == "$expected" ]]; then
+      authorized=1
+    fi
+    previous="$argument"
+  done
+  [[ "$authorized" == 1 ]] || return 22
   local url="${*: -1}"
   case "$url" in
     */System/Info) printf '%s' '{"ServerName":"Test","Version":"1.0","Id":"id"}' ;;
