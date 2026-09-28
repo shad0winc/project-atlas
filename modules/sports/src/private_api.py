@@ -9,6 +9,7 @@ import urllib.parse
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
+from uuid import UUID
 
 from atlas_live_policy_claim import AtlasLivePolicyUnavailable, claims_for_channel
 from dispatcharr_channel_bindings import (
@@ -357,6 +358,40 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlsplit(self.path)
         if parsed.path == "/health":
             self._json(HTTPStatus.OK, {"status": "ok"})
+            return
+        classification_prefix = "/internal/v1/live-policy-classification/"
+        if parsed.path.startswith(classification_prefix):
+            if not self._live_policy_authorized():
+                self._json(HTTPStatus.UNAUTHORIZED, {"error": "Unauthorized."})
+                return
+            if parsed.query or len(parsed.path) > 320:
+                self._json(HTTPStatus.BAD_REQUEST, {"error": "Invalid channel identity."})
+                return
+            channel_uuid = urllib.parse.unquote(parsed.path[len(classification_prefix):])
+            try:
+                if str(UUID(channel_uuid)) != channel_uuid:
+                    raise ValueError("noncanonical UUID")
+            except (TypeError, ValueError, AttributeError):
+                self._json(HTTPStatus.BAD_REQUEST, {"error": "Invalid channel identity."})
+                return
+            try:
+                registry = default_dispatcharr_channel_binding_registry()
+                # A missing registry is uncertain, even though the generic
+                # store reader represents it as an empty initial document.
+                if not registry.path.is_file():
+                    raise OSError("Channel binding registry unavailable")
+                bindings = registry.list_bindings()
+                matches = [binding for binding in bindings
+                           if binding.dispatcharr_channel_uuid == channel_uuid]
+                if len(matches) > 1:
+                    raise ValueError("ambiguous managed channel")
+            except (OSError, ValueError, TypeError, AttributeError):
+                self._backend_unavailable()
+                return
+            self._json(HTTPStatus.OK, {
+                "channel_uuid": channel_uuid,
+                "managed": len(matches) == 1,
+            })
             return
         live_policy_prefix = "/internal/v1/live-policy/"
         if parsed.path.startswith(live_policy_prefix):
