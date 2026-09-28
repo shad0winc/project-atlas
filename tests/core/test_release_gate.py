@@ -115,7 +115,7 @@ def test_atlas_cli_defaults_to_invoked_checkout_and_supports_override() -> None:
     assert 'if [[ -n "${ATLAS_PROJECT_DIR:-}" ]]; then' in content
     assert 'PROJECT_DIR="$ATLAS_PROJECT_DIR"' in content
     assert (
-        'cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."'
+        'cd -- "$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")/.."'
         in content
     )
     assert (
