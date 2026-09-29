@@ -164,6 +164,7 @@ export function ProviderAccountManagement(): React.ReactElement | null {
 
             const providerId = textValue(data, "providerId");
             const sourceId = textValue(data, "sourceId");
+            const credentialRealm = textValue(data, "credentialRealm");
             const providerDisplayName = textValue(data, "providerDisplayName");
             const accountDisplayName = textValue(data, "accountDisplayName");
             const serverUrl = textValue(data, "serverUrl");
@@ -175,6 +176,7 @@ export function ProviderAccountManagement(): React.ReactElement | null {
             if (
               providerId === null ||
               sourceId === null ||
+              credentialRealm === null ||
               providerDisplayName === null ||
               accountDisplayName === null ||
               serverUrl === null ||
@@ -188,6 +190,7 @@ export function ProviderAccountManagement(): React.ReactElement | null {
 
             const input: CreateAdminSportsProviderAccountInput = {
               sourceId,
+              credentialRealm,
               providerDisplayName,
               accountDisplayName,
               serverUrl,
@@ -231,6 +234,14 @@ export function ProviderAccountManagement(): React.ReactElement | null {
             Source ID
             <input autoComplete="off" disabled={busyKey !== null} name="sourceId" required />
           </label>
+
+          <label>
+            Credential realm
+            <input autoComplete="off" disabled={busyKey !== null} name="credentialRealm"
+              pattern="[a-z0-9][a-z0-9.-]{0,127}" maxLength={128} required />
+          </label>
+          <p>Use the same realm for accounts sharing one provider login or connection allowance.
+            Use a distinct realm for independently licensed accounts.</p>
 
           <label>
             Account display name

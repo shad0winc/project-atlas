@@ -1643,6 +1643,7 @@ def test_admin_can_create_disabled_provider_account_without_exposing_secrets() -
                 "source_id": (
                     "provider-a-secondary"
                 ),
+                "credential_realm": "provider-a-license",
                 "provider_display_name": (
                     "Provider A"
                 ),
@@ -1671,6 +1672,7 @@ def test_admin_can_create_disabled_provider_account_without_exposing_secrets() -
                 "provider-a-secondary"
             ),
             "provider_id": "provider-a",
+            "credential_realm": "provider-a-license",
             "provider_display_name": (
                 "Provider A"
             ),
@@ -1751,6 +1753,7 @@ def test_admin_provider_account_create_rejects_duplicate_source_before_backend_m
         ),
         json={
             "source_id": "provider-a-primary",
+            "credential_realm": "provider-a-license",
             "provider_display_name": "Provider A",
             "account_display_name": "Duplicate",
             "server_url": "https://provider.example",
@@ -1762,6 +1765,32 @@ def test_admin_provider_account_create_rejects_duplicate_source_before_backend_m
     )
 
     assert response.status_code == 409
+    assert writer.account_creates == []
+    assert audit_writer.events == []
+
+
+def test_admin_provider_account_create_requires_valid_realm_before_backend_mutation() -> None:
+    writer = ProviderAccountLifecycleFakeSportsWriter()
+    audit_writer = ProviderAccountLifecycleAuditWriter()
+    client = _provider_account_lifecycle_client(writer, audit_writer=audit_writer)
+    payload = {
+        "source_id": "provider-a-secondary",
+        "provider_display_name": "Provider A",
+        "account_display_name": "Secondary",
+        "server_url": "https://provider.example",
+        "username": "provider-user",
+        "password": "provider-secret",
+        "max_connections": 2,
+        "priority": 100,
+    }
+    for realm in (None, "UpperCase", "has space"):
+        attempt = dict(payload)
+        if realm is not None:
+            attempt["credential_realm"] = realm
+        response = client.post(
+            "/admin/sports/providers/provider-a/accounts", json=attempt,
+        )
+        assert response.status_code == 422
     assert writer.account_creates == []
     assert audit_writer.events == []
 
@@ -1788,6 +1817,7 @@ def test_admin_provider_account_create_rejects_provider_display_mismatch_before_
         ),
         json={
             "source_id": "provider-a-secondary",
+            "credential_realm": "provider-a-license",
             "provider_display_name": "Other Provider",
             "account_display_name": "Secondary",
             "server_url": "https://provider.example",
@@ -1825,6 +1855,7 @@ def test_admin_provider_account_create_requires_provider_display_name_before_bac
         ),
         json={
             "source_id": "new-provider-primary",
+            "credential_realm": "new-provider-license",
             "provider_display_name": "   ",
             "account_display_name": "Primary",
             "server_url": "https://provider.example",
@@ -1866,6 +1897,7 @@ def test_admin_provider_account_create_rejects_control_fields() -> None:
                 "source_id": (
                     "provider-a-secondary"
                 ),
+                "credential_realm": "provider-a-license",
                 "provider_display_name": (
                     "Provider A"
                 ),
