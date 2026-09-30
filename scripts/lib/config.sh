@@ -18,6 +18,9 @@ atlas_load_config() {
     source "$module_state_file"
   fi
 
+  # Child Compose processes must use the configured data roots.
+  export ATLAS_MEDIA_ROOT ATLAS_DOWNLOADS_ROOT
+
   export ATLAS_PROJECT_DIR
   export ATLAS_MODULE_STATE_FILE="$module_state_file"
 }

@@ -39,7 +39,7 @@ services:
     volumes:
       - ${CONFIG}/jellyfin:/config
       - ${CONFIG}/jellyfin-cache:/cache
-      - ${MEDIA}:/media
+      - ${ATLAS_MEDIA_ROOT:?ATLAS_MEDIA_ROOT is required}:/media
     devices:
       - /dev/dri:/dev/dri
     group_add:
@@ -106,7 +106,7 @@ services:
       - TZ=${TZ}
     volumes:
       - ${CONFIG}/sonarr:/config
-      - ${MEDIA}:/media
+      - ${ATLAS_MEDIA_ROOT:?ATLAS_MEDIA_ROOT is required}:/media
       - ${DOWNLOADS}:/downloads
     restart: unless-stopped
 
@@ -122,7 +122,7 @@ services:
       - TZ=${TZ}
     volumes:
       - ${CONFIG}/sonarr-anime:/config
-      - ${MEDIA}:/media
+      - ${ATLAS_MEDIA_ROOT:?ATLAS_MEDIA_ROOT is required}:/media
       - ${DOWNLOADS}:/downloads
     restart: unless-stopped
 
@@ -138,7 +138,7 @@ services:
       - TZ=${TZ}
     volumes:
       - ${CONFIG}/radarr:/config
-      - ${MEDIA}:/media
+      - ${ATLAS_MEDIA_ROOT:?ATLAS_MEDIA_ROOT is required}:/media
       - ${DOWNLOADS}:/downloads
     restart: unless-stopped
 
@@ -154,7 +154,7 @@ services:
       - TZ=${TZ}
     volumes:
       - ${CONFIG}/radarr-anime:/config
-      - ${MEDIA}:/media
+      - ${ATLAS_MEDIA_ROOT:?ATLAS_MEDIA_ROOT is required}:/media
       - ${DOWNLOADS}:/downloads
     restart: unless-stopped
 
@@ -241,7 +241,7 @@ services:
       - TZ=${TZ}
     volumes:
       - ${CONFIG}/bazarr:/config
-      - ${MEDIA}:/media
+      - ${ATLAS_MEDIA_ROOT:?ATLAS_MEDIA_ROOT is required}:/media
     restart: unless-stopped
 
   maintainerr:
@@ -255,7 +255,7 @@ services:
       - TZ=${TZ}
     volumes:
       - ${CONFIG}/maintainerr:/opt/data
-      - ${MEDIA}:/media
+      - ${ATLAS_MEDIA_ROOT:?ATLAS_MEDIA_ROOT is required}:/media
     restart: unless-stopped
     depends_on:
       - jellyfin
