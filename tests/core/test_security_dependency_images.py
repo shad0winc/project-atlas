@@ -67,7 +67,7 @@ def test_maintainerr_preserves_existing_storage_contract() -> None:
     )
 
     assert "      - ${CONFIG}/maintainerr:/opt/data\n" in maintainerr
-    assert "      - ${MEDIA}:/media\n" in maintainerr
+    assert "      - ${ATLAS_MEDIA_ROOT:?ATLAS_MEDIA_ROOT is required}:/media\n" in maintainerr
     assert '"${MAINTAINERR_PORT:-6246}:6246"' in maintainerr
 
 
