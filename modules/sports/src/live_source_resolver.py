@@ -271,6 +271,17 @@ def _team_aliases(team_name: str) -> tuple[str, ...]:
     full_name = " ".join(words)
     nickname = words[-1]
 
+    # These MLB nicknames identify the club as a phrase. Red Sox and
+    # White Sox must not both become "sox", and Blue Jays must not
+    # accept every channel containing "jays".
+    for multiword_nickname in ("red sox", "white sox", "blue jays"):
+        if (
+            full_name == multiword_nickname
+            or full_name.endswith(" " + multiword_nickname)
+        ):
+            nickname = multiword_nickname
+            break
+
     aliases = [full_name]
 
     if nickname != full_name:
