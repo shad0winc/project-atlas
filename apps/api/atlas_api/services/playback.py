@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
+from atlas.jellyfin_live_streams import OwnedJellyfinLiveStreams
 
 from atlas.media import (
     MediaProviderError,
@@ -31,9 +33,18 @@ class PlaybackService:
         jellyfin: JellyfinProvider,
         *,
         jellyfin_public_url: str,
+        live_streams: OwnedJellyfinLiveStreams | None = None,
     ) -> None:
         self._jellyfin = jellyfin
         self._jellyfin_public_url = jellyfin_public_url
+        self._live_streams = live_streams or OwnedJellyfinLiveStreams(
+            Path(
+                os.environ.get(
+                    "ATLAS_JELLYFIN_LIVE_STREAM_PATH",
+                    "/mnt/storage/configs/atlas/runtime/sports/jellyfin-live-streams.json",
+                )
+            )
+        )
 
     def list_library_series_episodes(
         self,
@@ -248,46 +259,97 @@ class PlaybackService:
         item_id: str,
         jellyfin_user_id: str,
         subtitle_stream_index: int | None = None,
+        atlas_session_id: str | None = None,
+        atlas_user_id: str | None = None,
+    ) -> PlaybackSession:
+        if atlas_session_id is None and atlas_user_id is None:
+            return self._resolve_live_session(
+                provider=provider,
+                item_id=item_id,
+                jellyfin_user_id=jellyfin_user_id,
+                subtitle_stream_index=subtitle_stream_index,
+            )
+        with self._live_streams.scope(
+            session_id=atlas_session_id,
+            user_id=atlas_user_id,
+            item_id=item_id,
+            close=self._jellyfin.close_live_stream,
+        ) as owner:
+            return self._resolve_live_session(
+                provider=provider,
+                item_id=item_id,
+                jellyfin_user_id=jellyfin_user_id,
+                subtitle_stream_index=subtitle_stream_index,
+                live_stream_owner=owner,
+            )
+
+    def heartbeat_live_stream(self, *, session_id: str, user_id: str) -> None:
+        self._live_streams.heartbeat(session_id=session_id, user_id=user_id)
+
+    def release_live_stream(self, *, session_id: str, user_id: str) -> None:
+        self._live_streams.release(
+            session_id=session_id,
+            user_id=user_id,
+            close=self._jellyfin.close_live_stream,
+        )
+
+    def authorize_live_stream(
+        self,
+        *,
+        user_id: str,
+        item_id: str,
+        live_stream_id: str,
+        play_session_id: str | None = None,
+        media_source_id: str | None = None,
+    ) -> None:
+        self._live_streams.authorize(
+            user_id=user_id,
+            item_id=item_id,
+            live_stream_id=live_stream_id,
+            play_session_id=play_session_id,
+            media_source_id=media_source_id,
+        )
+
+    def reap_live_streams(self) -> int:
+        if not self._live_streams.path.exists():
+            return 0
+        return self._live_streams.reap(self._jellyfin.close_live_stream)
+
+    def _resolve_live_session(
+        self,
+        *,
+        provider: str,
+        item_id: str,
+        jellyfin_user_id: str,
+        subtitle_stream_index: int | None = None,
+        live_stream_owner: object = None,
     ) -> PlaybackSession:
         """Resolve one Jellyfin Live TV item through the Atlas gateway."""
 
         normalized_provider = provider.strip().lower()
         if normalized_provider != "jellyfin":
-            raise PlaybackNotFoundError(
-                "unsupported playback provider"
-            )
+            raise PlaybackNotFoundError("unsupported playback provider")
 
         normalized_item_id = item_id.strip()
         if not normalized_item_id:
-            raise PlaybackNotFoundError(
-                "playback item is required"
-            )
+            raise PlaybackNotFoundError("playback item is required")
 
         normalized_jellyfin_user_id = jellyfin_user_id.strip()
         if not normalized_jellyfin_user_id:
-            raise PlaybackUnavailableError(
-                "Atlas user is not linked to Jellyfin"
-            )
+            raise PlaybackUnavailableError("Atlas user is not linked to Jellyfin")
 
-        if (
-            subtitle_stream_index is not None
-            and (
-                isinstance(subtitle_stream_index, bool)
-                or not isinstance(subtitle_stream_index, int)
-                or subtitle_stream_index < -1
-            )
+        if subtitle_stream_index is not None and (
+            isinstance(subtitle_stream_index, bool)
+            or not isinstance(subtitle_stream_index, int)
+            or subtitle_stream_index < -1
         ):
-            raise PlaybackUnavailableError(
-                "subtitle selection is invalid"
-            )
+            raise PlaybackUnavailableError("subtitle selection is invalid")
 
         try:
-            item = self._jellyfin.get_item(
-                normalized_item_id
+            item = self._jellyfin.get_item(normalized_item_id)
+            jellyfin_type = (
+                str(item.metadata.get("jellyfin_type") or "").strip().lower()
             )
-            jellyfin_type = str(
-                item.metadata.get("jellyfin_type") or ""
-            ).strip().lower()
 
             if jellyfin_type not in {
                 "tvchannel",
@@ -295,18 +357,19 @@ class PlaybackService:
                 "channel",
             }:
                 raise PlaybackNotFoundError(
-                    "playback item is not a Jellyfin "
-                    "Live TV channel"
+                    "playback item is not a Jellyfin " "Live TV channel"
                 )
 
             playback = self._jellyfin.get_playback_info(
                 normalized_item_id,
                 user_id=normalized_jellyfin_user_id,
                 **(
-                    {
-                        "subtitle_stream_index":
-                            subtitle_stream_index
-                    }
+                    {"live_stream_owner": live_stream_owner}
+                    if live_stream_owner is not None
+                    else {}
+                ),
+                **(
+                    {"subtitle_stream_index": subtitle_stream_index}
                     if subtitle_stream_index is not None
                     else {}
                 ),
@@ -316,8 +379,7 @@ class PlaybackService:
             raise
         except MediaProviderError as exc:
             raise PlaybackNotFoundError(
-                "live playback item was not found "
-                "or is not playable"
+                "live playback item was not found " "or is not playable"
             ) from exc
 
         tracks = tuple(
@@ -345,17 +407,11 @@ class PlaybackService:
             title=item.title,
             media_type=item.media_type,
             duration_ticks=playback["duration_ticks"],
-            can_seek=playback["can_seek"],
+            can_seek=False,
             stream_path=playback["stream_path"],
-            audio_tracks=tuple(
-                track
-                for track in tracks
-                if track.kind == "audio"
-            ),
+            audio_tracks=tuple(track for track in tracks if track.kind == "audio"),
             subtitle_tracks=tuple(
-                track
-                for track in tracks
-                if track.kind == "subtitle"
+                track for track in tracks if track.kind == "subtitle"
             ),
             previous_target_id=None,
             next_target_id=None,

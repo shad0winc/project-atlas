@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import secrets
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, parse_qsl
 
 import jwt
 from jwt import ExpiredSignatureError, InvalidTokenError
@@ -76,6 +76,8 @@ class PlaybackCapabilityService:
                 "sub": user_id,
                 "item": playable_target_id,
                 "scope": path_prefix,
+                "live_identity": self._live_identity(stream_path),
+                "entry_path": urlsplit(stream_path).path,
             },
         )
         return PlaybackGatewaySession(
@@ -85,7 +87,7 @@ class PlaybackCapabilityService:
             max_age_seconds=self.session_seconds,
         )
 
-    def authorize_session(self, token: str, *, request_uri: str) -> None:
+    def authorize_session(self, token: str, *, request_uri: str) -> dict[str, Any]:
         payload = self._decode(
             token,
             audience=self.session_audience,
@@ -98,6 +100,40 @@ class PlaybackCapabilityService:
             raise PlaybackCapabilityError(
                 "Playback request is outside the authorized scope."
             )
+
+        identity = payload.get("live_identity") or {}
+        if not identity and any(
+            k.lower() == "livestreamid"
+            for k, _ in parse_qsl(urlsplit(request_uri).query)
+        ):
+            raise PlaybackCapabilityError(
+                "Live playback identity is outside the authorized scope."
+            )
+        if identity:
+            pairs = parse_qsl(urlsplit(request_uri).query, keep_blank_values=True)
+            for name, expected in identity.items():
+                supplied = [v for k, v in pairs if k.lower() == name]
+                if supplied and supplied != [expected]:
+                    raise PlaybackCapabilityError(
+                        "Live playback identity is out of scope."
+                    )
+                if urlsplit(request_uri).path.endswith(".m3u8") and not supplied:
+                    raise PlaybackCapabilityError("Live playback identity is required.")
+        return payload
+
+    @staticmethod
+    def _live_identity(stream_path: str) -> dict[str, str]:
+        pairs = parse_qsl(urlsplit(stream_path).query, keep_blank_values=True)
+        live = [v for k, v in pairs if k.lower() == "livestreamid"]
+        if not live:
+            return {}
+        result = {}
+        for name in ("livestreamid", "mediasourceid", "playsessionid"):
+            values = [v for k, v in pairs if k.lower() == name]
+            if len(values) != 1 or not values[0]:
+                raise PlaybackCapabilityError("Live playback identity is invalid.")
+            result[name] = values[0]
+        return result
 
     def _encode(
         self,
@@ -150,13 +186,9 @@ class PlaybackCapabilityService:
                 },
             )
         except ExpiredSignatureError as error:
-            raise PlaybackCapabilityError(
-                "Playback capability has expired."
-            ) from error
+            raise PlaybackCapabilityError("Playback capability has expired.") from error
         except InvalidTokenError as error:
-            raise PlaybackCapabilityError(
-                "Playback capability is invalid."
-            ) from error
+            raise PlaybackCapabilityError("Playback capability is invalid.") from error
         if payload.get("kind") != expected_kind:
             raise PlaybackCapabilityError("Playback capability type is invalid.")
         return payload

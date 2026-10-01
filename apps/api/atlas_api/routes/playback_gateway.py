@@ -46,7 +46,7 @@ def bootstrap_playback(
             detail="Playback capability is required.",
         )
     try:
-        gateway = _capabilities().exchange_bootstrap(authorization[len(prefix):])
+        gateway = _capabilities().exchange_bootstrap(authorization[len(prefix) :])
     except PlaybackCapabilityError as error:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -86,7 +86,7 @@ def authorize_playback(
             detail="Playback request scope is required.",
         )
     try:
-        _capabilities().authorize_session(
+        claims = _capabilities().authorize_session(
             atlas_playback,
             request_uri=forwarded_uri,
         )
@@ -96,9 +96,25 @@ def authorize_playback(
             detail="Playback session is invalid or out of scope.",
         ) from error
 
+    if claims.get("live_identity"):
+        from atlas.jellyfin_live_streams import LiveStreamOwnershipError
+        from atlas_api.routes.v1.playback import get_playback_service
+
+        try:
+            get_playback_service().authorize_live_stream(
+                user_id=claims["sub"],
+                item_id=claims["item"],
+                live_stream_id=claims["live_identity"]["livestreamid"],
+                play_session_id=claims["live_identity"]["playsessionid"],
+                media_source_id=claims["live_identity"]["mediasourceid"],
+            )
+        except LiveStreamOwnershipError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Live playback owner is unavailable.",
+            ) from exc
+
     response = Response(status_code=status.HTTP_200_OK)
-    response.headers[
-        "X-Atlas-Jellyfin-Authorization"
-    ] = _jellyfin_authorization()
+    response.headers["X-Atlas-Jellyfin-Authorization"] = _jellyfin_authorization()
     response.headers["Cache-Control"] = "no-store"
     return response

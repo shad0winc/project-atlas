@@ -21,6 +21,7 @@ class FakeCapabilities:
     ) -> None:
         self.session_token = token
         self.request_uri = request_uri
+        return {}
 
 
 def _request(
