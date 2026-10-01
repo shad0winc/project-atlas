@@ -9,6 +9,7 @@ import type { MediaRetention } from "../../media/types/retention";
 import { resolvePlaybackSession } from "../services/session";
 import type { SubtitleSelection } from "../services/session";
 import { bootstrapPlaybackStream } from "../services/stream";
+import { refreshPlaybackForRetry, retryResumePosition } from "../services/retry";
 import type { PlaybackSession, PlaybackTrack } from "../types/session";
 
 type PlayerState =
@@ -17,10 +18,7 @@ type PlayerState =
   | Readonly<{ status: "error"; message: string }>;
 
 function subtitleOptionLabel(track: PlaybackTrack): string {
-  const qualifiers = [
-    track.default ? "Default" : "",
-    track.forced ? "Forced" : ""
-  ].filter(Boolean);
+  const qualifiers = [track.default ? "Default" : "", track.forced ? "Forced" : ""].filter(Boolean);
 
   if (qualifiers.length === 0) {
     return track.label;
@@ -29,17 +27,11 @@ function subtitleOptionLabel(track: PlaybackTrack): string {
   return `${track.label} (${qualifiers.join(", ")})`;
 }
 
-function subtitleSelectionValue(
-  selection: SubtitleSelection
-): string {
-  return typeof selection === "number"
-    ? String(selection)
-    : selection;
+function subtitleSelectionValue(selection: SubtitleSelection): string {
+  return typeof selection === "number" ? String(selection) : selection;
 }
 
-function parseSubtitleSelection(
-  value: string
-): SubtitleSelection {
+function parseSubtitleSelection(value: string): SubtitleSelection {
   if (value === "auto" || value === "off") {
     return value;
   }
@@ -53,12 +45,7 @@ function parseSubtitleSelection(
   return index;
 }
 
-type FavoriteState =
-  | "loading"
-  | "idle"
-  | "submitting"
-  | "complete"
-  | "unavailable";
+type FavoriteState = "loading" | "idle" | "submitting" | "complete" | "unavailable";
 
 export function AtlasTheaterPlayer({
   session,
@@ -88,21 +75,53 @@ export function AtlasTheaterPlayer({
 }): React.ReactElement {
   const videoRef = useRef<HTMLVideoElement>(null);
   const resumeAtRef = useRef<number | null>(null);
+  const retryRequestRef = useRef<AbortController | null>(null);
 
-  const [activeSession, setActiveSession] =
-    useState<PlaybackSession>(session);
+  const [activeSession, setActiveSession] = useState<PlaybackSession>(session);
 
-  const [subtitleSelection, setSubtitleSelection] =
-    useState<SubtitleSelection>("auto");
+  const [subtitleSelection, setSubtitleSelection] = useState<SubtitleSelection>("auto");
 
-  const [subtitleChanging, setSubtitleChanging] =
-    useState(false);
-
-  const [attempt, setAttempt] = useState(0);
+  const [subtitleChanging, setSubtitleChanging] = useState(false);
 
   const [state, setState] = useState<PlayerState>({
     status: "connecting"
   });
+
+  useEffect(() => () => retryRequestRef.current?.abort(), []);
+
+  function rememberPlaybackPosition(): void {
+    resumeAtRef.current = retryResumePosition(
+      activeSession.canSeek,
+      videoRef.current?.currentTime,
+      resumeAtRef.current
+    );
+  }
+
+  async function retryPlayback(): Promise<void> {
+    if (retryRequestRef.current !== null) return;
+    rememberPlaybackPosition();
+    const controller = new AbortController();
+    retryRequestRef.current = controller;
+    setState({ status: "connecting" });
+    try {
+      const refreshed = await refreshPlaybackForRetry(
+        activeSession,
+        sessionResolver,
+        subtitleSelection,
+        controller.signal
+      );
+      setActiveSession(refreshed);
+    } catch (error: unknown) {
+      if (!controller.signal.aborted) {
+        setState({
+          status: "error",
+          message: error instanceof Error ? error.message : "Atlas could not renew playback."
+        });
+      }
+    } finally {
+      if (retryRequestRef.current === controller) retryRequestRef.current = null;
+    }
+  }
 
   useEffect(() => {
     const video = videoRef.current;
@@ -118,11 +137,7 @@ export function AtlasTheaterPlayer({
     const restorePlaybackPosition = () => {
       const resumeAt = resumeAtRef.current;
 
-      if (
-        resumeAt === null ||
-        !Number.isFinite(resumeAt) ||
-        resumeAt <= 0
-      ) {
+      if (resumeAt === null || !Number.isFinite(resumeAt) || resumeAt <= 0) {
         return;
       }
 
@@ -136,10 +151,7 @@ export function AtlasTheaterPlayer({
       resumeAtRef.current = null;
     };
 
-    video.addEventListener(
-      "loadedmetadata",
-      restorePlaybackPosition
-    );
+    video.addEventListener("loadedmetadata", restorePlaybackPosition);
 
     void bootstrapPlaybackStream(activeSession, controller.signal)
       .then(async ({ streamUrl }) => {
@@ -147,9 +159,7 @@ export function AtlasTheaterPlayer({
           return;
         }
 
-        const nativeHls = video.canPlayType(
-          "application/vnd.apple.mpegurl"
-        );
+        const nativeHls = video.canPlayType("application/vnd.apple.mpegurl");
 
         if (nativeHls) {
           video.crossOrigin = "use-credentials";
@@ -166,9 +176,7 @@ export function AtlasTheaterPlayer({
         }
 
         if (!Hls.isSupported()) {
-          throw new Error(
-            "This browser cannot play the Jellyfin HLS stream."
-          );
+          throw new Error("This browser cannot play the Jellyfin HLS stream.");
         }
 
         const hls = new Hls({
@@ -184,10 +192,14 @@ export function AtlasTheaterPlayer({
             return;
           }
 
+          resumeAtRef.current = retryResumePosition(
+            activeSession.canSeek,
+            video.currentTime,
+            resumeAtRef.current
+          );
           setState({
             status: "error",
-            message:
-              "Jellyfin playback encountered a fatal stream error."
+            message: "Jellyfin playback encountered a fatal stream error."
           });
 
           hls.destroy();
@@ -205,10 +217,7 @@ export function AtlasTheaterPlayer({
 
         setState({
           status: "error",
-          message:
-            error instanceof Error
-              ? error.message
-              : "Atlas could not start playback."
+          message: error instanceof Error ? error.message : "Atlas could not start playback."
         });
       });
 
@@ -217,19 +226,14 @@ export function AtlasTheaterPlayer({
       controller.abort();
       destroyHls?.();
 
-      video.removeEventListener(
-        "loadedmetadata",
-        restorePlaybackPosition
-      );
+      video.removeEventListener("loadedmetadata", restorePlaybackPosition);
 
       video.removeAttribute("src");
       video.load();
     };
-  }, [activeSession, attempt]);
+  }, [activeSession]);
 
-  async function changeSubtitle(
-    selection: SubtitleSelection
-  ): Promise<void> {
+  async function changeSubtitle(selection: SubtitleSelection): Promise<void> {
     const video = videoRef.current;
 
     if (video !== null && Number.isFinite(video.currentTime)) {
@@ -249,27 +253,21 @@ export function AtlasTheaterPlayer({
       );
 
       if (!refreshed.available) {
-        throw new Error(
-          "Playback is not currently available."
-        );
+        throw new Error("Playback is not currently available.");
       }
 
       setActiveSession(refreshed);
     } catch (error: unknown) {
       setState({
         status: "error",
-        message:
-          error instanceof Error
-            ? error.message
-            : "Atlas could not change closed captions."
+        message: error instanceof Error ? error.message : "Atlas could not change closed captions."
       });
     } finally {
       setSubtitleChanging(false);
     }
   }
 
-  const hasSubtitleTracks =
-    activeSession.subtitleTracks.length > 0;
+  const hasSubtitleTracks = activeSession.subtitleTracks.length > 0;
 
   return (
     <div
@@ -286,6 +284,7 @@ export function AtlasTheaterPlayer({
           className="atlas-theater-video"
           controls
           onError={() => {
+            rememberPlaybackPosition();
             setState({
               status: "error",
               message: "The browser could not play this stream."
@@ -308,8 +307,7 @@ export function AtlasTheaterPlayer({
             <button
               className="button button-secondary"
               onClick={() => {
-                setState({ status: "connecting" });
-                setAttempt((value) => value + 1);
+                void retryPlayback();
               }}
               type="button"
             >
@@ -322,16 +320,11 @@ export function AtlasTheaterPlayer({
       <div className="atlas-theater-player-meta">
         <span>Powered by Jellyfin</span>
 
-        {retention !== null ? (
-          <MediaRetentionStatus retention={retention} />
-        ) : null}
+        {retention !== null ? <MediaRetentionStatus retention={retention} /> : null}
 
         {canFavorite && onFavorite !== undefined ? (
           <button
-            aria-busy={
-              favoriteState === "loading" ||
-              favoriteState === "submitting"
-            }
+            aria-busy={favoriteState === "loading" || favoriteState === "submitting"}
             aria-label={
               favoriteState === "complete"
                 ? `${activeSession.title} added to favorites`
@@ -340,9 +333,7 @@ export function AtlasTheaterPlayer({
                   : `Add ${activeSession.title} to favorites`
             }
             className="media-discovery-primary-button"
-            disabled={
-              favoriteState !== "idle"
-            }
+            disabled={favoriteState !== "idle"}
             onClick={() => {
               void onFavorite();
             }}
@@ -370,35 +361,24 @@ export function AtlasTheaterPlayer({
           />
         ) : null}
 
-        {activeSession.canSeek ? (
-          <span>Seeking available</span>
-        ) : null}
+        {activeSession.canSeek ? <span>Seeking available</span> : null}
 
         {hasSubtitleTracks ? (
           <label>
             <span>Closed captions</span>{" "}
             <select
               aria-label="Closed captions"
-              disabled={subtitleChanging}
+              disabled={subtitleChanging || state.status === "connecting"}
               onChange={(event) => {
-                void changeSubtitle(
-                  parseSubtitleSelection(
-                    event.currentTarget.value
-                  )
-                );
+                void changeSubtitle(parseSubtitleSelection(event.currentTarget.value));
               }}
-              value={subtitleSelectionValue(
-                subtitleSelection
-              )}
+              value={subtitleSelectionValue(subtitleSelection)}
             >
               <option value="auto">Auto</option>
               <option value="off">Off</option>
 
               {activeSession.subtitleTracks.map((track) => (
-                <option
-                  key={track.index}
-                  value={String(track.index)}
-                >
+                <option key={track.index} value={String(track.index)}>
                   {subtitleOptionLabel(track)}
                 </option>
               ))}
@@ -408,9 +388,7 @@ export function AtlasTheaterPlayer({
           <span>Closed captions unavailable</span>
         )}
 
-        {subtitleChanging ? (
-          <span role="status">Changing captions…</span>
-        ) : null}
+        {subtitleChanging ? <span role="status">Changing captions…</span> : null}
       </div>
     </div>
   );
