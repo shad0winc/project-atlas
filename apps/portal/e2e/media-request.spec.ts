@@ -11,7 +11,7 @@ test("successful login establishes an authenticated session and creates one medi
   await Promise.all([
     page.waitForResponse(
       (response) =>
-        response.url().endsWith("/api/v1/auth/login") &&
+        response.url().endsWith("/api/v1/auth/browser/login") &&
         response.request().method() === "POST" &&
         response.status() === 200
     ),

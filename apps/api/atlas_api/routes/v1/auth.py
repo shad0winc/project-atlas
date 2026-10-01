@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from fastapi import BackgroundTasks, APIRouter, Depends, HTTPException, Response, status
+import time
+from urllib.parse import urlsplit
+
+from fastapi import BackgroundTasks, APIRouter, Depends, HTTPException, Request, Response, status
 
 from atlas_api.auth.exceptions import (
     AuthenticationProviderError,
@@ -11,7 +14,10 @@ from atlas_api.auth.exceptions import (
     TokenError,
 )
 from atlas_api.auth.jwt import JWTService
-from atlas_api.auth.models import AuthenticatedUser
+from fastapi.responses import JSONResponse
+
+from atlas_api.core.settings import AtlasAPISettings
+from atlas_api.auth.models import AuthenticatedUser, TokenType
 from atlas_api.auth.schemas import (
     CurrentUserResponse,
     LoginRequest,
@@ -363,3 +369,108 @@ def reset_password_recovery(
         ) from error
 
     return {"status": "password-reset"}
+
+
+# Browser credentials use a narrow, host-only cookie. Legacy token endpoints
+# remain available to explicit API clients and never accept cookie credentials.
+_BROWSER_COOKIE = "__Secure-atlas_refresh"
+_BROWSER_PATH = "/api/v1/auth/browser"
+
+
+def _require_browser_origin(request: Request) -> None:
+    configured = urlsplit(AtlasAPISettings.from_environment().base_url)
+    if configured.scheme != "https" or not configured.netloc:
+        raise HTTPException(503, "Browser sessions require a configured HTTPS Portal origin.")
+    expected = f"{configured.scheme}://{configured.netloc}"
+    if (
+        request.headers.get("origin") != expected
+        or request.headers.get("x-atlas-browser-session") != "1"
+        or request.headers.get("sec-fetch-site", "same-origin") != "same-origin"
+    ):
+        raise HTTPException(403, "Browser session request origin is not permitted.")
+
+
+def _browser_response(tokens: TokenResponse, jwt_service: JWTService) -> Response:
+    claims = jwt_service.decode_token(tokens.refresh_token, expected_type=TokenType.REFRESH)
+    response = JSONResponse(
+        {"access_token": tokens.access_token, "token_type": tokens.token_type},
+        headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+    )
+    response.set_cookie(
+        _BROWSER_COOKIE, tokens.refresh_token,
+        max_age=max(0, claims.expires_at - int(time.time())),
+        path=_BROWSER_PATH, secure=True, httponly=True, samesite="strict",
+    )
+    return response
+
+
+def _clear_browser_response(status_code: int = 204) -> Response:
+    response = (
+        Response(status_code=204)
+        if status_code == 204
+        else JSONResponse({"detail": "Browser session is invalid or expired."}, status_code=status_code)
+    )
+    response.headers["Cache-Control"] = "no-store"
+    response.delete_cookie(
+        _BROWSER_COOKIE, path=_BROWSER_PATH,
+        secure=True, httponly=True, samesite="strict",
+    )
+    return response
+
+
+@router.post("/browser/login")
+def browser_login(
+    request: Request,
+    credentials: LoginRequest,
+    authentication: AuthenticationService = Depends(get_authentication_service),
+    jwt_service: JWTService = Depends(get_jwt_service),
+) -> Response:
+    _require_browser_origin(request)
+    tokens = login(credentials, authentication)
+    return _browser_response(tokens, jwt_service)
+
+
+@router.post("/browser/refresh")
+def browser_refresh(
+    request: Request,
+    authentication: AuthenticationService = Depends(get_authentication_service),
+    jwt_service: JWTService = Depends(get_jwt_service),
+    profiles=Depends(get_user_profile_store),
+    audit_writer=Depends(get_security_audit_writer),
+) -> Response:
+    _require_browser_origin(request)
+    refresh_token = request.cookies.get(_BROWSER_COOKIE)
+    if not refresh_token:
+        return _clear_browser_response(401)
+    try:
+        tokens = refresh_tokens(
+            RefreshRequest(refresh_token=refresh_token), authentication,
+            jwt_service, profiles, audit_writer,
+        )
+    except HTTPException as error:
+        if error.status_code != 401:
+            raise
+        return _clear_browser_response(401)
+    return _browser_response(tokens, jwt_service)
+
+
+@router.post("/browser/logout", status_code=204)
+def browser_logout(
+    request: Request,
+    authentication: AuthenticationService = Depends(get_authentication_service),
+    jwt_service: JWTService = Depends(get_jwt_service),
+    profiles=Depends(get_user_profile_store),
+    audit_writer=Depends(get_security_audit_writer),
+) -> Response:
+    _require_browser_origin(request)
+    refresh_token = request.cookies.get(_BROWSER_COOKIE)
+    if refresh_token:
+        try:
+            logout(
+                RefreshRequest(refresh_token=refresh_token), authentication,
+                jwt_service, profiles, audit_writer,
+            )
+        except HTTPException as error:
+            if error.status_code != 401:
+                raise
+    return _clear_browser_response()

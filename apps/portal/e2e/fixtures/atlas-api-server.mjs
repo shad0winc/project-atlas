@@ -16,6 +16,8 @@ const SPORTS_PROVIDER = "thesportsdb";
 const SPORTS_EVENT_ID = "atlas-sports-event-001";
 const SPORTS_SUBSCRIPTION_ID = `sub_${"e".repeat(32)}`;
 
+const browserSessions = new Set();
+
 let favoriteCreated = false;
 let sportsRequested = false;
 let adminMemberStatus = "active";
@@ -66,6 +68,49 @@ const server = http.createServer(async (request, response) => {
 
     if (request.method === "GET" && url.pathname === "/_atlas_e2e/health") {
       sendJson(response, 200, { status: "ok" });
+      return;
+    }
+
+    // Deterministic HTTP fixture only: production Secure cookie attributes are
+    // covered by API tests. Keep a per-browser cookie and single-use rotation.
+    if (request.method === "POST" && url.pathname.startsWith("/api/v1/auth/browser/")) {
+      if (request.headers["x-atlas-browser-session"] !== "1") {
+        sendJson(response, 403, { detail: "Browser session header missing." });
+        return;
+      }
+      const old = /(?:^|;\s*)atlas_e2e_refresh=([^;]+)/.exec(request.headers.cookie ?? "")?.[1];
+      if (url.pathname.endsWith("/logout")) {
+        if (old) browserSessions.delete(old);
+        response.setHeader(
+          "Set-Cookie",
+          "atlas_e2e_refresh=; Path=/api/v1/auth/browser; Max-Age=0; HttpOnly; SameSite=Strict"
+        );
+        response.writeHead(204);
+        response.end();
+        return;
+      }
+      if (url.pathname.endsWith("/login")) {
+        const payload = await readJson(request);
+        if (payload.username !== "atlas-e2e-user" || payload.password !== "atlas-e2e-password") {
+          sendJson(response, 401, { detail: "Username or password is incorrect." });
+          return;
+        }
+      } else if (url.pathname.endsWith("/refresh")) {
+        if (!old || !browserSessions.delete(old)) {
+          sendJson(response, 401, { detail: "Browser session expired." });
+          return;
+        }
+      } else {
+        sendJson(response, 404, { detail: "Unknown browser session route." });
+        return;
+      }
+      const next = crypto.randomUUID();
+      browserSessions.add(next);
+      response.setHeader(
+        "Set-Cookie",
+        `atlas_e2e_refresh=${next}; Path=/api/v1/auth/browser; HttpOnly; SameSite=Strict`
+      );
+      sendJson(response, 200, { access_token: ACCESS_TOKEN, token_type: "bearer" });
       return;
     }
 

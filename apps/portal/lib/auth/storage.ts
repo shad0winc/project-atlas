@@ -3,9 +3,9 @@ import type { AtlasAuthSession } from "./types";
 /**
  * Minimal session store used by the Portal authentication provider.
  *
- * Tokens intentionally remain in process memory. A browser refresh therefore
- * ends the Portal session. Persistent browser storage is deferred until Atlas
- * supports a server-managed cookie or another hardened session mechanism.
+ * Access tokens and user projections remain in process memory. On refresh the
+ * Portal restores a validated session through the API-owned HttpOnly cookie.
+ * Refresh credentials are never written to this store or browser storage.
  */
 let activeSession: AtlasAuthSession | null = null;
 

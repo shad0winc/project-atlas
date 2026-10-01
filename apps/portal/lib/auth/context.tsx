@@ -1,23 +1,27 @@
 "use client";
 
-import { createContext, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode
+} from "react";
 
 import type { AtlasLoginRequest } from "../api/contracts";
+import { readCurrentAtlasUser } from "../services/auth";
 import {
-  loginAtlasUser,
-  logoutAtlasSession,
-  readCurrentAtlasUser,
-  refreshAtlasTokens
-} from "../services/auth";
+  loginBrowserSession,
+  logoutBrowserSession,
+  refreshBrowserIdentity,
+  restoreBrowserSession
+} from "../services/browser-auth";
 
 import { registerAtlasAuthLifecycle } from "./session-lifecycle";
 import { clearAtlasAuthSession, readAtlasAuthSession, writeAtlasAuthSession } from "./storage";
-import {
-  normalizeAtlasAuthTokens,
-  type AtlasAuthContextValue,
-  type AtlasAuthSession,
-  type AtlasAuthStatus
-} from "./types";
+import { type AtlasAuthContextValue, type AtlasAuthSession, type AtlasAuthStatus } from "./types";
 
 export const AtlasAuthContext = createContext<AtlasAuthContextValue | null>(null);
 
@@ -33,16 +37,43 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
   const [session, setSession] = useState<AtlasAuthSession | null>(initialSession);
 
   const [status, setStatus] = useState<AtlasAuthStatus>(() =>
-    initialSession() ? "authenticated" : "unauthenticated"
+    initialSession() ? "authenticated" : "loading"
   );
 
+  const generation = useRef(0);
+
+  useEffect(() => {
+    if (readAtlasAuthSession() !== null) return;
+    let disposed = false;
+    const expected = generation.current;
+    void restoreBrowserSession()
+      .then((restored) => {
+        if (disposed || generation.current !== expected) return;
+        writeAtlasAuthSession(restored);
+        setSession(restored);
+        setStatus("authenticated");
+      })
+      .catch(() => {
+        if (disposed || generation.current !== expected) return;
+        clearAtlasAuthSession();
+        setSession(null);
+        setStatus("unauthenticated");
+      });
+    return () => {
+      disposed = true;
+    };
+  }, []);
+
   const login = useCallback(async (credentials: AtlasLoginRequest): Promise<void> => {
+    const expected = ++generation.current;
+    clearAtlasAuthSession();
+    setSession(null);
     setStatus("loading");
 
     try {
-      const tokenResponse = await loginAtlasUser(credentials);
-      const tokens = normalizeAtlasAuthTokens(tokenResponse);
+      const tokens = await loginBrowserSession(credentials);
       const user = await readCurrentAtlasUser(tokens.accessToken);
+      if (generation.current !== expected) return;
 
       const nextSession: AtlasAuthSession = {
         tokens,
@@ -53,6 +84,7 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
       setSession(nextSession);
       setStatus("authenticated");
     } catch (error: unknown) {
+      if (generation.current !== expected) throw error;
       clearAtlasAuthSession();
       setSession(null);
       setStatus("unauthenticated");
@@ -61,24 +93,18 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
   }, []);
 
   const expireSession = useCallback((): void => {
+    generation.current += 1;
     clearAtlasAuthSession();
     setSession(null);
     setStatus("unauthenticated");
   }, []);
 
   const logout = useCallback(async (): Promise<void> => {
-    const currentSession = readAtlasAuthSession();
-
-    try {
-      if (currentSession !== null) {
-        await logoutAtlasSession(currentSession.tokens.refreshToken);
-      }
-    } catch {
-      // Explicit sign-out must still clear local credentials if revocation
-      // cannot reach the API. The server session will expire independently.
-    } finally {
-      expireSession();
-    }
+    generation.current += 1;
+    // Confirm server revocation before reporting logout. A network failure
+    // leaves the current page signed in so the user can retry explicitly.
+    await logoutBrowserSession();
+    expireSession();
   }, [expireSession]);
 
   const refreshAccessToken = useCallback(async (): Promise<string> => {
@@ -88,20 +114,17 @@ export function AuthProvider({ children }: AuthProviderProps): React.ReactElemen
       throw new Error("Atlas authentication session is unavailable.");
     }
 
-    const tokenResponse = await refreshAtlasTokens(currentSession.tokens.refreshToken);
-
-    const tokens = normalizeAtlasAuthTokens(tokenResponse);
-
-    const nextSession: AtlasAuthSession = {
-      ...currentSession,
-      tokens
-    };
+    const expected = generation.current;
+    const nextSession = await refreshBrowserIdentity(currentSession);
+    if (generation.current !== expected) {
+      throw new Error("Atlas session changed while refreshing.");
+    }
 
     writeAtlasAuthSession(nextSession);
     setSession(nextSession);
     setStatus("authenticated");
 
-    return tokens.accessToken;
+    return nextSession.tokens.accessToken;
   }, []);
 
   useEffect(() => {

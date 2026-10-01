@@ -16,8 +16,8 @@ M-023.26 discovery confirmed several strong existing contracts:
 - the API validates signed JWT issuer, audience, type, identity, timestamps,
   and algorithm;
 - authorization is permission based and defaults to denial;
-- Portal access and refresh tokens remain in browser process memory rather
-  than persistent browser storage;
+- Portal access tokens remain in process memory; browser refresh credentials
+  use an API-owned Secure, HttpOnly cookie rather than JavaScript storage;
 - invitation records persist token hashes rather than plaintext invitation
   tokens;
 - the Atlas API image runs as a non-root user;
@@ -62,16 +62,31 @@ operations continue to use explicit permission dependencies. Missing,
 inactive, deleted, unknown-role, or insufficiently privileged identities fail
 closed.
 
-### 3. Browser credentials remain ephemeral
+### 3. Browser session restoration
 
-Atlas does not introduce a persistent browser cookie or local-storage token as
-part of M-023.26. Bearer credentials remain process-memory state. The Portal
-must clear them on terminal authentication failure.
+Portal access tokens and user projections remain in process memory. The API's
+`/auth/browser/*` endpoints own a host-only Secure, HttpOnly, SameSite=Strict
+refresh cookie scoped to `/api/v1/auth/browser`. Browser responses do not expose
+a refresh credential to JavaScript. Legacy bearer-token clients retain their
+explicit login, refresh and logout contracts.
 
-Because bearer credentials are readable by executing page JavaScript, the
-public Portal boundary must also be hardened against unintended script and
-content execution. Browser security headers, including an appropriate Content
-Security Policy, are part of the release boundary.
+Cookie-authenticated mutations require the exact configured HTTPS Portal origin,
+a browser-session request header, and same-origin Fetch Metadata when present.
+All credential responses are non-cacheable. The Portal serializes rotation across
+tabs using Web Locks, restores `/auth/me` before revealing protected pages, and
+rejects refresh results belonging to a different user. Unsupported coordination
+fails visibly. An API restart still invalidates the process-local refresh registry;
+this change supports page refresh, not restoration across API restarts.
+
+Explicit logout must confirm server revocation and cookie removal. Network failure
+is reported so the user can retry sign-out. Access tokens already issued to other
+tabs retain their existing short lifetime; refresh revocation is not immediate
+revocation of every access token. Separate browser profiles retain separate cookies.
+Playback resume and progress persistence remain outside this contract.
+
+Because access credentials are readable by executing page JavaScript, the public
+Portal boundary must remain hardened against unintended script and content
+execution. Content Security Policy remains part of the release boundary.
 
 ### 4. Refresh credentials are replay-sensitive
 

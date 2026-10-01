@@ -20,7 +20,7 @@ test("authenticated administrator can inspect the complete read-only Service Lif
   await Promise.all([
     page.waitForResponse(
       (response) =>
-        response.url().endsWith("/api/v1/auth/login") &&
+        response.url().endsWith("/api/v1/auth/browser/login") &&
         response.request().method() === "POST" &&
         response.status() === 200
     ),
