@@ -12,7 +12,7 @@ test("Jellyfin catalog item can be added to the authenticated user Favorites lis
   await Promise.all([
     page.waitForResponse(
       (response) =>
-        response.url().endsWith("/api/v1/auth/login") &&
+        response.url().endsWith("/api/v1/auth/browser/login") &&
         response.request().method() === "POST" &&
         response.status() === 200
     ),

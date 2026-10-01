@@ -30,6 +30,7 @@ export function PortalTopbar({ onOpenNavigation }: PortalTopbarProps): React.Rea
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
 
   const displayName = user?.display_name.trim() || user?.username.trim() || "Atlas user";
 
@@ -38,12 +39,15 @@ export function PortalTopbar({ onOpenNavigation }: PortalTopbarProps): React.Rea
       return;
     }
 
+    setLogoutError(null);
     setIsLoggingOut(true);
 
     try {
       await Promise.resolve(logout());
       router.replace("/login");
       router.refresh();
+    } catch {
+      setLogoutError("Atlas could not confirm sign-out. Please try again.");
     } finally {
       setIsLoggingOut(false);
       setIsMenuOpen(false);
@@ -68,6 +72,7 @@ export function PortalTopbar({ onOpenNavigation }: PortalTopbarProps): React.Rea
         </div>
       </div>
 
+      {logoutError !== null ? <p role="alert">{logoutError}</p> : null}
       <div className="portal-user-menu">
         <button
           aria-expanded={isMenuOpen}
