@@ -711,6 +711,13 @@ def _looks_event_specific(
             r"\bnfl\s+live\s+\d+\b",
             name,
         )
+        # Numbered NFL slots with a kickoff and matchup rotate between
+        # events; they must not compete with persistent team channels.
+        or re.search(
+            r"\bnfl\s*\|\s*\d+\s*-\s*"
+            r"\d{1,2}(?::\d{2})?\s*(?:am|pm)\b.*\b(?:at|vs)\b",
+            name,
+        )
     )
 
 
