@@ -11,12 +11,17 @@ ROUTES_ROOT = Path("apps/api/atlas_api/routes/v1")
 
 # These endpoints are intentionally usable without an access-token permission
 # dependency. Login establishes a session; refresh and logout authenticate with
-# the supplied refresh credential; health intentionally exposes no user data.
+# the supplied refresh credential. Browser variants use credentials or the
+# origin-checked HttpOnly refresh cookie instead of an access token. Health
+# intentionally exposes no user data.
 INTENTIONALLY_PUBLIC_ROUTES = frozenset(
     {
         ("auth.py", "POST", "/login"),
         ("auth.py", "POST", "/refresh"),
         ("auth.py", "POST", "/logout"),
+        ("auth.py", "POST", "/browser/login"),
+        ("auth.py", "POST", "/browser/refresh"),
+        ("auth.py", "POST", "/browser/logout"),
         ("auth.py", "POST", "/password-recovery/request"),
         ("auth.py", "POST", "/password-recovery/reset"),
         ("health.py", "GET", "/health"),
@@ -121,4 +126,4 @@ def test_public_routes_never_expand_implicitly() -> None:
     identities = {route.identity for route in routes}
 
     assert INTENTIONALLY_PUBLIC_ROUTES <= identities
-    assert len(INTENTIONALLY_PUBLIC_ROUTES) == 6
+    assert len(INTENTIONALLY_PUBLIC_ROUTES) == 9
