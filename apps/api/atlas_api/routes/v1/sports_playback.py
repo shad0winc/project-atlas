@@ -6,6 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
 
+from atlas.jellyfin_live_streams import LiveStreamOwnershipError
 from atlas.user_profiles import UserProfileError, UserProfileStore
 from atlas.live_session_policy import (
     LiveSessionPolicyError,
@@ -52,7 +53,6 @@ from atlas_api.services.sports import (
     SportsLiveTvBindingNotFoundError,
     SportsWriterTransportError,
 )
-
 
 _SPORTS_SOURCE_KIND_ORDER = {
     "licensed_subscription": 0,
@@ -394,10 +394,7 @@ def read_sports_live_session(
         ) from exc
 
     jellyfin_user_id = profile.get("jellyfin_user_id")
-    if (
-        not isinstance(jellyfin_user_id, str)
-        or not jellyfin_user_id.strip()
-    ):
+    if not isinstance(jellyfin_user_id, str) or not jellyfin_user_id.strip():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Playback is not configured for this user.",
@@ -414,8 +411,7 @@ def read_sports_live_session(
     matching_sources = [
         source
         for source in live_sources
-        if source.get("atlas_channel_id")
-        == atlas_channel_id
+        if source.get("atlas_channel_id") == atlas_channel_id
     ]
 
     if len(matching_sources) != 1:
@@ -428,9 +424,7 @@ def read_sports_live_session(
 
     if live_source.get("standalone") is False:
         provider = live_source.get("provider")
-        provider_event_id = live_source.get(
-            "provider_event_id"
-        )
+        provider_event_id = live_source.get("provider_event_id")
 
         if (
             not isinstance(provider, str)
@@ -443,9 +437,7 @@ def read_sports_live_session(
         ):
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=(
-                    "Sports live availability is unavailable."
-                ),
+                detail=("Sports live availability is unavailable."),
             )
 
         try:
@@ -456,15 +448,12 @@ def read_sports_live_session(
         except SportsWriterTransportError as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=(
-                    "Sports live availability is unavailable."
-                ),
+                detail=("Sports live availability is unavailable."),
             ) from exc
 
         if (
             availability.get("available") is not True
-            or availability.get("atlas_channel_id")
-            != atlas_channel_id
+            or availability.get("atlas_channel_id") != atlas_channel_id
         ):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -472,9 +461,7 @@ def read_sports_live_session(
             )
 
     try:
-        binding = sports.get_live_tv_binding(
-            atlas_channel_id=atlas_channel_id
-        )
+        binding = sports.get_live_tv_binding(atlas_channel_id=atlas_channel_id)
     except SportsLiveTvBindingNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -486,13 +473,8 @@ def read_sports_live_session(
             detail="Sports live channel resolution is unavailable.",
         ) from exc
 
-    jellyfin_item_id = str(
-        binding.get("jellyfin_item_id", "")
-    ).strip()
-    if (
-        binding.get("atlas_channel_id") != atlas_channel_id
-        or not jellyfin_item_id
-    ):
+    jellyfin_item_id = str(binding.get("jellyfin_item_id", "")).strip()
+    if binding.get("atlas_channel_id") != atlas_channel_id or not jellyfin_item_id:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Sports live channel resolution is unavailable.",
@@ -521,9 +503,7 @@ def read_sports_live_session(
         resource_lease = resource_pool.acquire(
             user_id=current_user.user_id,
             target_id=atlas_channel_id,
-            candidate_source_ids=(
-                candidate_source_ids
-            ),
+            candidate_source_ids=(candidate_source_ids),
             capacities=capacities,
             user_limit=effective_limit,
         )
@@ -551,9 +531,7 @@ def read_sports_live_session(
             user_id=current_user.user_id,
             target_id=atlas_channel_id,
             limit=effective_limit,
-            resource_lease_id=(
-                resource_lease.lease_id
-            ),
+            resource_lease_id=(resource_lease.lease_id),
         )
     except SportsSessionLimitExceeded as exc:
         resource_pool.release(
@@ -586,6 +564,8 @@ def read_sports_live_session(
             item_id=jellyfin_item_id,
             jellyfin_user_id=jellyfin_user_id,
             subtitle_stream_index=_subtitle_stream_index(subtitle),
+            atlas_session_id=live_session.session_id,
+            atlas_user_id=current_user.user_id,
         )
     except PlaybackNotFoundError as exc:
         live_sessions.release(
@@ -631,6 +611,9 @@ def read_sports_live_session(
             stream_path=session.stream_path,
         )
     except Exception:
+        playback.release_live_stream(
+            session_id=live_session.session_id, user_id=current_user.user_id
+        )
         live_sessions.release(
             session_id=live_session.session_id,
             user_id=current_user.user_id,
@@ -642,9 +625,7 @@ def read_sports_live_session(
         raise
 
     response.headers["X-Atlas-Live-Session-ID"] = live_session.session_id
-    response.headers["X-Atlas-Live-Session-TTL"] = str(
-        live_sessions.ttl_seconds
-    )
+    response.headers["X-Atlas-Live-Session-TTL"] = str(live_sessions.ttl_seconds)
 
     return PlaybackSessionResponse.from_domain(
         session,
@@ -677,7 +658,18 @@ def heartbeat_sports_live_session(
         str,
         Path(min_length=1, max_length=256),
     ],
+    playback: Annotated[PlaybackService, Depends(get_playback_service)],
 ) -> dict[str, object]:
+    try:
+        playback.heartbeat_live_stream(
+            session_id=session_id, user_id=current_user.user_id
+        )
+    except LiveStreamOwnershipError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Live stream cleanup requires reconciliation.",
+        ) from exc
+
     try:
         record = live_sessions.heartbeat(
             session_id=session_id,
@@ -704,6 +696,9 @@ def heartbeat_sports_live_session(
             SportsResourceLeaseNotFound,
             SportsResourcePoolStateError,
         ) as exc:
+            playback.release_live_stream(
+                session_id=record.session_id, user_id=current_user.user_id
+            )
             live_sessions.release(
                 session_id=record.session_id,
                 user_id=current_user.user_id,
@@ -742,7 +737,18 @@ def release_sports_live_session(
         str,
         Path(min_length=1, max_length=256),
     ],
+    playback: Annotated[PlaybackService, Depends(get_playback_service)],
 ) -> Response:
+    try:
+        playback.release_live_stream(
+            session_id=session_id, user_id=current_user.user_id
+        )
+    except LiveStreamOwnershipError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Live stream cleanup requires reconciliation.",
+        ) from exc
+
     try:
         released = live_sessions.release_record(
             session_id=session_id,

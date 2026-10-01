@@ -718,6 +718,7 @@ class JellyfinProvider:
         *,
         user_id: str,
         subtitle_stream_index: int | None = None,
+        live_stream_owner: Any = None,
     ) -> dict[str, Any]:
         normalized_id = _required(item_id, "item_id")
         normalized_user_id = _required(user_id, "user_id")
@@ -760,6 +761,7 @@ class JellyfinProvider:
 
         playback_payload: dict[str, Any] = {
             "UserId": normalized_user_id,
+            "AutoOpenLiveStream": False,
             "EnableDirectPlay": True,
             "EnableDirectStream": True,
             "EnableTranscoding": True,
@@ -890,6 +892,39 @@ class JellyfinProvider:
 
             media_source_id = selected_media_source_id
 
+        if source.get("RequiresOpening") is True:
+            if live_stream_owner is None:
+                raise MediaProviderError("Live stream opening requires an Atlas owner")
+            open_token = _required(source.get("OpenToken"), "live stream open token")
+            play_session_id = _required(payload.get("PlaySessionId"), "play session ID")
+            open_payload = {
+                "OpenToken": open_token,
+                "PlaySessionId": play_session_id,
+                "ItemId": normalized_id,
+                "UserId": normalized_user_id,
+                "DeviceProfile": playback_payload["DeviceProfile"],
+                "EnableDirectPlay": False,
+                "EnableDirectStream": True,
+            }
+            if subtitle_stream_index is not None:
+                open_payload["SubtitleStreamIndex"] = subtitle_stream_index
+                open_payload["DeviceProfile"] = selected_payload["DeviceProfile"]
+                if subtitle_stream_index >= 0:
+                    open_payload["AlwaysBurnInSubtitleWhenTranscoding"] = True
+            opened = live_stream_owner.open(
+                lambda: self._request_json(
+                    "/LiveStreams/Open",
+                    method="POST",
+                    payload=open_payload,
+                    timeout=30.0,
+                ),
+                play_session_id=play_session_id,
+                media_source_id=media_source_id,
+            )
+            source = opened.get("MediaSource")
+            if not isinstance(source, dict) or source.get("Id") != media_source_id:
+                raise MediaProviderError("Jellyfin changed the opened media source")
+
         runtime = source.get("RunTimeTicks")
         duration_ticks = runtime if isinstance(runtime, int) and runtime >= 0 else None
         supports_direct_play = bool(source.get("SupportsDirectPlay"))
@@ -918,6 +953,26 @@ class JellyfinProvider:
             raw_stream_url,
             normalized_id,
         )
+
+        if source.get("LiveStreamId"):
+            parsed = urlsplit(stream_path)
+            query = parse_qsl(parsed.query, keep_blank_values=True)
+            for name, expected in (
+                ("LiveStreamId", source["LiveStreamId"]),
+                ("MediaSourceId", media_source_id),
+                ("PlaySessionId", payload.get("PlaySessionId")),
+            ):
+                expected = _required(expected, name)
+                supplied = [
+                    value for key, value in query if key.lower() == name.lower()
+                ]
+                if supplied and supplied != [expected]:
+                    raise MediaProviderError(
+                        "Jellyfin returned inconsistent live playback identity"
+                    )
+                if not supplied:
+                    query.append((name, expected))
+            stream_path = urlunsplit(("", "", parsed.path, urlencode(query), ""))
 
         tracks: list[dict[str, Any]] = []
         streams = source.get("MediaStreams")
@@ -1298,12 +1353,22 @@ class JellyfinProvider:
 
         return None
 
+    def close_live_stream(self, live_stream_id: str) -> None:
+        """Release only one explicitly acquired Jellyfin live-stream consumer."""
+        stream_id = _required(live_stream_id, "live_stream_id")
+        self._request_json(
+            "/LiveStreams/Close?" + urlencode({"liveStreamId": stream_id}),
+            method="POST",
+        )
+
+
     def _request_json(
         self,
         path: str,
         *,
         method: str = "GET",
         payload: dict[str, Any] | None = None,
+        timeout: float | None = None,
     ) -> Any:
         if not self.api_key.strip():
             raise MediaProviderError(
@@ -1329,7 +1394,7 @@ class JellyfinProvider:
         )
 
         try:
-            with urlopen(request, timeout=self.timeout) as response:
+            with urlopen(request, timeout=self.timeout if timeout is None else timeout) as response:
                 raw = response.read()
                 if not raw:
                     return None

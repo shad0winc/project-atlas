@@ -297,6 +297,7 @@ export async function createSportsLiveSession(
       )}/session${suffix}`,
       {
         method: "GET",
+        timeoutMs: 60_000,
         cache: "no-store",
         signal: options.signal,
         retryPolicy: {

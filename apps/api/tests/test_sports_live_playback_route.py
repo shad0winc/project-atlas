@@ -110,6 +110,13 @@ class FakeSports:
 class FakePlayback:
     def __init__(self) -> None:
         self.calls: list[dict[str, object]] = []
+        self.lifecycle_calls = []
+
+    def heartbeat_live_stream(self, **kwargs):
+        self.lifecycle_calls.append(("heartbeat", kwargs))
+
+    def release_live_stream(self, **kwargs):
+        self.lifecycle_calls.append(("release", kwargs))
 
     def resolve_live_session(self, **kwargs) -> PlaybackSession:
         self.calls.append(dict(kwargs))
@@ -411,6 +418,8 @@ def test_watch_live_uses_exact_binding_and_authenticated_identity() -> None:
             "item_id": "jf-channel-exact",
             "jellyfin_user_id": "jf-user-live",
             "subtitle_stream_index": None,
+            "atlas_session_id": "live-session-test",
+            "atlas_user_id": USER.user_id,
         }
     ]
     assert harness.capabilities.calls == [
