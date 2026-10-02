@@ -124,6 +124,7 @@ class OwnedJellyfinLiveStreams:
         user_id: str,
         item_id: str,
         close: Callable[[str], None],
+        stop_transcode: Callable[[str], None] | None = None,
     ) -> Iterator[LiveStreamOwner]:
         if not all(
             isinstance(v, str) and v.strip() for v in (session_id, user_id, item_id)
@@ -134,7 +135,10 @@ class OwnedJellyfinLiveStreams:
             yield owner
         except Exception:
             # Known successful opens can be closed; ambiguous opens stay latched.
-            self.release(session_id=session_id, user_id=user_id, close=close)
+            self.release(
+                session_id=session_id, user_id=user_id, close=close,
+                stop_transcode=stop_transcode,
+            )
             raise
 
     def open(
@@ -204,7 +208,10 @@ class OwnedJellyfinLiveStreams:
             row["last_seen"] = self.clock()
             self._write(state)
 
-    def _close(self, state: dict, key: str, close: Callable[[str], None]) -> None:
+    def _close(
+        self, state: dict, key: str, close: Callable[[str], None],
+        stop_transcode: Callable[[str], None] | None,
+    ) -> None:
         row = state["streams"][key]
         if row["status"] != "active":
             raise LiveStreamOwnershipError(
@@ -213,18 +220,26 @@ class OwnedJellyfinLiveStreams:
         row["status"] = "closing"
         self._write(state)
         try:
+            if stop_transcode is not None:
+                # Stop the exact job before releasing its consumer. Otherwise its
+                # delayed kill timer can close a newly opened shared stream ID.
+                play_session_id = row["play_session_id"]
+                if not isinstance(play_session_id, str) or not play_session_id.strip():
+                    raise LiveStreamOwnershipError("Live transcode identity is required")
+                stop_transcode(play_session_id)
             close(row["live_stream_id"])
         except Exception as exc:
             row["status"] = "blocked"
             self._write(state)
             raise LiveStreamOwnershipError(
-                "Live stream close outcome requires reconciliation"
+                "Live stream cleanup outcome requires reconciliation"
             ) from exc
         del state["streams"][key]
         self._write(state)
 
     def release(
-        self, *, session_id: str, user_id: str, close: Callable[[str], None]
+        self, *, session_id: str, user_id: str, close: Callable[[str], None],
+        stop_transcode: Callable[[str], None] | None = None,
     ) -> bool:
         with self._locked() as state:
             row = state["streams"].get(session_id)
@@ -232,7 +247,7 @@ class OwnedJellyfinLiveStreams:
                 return False
             if row["user_id"] != user_id:
                 raise LiveStreamOwnershipError("Live stream owner is unavailable")
-            self._close(state, session_id, close)
+            self._close(state, session_id, close, stop_transcode)
             return True
 
     def authorize(
@@ -258,7 +273,10 @@ class OwnedJellyfinLiveStreams:
             ):
                 raise LiveStreamOwnershipError("Live stream owner is unavailable")
 
-    def reap(self, close: Callable[[str], None]) -> int:
+    def reap(
+        self, close: Callable[[str], None], *,
+        stop_transcode: Callable[[str], None] | None = None,
+    ) -> int:
         with self._locked() as state:
             if any(row["status"] != "active" for row in state["streams"].values()):
                 raise LiveStreamOwnershipError(
@@ -272,7 +290,7 @@ class OwnedJellyfinLiveStreams:
             ]
             completed = 0
             for key in expired:
-                self._close(state, key, close)
+                self._close(state, key, close, stop_transcode)
                 completed += 1
             return completed
 

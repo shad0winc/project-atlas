@@ -15,6 +15,7 @@ from urllib.request import Request, urlopen
 
 from atlas.media.jellyfin_auth import (
     build_jellyfin_authorization,
+    DEFAULT_JELLYFIN_DEVICE_ID,
 )
 from atlas.media.capabilities import (
     ProviderCapabilities,
@@ -1352,6 +1353,18 @@ class JellyfinProvider:
                     return name.strip()
 
         return None
+
+    def stop_live_transcode(self, play_session_id: str) -> None:
+        """Stop only this owner's encoding job; never stop an entire device."""
+        session_id = _required(play_session_id, "play_session_id")
+        self._request_json(
+            "/Videos/ActiveEncodings?" + urlencode({
+                "DeviceId": DEFAULT_JELLYFIN_DEVICE_ID,
+                "PlaySessionId": session_id,
+            }),
+            method="DELETE",
+            timeout=30,
+        )
 
     def close_live_stream(self, live_stream_id: str) -> None:
         """Release only one explicitly acquired Jellyfin live-stream consumer."""

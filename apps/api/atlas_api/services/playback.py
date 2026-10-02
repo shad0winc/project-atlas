@@ -274,6 +274,7 @@ class PlaybackService:
             user_id=atlas_user_id,
             item_id=item_id,
             close=self._jellyfin.close_live_stream,
+            stop_transcode=self._jellyfin.stop_live_transcode,
         ) as owner:
             return self._resolve_live_session(
                 provider=provider,
@@ -291,6 +292,7 @@ class PlaybackService:
             session_id=session_id,
             user_id=user_id,
             close=self._jellyfin.close_live_stream,
+            stop_transcode=self._jellyfin.stop_live_transcode,
         )
 
     def authorize_live_stream(
@@ -313,7 +315,10 @@ class PlaybackService:
     def reap_live_streams(self) -> int:
         if not self._live_streams.path.exists():
             return 0
-        return self._live_streams.reap(self._jellyfin.close_live_stream)
+        return self._live_streams.reap(
+            self._jellyfin.close_live_stream,
+            stop_transcode=self._jellyfin.stop_live_transcode,
+        )
 
     def _resolve_live_session(
         self,
