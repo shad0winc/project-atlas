@@ -59,6 +59,7 @@ def test_service_records_owner_and_closes_on_authenticated_release(tmp_path):
             Response(INFO),
             Response(OPEN),
             Response({}),
+            Response({}),
         ],
     ) as http:
         result = service.resolve_live_session(
@@ -83,6 +84,12 @@ def test_service_records_owner_and_closes_on_authenticated_release(tmp_path):
         http.call_args.args[0].full_url
         == "http://jellyfin/LiveStreams/Close?liveStreamId=live-one"
     )
+    stop = http.call_args_list[-2].args[0]
+    assert stop.get_method() == "DELETE"
+    assert stop.full_url == (
+        "http://jellyfin/Videos/ActiveEncodings?DeviceId=atlas-api&PlaySessionId=play-one"
+    )
+    assert http.call_args_list[-1].args[0].get_method() == "POST"
     assert json.loads(store.path.read_text())["streams"] == {}
 
 
@@ -107,6 +114,7 @@ def test_service_cleanup_survives_validation_failure_after_open(tmp_path):
             Response(INFO),
             Response(opened),
             Response({}),
+            Response({}),
         ],
     ) as http:
         with pytest.raises(PlaybackNotFoundError):
@@ -117,5 +125,41 @@ def test_service_cleanup_survives_validation_failure_after_open(tmp_path):
                 atlas_session_id="s",
                 atlas_user_id="u",
             )
-    assert http.call_count == 5
+    assert http.call_count == 6
+    stop = http.call_args_list[-2].args[0]
+    assert stop.get_method() == "DELETE"
+    assert stop.full_url == (
+        "http://jellyfin/Videos/ActiveEncodings?DeviceId=atlas-api&PlaySessionId=play-one"
+    )
+    assert http.call_args_list[-1].args[0].get_method() == "POST"
+    assert json.loads(store.path.read_text())["streams"] == {}
+
+
+def test_service_reaps_expired_owner_by_exact_play_session(tmp_path):
+    now = [0]
+    store = OwnedJellyfinLiveStreams(tmp_path / "streams.json", clock=lambda: now[0])
+    with store.scope(
+        session_id="old", user_id="alice", item_id="item", close=lambda _: None
+    ) as owner:
+        owner.open(
+            lambda: OPEN, play_session_id="play-one", media_source_id="source-one"
+        )
+    service = PlaybackService(
+        JellyfinProvider("http://jellyfin", "secret"),
+        jellyfin_public_url="https://playback.example",
+        live_streams=store,
+    )
+    now[0] = 91
+    with patch(
+        "atlas.media.jellyfin.urlopen", side_effect=[Response({}), Response({})]
+    ) as http:
+        assert service.reap_live_streams() == 1
+    requests = [call.args[0] for call in http.call_args_list]
+    assert [(request.get_method(), request.full_url) for request in requests] == [
+        (
+            "DELETE",
+            "http://jellyfin/Videos/ActiveEncodings?DeviceId=atlas-api&PlaySessionId=play-one",
+        ),
+        ("POST", "http://jellyfin/LiveStreams/Close?liveStreamId=live-one"),
+    ]
     assert json.loads(store.path.read_text())["streams"] == {}
