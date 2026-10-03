@@ -41,6 +41,29 @@ _TYPE_MAP = {
 }
 
 
+def _english_audio_stream_index(source: dict[str, Any]) -> int | None:
+    streams = source.get("MediaStreams")
+    if not isinstance(streams, list):
+        return None
+    audio = [row for row in streams if isinstance(row, dict)
+             and str(row.get("Type", "")).strip().lower() == "audio"
+             and type(row.get("Index")) is int and row["Index"] >= 0]
+    indexes = [row["Index"] for row in audio]
+    if len(indexes) != len(set(indexes)):
+        raise MediaProviderError("Jellyfin returned ambiguous audio track identities")
+    english = [row for row in audio
+               if str(row.get("Language") or "").strip().lower()
+               in {"eng", "en", "english", "en-us", "en-gb"}]
+    if not english:
+        return None
+    selected = source.get("DefaultAudioStreamIndex")
+    if type(selected) is int:
+        existing = next((row for row in english if row["Index"] == selected), None)
+        if existing is not None:
+            return existing["Index"]
+    return min(english, key=lambda row: (not bool(row.get("IsDefault")), row["Index"]))["Index"]
+
+
 Clock = Callable[[], datetime]
 
 
@@ -754,6 +777,7 @@ class JellyfinProvider:
         user_id: str,
         subtitle_stream_index: int | None = None,
         live_stream_owner: Any = None,
+        prefer_english_audio: bool = False,
     ) -> dict[str, Any]:
         normalized_id = _required(item_id, "item_id")
         normalized_user_id = _required(user_id, "user_id")
@@ -881,12 +905,26 @@ class JellyfinProvider:
                 "Jellyfin playback source has no ID"
             )
 
-        if subtitle_stream_index is not None:
+        english_audio_index = None
+        if (prefer_english_audio and live_stream_owner is None
+                and source.get("RequiresOpening") is not True
+                and not source.get("LiveStreamId")):
+            english_audio_index = _english_audio_stream_index(source)
+        # Re-negotiate to select an alternate track. Direct playback of the
+        # original container cannot reliably select alternate audio in browsers.
+        select_audio = english_audio_index is not None and not (
+            source.get("DefaultAudioStreamIndex") == english_audio_index
+            and any(isinstance(row, dict) and row.get("Index") == english_audio_index
+                    and row.get("IsDefault") is True
+                    for row in source.get("MediaStreams", []))
+        )
+
+        if subtitle_stream_index is not None or select_audio:
             selected_profile = {
                 **playback_payload["DeviceProfile"],
                 "SubtitleProfiles": (
                     encode_subtitle_profiles
-                    if subtitle_stream_index >= 0
+                    if subtitle_stream_index is not None and subtitle_stream_index >= 0
                     else external_subtitle_profiles
                 ),
             }
@@ -894,11 +932,16 @@ class JellyfinProvider:
             selected_payload: dict[str, Any] = {
                 **playback_payload,
                 "MediaSourceId": media_source_id,
-                "SubtitleStreamIndex": subtitle_stream_index,
                 "DeviceProfile": selected_profile,
             }
 
-            if subtitle_stream_index >= 0:
+            if subtitle_stream_index is not None:
+                selected_payload["SubtitleStreamIndex"] = subtitle_stream_index
+            if english_audio_index is not None:
+                selected_payload["AudioStreamIndex"] = english_audio_index
+                selected_payload["EnableDirectPlay"] = False
+
+            if subtitle_stream_index is not None and subtitle_stream_index >= 0:
                 selected_payload[
                     "AlwaysBurnInSubtitleWhenTranscoding"
                 ] = True
@@ -922,10 +965,24 @@ class JellyfinProvider:
 
             if selected_media_source_id != media_source_id:
                 raise MediaProviderError(
-                    "Jellyfin changed media source during subtitle selection"
+                    "Jellyfin changed media source during track selection"
                 )
 
             media_source_id = selected_media_source_id
+            if english_audio_index is not None:
+                returned_streams = source.get("MediaStreams") or []
+                assert_english = any(
+                    isinstance(row, dict) and row.get("Index") == english_audio_index
+                    and str(row.get("Type") or "").lower() == "audio"
+                    and str(row.get("Language") or "").strip().lower()
+                    in {"eng", "en", "english", "en-us", "en-gb"}
+                    for row in returned_streams
+                )
+                if not assert_english or source.get("RequiresOpening") is True or source.get("LiveStreamId"):
+                    raise MediaProviderError("Jellyfin changed the selected English audio track")
+                returned_index = source.get("DefaultAudioStreamIndex")
+                if returned_index is not None and returned_index != english_audio_index:
+                    raise MediaProviderError("Jellyfin did not select the requested English audio track")
 
         if source.get("RequiresOpening") is True:
             if live_stream_owner is None:
@@ -988,6 +1045,18 @@ class JellyfinProvider:
             raw_stream_url,
             normalized_id,
         )
+
+        if english_audio_index is not None and (select_audio or subtitle_stream_index is not None):
+            parsed = urlsplit(stream_path)
+            query = parse_qsl(parsed.query, keep_blank_values=True)
+            if any(key.lower() == "static" and value.lower() == "true" for key, value in query):
+                raise MediaProviderError("Jellyfin returned static playback for alternate audio")
+            supplied = [value for key, value in query if key.lower() == "audiostreamindex"]
+            if supplied and supplied != [str(english_audio_index)]:
+                raise MediaProviderError("Jellyfin returned inconsistent selected audio identity")
+            if not supplied:
+                query.append(("AudioStreamIndex", str(english_audio_index)))
+            stream_path = urlunsplit(("", "", parsed.path, urlencode(query), ""))
 
         if source.get("LiveStreamId"):
             parsed = urlsplit(stream_path)
