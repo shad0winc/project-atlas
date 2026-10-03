@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from typing import Self
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_serializer
 
 from atlas.media_requests import (
+    MediaAudioPreference,
     MediaRequest,
     MediaRequestStatus,
 )
@@ -33,6 +34,7 @@ class MediaRequestCreateRequest(BaseModel):
     title: str
     year: int | None = None
     season_number: int | None = None
+    audio_preference: MediaAudioPreference | None = None
 
 
 class MediaRequestResponse(BaseModel):
@@ -59,6 +61,14 @@ class MediaRequestResponse(BaseModel):
     created_at: str
     updated_at: str
     available_at: str | None
+    audio_preference: MediaAudioPreference | None = None
+
+    @model_serializer(mode="wrap")
+    def serialize_request(self, handler):
+        result = handler(self)
+        if self.audio_preference is None:
+            result.pop("audio_preference", None)
+        return result
 
     @classmethod
     def from_domain(
@@ -92,6 +102,7 @@ class MediaRequestResponse(BaseModel):
             title=request.title,
             year=request.year,
             season_number=request.season_number,
+            audio_preference=request.audio_preference,
             status=request.status.value,
             terminal=request.terminal,
             active=request.active,

@@ -376,6 +376,7 @@ class JsonMediaRequestRepository:
             "title": payload.get("title"),
             "year": payload.get("year"),
             "season_number": payload.get("season_number"),
+            "audio_preference": payload.get("audio_preference"),
             "status": payload.get("status"),
             "created_at": payload.get("created_at"),
             "updated_at": payload.get("updated_at"),

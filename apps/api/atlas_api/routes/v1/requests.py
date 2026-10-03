@@ -118,6 +118,8 @@ def create_request(
             title=payload.title,
             year=payload.year,
             season_number=payload.season_number,
+            **({"audio_preference": payload.audio_preference.value}
+               if payload.audio_preference is not None else {}),
         )
     except MediaRequestValidationError as error:
         raise HTTPException(

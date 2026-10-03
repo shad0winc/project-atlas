@@ -13,6 +13,7 @@ from .events import (
     event_type_for_status,
 )
 from .models import (
+    MediaAudioPreference,
     MediaRequest,
     MediaRequestError,
     MediaRequestStatus,
@@ -62,6 +63,7 @@ __all__ = [
     "JellyseerrMediaRequestProvider",
     "JsonMediaRequestRepository",
     "MediaRequest",
+    "MediaAudioPreference",
     "MediaRequestError",
     "MediaRequestEvent",
     "MediaRequestEventError",

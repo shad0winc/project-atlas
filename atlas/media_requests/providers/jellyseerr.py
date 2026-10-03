@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import os
 from typing import Any, Callable
+from types import MappingProxyType
 from urllib.parse import quote, urlencode
 
 from ..discovery import (
@@ -16,6 +17,7 @@ from ..discovery import (
     MediaDiscoveryPage,
 )
 from ..models import (
+    MediaAudioPreference,
     MediaRequest,
     MediaRequestStatus,
     MediaRequestType,
@@ -62,6 +64,8 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
         compare=False,
     )
 
+    audio_profile_ids: Mapping[tuple[str, str], int] = field(default_factory=dict)
+
     def __post_init__(self) -> None:
         BaseMediaRequestHTTPProvider.__post_init__(
             self
@@ -81,6 +85,28 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
                     field_name,
                 ),
             )
+
+        profiles = {}
+        if not isinstance(self.audio_profile_ids, Mapping):
+            raise MediaRequestProviderError("audio profile mapping must be an object")
+        for key, value in self.audio_profile_ids.items():
+            if (not isinstance(key, tuple) or len(key) != 2
+                    or key[0] not in {"movie", "tv", "anime_movie", "anime_tv"}
+                    or key[1] not in {mode.value for mode in MediaAudioPreference}
+                    or isinstance(value, bool) or not isinstance(value, int)
+                    or value <= 0):
+                raise MediaRequestProviderError("audio profile mapping is invalid")
+            profiles[key] = value
+        object.__setattr__(self, "audio_profile_ids", MappingProxyType(profiles))
+
+    def _audio_profile_id(self, request: MediaRequest) -> int | None:
+        if request.audio_preference is None:
+            return None
+        key = (request.media_type.value, request.audio_preference.value)
+        profile_id = self.audio_profile_ids.get(key)
+        if profile_id is None:
+            raise MediaRequestProviderError("requested audio policy is not configured")
+        return profile_id
 
     @property
     def name(self) -> str:
@@ -133,6 +159,7 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
         self._server_id_for(
             request.media_type
         )
+        self._audio_profile_id(request)
 
     def submit(
         self,
@@ -166,11 +193,23 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
                 else "all"
             )
 
+        profile_id = self._audio_profile_id(request)
+        if profile_id is not None:
+            payload["profileId"] = profile_id
+
         response = self._post_json("/api/v1/request", payload)
         resource = _required_mapping(
             response,
             "Jellyseerr request response",
         )
+        if profile_id is not None:
+            for key in ("serverId", "profileId"):
+                actual = resource.get(key)
+                if (isinstance(actual, bool) or not isinstance(actual, int)
+                        or actual != payload[key]):
+                    raise MediaRequestProviderError(
+                        "Jellyseerr did not confirm requested acquisition routing"
+                    )
         provider_request_id = _required_identifier(
             resource.get("id"),
             "Jellyseerr request id",

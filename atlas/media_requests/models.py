@@ -31,6 +31,14 @@ class MediaRequestType(str, Enum):
     SPORTS = "sports"
 
 
+class MediaAudioPreference(str, Enum):
+    """Requested acquisition policy, distinct from playback track selection."""
+
+    ENGLISH_PREFERRED = "english_preferred"
+    ENGLISH_REQUIRED = "english_required"
+    ORIGINAL_SUBBED = "original_subbed"
+
+
 class MediaRequestStatus(str, Enum):
     """Normalized lifecycle states for an Atlas media request."""
 
@@ -65,6 +73,7 @@ class MediaRequest:
     created_at: str = field(default_factory=lambda: _now_timestamp())
     updated_at: str | None = None
     available_at: str | None = None
+    audio_preference: MediaAudioPreference | None = None
 
     def __post_init__(self) -> None:
         request_id = _required_identity(self.request_id, "request_id")
@@ -86,6 +95,15 @@ class MediaRequest:
             self.season_number,
             "season_number",
         )
+        try:
+            audio_preference = (
+                None if self.audio_preference is None
+                else MediaAudioPreference(self.audio_preference)
+            )
+        except (ValueError, TypeError) as exc:
+            raise MediaRequestError("audio_preference is unsupported") from exc
+        if media_type is MediaRequestType.SPORTS and audio_preference is not None:
+            raise MediaRequestError("audio_preference is not supported for sports")
         created_at = _required_timestamp(self.created_at, "created_at")
         updated_at = _optional_timestamp(self.updated_at, "updated_at")
         available_at = _optional_timestamp(
@@ -167,6 +185,7 @@ class MediaRequest:
             updated_at or created_at,
         )
         object.__setattr__(self, "available_at", available_at)
+        object.__setattr__(self, "audio_preference", audio_preference)
 
     @property
     def terminal(self) -> bool:
@@ -204,6 +223,8 @@ class MediaRequest:
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "available_at": self.available_at,
+            **({"audio_preference": self.audio_preference.value}
+               if self.audio_preference is not None else {}),
         }
 
 
