@@ -113,6 +113,8 @@ export type SeriesEpisode = Readonly<{
   seriesName?: string;
   seasonNumber?: number;
   episodeNumber?: number;
+  videoWidth?: number;
+  videoHeight?: number;
 }>;
 
 type SeriesEpisodeTransport = Readonly<{
@@ -121,6 +123,8 @@ type SeriesEpisodeTransport = Readonly<{
   series_name: string | null;
   season_number: number | null;
   episode_number: number | null;
+  video_width?: number | null;
+  video_height?: number | null;
 }>;
 
 type SeriesEpisodesTransport = Readonly<{
@@ -177,6 +181,8 @@ export async function resolveSeriesEpisodes(
       (episode): SeriesEpisode =>
         Object.freeze({
           id: episode.id,
+          ...(Number.isInteger(episode.video_width) && Number.isInteger(episode.video_height)
+            ? { videoWidth: episode.video_width!, videoHeight: episode.video_height! } : {}),
           title: episode.title,
           ...(episode.series_name === null
             ? {}

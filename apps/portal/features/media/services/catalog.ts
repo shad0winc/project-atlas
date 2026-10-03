@@ -9,6 +9,8 @@ type MediaCatalogItemTransportResponse = Readonly<{
   title: string;
   year: number | null;
   library: string | null;
+  video_width?: number | null;
+  video_height?: number | null;
 }>;
 
 type MediaCatalogTransportResponse = Readonly<{
@@ -62,6 +64,8 @@ export async function readMediaCatalog({
       itemId: item.item_id,
       mediaType: item.media_type,
       title: item.title,
+      videoWidth: item.video_width ?? undefined,
+      videoHeight: item.video_height ?? undefined,
       ...(item.year === null ? {} : { year: item.year }),
       ...(item.library === null ? {} : { library: item.library })
     }))

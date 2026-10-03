@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { sourceQuality } from "../types/quality";
 import {
   useMemo,
   useState
@@ -71,7 +72,7 @@ function episodeLabel(
     );
   }
 
-  parts.push(episode.title);
+  parts.push(episode.title, "—", sourceQuality(episode.videoWidth, episode.videoHeight));
 
   return parts.join(" ");
 }
@@ -334,6 +335,11 @@ export function SeriesEpisodeNavigation({
           )}
         </select>
       </label>
+
+      <p aria-live="polite">
+        {sourceQuality(episodes.find(row => row.id === selectedEpisodeId)?.videoWidth,
+          episodes.find(row => row.id === selectedEpisodeId)?.videoHeight)}
+      </p>
 
       {selectedEpisodeId ? (
         <Link

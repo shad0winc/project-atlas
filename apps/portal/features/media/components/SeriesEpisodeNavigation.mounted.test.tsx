@@ -5,7 +5,7 @@ import { expect, it, vi } from "vitest";
 import { SeriesEpisodeNavigation } from "./SeriesEpisodeNavigation";
 vi.mock("next/link",()=>({default:({children,...props}:{children:React.ReactNode;href:string})=><a {...props}>{children}</a>}));
 vi.mock("../../playback/services/session",()=>({resolveSeriesEpisodes:async()=>[
- {id:"e1",title:"First",seasonNumber:1,episodeNumber:1},
+ {id:"e1",title:"First",seasonNumber:1,episodeNumber:1,videoWidth:640,videoHeight:480},
  {id:"e3",title:"Third",seasonNumber:1,episodeNumber:3},
  {id:"s2e1",title:"Next season",seasonNumber:2,episodeNumber:1}
 ]}));
@@ -18,6 +18,7 @@ it("opens on the current episode and allows switching season and exact episode",
   let selects=container.querySelectorAll("select");expect(selects[0].value).toBe("2");expect(selects[1].value).toBe("s2e1");
   await act(async()=>{selects[0].value="1";selects[0].dispatchEvent(new Event("change",{bubbles:true}));});
   selects=container.querySelectorAll("select");expect(selects[1].value).toBe("e1");
+  expect(container.textContent).toContain("Below HD · 640×480");
   await act(async()=>{selects[1].value="e3";selects[1].dispatchEvent(new Event("change",{bubbles:true}));});
   expect(container.querySelector("a")!.getAttribute("href")).toBe("/portal/theater?provider=jellyfin&item=e3");
  } finally {await act(async()=>root.unmount());container.remove();}

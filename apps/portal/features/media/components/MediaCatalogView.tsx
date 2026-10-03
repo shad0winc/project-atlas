@@ -6,6 +6,7 @@ import { DislikeAction } from "../../dislikes";
 import { loadFavorites } from "../../favorites";
 import { WatchAction } from "../../playback/components/WatchAction";
 import { MediaRetentionStatus } from "./MediaRetentionStatus";
+import { sourceQuality } from "../types/quality";
 import { SeriesEpisodeNavigation } from "./SeriesEpisodeNavigation";
 
 import { ATLAS_PERMISSIONS } from "../../../lib/authorization/permissions";
@@ -113,6 +114,10 @@ export function MediaCatalogContent({
                 ) : null}
 
                 <p className="media-discovery-status">Provider: {item.provider}</p>
+                <p className="media-discovery-status">
+                  {item.mediaType === "tv" || item.mediaType === "anime_tv"
+                    ? "Quality shown per episode" : sourceQuality(item.videoWidth, item.videoHeight)}
+                </p>
 
                 {retention !== undefined ? (
                   <MediaRetentionStatus retention={retention} />

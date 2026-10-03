@@ -19,6 +19,8 @@ class PlaybackEpisodeResponse(BaseModel):
     series_name: str | None = None
     season_number: int | None = None
     episode_number: int | None = None
+    video_width: int | None = None
+    video_height: int | None = None
 
 
 class PlaybackSeriesEpisodesResponse(BaseModel):

@@ -5,6 +5,8 @@ export type MediaCatalogItem = Readonly<{
   title: string;
   year?: number;
   library?: string;
+  videoWidth?: number;
+  videoHeight?: number;
 }>;
 
 export type MediaCatalogPage = Readonly<{
@@ -22,6 +24,8 @@ export type CreateMediaCatalogItemInput = Readonly<{
   title: string;
   year?: number;
   library?: string;
+  videoWidth?: number;
+  videoHeight?: number;
 }>;
 
 export type CreateMediaCatalogPageInput = Readonly<{
@@ -80,7 +84,10 @@ export function createMediaCatalogItem(input: CreateMediaCatalogItemInput): Medi
     mediaType,
     title,
     ...(year === undefined ? {} : { year }),
-    ...(library === undefined ? {} : { library })
+    ...(library === undefined ? {} : { library }),
+    ...(Number.isInteger(input.videoWidth) && Number.isInteger(input.videoHeight) &&
+        input.videoWidth! > 0 && input.videoHeight! > 0 && input.videoWidth! <= 32768 && input.videoHeight! <= 32768
+      ? { videoWidth: input.videoWidth, videoHeight: input.videoHeight } : {})
   });
 }
 

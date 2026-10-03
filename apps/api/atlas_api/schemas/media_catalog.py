@@ -23,6 +23,8 @@ class MediaCatalogItemResponse(BaseModel):
     title: str
     year: int | None = None
     library: str | None = None
+    video_width: int | None = None
+    video_height: int | None = None
 
     @classmethod
     def from_domain(
@@ -39,7 +41,13 @@ class MediaCatalogItemResponse(BaseModel):
         year = item.metadata.get("year")
         library = item.metadata.get("library")
 
+        dimensions = {key: item.metadata.get(key) for key in ("video_width", "video_height")}
+        valid_dimensions = all(isinstance(x, int) and not isinstance(x, bool) and 0 < x <= 32768
+                               for x in dimensions.values())
+
         return cls(
+            video_width=dimensions["video_width"] if valid_dimensions else None,
+            video_height=dimensions["video_height"] if valid_dimensions else None,
             provider=item.provider,
             item_id=item.item_id,
             media_type=item.media_type,
