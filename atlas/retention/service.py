@@ -9,7 +9,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Protocol
 
 from atlas.media.jellyfin import default_jellyfin_provider
-from atlas.policies import PolicyService
+from atlas.policies import PolicyService, PolicyAction, PolicyDecision
+from dataclasses import replace
 from atlas.retention.models import (
     RetentionDecision,
     RetentionLifecycle,
@@ -58,7 +59,12 @@ class RetentionService:
         user_store: RetentionUserStore | None = None,
         dislike_store: DislikeStore | None = None,
         clock: Callable[[], datetime] | None = None,
+        episode_retention_enabled: bool = False,
     ) -> None:
+        if not isinstance(episode_retention_enabled, bool):
+            raise TypeError("episode_retention_enabled must be boolean")
+        # Source-review opt-in only. Production factory deliberately keeps false.
+        self.episode_retention_enabled = episode_retention_enabled
         self.policy_service = (
             policy_service
             if policy_service is not None
@@ -94,6 +100,40 @@ class RetentionService:
             provider,
             item_id,
         )
+
+        context: Mapping[str, object] | None = None
+        media_provider = (self.media_providers or {}).get(policy.provider)
+        context_reader = getattr(media_provider, "get_retention_context", None)
+        if not policy.protected and callable(context_reader):
+            try:
+                context = context_reader(policy.item_id)
+                if not isinstance(context, Mapping):
+                    raise ValueError("invalid retention context")
+                kind = context.get("item_type")
+                if kind not in {"movie", "episode", "series", "season"}:
+                    raise ValueError("invalid retention item type")
+                # Never translate a container dislike into recursive deletion.
+                if kind in {"series", "season"}:
+                    return self._retain_unknown(policy)
+                if kind == "episode":
+                    series_id = context.get("series_id")
+                    if not isinstance(series_id, str) or not series_id.strip():
+                        raise ValueError("episode series identity is missing")
+                    parent_policy = self.policy_service.evaluate(policy.provider, series_id)
+                    if parent_policy.protected:
+                        policy = replace(
+                            policy,
+                            action=PolicyAction.PROTECT,
+                            reasons=policy.reasons + tuple(
+                                replace(reason, metadata={
+                                    **reason.metadata, "inherited_from_series_id": series_id,
+                                }) for reason in parent_policy.reasons
+                            ),
+                        )
+                    elif not self.episode_retention_enabled:
+                        return self._retain_unknown(policy)
+            except Exception:
+                return self._retain_unknown(policy)
 
         if policy.protected:
             return RetentionDecision(
@@ -202,6 +242,7 @@ class RetentionService:
         eligible, lifecycle = self._timing_decision(
             policy.provider,
             policy.item_id,
+            allow_episode=context is not None and context.get("item_type") == "episode",
         )
 
         return RetentionDecision(
@@ -212,10 +253,19 @@ class RetentionService:
             lifecycle=lifecycle,
         )
 
+    @staticmethod
+    def _retain_unknown(policy: PolicyDecision) -> RetentionDecision:
+        return RetentionDecision(
+            provider=policy.provider, item_id=policy.item_id, eligible=False,
+            policy=policy, lifecycle=_unavailable_timing_decision()[1],
+        )
+
     def _timing_decision(
         self,
         provider: str,
         item_id: str,
+        *,
+        allow_episode: bool = False,
     ) -> tuple[bool, RetentionLifecycle]:
         """Return timing eligibility and lifecycle, failing closed on ambiguity."""
 
@@ -240,7 +290,7 @@ class RetentionService:
 
         if (
             not isinstance(media_type, str)
-            or media_type.strip().lower() != "movie"
+            or media_type.strip().lower() != ("tv" if allow_episode else "movie")
         ):
             return _unavailable_timing_decision()
 

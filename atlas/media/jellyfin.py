@@ -290,6 +290,40 @@ class JellyfinProvider:
 
         return tuple(episodes)
 
+    def get_retention_context(self, item_id: str) -> dict[str, str]:
+        """Read authoritative cleanup type and verify an episode's series.
+
+        This deliberately does not use the optional library-name lookup:
+        failures here must retain media rather than bypass protection.
+        """
+        def read(identity: str) -> dict[str, object]:
+            query = urlencode({"Ids": identity, "Recursive": "true", "Limit": 1})
+            payload = self._get_json(f"/Items?{query}")
+            rows = payload.get("Items") if isinstance(payload, dict) else None
+            if not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], dict):
+                raise MediaProviderError("Jellyfin cleanup identity is unavailable")
+            row = rows[0]
+            returned = _required(row.get("Id"), "Jellyfin item ID")
+            if returned.replace("-", "").lower() != identity.replace("-", "").lower():
+                raise MediaProviderError("Jellyfin cleanup identity mismatch")
+            return row
+
+        identity = _required(item_id, "item_id")
+        row = read(identity)
+        kind = _required(row.get("Type"), "Jellyfin item type").lower()
+        if kind not in {"movie", "episode", "series", "season"}:
+            raise MediaProviderError("Jellyfin cleanup type is unsupported")
+        context = {"item_type": kind}
+        if kind == "episode":
+            series_id = _required(row.get("SeriesId"), "Jellyfin series ID")
+            if series_id.replace("-", "").lower() == identity.replace("-", "").lower():
+                raise MediaProviderError("Jellyfin episode cannot be its own series")
+            parent = read(series_id)
+            if str(parent.get("Type", "")).lower() != "series":
+                raise MediaProviderError("Jellyfin episode parent is not a series")
+            context["series_id"] = _required(parent.get("Id"), "Jellyfin series ID")
+        return context
+
     def get_retention_state(
         self,
         item_id: str,
@@ -1245,6 +1279,26 @@ class JellyfinProvider:
     ) -> tuple[str, ...]:
         """Return all top-level movie and series identifiers."""
 
+        return self._list_item_ids(page_size=page_size, item_types="Movie,Series")
+
+    def list_cleanup_item_ids(
+        self, *, page_size: int = 200, include_episodes: bool = False,
+    ) -> tuple[str, ...]:
+        """Enumerate physical cleanup targets without flattening the catalog.
+
+        Production workflows do not enroll episodes through this method yet.
+        """
+        if not isinstance(include_episodes, bool):
+            raise MediaProviderError("include_episodes must be boolean")
+        return self._list_item_ids(
+            page_size=page_size,
+            item_types="Movie,Episode" if include_episodes else "Movie",
+            strict=True,
+        )
+
+    def _list_item_ids(
+        self, *, page_size: int, item_types: str, strict: bool = False,
+    ) -> tuple[str, ...]:
         if (
             isinstance(page_size, bool)
             or not isinstance(page_size, int)
@@ -1262,7 +1316,7 @@ class JellyfinProvider:
             query = urlencode(
                 {
                     "Recursive": "true",
-                    "IncludeItemTypes": "Movie,Series",
+                    "IncludeItemTypes": item_types,
                     "StartIndex": start_index,
                     "Limit": page_size,
                 }
@@ -1300,6 +1354,8 @@ class JellyfinProvider:
                         "Jellyfin returned an invalid item entry"
                     )
 
+                if strict and item.get("Type") not in item_types.split(","):
+                    raise MediaProviderError("Jellyfin cleanup list contains an unexpected type")
                 item_id = _required(
                     item.get("Id"),
                     "Jellyfin item ID",
@@ -1315,6 +1371,8 @@ class JellyfinProvider:
                 item_ids.append(item_id)
 
             start_index += len(items)
+            if strict and (start_index > total or (not items and start_index < total)):
+                raise MediaProviderError("Jellyfin cleanup pagination is incomplete")
 
             if not items or start_index >= total:
                 break
