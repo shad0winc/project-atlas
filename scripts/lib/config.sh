@@ -21,6 +21,9 @@ atlas_load_config() {
   # Child Compose processes must use the configured data roots.
   export ATLAS_MEDIA_ROOT ATLAS_DOWNLOADS_ROOT
 
+  # Preserve explicit cleanup activation for scheduler child processes.
+  export ATLAS_CLEANUP_EXECUTION_ENABLED
+
   export ATLAS_PROJECT_DIR
   export ATLAS_MODULE_STATE_FILE="$module_state_file"
 }

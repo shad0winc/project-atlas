@@ -14,6 +14,7 @@ from atlas.events import publish_core_event
 from atlas.cleanup.scheduler import (
     register_cleanup_execution,
 )
+from atlas.cleanup.scheduled_execution import cleanup_execution_enabled
 from atlas.module_scheduler import sync_module_jobs
 from atlas.operations_scheduler import (
     register_operations_collection,
@@ -160,6 +161,7 @@ def _sync_scheduler_jobs(
 
     cleanup_task = register_cleanup_execution(
         scheduler,
+        enabled=cleanup_execution_enabled(),
     )
     cleanup_name = str(
         cleanup_task["name"],
