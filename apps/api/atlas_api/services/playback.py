@@ -201,11 +201,13 @@ class PlaybackService:
                 playback = self._jellyfin.get_playback_info(
                     playable_target_id,
                     user_id=normalized_jellyfin_user_id,
+                    prefer_english_audio=True,
                 )
             else:
                 playback = self._jellyfin.get_playback_info(
                     playable_target_id,
                     user_id=normalized_jellyfin_user_id,
+                    prefer_english_audio=True,
                     subtitle_stream_index=subtitle_stream_index,
                 )
         except PlaybackNotFoundError:

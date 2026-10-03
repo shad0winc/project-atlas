@@ -13,6 +13,7 @@ from atlas_api.services.playback import (
 class FakeJellyfin:
     def __init__(self) -> None:
         self.playback_user_id: str | None = None
+        self.prefer_english_audio = False
 
     def get_item(self, item_id: str):
         return SimpleNamespace(
@@ -27,8 +28,10 @@ class FakeJellyfin:
         item_id: str,
         *,
         user_id: str,
+        prefer_english_audio: bool = False,
     ) -> dict:
         self.playback_user_id = user_id
+        self.prefer_english_audio = prefer_english_audio
         return {
             "media_source_id": "source-1",
             "duration_ticks": 100,
@@ -59,6 +62,7 @@ def test_library_session_uses_linked_jellyfin_identity() -> None:
 
     assert session.available is True
     assert jellyfin.playback_user_id == "a" * 32
+    assert jellyfin.prefer_english_audio is True
 
 
 def test_library_session_fails_closed_without_linked_identity() -> None:

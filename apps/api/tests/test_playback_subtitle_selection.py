@@ -12,6 +12,7 @@ from atlas_api.services.playback import PlaybackService
 class FakeJellyfin:
     def __init__(self) -> None:
         self.subtitle_stream_index: int | None = None
+        self.prefer_english_audio = False
 
     def get_item(self, item_id: str):
         return SimpleNamespace(
@@ -26,9 +27,11 @@ class FakeJellyfin:
         item_id: str,
         *,
         user_id: str,
+        prefer_english_audio: bool = False,
         subtitle_stream_index: int | None = None,
     ) -> dict:
         self.subtitle_stream_index = subtitle_stream_index
+        self.prefer_english_audio = prefer_english_audio
         return {
             "media_source_id": "source-1",
             "duration_ticks": 100,
@@ -110,4 +113,5 @@ def test_library_session_forwards_subtitle_selection(
 
     assert session.available is True
     assert jellyfin.subtitle_stream_index == selection
+    assert jellyfin.prefer_english_audio is True
     assert session.subtitle_tracks[0].index == 2
