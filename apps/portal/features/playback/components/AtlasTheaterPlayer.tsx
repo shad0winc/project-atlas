@@ -10,6 +10,7 @@ import { resolvePlaybackSession } from "../services/session";
 import type { SubtitleSelection } from "../services/session";
 import { bootstrapPlaybackStream } from "../services/stream";
 import { refreshPlaybackForRetry, retryResumePosition } from "../services/retry";
+import { readResume, resumeKey, restoreContinuity, writeResume } from "../services/continuity";
 import type { PlaybackSession, PlaybackTrack } from "../types/session";
 
 type PlayerState =
@@ -49,6 +50,7 @@ type FavoriteState = "loading" | "idle" | "submitting" | "complete" | "unavailab
 
 export function AtlasTheaterPlayer({
   session,
+  viewerId,
   sessionResolver = resolvePlaybackSession,
   retention = null,
   canFavorite = false,
@@ -59,6 +61,7 @@ export function AtlasTheaterPlayer({
   onDisliked
 }: {
   session: PlaybackSession;
+  viewerId?: string;
   sessionResolver?: (
     provider: string,
     itemId: string,
@@ -75,6 +78,8 @@ export function AtlasTheaterPlayer({
 }): React.ReactElement {
   const videoRef = useRef<HTMLVideoElement>(null);
   const resumeAtRef = useRef<number | null>(null);
+  const shouldPlayRef = useRef(session.sourceType !== "live");
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const retryRequestRef = useRef<AbortController | null>(null);
 
   const [activeSession, setActiveSession] = useState<PlaybackSession>(session);
@@ -134,24 +139,46 @@ export function AtlasTheaterPlayer({
     let disposed = false;
     let destroyHls: (() => void) | undefined;
 
-    const restorePlaybackPosition = () => {
-      const resumeAt = resumeAtRef.current;
-
-      if (resumeAt === null || !Number.isFinite(resumeAt) || resumeAt <= 0) {
-        return;
-      }
-
-      try {
-        video.currentTime = resumeAt;
-      } catch {
-        // The browser may reject seeking until a later media event.
-        return;
-      }
-
-      resumeAtRef.current = null;
+    const key = resumeKey(viewerId, activeSession.provider, activeSession.playableTargetId,
+      activeSession.canSeek && activeSession.sourceType !== "live");
+    if (resumeAtRef.current === null && key) {
+      try { resumeAtRef.current = readResume(window.localStorage, key); } catch { /* Optional storage. */ }
+    }
+    let restoring = false;
+    let restored = false;
+    let lastSaved = 0;
+    setAutoplayBlocked(false);
+    const savePosition = () => {
+      if (!restored) return;
+      try { writeResume(window.localStorage, key, video.currentTime, video.ended); } catch { /* Optional storage. */ }
     };
-
-    video.addEventListener("loadedmetadata", restorePlaybackPosition);
+    const restorePlaybackPosition = async () => {
+      if (disposed || restoring || restored) return;
+      restoring = true;
+      const result = await restoreContinuity(video, resumeAtRef.current, shouldPlayRef.current);
+      restoring = false;
+      if (disposed) return;
+      if (result.restored) {
+        restored = true;
+        resumeAtRef.current = null;
+        setAutoplayBlocked(result.blocked);
+      }
+    };
+    const pausePlayback = () => {
+      savePosition();
+      if (restored && !disposed) shouldPlayRef.current = false;
+    };
+    const updatePosition = () => {
+      void restorePlaybackPosition();
+      if (Date.now() - lastSaved >= 5000) { savePosition(); lastSaved = Date.now(); }
+    };
+    for (const event of ["loadedmetadata", "canplay", "progress", "durationchange"]) {
+      video.addEventListener(event, restorePlaybackPosition);
+    }
+    video.addEventListener("timeupdate", updatePosition);
+    video.addEventListener("pause", pausePlayback);
+    video.addEventListener("ended", savePosition);
+    window.addEventListener("pagehide", savePosition);
 
     void bootstrapPlaybackStream(activeSession, controller.signal)
       .then(async ({ streamUrl }) => {
@@ -192,6 +219,7 @@ export function AtlasTheaterPlayer({
             return;
           }
 
+          restored = false;
           resumeAtRef.current = retryResumePosition(
             activeSession.canSeek,
             video.currentTime,
@@ -226,18 +254,26 @@ export function AtlasTheaterPlayer({
       controller.abort();
       destroyHls?.();
 
-      video.removeEventListener("loadedmetadata", restorePlaybackPosition);
+      savePosition();
+      for (const event of ["loadedmetadata", "canplay", "progress", "durationchange"]) {
+        video.removeEventListener(event, restorePlaybackPosition);
+      }
+      video.removeEventListener("timeupdate", updatePosition);
+      video.removeEventListener("pause", pausePlayback);
+      video.removeEventListener("ended", savePosition);
+      window.removeEventListener("pagehide", savePosition);
 
       video.removeAttribute("src");
       video.load();
     };
-  }, [activeSession]);
+  }, [activeSession, viewerId]);
 
   async function changeSubtitle(selection: SubtitleSelection): Promise<void> {
     const video = videoRef.current;
 
     if (video !== null && Number.isFinite(video.currentTime)) {
-      resumeAtRef.current = video.currentTime;
+      resumeAtRef.current = retryResumePosition(activeSession.canSeek, video.currentTime, resumeAtRef.current);
+      shouldPlayRef.current = !video.paused;
     }
 
     setSubtitleSelection(selection);
@@ -283,6 +319,7 @@ export function AtlasTheaterPlayer({
           aria-label={`Playing ${activeSession.title}`}
           className="atlas-theater-video"
           controls
+          onPlay={() => { shouldPlayRef.current = true; setAutoplayBlocked(false); }}
           onError={() => {
             rememberPlaybackPosition();
             setState({
@@ -294,6 +331,12 @@ export function AtlasTheaterPlayer({
           preload="metadata"
           ref={videoRef}
         />
+
+        {autoplayBlocked ? (
+          <p className="atlas-theater-status" role="status">
+            Press Play to continue playback.
+          </p>
+        ) : null}
 
         {state.status === "connecting" ? (
           <p className="atlas-theater-status" role="status">
