@@ -29,4 +29,5 @@ export type PlaybackSession = Readonly<{
   subtitleTracks: readonly PlaybackTrack[];
   previousTargetId?: string;
   nextTargetId?: string;
+  seriesId?: string;
 }>;

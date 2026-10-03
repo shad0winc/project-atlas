@@ -53,6 +53,7 @@ class PlaybackSession:
     stream_path: str = ""
     previous_target_id: str | None = None
     next_target_id: str | None = None
+    series_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
