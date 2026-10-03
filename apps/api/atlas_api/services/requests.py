@@ -104,6 +104,7 @@ class MediaRequestsAPIService:
         title: str,
         year: int | None = None,
         season_number: int | None = None,
+        audio_preference: str | None = None,
     ) -> MediaRequest:
         """Create and submit one request owned by the authenticated user."""
 
@@ -117,6 +118,7 @@ class MediaRequestsAPIService:
                 title=title,
                 year=year,
                 season_number=season_number,
+                audio_preference=audio_preference,
             )
         except (
             MediaRequestError,
