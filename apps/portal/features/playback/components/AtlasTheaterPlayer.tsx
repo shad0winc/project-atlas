@@ -192,9 +192,18 @@ export function AtlasTheaterPlayer({
           return;
         }
 
-        const nativeHls = video.canPlayType("application/vnd.apple.mpegurl");
+        const { default: Hls } = await import("hls.js");
 
-        if (nativeHls) {
+        if (disposed) {
+          return;
+        }
+
+        const nativeHls = video.canPlayType("application/vnd.apple.mpegurl");
+        const managedHls = Hls.isSupported();
+
+        // Library playback uses hls.js when available. Keep native HLS for
+        // platforms without MSE support and preserve the live playback path.
+        if (nativeHls && (!managedHls || activeSession.sourceType === "live")) {
           video.crossOrigin = "use-credentials";
           video.src = streamUrl;
           video.load();
@@ -203,13 +212,7 @@ export function AtlasTheaterPlayer({
           return;
         }
 
-        const { default: Hls } = await import("hls.js");
-
-        if (disposed) {
-          return;
-        }
-
-        if (!Hls.isSupported()) {
+        if (!managedHls) {
           throw new Error("This browser cannot play the Jellyfin HLS stream.");
         }
 
