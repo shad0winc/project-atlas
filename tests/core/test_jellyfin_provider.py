@@ -97,7 +97,7 @@ class JellyfinProviderTests(unittest.TestCase):
         )
         self.assertNotIn("x-emby-token", headers)
         self.assertEqual(
-            "http://jellyfin:8096/Items?Ids=abc&Recursive=true&Limit=1",
+            "http://jellyfin:8096/Items?Ids=abc&Recursive=true&Limit=1&Fields=MediaStreams",
             request.call_args_list[0].args[0].full_url,
         )
     def test_series_maps_to_tv_and_ancestor_failure_is_nonfatal(self):

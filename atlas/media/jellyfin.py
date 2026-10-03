@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from atlas.media.quality import video_dimensions
+
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import json
@@ -150,6 +152,7 @@ class JellyfinProvider:
                 "Ids": normalized_id,
                 "Recursive": "true",
                 "Limit": 1,
+                "Fields": "MediaStreams",
             }
         )
         payload = self._get_json(f"/Items?{query}")
@@ -199,6 +202,9 @@ class JellyfinProvider:
             "jellyfin_type": item.get("Type") or "Unknown"
         }
 
+        if raw_type in {"movie", "episode"}:
+            metadata.update(video_dimensions(item))
+
         if isinstance(item.get("ProductionYear"), int):
             metadata["year"] = item["ProductionYear"]
 
@@ -246,7 +252,7 @@ class JellyfinProvider:
                 "SortBy": "ParentIndexNumber,IndexNumber",
                 "SortOrder": "Ascending",
                 "Fields": (
-                    "SeriesName,ParentIndexNumber,IndexNumber"
+                    "SeriesName,ParentIndexNumber,IndexNumber,MediaStreams"
                 ),
             }
         )
@@ -310,6 +316,7 @@ class JellyfinProvider:
                     "series_name": series_name,
                     "season_number": season_number,
                     "episode_number": episode_number,
+                    **video_dimensions(item),
                 }
             )
 

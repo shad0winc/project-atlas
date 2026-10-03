@@ -115,6 +115,7 @@ class PlaybackService:
                         "season_number"
                     )
                 ),
+                **{key: episode[key] for key in ("video_width", "video_height") if key in episode},
                 "episode_number": (
                     episode.get(
                         "episode_number"

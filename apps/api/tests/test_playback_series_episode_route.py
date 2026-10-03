@@ -99,6 +99,8 @@ def test_series_episode_route_returns_safe_ordered_identities() -> None:
                 "series_name": "Example Series",
                 "season_number": 1,
                 "episode_number": 1,
+                "video_width": None,
+                "video_height": None,
             },
             {
                 "id": "episode-s02e03",
@@ -106,6 +108,8 @@ def test_series_episode_route_returns_safe_ordered_identities() -> None:
                 "series_name": "Example Series",
                 "season_number": 2,
                 "episode_number": 3,
+                "video_width": None,
+                "video_height": None,
             },
         ],
     }
