@@ -42,6 +42,8 @@ class FakePlayback:
                 "series_name": "Example Series",
                 "season_number": 1,
                 "episode_number": 1,
+                "video_width": 1920,
+                "video_height": 1080,
             },
             {
                 "id": "episode-s02e03",
@@ -99,8 +101,8 @@ def test_series_episode_route_returns_safe_ordered_identities() -> None:
                 "series_name": "Example Series",
                 "season_number": 1,
                 "episode_number": 1,
-                "video_width": None,
-                "video_height": None,
+                "video_width": 1920,
+                "video_height": 1080,
             },
             {
                 "id": "episode-s02e03",
