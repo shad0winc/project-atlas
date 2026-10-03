@@ -233,6 +233,8 @@ function AuthorizedTheaterPlayer({
       onFavorite={handleFavorite}
       retention={retention}
       session={session}
+      viewerId={user?.user_id}
+      key={JSON.stringify([user?.user_id, session.provider, session.playableTargetId])}
     />
   );
 }
