@@ -45,7 +45,8 @@ def test_unqualified_sync_registers_both_core_jobs(
             ],
         }
 
-    def fake_cleanup(received_scheduler):
+    def fake_cleanup(received_scheduler, *, enabled=False):
+        assert enabled is False
         calls.append(
             (
                 "cleanup",
@@ -268,7 +269,7 @@ def test_core_registration_result_is_deduplicated(
     monkeypatch.setattr(
         scheduler_cli,
         "register_cleanup_execution",
-        lambda received_scheduler: {
+        lambda received_scheduler, *, enabled=False: {
             "name": "cleanup.execute",
         },
     )
