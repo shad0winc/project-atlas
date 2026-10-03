@@ -117,6 +117,8 @@ def read_series_episodes(
             PlaybackEpisodeResponse(
                 id=str(episode["id"]),
                 title=str(episode["title"]),
+                video_width=episode.get("video_width"),
+                video_height=episode.get("video_height"),
                 series_name=(
                     None
                     if episode.get("series_name") is None
