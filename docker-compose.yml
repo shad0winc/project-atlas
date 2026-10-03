@@ -30,6 +30,7 @@ services:
   jellyfin:
     image: jellyfin/jellyfin:latest
     container_name: jellyfin
+    user: "${PUID:?PUID is required}:${PGID:?PGID is required}"
     networks:
       - atlas
       - atlas-identity
