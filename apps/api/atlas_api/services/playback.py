@@ -124,6 +124,22 @@ class PlaybackService:
             for episode in episodes
         )
 
+    def _episode_navigation(self, item_id: str) -> tuple[str, str | None, str | None]:
+        """Resolve neighbors from a verified parent and its ordered inventory."""
+        context = self._jellyfin.get_retention_context(item_id)
+        if context.get("item_type") != "episode" or not context.get("series_id"):
+            raise MediaProviderError("Episode parent is unavailable")
+        series_id = context["series_id"]
+        episodes = self._jellyfin.list_series_episodes(series_id)
+        ids = [str(row["id"]) for row in episodes]
+        canonical = [value.replace("-", "").lower() for value in ids]
+        target = item_id.replace("-", "").lower()
+        if len(set(canonical)) != len(canonical) or canonical.count(target) != 1:
+            raise MediaProviderError("Episode inventory identity mismatch")
+        index = canonical.index(target)
+        return (series_id, ids[index - 1] if index else None,
+                ids[index + 1] if index + 1 < len(ids) else None)
+
     def resolve_library_session(
         self,
         *,
@@ -165,12 +181,21 @@ class PlaybackService:
             session_title = item.title
             previous_target_id = None
             next_target_id = None
+            series_id = None
 
             jellyfin_type = str(
                 item.metadata.get("jellyfin_type") or ""
             ).strip().lower()
 
+            if jellyfin_type == "episode":
+                try:
+                    series_id, previous_target_id, next_target_id = self._episode_navigation(normalized_item_id)
+                except MediaProviderError:
+                    # Optional navigation failure must not prevent playback.
+                    pass
+
             if jellyfin_type == "series":
+                series_id = normalized_item_id
                 episodes = self._jellyfin.list_series_episodes(
                     normalized_item_id
                 )
@@ -252,6 +277,7 @@ class PlaybackService:
             ),
             previous_target_id=previous_target_id,
             next_target_id=next_target_id,
+            series_id=series_id,
         )
 
     def resolve_live_session(

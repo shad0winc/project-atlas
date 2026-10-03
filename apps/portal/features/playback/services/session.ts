@@ -30,6 +30,7 @@ type PlaybackSessionTransport = Readonly<{
   subtitle_tracks: readonly PlaybackTrackTransport[];
   previous_target_id: string | null;
   next_target_id: string | null;
+  series_id?: string | null;
 }>;
 
 function mapTrack(track: PlaybackTrackTransport): PlaybackTrack {
@@ -101,7 +102,8 @@ export async function resolvePlaybackSession(
     audioTracks: response.audio_tracks.map(mapTrack),
     subtitleTracks: response.subtitle_tracks.map(mapTrack),
     ...(response.previous_target_id === null ? {} : { previousTargetId: response.previous_target_id }),
-    ...(response.next_target_id === null ? {} : { nextTargetId: response.next_target_id })
+    ...(response.next_target_id === null ? {} : { nextTargetId: response.next_target_id }),
+    ...(response.series_id ? { seriesId: response.series_id } : {})
   });
 }
 

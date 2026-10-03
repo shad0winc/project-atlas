@@ -15,6 +15,7 @@ type SeriesEpisodeNavigationProps = Readonly<{
   provider: string;
   seriesId: string;
   title: string;
+  currentEpisodeId?: string;
 }>;
 
 type NavigationStatus =
@@ -78,7 +79,8 @@ function episodeLabel(
 export function SeriesEpisodeNavigation({
   provider,
   seriesId,
-  title
+  title,
+  currentEpisodeId
 }: SeriesEpisodeNavigationProps): React.ReactElement {
   const [status, setStatus] =
     useState<NavigationStatus>("idle");
@@ -161,11 +163,12 @@ export function SeriesEpisodeNavigation({
 
       setEpisodes(loaded);
 
+      const current = loaded.find((episode) => episode.id === currentEpisodeId);
       const firstSeason =
         loaded.length === 0
           ? null
           : episodeSeasonKey(
-              loaded[0]
+              current ?? loaded[0]
             );
 
       setSelectedSeason(firstSeason);
@@ -181,7 +184,7 @@ export function SeriesEpisodeNavigation({
             );
 
       setSelectedEpisodeId(
-        firstEpisode?.id ?? ""
+        current?.id ?? firstEpisode?.id ?? ""
       );
 
       setStatus("ready");

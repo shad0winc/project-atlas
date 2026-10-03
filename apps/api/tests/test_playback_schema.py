@@ -41,6 +41,7 @@ def test_playback_session_response_serializes_slotted_tracks() -> None:
         subtitle_tracks=(subtitle,),
         previous_target_id=None,
         next_target_id="next-episode-id",
+        series_id="series-id",
     )
 
     response = PlaybackSessionResponse.from_domain(
@@ -69,3 +70,6 @@ def test_playback_session_response_serializes_slotted_tracks() -> None:
     assert response.subtitle_tracks[0].codec == "srt"
     assert response.subtitle_tracks[0].default is False
     assert response.subtitle_tracks[0].forced is True
+
+
+    assert response.series_id == "series-id"

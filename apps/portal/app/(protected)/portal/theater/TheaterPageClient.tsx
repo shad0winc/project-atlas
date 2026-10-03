@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { PortalPage } from "../../../../components/portal/PortalPage";
@@ -12,6 +12,8 @@ import { addFavoriteAndRefreshRetention } from "../../../../features/media/servi
 import { refreshMediaRetentionAfterMutation } from "../../../../features/media/services/retention-refresh";
 import type { MediaRetention } from "../../../../features/media/types/retention";
 import { loadPlaybackSession } from "../../../../features/playback/api/session";
+import { SeriesEpisodeNavigation } from "../../../../features/media/components/SeriesEpisodeNavigation";
+import { episodeHref } from "../../../../features/playback/services/episode-navigation";
 import { AtlasTheaterPlayer } from "../../../../features/playback/components/AtlasTheaterPlayer";
 import type { PlaybackSession } from "../../../../features/playback/types/session";
 import { useAuth } from "../../../../lib/auth/use-auth";
@@ -32,6 +34,8 @@ function AuthorizedTheaterPlayer({
   session: PlaybackSession;
 }>): React.ReactElement {
   const { user } = useAuth();
+  const router = useRouter();
+  const [autoAdvance, setAutoAdvance] = useState(true);
   const { can } = usePermission();
 
   const [retention, setRetention] =
@@ -220,7 +224,10 @@ function AuthorizedTheaterPlayer({
   );
 
   return (
+    <>
     <AtlasTheaterPlayer
+      autoAdvance={autoAdvance}
+      onNextEpisode={(nextId) => router.push(episodeHref(session.provider, nextId))}
       canDislike={canDislike}
       canFavorite={canFavorite}
       dislikeExpectedUserId={
@@ -236,6 +243,15 @@ function AuthorizedTheaterPlayer({
       viewerId={user?.user_id}
       key={JSON.stringify([user?.user_id, session.provider, session.playableTargetId])}
     />
+    {session.seriesId && session.sourceType === "library" ? (
+      <section aria-label="Episode controls" className="atlas-theater-player-meta">
+        {session.previousTargetId ? <Link href={episodeHref(session.provider, session.previousTargetId)}>Previous episode</Link> : null}
+        {session.nextTargetId ? <Link href={episodeHref(session.provider, session.nextTargetId)}>Next episode</Link> : <span>Last available episode</span>}
+        <label><input type="checkbox" checked={autoAdvance} onChange={(event) => setAutoAdvance(event.target.checked)} /> Play next episode automatically</label>
+        <SeriesEpisodeNavigation key={session.seriesId} provider={session.provider} seriesId={session.seriesId} currentEpisodeId={session.playableTargetId} title="This series" />
+      </section>
+    ) : null}
+    </>
   );
 }
 

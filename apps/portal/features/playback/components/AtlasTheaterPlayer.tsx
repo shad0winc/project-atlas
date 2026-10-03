@@ -10,6 +10,7 @@ import { resolvePlaybackSession } from "../services/session";
 import type { SubtitleSelection } from "../services/session";
 import { bootstrapPlaybackStream } from "../services/stream";
 import { refreshPlaybackForRetry, retryResumePosition } from "../services/retry";
+import { nextEpisodeTarget } from "../services/episode-navigation";
 import { readResume, resumeKey, restoreContinuity, writeResume } from "../services/continuity";
 import type { PlaybackSession, PlaybackTrack } from "../types/session";
 
@@ -51,6 +52,8 @@ type FavoriteState = "loading" | "idle" | "submitting" | "complete" | "unavailab
 export function AtlasTheaterPlayer({
   session,
   viewerId,
+  onNextEpisode,
+  autoAdvance = true,
   sessionResolver = resolvePlaybackSession,
   retention = null,
   canFavorite = false,
@@ -62,6 +65,8 @@ export function AtlasTheaterPlayer({
 }: {
   session: PlaybackSession;
   viewerId?: string;
+  onNextEpisode?: (itemId: string) => void;
+  autoAdvance?: boolean;
   sessionResolver?: (
     provider: string,
     itemId: string,
@@ -138,6 +143,7 @@ export function AtlasTheaterPlayer({
     const controller = new AbortController();
     let disposed = false;
     let destroyHls: (() => void) | undefined;
+    let sourceAttached = false;
 
     const key = resumeKey(viewerId, activeSession.provider, activeSession.playableTargetId,
       activeSession.canSeek && activeSession.sourceType !== "live");
@@ -153,7 +159,7 @@ export function AtlasTheaterPlayer({
       try { writeResume(window.localStorage, key, video.currentTime, video.ended); } catch { /* Optional storage. */ }
     };
     const restorePlaybackPosition = async () => {
-      if (disposed || restoring || restored) return;
+      if (disposed || !sourceAttached || restoring || restored) return;
       restoring = true;
       const result = await restoreContinuity(video, resumeAtRef.current, shouldPlayRef.current);
       restoring = false;
@@ -192,6 +198,7 @@ export function AtlasTheaterPlayer({
           video.crossOrigin = "use-credentials";
           video.src = streamUrl;
           video.load();
+          sourceAttached = true;
           setState({ status: "ready" });
           return;
         }
@@ -235,6 +242,7 @@ export function AtlasTheaterPlayer({
 
         hls.attachMedia(video);
         hls.loadSource(streamUrl);
+        sourceAttached = true;
 
         setState({ status: "ready" });
       })
@@ -319,6 +327,10 @@ export function AtlasTheaterPlayer({
           aria-label={`Playing ${activeSession.title}`}
           className="atlas-theater-video"
           controls
+          onEnded={() => {
+            const next = nextEpisodeTarget(activeSession, autoAdvance);
+            if (next !== null) onNextEpisode?.(next);
+          }}
           onPlay={() => { shouldPlayRef.current = true; setAutoplayBlocked(false); }}
           onError={() => {
             rememberPlaybackPosition();
@@ -331,12 +343,6 @@ export function AtlasTheaterPlayer({
           preload="metadata"
           ref={videoRef}
         />
-
-        {autoplayBlocked ? (
-          <p className="atlas-theater-status" role="status">
-            Press Play to continue playback.
-          </p>
-        ) : null}
 
         {state.status === "connecting" ? (
           <p className="atlas-theater-status" role="status">
@@ -362,6 +368,15 @@ export function AtlasTheaterPlayer({
 
       <div className="atlas-theater-player-meta">
         <span>Powered by Jellyfin</span>
+        {autoplayBlocked ? (
+          <div role="status">
+            <span>Playback is paused. </span>
+            <button className="button button-secondary" type="button" onClick={() => {
+              const video = videoRef.current;
+              if (video) void video.play().then(() => setAutoplayBlocked(false)).catch(() => setAutoplayBlocked(true));
+            }}>Play</button>
+          </div>
+        ) : null}
 
         {retention !== null ? <MediaRetentionStatus retention={retention} /> : null}
 

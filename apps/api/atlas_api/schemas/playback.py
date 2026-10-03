@@ -94,6 +94,7 @@ class PlaybackSessionResponse(BaseModel):
     subtitle_tracks: tuple[PlaybackTrackResponse, ...]
     previous_target_id: str | None = None
     next_target_id: str | None = None
+    series_id: str | None = None
 
     @classmethod
     def from_domain(
@@ -144,4 +145,5 @@ class PlaybackSessionResponse(BaseModel):
             ),
             previous_target_id=session.previous_target_id,
             next_target_id=session.next_target_id,
+            series_id=session.series_id,
         )

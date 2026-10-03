@@ -241,6 +241,8 @@ class JellyfinProvider:
                 "ParentId": normalized_id,
                 "Recursive": "true",
                 "IncludeItemTypes": "Episode",
+                "IsMissing": "false",
+                "ExcludeLocationTypes": "Virtual",
                 "SortBy": "ParentIndexNumber,IndexNumber",
                 "SortOrder": "Ascending",
                 "Fields": (
