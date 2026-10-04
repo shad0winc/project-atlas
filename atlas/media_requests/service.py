@@ -366,7 +366,8 @@ class MediaRequestService:
             replace(
                 request,
                 status=MediaRequestStatus.SUBMITTING,
-            )
+            ),
+            expected=request,
         )
 
         try:
@@ -399,7 +400,7 @@ class MediaRequestService:
             available_at=None,
         )
 
-        persisted = self._replace(updated)
+        persisted = self._replace(updated, expected=intent)
 
         self._publish(
             MediaRequestEventType.SUBMITTED,
@@ -488,7 +489,7 @@ class MediaRequestService:
             available_at=timestamp,
         )
 
-        persisted = self._replace(updated)
+        persisted = self._replace(updated, expected=request)
 
         self._publish(
             MediaRequestEventType.AVAILABLE,
@@ -535,7 +536,8 @@ class MediaRequestService:
             replace(
                 request,
                 status=MediaRequestStatus.CANCELLING,
-            )
+            ),
+            expected=request,
         )
 
         try:
@@ -780,11 +782,11 @@ class MediaRequestService:
             available_at=result.available_at,
         )
 
-        return self._replace(updated)
+        return self._replace(updated, expected=request)
 
-    def _replace(self, request: MediaRequest) -> MediaRequest:
+    def _replace(self, request: MediaRequest, *, expected: MediaRequest | None = None) -> MediaRequest:
         try:
-            return self.repository.replace(request)
+            return self.repository.replace(request, expected=expected)
         except MediaRequestRepositoryError as exc:
             raise MediaRequestServiceError(
                 f"unable to update media request: {request.request_id}",

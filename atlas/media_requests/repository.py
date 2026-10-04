@@ -41,6 +41,8 @@ class MediaRequestRepositoryConflictError(
 class JsonMediaRequestRepository:
     """Persist normalized media requests in one atomic JSON registry."""
 
+    schema_version = SCHEMA_VERSION
+
     def __init__(self, root: str | Path) -> None:
         self.root = Path(root)
         self.registry_file = self.root / "requests.json"
@@ -126,12 +128,12 @@ class JsonMediaRequestRepository:
 
             requests[request.request_id] = request.to_dict()
             self._write_document(
-                self._document(requests),
+                self._document(requests, previous=document),
             )
 
         return request
 
-    def replace(self, request: MediaRequest) -> MediaRequest:
+    def replace(self, request: MediaRequest, *, expected: MediaRequest | None = None) -> MediaRequest:
         """Atomically replace one existing request."""
 
         if not isinstance(request, MediaRequest):
@@ -150,6 +152,11 @@ class JsonMediaRequestRepository:
                     f"media request not found: {request.request_id}",
                 )
 
+            current = self._request_from_payload(requests[request.request_id], expected_request_id=request.request_id)
+            if expected is not None and current != expected:
+                raise MediaRequestRepositoryConflictError("media request changed during operation")
+            self._validate_replace(document, current, request, expected)
+
             if request.provider_request_id is not None:
                 duplicate = self._find_provider_request_in_records(
                     requests,
@@ -166,7 +173,7 @@ class JsonMediaRequestRepository:
             requests[request.request_id] = request.to_dict()
 
             self._write_document(
-                self._document(requests),
+                self._document(requests, previous=document),
             )
 
         return request
@@ -279,10 +286,11 @@ class JsonMediaRequestRepository:
                 payload,
                 expected_request_id=normalized_id,
             )
+            self._validate_delete(document, request)
             del requests[normalized_id]
 
             self._write_document(
-                self._document(requests),
+                self._document(requests, previous=document),
             )
 
         return request
@@ -327,7 +335,7 @@ class JsonMediaRequestRepository:
                 "media-request registry must be an object",
             )
 
-        if payload.get("schema_version") != SCHEMA_VERSION:
+        if payload.get("schema_version") != self.schema_version:
             raise MediaRequestRepositoryError(
                 "unsupported media-request registry schema_version",
             )
@@ -354,8 +362,9 @@ class JsonMediaRequestRepository:
             normalized_requests[request_id] = record
 
         return {
-            "schema_version": SCHEMA_VERSION,
+            "schema_version": self.schema_version,
             "requests": normalized_requests,
+            **self._extra_fields(payload),
         }
 
     def _request_from_payload(
@@ -504,23 +513,34 @@ class JsonMediaRequestRepository:
         finally:
             handle.close()
 
-    @staticmethod
-    def _empty_document() -> dict[str, Any]:
+    def _validate_replace(self, document, current, request, expected):
+        pass
+
+    def _validate_delete(self, document, request):
+        pass
+
+    def _extra_fields(self, payload: Mapping[str, Any]) -> dict[str, Any]:
+        return {}
+
+    def _empty_document(self) -> dict[str, Any]:
         return {
-            "schema_version": SCHEMA_VERSION,
+            "schema_version": self.schema_version,
             "requests": {},
         }
 
-    @staticmethod
     def _document(
+        self,
         requests: Mapping[str, Mapping[str, Any]],
+        *,
+        previous: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         return {
-            "schema_version": SCHEMA_VERSION,
+            "schema_version": self.schema_version,
             "requests": {
                 request_id: requests[request_id]
                 for request_id in sorted(requests)
             },
+            **self._extra_fields(previous or {}),
         }
 
 

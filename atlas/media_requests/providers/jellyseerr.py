@@ -174,6 +174,14 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
         self,
         request: MediaRequest,
     ) -> ProviderSubmissionResult:
+        return self._submit(request)
+
+    def submit_with_receipt(self, request: MediaRequest, receipt: Callable[[int], object]) -> ProviderSubmissionResult:
+        if not callable(receipt):
+            raise MediaRequestProviderError("Submission receipt callback is invalid")
+        return self._submit(request, receipt=receipt)
+
+    def _submit(self, request: MediaRequest, *, receipt: Callable[[int], object] | None = None) -> ProviderSubmissionResult:
         self.validate_submission(
             request
         )
@@ -206,11 +214,15 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
         if profile_id is not None:
             payload["profileId"] = profile_id
 
-        response = self._post_json("/api/v1/request", payload)
+        response = (self._post_json("/api/v1/request", payload) if receipt is None
+                    else self._recovery_json("POST", "/api/v1/request", payload))
         resource = _required_mapping(
             response,
             "Jellyseerr request response",
         )
+        if receipt is not None:
+            from .managed_profiles import positive_id
+            receipt(positive_id(resource.get("id")))
         if profile_id is not None:
             for key in ("serverId", "profileId"):
                 actual = resource.get(key)
@@ -242,6 +254,71 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
             updated_at=updated_at,
             context=self._context(request, resource),
         )
+
+    def _recovery_json(self, method: str, path: str, payload: object | None = None):
+        """Bounded transport used only for correlated submission/recovery."""
+        import json
+        import re
+        from urllib.request import Request, build_opener
+        from .managed_profiles import _NoRedirect
+
+        def unique_object(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise ValueError("Duplicate response field")
+                result[key] = value
+            return result
+
+        if (method == "POST" and path != "/api/v1/request") or (method == "GET" and re.fullmatch(r"/api/v1/request/[1-9][0-9]*", path) is None) or method not in {"GET", "POST"}:
+            raise MediaRequestProviderError("Recovery endpoint is invalid")
+        try:
+            data = None if method == "GET" else json.dumps(payload, separators=(",", ":")).encode()
+            req = Request(self._build_url(path), data=data, headers=self._headers(include_content_type=data is not None), method=method)
+            with build_opener(_NoRedirect()).open(req, timeout=min(self.timeout, 60)) as response:
+                raw = response.read(2_000_001)
+            if len(raw) > 2_000_000:
+                raise ValueError("Oversized response")
+            return json.loads(raw, object_pairs_hook=unique_object)
+        except Exception:
+            raise MediaRequestProviderError("Submission recovery transport could not be verified") from None
+
+    def get_recovery_status(self, request: MediaRequest, receipt_id: int) -> ProviderStatusResult:
+        """Verify exact backend resource identity before any recovered binding."""
+        from .managed_profiles import positive_id, server_id
+        try:
+            positive_id(receipt_id)
+            resource = self._recovery_json("GET", f"/api/v1/request/{receipt_id}")
+            if not isinstance(resource, Mapping) or positive_id(resource.get("id")) != receipt_id:
+                raise ValueError("Wrong request identity")
+            family = _jellyseerr_media_type(request.media_type)
+            if resource.get("type") != family or resource.get("is4k") is not False:
+                raise ValueError("Wrong family or 4K variant")
+            media = resource.get("media")
+            if not isinstance(media, Mapping) or positive_id(media.get("tmdbId")) != _numeric_identifier(request.provider_media_id, "provider_media_id"):
+                raise ValueError("Wrong TMDB identity")
+            if media.get("mediaType", family) != family:
+                raise ValueError("Conflicting media family")
+            if (server_id(resource.get("serverId")) != self._server_id_for(request.media_type)
+                    or positive_id(resource.get("profileId")) != self._audio_profile_id(request)):
+                raise ValueError("Wrong routing")
+            seasons = resource.get("seasons", [])
+            if not isinstance(seasons, list):
+                raise ValueError("Invalid season scope")
+            if family == "tv":
+                if request.season_number is None or len(seasons) != 1 or not isinstance(seasons[0], Mapping):
+                    raise ValueError("Unverified season scope")
+                actual = seasons[0].get("seasonNumber")
+                if type(actual) is not int or actual != request.season_number:
+                    raise ValueError("Wrong season scope")
+            elif seasons:
+                raise ValueError("Movie season scope")
+            status = _normalize_status(resource)
+            stamp = _required_timestamp(resource.get("updatedAt") or resource.get("createdAt"), "Recovery timestamp")
+            return ProviderStatusResult(provider=self.name, provider_request_id=str(receipt_id), status=status,
+                                        updated_at=stamp, context=self._context(request, resource))
+        except Exception:
+            raise MediaRequestProviderError("Submission backend identity could not be verified") from None
 
     def validate_effective_profile(self, request: MediaRequest) -> None:
         self._verify_managed_profile(request, require_existing=True)
