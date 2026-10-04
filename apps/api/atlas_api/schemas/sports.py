@@ -133,3 +133,13 @@ class SportsFollowResponse(_StrictSportsModel):
 
 class SportsFollowListResponse(_StrictSportsModel):
     subscriptions: list[SportsFollowResponse]
+
+
+class SportsLiveChannelResponse(_StrictSportsModel):
+    atlas_channel_id: str
+    name: str
+    playback_configured: bool
+
+
+class SportsLiveChannelListResponse(_StrictSportsModel):
+    channels: list[SportsLiveChannelResponse]

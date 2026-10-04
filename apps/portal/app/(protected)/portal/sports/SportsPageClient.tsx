@@ -37,6 +37,8 @@ import { reconcileFollowedEventMetadata } from "../../../../features/sports/serv
 import { startLiveAvailabilityRefresh } from "../../../../features/sports/services/liveAvailabilityRefresh";
 import { PORTAL_ROUTES } from "../../../../lib/navigation/portal";
 
+import { SportsLiveChannels } from "../../../../features/sports/components/SportsLiveChannels";
+
 const sportsRoute = PORTAL_ROUTES.sports;
 
 export function SportsPageClient(): React.ReactElement {
@@ -594,6 +596,8 @@ export function SportsPageClient(): React.ReactElement {
           />
         </section>
       ) : null}
+
+      <SportsLiveChannels onWatchLive={handleWatchLive} />
 
       {loading ? (
         <section

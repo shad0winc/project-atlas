@@ -16,6 +16,8 @@ from fastapi import (
 
 from atlas_api.auth.models import AuthenticatedUser
 from atlas_api.schemas.sports import (
+    SportsLiveChannelListResponse,
+    SportsLiveChannelResponse,
     SportsEventListResponse,
     SportsEventResponse,
     SportsSubscriptionCreateRequest,
@@ -399,3 +401,30 @@ def remove_sports_follow(
     if not removed:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sports subscription was not found.")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/live-channels",
+    response_model=SportsLiveChannelListResponse,
+    summary="List standalone Sports broadcasts without opening playback",
+)
+def list_sports_live_channels(
+    current_user: Annotated[AuthenticatedUser, Depends(require_sports_read)],
+    service: Annotated[SportsAPIService, Depends(get_sports_api_service)],
+    response: Response,
+) -> SportsLiveChannelListResponse:
+    from atlas_api.services.live_channel_discovery import discover_live_channels
+
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        channels = discover_live_channels(
+            service.list_live_sources(), service.list_live_tv_bindings(),
+        )
+    except (SportsWriterTransportError, ValueError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Sports live channels are temporarily unavailable.",
+        ) from error
+    return SportsLiveChannelListResponse(
+        channels=[SportsLiveChannelResponse(**channel) for channel in channels]
+    )
