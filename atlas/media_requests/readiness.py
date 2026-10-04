@@ -90,6 +90,13 @@ class JellyfinRequestReadiness:
             request.provider_media_id
         )
 
+        # The legacy provider contract proves playability only. It cannot
+        # establish audio language, full English dialogue subtitles, or
+        # complete requested episode coverage. Keep explicit acquisition
+        # policies processing until identity-bound policy evidence is wired.
+        if request.audio_preference is not None:
+            return False
+
         if request.media_type in {
             MediaRequestType.MOVIE,
             MediaRequestType.ANIME_MOVIE,
