@@ -845,7 +845,7 @@ def test_submit_intent_persistence_failure_blocks_provider(
     monkeypatch.setattr(
         service.repository,
         "replace",
-        lambda request: (_ for _ in ()).throw(
+        lambda request, *, expected: (_ for _ in ()).throw(
             MediaRequestRepositoryError("failure")
         ),
     )
@@ -887,12 +887,13 @@ def test_submit_final_persistence_failure_keeps_intent(
     real_replace = service.repository.replace
     calls = 0
 
-    def fail_final(request: MediaRequest) -> MediaRequest:
+    def fail_final(request: MediaRequest, *, expected: MediaRequest) -> MediaRequest:
         nonlocal calls
+        assert expected == service.get_request(request.request_id)
         calls += 1
         if calls == 2:
             raise MediaRequestRepositoryError("failure")
-        return real_replace(request)
+        return real_replace(request, expected=expected)
 
     monkeypatch.setattr(service.repository, "replace", fail_final)
 
@@ -944,7 +945,7 @@ def test_cancel_intent_persistence_failure_blocks_provider(
     monkeypatch.setattr(
         service.repository,
         "replace",
-        lambda request: (_ for _ in ()).throw(
+        lambda request, *, expected: (_ for _ in ()).throw(
             MediaRequestRepositoryError("failure")
         ),
     )
@@ -986,12 +987,13 @@ def test_cancel_final_persistence_failure_keeps_intent(
     real_replace = service.repository.replace
     calls = 0
 
-    def fail_final(request: MediaRequest) -> MediaRequest:
+    def fail_final(request: MediaRequest, *, expected: MediaRequest) -> MediaRequest:
         nonlocal calls
+        assert expected == service.get_request(request.request_id)
         calls += 1
         if calls == 2:
             raise MediaRequestRepositoryError("failure")
-        return real_replace(request)
+        return real_replace(request, expected=expected)
 
     monkeypatch.setattr(service.repository, "replace", fail_final)
 

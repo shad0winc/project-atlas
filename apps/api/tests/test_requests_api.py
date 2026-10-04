@@ -887,8 +887,11 @@ def test_submission_final_persistence_failure_requires_reconciliation(
 
     def replace_with_final_failure(
         request: MediaRequest,
+        *,
+        expected: MediaRequest,
     ) -> MediaRequest:
         nonlocal replace_calls
+        assert expected == fixture.repository.get(request.request_id)
 
         replace_calls += 1
 
@@ -898,7 +901,8 @@ def test_submission_final_persistence_failure_requires_reconciliation(
             )
 
         return original_replace(
-            request
+            request,
+            expected=expected,
         )
 
     monkeypatch.setattr(
@@ -939,8 +943,11 @@ def test_cancellation_final_persistence_failure_requires_reconciliation(
 
     def replace_with_final_failure(
         request: MediaRequest,
+        *,
+        expected: MediaRequest,
     ) -> MediaRequest:
         nonlocal replace_calls
+        assert expected == fixture.repository.get(request.request_id)
 
         replace_calls += 1
 
@@ -950,7 +957,8 @@ def test_cancellation_final_persistence_failure_requires_reconciliation(
             )
 
         return original_replace(
-            request
+            request,
+            expected=expected,
         )
 
     monkeypatch.setattr(
