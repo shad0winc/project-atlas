@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from .providers.managed_profiles import AcquisitionProfileConflict
+
 from collections.abc import Iterable, Mapping
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -471,6 +473,8 @@ class MediaRequestService:
             MediaRequestStatus.AVAILABLE,
         )
 
+        self._validate_effective_profile(request)
+
         occurred_at = self._occurred_at()
         timestamp = (
             occurred_at.isoformat()
@@ -712,6 +716,8 @@ class MediaRequestService:
             result = provider.validate_submission(
                 request
             )
+        except AcquisitionProfileConflict as exc:
+            raise MediaRequestServiceConflictError(str(exc)) from exc
         except (
             MediaRequestProviderError,
             MediaRequestProviderOperationError,
@@ -725,6 +731,19 @@ class MediaRequestService:
             raise MediaRequestServiceError(
                 "provider validate_submission() must return null",
             )
+
+    def _validate_effective_profile(self, request: MediaRequest) -> None:
+        if request.audio_preference is None:
+            return
+        verifier = getattr(self._provider_for(request.provider), "validate_effective_profile", None)
+        if not callable(verifier):
+            raise MediaRequestServiceError("Acquisition profile verification is unavailable")
+        try:
+            result = verifier(request)
+        except (MediaRequestProviderError, MediaRequestProviderOperationError):
+            raise MediaRequestServiceError("Acquisition profile remains unverified") from None
+        if result is not None:
+            raise MediaRequestServiceError("Acquisition profile verifier must return null")
 
     def _apply_status_result(
         self,
@@ -747,6 +766,12 @@ class MediaRequestService:
             result.provider_request_id,
         )
         self._validate_transition(request.status, result.status)
+        if result.status in {
+            MediaRequestStatus.APPROVED, MediaRequestStatus.SEARCHING,
+            MediaRequestStatus.DOWNLOADING, MediaRequestStatus.IMPORTING,
+            MediaRequestStatus.PROCESSING, MediaRequestStatus.AVAILABLE,
+        }:
+            self._validate_effective_profile(request)
 
         updated = replace(
             request,
