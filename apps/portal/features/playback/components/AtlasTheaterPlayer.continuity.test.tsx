@@ -68,9 +68,24 @@ describe("mounted player continuity",()=>{
     expect(container.querySelector("video")!.src).toContain("master.m3u8");
     expect(hlsMock.constructed).not.toHaveBeenCalled();
   });
-  it("preserves the native live playback path when both are supported", async () => {
+  it.each(["maybe", "probably", ""] as const)("uses managed live HLS when native support is %s", async (nativeSupport) => {
     hlsMock.supported=true;
-    await act(async()=>root.render(<AtlasTheaterPlayer session={{...session,sourceType:"live"}}/>));await flush();
+    vi.mocked(HTMLMediaElement.prototype.canPlayType).mockReturnValue(nativeSupport);
+    await act(async()=>root.render(<AtlasTheaterPlayer session={{...session,sourceType:"live",canSeek:false}}/>));await flush();
+    const video=container.querySelector("video")!;
+    expect(hlsMock.attach).toHaveBeenCalledWith(video);
+    expect(hlsMock.source).toHaveBeenCalledWith("https://playback.example.test/videos/fixture/master.m3u8");
+    expect(video.getAttribute("src")).toBeNull();
+    const options=hlsMock.constructed.mock.calls[0][0];
+    const xhr={withCredentials:false}; options.xhrSetup(xhr);
+    expect(xhr.withCredentials).toBe(true);
+    expect(playing).toBe(false);
+    await act(async()=>root.render(null));await flush();
+    expect(hlsMock.destroy).toHaveBeenCalledTimes(1);
+  });
+  it("retains native live HLS when managed HLS is unavailable", async () => {
+    hlsMock.supported=false;
+    await act(async()=>root.render(<AtlasTheaterPlayer session={{...session,sourceType:"live",canSeek:false}}/>));await flush();
     expect(container.querySelector("video")!.src).toContain("master.m3u8");
     expect(hlsMock.constructed).not.toHaveBeenCalled();
     expect(playing).toBe(false);

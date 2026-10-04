@@ -201,9 +201,9 @@ export function AtlasTheaterPlayer({
         const nativeHls = video.canPlayType("application/vnd.apple.mpegurl");
         const managedHls = Hls.isSupported();
 
-        // Library playback uses hls.js when available. Keep native HLS for
-        // platforms without MSE support and preserve the live playback path.
-        if (nativeHls && (!managedHls || activeSession.sourceType === "live")) {
+        // Prefer managed HLS for both library and live streams. Native HLS
+        // remains the fallback when MediaSource playback is unavailable.
+        if (nativeHls && !managedHls) {
           video.crossOrigin = "use-credentials";
           video.src = streamUrl;
           video.load();
