@@ -69,10 +69,14 @@ def test_application_service_persists_selected_audio_policy(tmp_path):
     from atlas.media_requests import (JsonMediaRequestRepository,
                                      JellyseerrMediaRequestProvider, MediaRequestService)
     from atlas_api.services.requests import MediaRequestsAPIService
+    from atlas.media_requests.providers.managed_profiles import ManagedProfileEvidence
     repo = JsonMediaRequestRepository(tmp_path)
     provider = JellyseerrMediaRequestProvider(
         "http://seerr:5055", "test-credential", anime_tv_server_id=1,
         audio_profile_ids={("anime_tv", "english_required"): 8},
+        managed_profile_reader=lambda row, server: ManagedProfileEvidence(
+            row.media_type.value, server, int(row.provider_media_id), 42, 8,
+        ),
     )
     service = MediaRequestsAPIService(repo, MediaRequestService(repo, [provider]),
                                      request_id_factory=lambda: "req-application")
@@ -89,3 +93,69 @@ def test_application_service_persists_selected_audio_policy(tmp_path):
     assert row.audio_preference is MediaAudioPreference.ENGLISH_REQUIRED
     assert repo.get(row.request_id).audio_preference is MediaAudioPreference.ENGLISH_REQUIRED
     assert post.call_args.args[1]["profileId"] == 8
+
+
+def _guarded_application_service(folder, reader):
+    from atlas.media_requests import (JsonMediaRequestRepository,
+                                     JellyseerrMediaRequestProvider, MediaRequestService)
+    from atlas_api.services.requests import MediaRequestsAPIService
+    repo = JsonMediaRequestRepository(folder)
+    provider = JellyseerrMediaRequestProvider(
+        "http://seerr:5055", "test-credential", anime_tv_server_id=1,
+        audio_profile_ids={("anime_tv", "english_required"): 8},
+        managed_profile_reader=reader,
+    )
+    core = MediaRequestService(repo, [provider])
+    return repo, core, MediaRequestsAPIService(repo, core, request_id_factory=lambda: "req-guard-api")
+
+
+def _create_guarded_audio_request(service):
+    return service.create_for_user("user-audio", media_type="anime_tv", provider_media_id="123",
+                                   title="Example", season_number=1, audio_preference="english_required")
+
+
+def test_application_service_rejects_shared_profile_conflict_before_post(tmp_path):
+    from unittest.mock import patch
+    from atlas.media_requests import JellyseerrMediaRequestProvider
+    from atlas.media_requests.providers.managed_profiles import ManagedProfileEvidence
+    from atlas_api.services.requests import MediaRequestConflictError
+    repo, core, service = _guarded_application_service(tmp_path, lambda row, server:
+        ManagedProfileEvidence(row.media_type.value, server, int(row.provider_media_id), 42, 7))
+    with patch.object(JellyseerrMediaRequestProvider, "_post_json") as post:
+        with unittest.TestCase().assertRaises(MediaRequestConflictError):
+            _create_guarded_audio_request(service)
+        post.assert_not_called()
+    assert not repo.registry_file.exists()
+
+
+def test_application_service_rejects_missing_reader_before_post(tmp_path):
+    from unittest.mock import patch
+    from atlas.media_requests import JellyseerrMediaRequestProvider
+    from atlas_api.services.requests import MediaRequestsUnavailableError
+    repo, core, service = _guarded_application_service(tmp_path, None)
+    with patch.object(JellyseerrMediaRequestProvider, "_post_json") as post:
+        with unittest.TestCase().assertRaises(MediaRequestsUnavailableError):
+            _create_guarded_audio_request(service)
+        post.assert_not_called()
+    assert not repo.registry_file.exists()
+
+
+def test_application_service_keeps_unconfirmed_submission_for_reconciliation(tmp_path):
+    from unittest.mock import patch
+    from datetime import datetime, timezone
+    from atlas.media_requests import JellyseerrMediaRequestProvider, MediaRequestStatus, MediaRequestServiceError
+    from atlas.media_requests.providers.managed_profiles import ManagedProfileEvidence
+    from atlas_api.services.requests import MediaRequestReconciliationRequiredError
+    repo, core, service = _guarded_application_service(tmp_path, lambda row, server:
+        ManagedProfileEvidence(row.media_type.value, server, int(row.provider_media_id), None, None))
+    def reply(*args):
+        stamp = datetime.now(timezone.utc).isoformat()
+        return {"id": 9, "status": 2, "createdAt": stamp, "updatedAt": stamp,
+                "serverId": 1, "profileId": 8}
+    with patch.object(JellyseerrMediaRequestProvider, "_post_json", side_effect=reply) as post:
+        with unittest.TestCase().assertRaises(MediaRequestReconciliationRequiredError):
+            _create_guarded_audio_request(service)
+        assert repo.get("req-guard-api").status is MediaRequestStatus.SUBMITTING
+        with unittest.TestCase().assertRaises(MediaRequestServiceError):
+            core.submit_request("req-guard-api")
+        assert post.call_count == 1

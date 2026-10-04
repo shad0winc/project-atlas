@@ -11,6 +11,8 @@ from atlas.media_requests import (
     MediaRequestServiceConflictError, MediaRequestStatus,
 )
 
+from atlas.media_requests.providers.managed_profiles import ManagedProfileEvidence
+
 STAMP = "2026-10-03T00:00:00Z"
 
 def request(**changes):
@@ -26,6 +28,10 @@ def provider(mapping=None):
         "http://seerr:5055", "test-credential", movie_server_id=0,
         tv_server_id=0, anime_tv_server_id=1, anime_movie_server_id=1,
         audio_profile_ids=mapping or {},
+        managed_profile_reader=lambda row, server: ManagedProfileEvidence(
+            row.media_type.value, server, int(row.provider_media_id), 42,
+            (mapping or {}).get((row.media_type.value, row.audio_preference.value), 8),
+        ),
     )
 
 

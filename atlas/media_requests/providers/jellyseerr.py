@@ -43,6 +43,9 @@ from .base import (
 )
 
 
+from .managed_profiles import AcquisitionProfileConflict, ManagedProfileEvidence
+
+
 Clock = Callable[[], datetime]
 
 
@@ -66,6 +69,10 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
 
     audio_profile_ids: Mapping[tuple[str, str], int] = field(default_factory=dict)
 
+    managed_profile_reader: Callable[[MediaRequest, int], ManagedProfileEvidence] | None = field(
+        default=None, repr=False, compare=False,
+    )
+
     def __post_init__(self) -> None:
         BaseMediaRequestHTTPProvider.__post_init__(
             self
@@ -86,6 +93,8 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
                 ),
             )
 
+        if self.managed_profile_reader is not None and not callable(self.managed_profile_reader):
+            raise MediaRequestProviderError("managed profile reader must be callable")
         profiles = {}
         if not isinstance(self.audio_profile_ids, Mapping):
             raise MediaRequestProviderError("audio profile mapping must be an object")
@@ -159,7 +168,7 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
         self._server_id_for(
             request.media_type
         )
-        self._audio_profile_id(request)
+        self._verify_managed_profile(request, require_existing=False)
 
     def submit(
         self,
@@ -210,6 +219,7 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
                     raise MediaRequestProviderError(
                         "Jellyseerr did not confirm requested acquisition routing"
                     )
+        self.validate_effective_profile(request)
         provider_request_id = _required_identifier(
             resource.get("id"),
             "Jellyseerr request id",
@@ -232,6 +242,34 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
             updated_at=updated_at,
             context=self._context(request, resource),
         )
+
+    def validate_effective_profile(self, request: MediaRequest) -> None:
+        self._verify_managed_profile(request, require_existing=True)
+
+    def _verify_managed_profile(self, request: MediaRequest, *, require_existing: bool) -> None:
+        expected = self._audio_profile_id(request)
+        if expected is None:
+            return
+        if self.managed_profile_reader is None:
+            raise MediaRequestProviderError("Managed acquisition profile verification is not configured")
+        server = self._server_id_for(request.media_type)
+        try:
+            evidence = self.managed_profile_reader(request, server)
+        except Exception:
+            raise MediaRequestProviderError("Managed acquisition profile could not be verified") from None
+        if (not isinstance(evidence, ManagedProfileEvidence)
+                or evidence.category != request.media_type.value
+                or evidence.server_id != server
+                or evidence.tmdb_id != _numeric_identifier(request.provider_media_id, "provider_media_id")):
+            raise MediaRequestProviderError("Managed acquisition profile returned conflicting identity")
+        if evidence.managed_item_id is None:
+            if require_existing:
+                raise MediaRequestProviderError("Managed acquisition profile is pending verification")
+            return
+        if evidence.quality_profile_id != expected:
+            raise AcquisitionProfileConflict(
+                "This title uses a different shared acquisition profile; the requested audio policy cannot be applied automatically"
+            )
 
     def _server_id_for(
         self,
