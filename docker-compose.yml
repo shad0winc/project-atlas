@@ -338,7 +338,7 @@ services:
     restart: unless-stopped
 
   dozzle:
-    image: amir20/dozzle:latest
+    image: "amir20/dozzle@sha256:a70238909232f61ebcfdc4617200cb32872be481a51d8c65cc56c4f261ba66ca"
     container_name: dozzle
     networks:
       - atlas
