@@ -627,7 +627,7 @@ export function SportsPageClient(): React.ReactElement {
         <SportsRequestView
           events={events}
           followedEvents={followedEvents}
-          follows={follows}
+          follows={follows.filter((follow) => follow.type !== "channel")}
           liveAvailabilityByEvent={liveAvailabilityByEvent}
           onBrowse={handleBrowse}
           onWatchLive={handleWatchLive}

@@ -4,6 +4,16 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SportsLiveChannels } from "./SportsLiveChannels";
 import { loadSportsLiveChannels } from "../services/liveChannels";
+import {
+  loadSportsFollows,
+  followSports,
+  unfollowSports,
+} from "../services/sports";
+vi.mock("../services/sports", () => ({
+  loadSportsFollows: vi.fn(),
+  followSports: vi.fn(),
+  unfollowSports: vi.fn(),
+}));
 vi.mock("../services/liveChannels", () => ({
   loadSportsLiveChannels: vi.fn(),
 }));
@@ -23,6 +33,7 @@ async function flush() {
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   vi.mocked(loadSportsLiveChannels).mockResolvedValue([ready]);
+  vi.mocked(loadSportsFollows).mockResolvedValue([]);
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -110,4 +121,141 @@ describe("standalone live channel discovery", () => {
     expect(watch).toHaveBeenCalledTimes(1);
     await act(async () => resolve());
   });
+});
+
+const persisted = {
+  subscriptionId: "sub-redzone",
+  type: "channel" as const,
+  provider: "atlas",
+  providerId: ready.atlasChannelId,
+  name: ready.name,
+  userId: "user-one",
+  enabled: true,
+  record: false,
+  createdAt: null,
+};
+function button(label: string) {
+  return Array.from(container.querySelectorAll("button")).find(
+    (item) => item.textContent === label,
+  )!;
+}
+async function search(query: string) {
+  await act(async () => {
+    const input = container.querySelector('input[type="search"]')!;
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )!.set!.call(input, query);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+describe("durable channel follows", () => {
+  it("saves the stable channel identity without starting playback and removes it after unfollow", async () => {
+    vi.mocked(followSports).mockResolvedValue(persisted);
+    const watch = await mount();
+    await act(async () => button("Follow").click());
+    expect(followSports).toHaveBeenCalledWith("channel", ready.atlasChannelId);
+    expect(button("Unfollow")).toBeDefined();
+    expect(watch).not.toHaveBeenCalled();
+    await act(async () => button("Unfollow").click());
+    expect(unfollowSports).toHaveBeenCalledWith("sub-redzone");
+    expect(button("Follow")).toBeDefined();
+  });
+  it("loads persisted follows and supports followed-only filtering", async () => {
+    vi.mocked(loadSportsFollows).mockResolvedValue([persisted]);
+    vi.mocked(loadSportsLiveChannels).mockResolvedValue([
+      ready,
+      { ...ready, name: "NBA TV", atlasChannelId: "sports-live-nba-tv" },
+    ]);
+    await mount();
+    expect(container.textContent).toContain("NBA TV");
+    expect(button("Unfollow")).toBeDefined();
+    await act(async () =>
+      (
+        container.querySelector('input[type="checkbox"]') as HTMLInputElement
+      ).click(),
+    );
+    expect(container.textContent).toContain("NFL RedZone");
+    expect(container.textContent).not.toContain("NBA TV");
+    expect(followSports).not.toHaveBeenCalled();
+  });
+  it("keeps disappeared saved channels removable without offering playback", async () => {
+    vi.mocked(loadSportsLiveChannels).mockResolvedValue([]);
+    vi.mocked(loadSportsFollows).mockResolvedValue([persisted]);
+    await mount();
+    expect(container.textContent).toContain("Channel currently unavailable");
+    expect(button("Watch Live")).toBeUndefined();
+    await act(async () => button("Unfollow").click());
+    expect(unfollowSports).toHaveBeenCalledWith("sub-redzone");
+    expect(container.textContent).not.toContain("NFL RedZone");
+  });
+  it("preserves saved state when unfollow fails", async () => {
+    vi.mocked(loadSportsFollows).mockResolvedValue([persisted]);
+    vi.mocked(unfollowSports).mockRejectedValue(new Error("offline"));
+    await mount();
+    await act(async () => button("Unfollow").click());
+    expect(button("Unfollow")).toBeDefined();
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      "Refresh to check",
+    );
+  });
+  it("does not allow duplicate in-flight follow changes", async () => {
+    let resolve!: (value: typeof persisted) => void;
+    vi.mocked(followSports).mockImplementation(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    );
+    await mount();
+    await act(async () => {
+      button("Follow").click();
+    });
+    expect(button("Saving...").disabled).toBe(true);
+    expect(followSports).toHaveBeenCalledTimes(1);
+    await act(async () => resolve(persisted));
+    expect(button("Unfollow")).toBeDefined();
+  });
+  it("shows a follow-read failure instead of pretending no saved channels exist", async () => {
+    vi.mocked(loadSportsFollows).mockRejectedValue(new Error("offline"));
+    await mount();
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    expect(button("Follow")).toBeUndefined();
+    expect(followSports).not.toHaveBeenCalled();
+  });
+  it.each([
+    ["Red Zone", "NFL RedZone"],
+    ["nba", "NBA TV"],
+    ["MLB", "MLB Network"],
+    ["nhl", "NHL Network"],
+    ["soccer", "Soccer Live"],
+    ["thursday night", "Thursday Night Football"],
+    ["monday night", "Monday Night Football"],
+  ])(
+    "searches all registered league channels for %s",
+    async (query, expected) => {
+      const names = [
+        "NFL RedZone",
+        "NBA TV",
+        "MLB Network",
+        "NHL Network",
+        "Soccer Live",
+        "Thursday Night Football",
+        "Monday Night Football",
+      ];
+      vi.mocked(loadSportsLiveChannels).mockResolvedValue(
+        names.map((name, index) => ({
+          atlasChannelId: `sports-live-fixture-${index}`,
+          name,
+          playbackConfigured: true,
+        })),
+      );
+      const watch = await mount();
+      await search(query);
+      expect(container.querySelectorAll("li")).toHaveLength(1);
+      expect(container.querySelector("li")?.textContent).toContain(expected);
+      expect(watch).not.toHaveBeenCalled();
+    },
+  );
 });

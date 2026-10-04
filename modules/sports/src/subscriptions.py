@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 from datetime import datetime, timezone
@@ -20,6 +21,7 @@ VALID_SUBSCRIPTION_TYPES = {
     "event",
     "team",
     "league",
+    "channel",
 }
 
 
@@ -256,6 +258,12 @@ def normalize_subscription(
             "Subscription ID is required"
         )
 
+    if subscription_type == "channel" and (
+        provider != "atlas"
+        or not re.fullmatch(r"sports-live-[A-Za-z0-9_.:-]+", subscription_id)
+    ):
+        raise ValueError("Channel follows require a stable Atlas channel identity")
+
     return {
         "subscription_id": str(
             subscription.get(
@@ -287,7 +295,7 @@ def normalize_subscription(
         # Recording is explicit opt-in. Legacy subscriptions that predate
         # this field normalize to False so following/requesting content can
         # never silently become recording intent after an upgrade.
-        "record": bool(
+        "record": subscription_type != "channel" and bool(
             subscription.get(
                 "record",
                 False,
