@@ -322,7 +322,7 @@ def list_sports_follows(
     return SportsFollowListResponse(subscriptions=[_follow_response(item) for item in items])
 
 
-@router.post("/follows", response_model=SportsFollowResponse, status_code=status.HTTP_201_CREATED, summary="Follow a Sports event, team, or league")
+@router.post("/follows", response_model=SportsFollowResponse, status_code=status.HTTP_201_CREATED, summary="Follow a Sports event, team, league, or live channel")
 def create_sports_follow(
     request: SportsFollowCreateRequest,
     response: Response,
@@ -330,17 +330,26 @@ def create_sports_follow(
     service: Annotated[SportsAPIService, Depends(get_sports_api_service)],
 ) -> SportsFollowResponse:
     subscription_type = request.type.strip().lower()
-    if subscription_type not in {"event", "team", "league"}:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Sports follow type must be event, team, or league.")
+    if subscription_type not in {"event", "team", "league", "channel"}:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Sports follow type must be event, team, league, or channel.")
+    if subscription_type == "channel" and request.provider != "atlas":
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Live channel follows require the Atlas catalog.")
+    response.headers["Cache-Control"] = "no-store"
     try:
+        if subscription_type == "channel":
+            from atlas_api.services.live_channel_discovery import discover_live_channels
+
+            channels = discover_live_channels(service.list_live_sources(), [])
+            if not any(channel["atlas_channel_id"] == request.provider_id for channel in channels):
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Live channel was not found.")
         subscription, created = service.create_follow_subscription(
             user_id=current_user.user_id,
             provider_name=request.provider,
             subscription_type=subscription_type,
             provider_id=request.provider_id,
         )
-    except SportsWriterTransportError as error:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+    except (SportsWriterTransportError, ValueError) as error:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Sports follow could not be saved. Please refresh and try again.") from error
     if not created:
         response.status_code = status.HTTP_200_OK
     return _follow_response(subscription)

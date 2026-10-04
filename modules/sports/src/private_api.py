@@ -1447,8 +1447,26 @@ class Handler(BaseHTTPRequestHandler):
         else:
             subscription_type = str(payload.get("type", "")).strip().lower()
             target_id = str(payload.get("provider_id", "")).strip()
-        if not user_id or not provider_name or subscription_type not in {"event", "team", "league"} or not target_id:
+        if not user_id or not provider_name or subscription_type not in {"event", "team", "league", "channel"} or not target_id:
             self._json(HTTPStatus.BAD_REQUEST, {"error": "user_id, provider, valid type, and provider id are required."})
+            return
+        if subscription_type == "channel":
+            if provider_name != "atlas":
+                self._json(HTTPStatus.BAD_REQUEST, {"error": "Channel follows require the Atlas catalog."})
+                return
+            try:
+                matches = [source for source in default_live_source_registry().list_sources()
+                           if source.standalone and source.atlas_channel_id == target_id]
+                if len(matches) != 1:
+                    self._json(HTTPStatus.NOT_FOUND, {"code": "sports_target_not_found", "error": "Live channel was not found."})
+                    return
+                subscription, created = create_subscription(
+                    "channel", "atlas", target_id, matches[0].name, user_id,
+                )
+            except Exception:
+                self._backend_unavailable()
+                return
+            self._json(HTTPStatus.OK, {"subscription": subscription, "created": created})
             return
         try:
             provider = _provider(provider_name)

@@ -545,9 +545,9 @@ export async function searchSports(
 }
 
 export async function loadSportsFollows(options: SportsRequestOptions = {}): Promise<readonly SportsFollow[]> { return createSportsFollowCollection(await authenticatedAtlasApiRequest<SportsFollowCollectionTransport>("/sports/follows", { method: "GET", cache: "no-store", signal: options.signal })); }
-export async function followSports(type: "event" | "team" | "league", providerId: string, options: SportsRequestOptions = {}): Promise<SportsFollow> {
+export async function followSports(type: "event" | "team" | "league" | "channel", providerId: string, options: SportsRequestOptions = {}): Promise<SportsFollow> {
   const id=providerId.trim(); if (!id) throw new Error("sportsFollow.providerId must not be empty.");
-  return createSportsFollow(await authenticatedAtlasApiRequest<SportsFollowTransport>("/sports/follows", { method: "POST", cache: "no-store", signal: options.signal, body: { type, provider: "thesportsdb", provider_id: id }, retryPolicy: { maxRetries: 0, baseDelayMs: 250, maxDelayMs: 5000 } }));
+  return createSportsFollow(await authenticatedAtlasApiRequest<SportsFollowTransport>("/sports/follows", { method: "POST", cache: "no-store", signal: options.signal, body: { type, provider: type === "channel" ? "atlas" : "thesportsdb", provider_id: id }, retryPolicy: { maxRetries: 0, baseDelayMs: 250, maxDelayMs: 5000 } }));
 }
 export async function unfollowSports(subscriptionId: string, options: SportsRequestOptions = {}): Promise<void> {
   const id=subscriptionId.trim(); if (!id) throw new Error("sportsFollow.subscriptionId must not be empty.");

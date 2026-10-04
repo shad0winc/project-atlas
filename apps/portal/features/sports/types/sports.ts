@@ -51,7 +51,7 @@ export type SportsEntitySearchResult = Readonly<{ kind: "team" | "league"; id: s
 export type SportsEventSearchResult = Readonly<{ kind: "event"; id: string; provider: string; name: string; sport: string; league: string; startAt: string; status: string; requested: boolean; }>;
 export type SportsSearchResult = SportsEntitySearchResult | SportsEventSearchResult;
 export type SportsSearchCollectionTransport = Readonly<{ results: readonly Readonly<{ id: string; name: string; sport?: string; league?: string; }>[]; }>;
-export type SportsFollow = Readonly<{ subscriptionId: string; type: "event" | "team" | "league"; provider: string; providerId: string; name: string; userId: string; enabled: boolean; record: boolean; createdAt: string | null; }>;
+export type SportsFollow = Readonly<{ subscriptionId: string; type: "event" | "team" | "league" | "channel"; provider: string; providerId: string; name: string; userId: string; enabled: boolean; record: boolean; createdAt: string | null; }>;
 export type SportsFollowTransport = Readonly<{ subscription_id: string; type: string; provider: string; provider_id: string; name: string; user_id: string; enabled: boolean; record?: boolean; created_at?: string | null; }>;
 export type SportsFollowCollectionTransport = Readonly<{ subscriptions: readonly SportsFollowTransport[]; }>;
 
@@ -143,7 +143,8 @@ export function createSportsEventSearchCollection(
 }
 export function createSportsFollow(input: SportsFollowTransport): SportsFollow {
   const type = requiredText(input.type, "sportsFollow.type");
-  if (type !== "event" && type !== "team" && type !== "league") throw new Error("sportsFollow.type must be event, team, or league.");
+  if (type !== "event" && type !== "team" && type !== "league" && type !== "channel") throw new Error("sportsFollow.type must be event, team, league, or channel.");
+  if (type === "channel" && (input.provider !== "atlas" || !/^sports-live-[A-Za-z0-9_.:-]+$/.test(input.provider_id) || input.record)) throw new Error("Invalid live channel follow.");
   return Object.freeze({ subscriptionId: requiredText(input.subscription_id, "sportsFollow.subscriptionId"), type, provider: requiredText(input.provider, "sportsFollow.provider"), providerId: requiredText(input.provider_id, "sportsFollow.providerId"), name: requiredText(input.name, "sportsFollow.name"), userId: requiredText(input.user_id, "sportsFollow.userId"), enabled: Boolean(input.enabled), record: Boolean(input.record), createdAt: input.created_at ? normalizedTimestamp(input.created_at, "sportsFollow.createdAt") : null });
 }
 export function createSportsFollowCollection(input: SportsFollowCollectionTransport): readonly SportsFollow[] { return Object.freeze(input.subscriptions.map(createSportsFollow)); }
