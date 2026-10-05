@@ -22,7 +22,7 @@ from .reconciler import (
     reconcile_active_requests,
 )
 from .service import MediaRequestService
-from .construction import build_request_service, open_request_repository
+from .construction import build_request_service, open_request_repository, validate_default_acquisition_activation
 from .submission_recovery import SubmissionRecoveryService
 from .submission_reconciler import SubmissionRecoveryOutcome, reconcile_submission_receipts
 
@@ -84,6 +84,7 @@ def build_default_service() -> MediaRequestService:
         )
 
     repository = open_request_repository(root_value)
+    validate_default_acquisition_activation(repository)
 
     provider: MediaRequestProvider = (
         default_jellyseerr_media_request_provider()
