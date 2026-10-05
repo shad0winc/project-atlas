@@ -27,3 +27,11 @@ export async function loadSportsPlaybackOptions(channelId: string, signal?: Abor
   });
   return parseSportsPlaybackOptions(payload);
 }
+
+export function preferredSportsPlaybackOption(options: readonly SportsPlaybackOption[]): SportsPlaybackOption["optionId"] | undefined {
+  const primary = options[0];
+  if (primary === undefined) return undefined;
+  if (primary.optionId !== "primary" || !primary.configured)
+    throw new Error("Primary playback setup is pending.");
+  return primary.optionId;
+}

@@ -36,7 +36,7 @@ import { followedLiveEvents } from "../../../../features/sports/services/current
 import { SportsCurrentlyLive } from "../../../../features/sports/components/SportsCurrentlyLive";
 import { SportsLiveChannels } from "../../../../features/sports/components/SportsLiveChannels";
 
-import { loadSportsPlaybackOptions, type SportsPlaybackOption } from "../../../../features/sports/services/playbackOptions";
+import { loadSportsPlaybackOptions, preferredSportsPlaybackOption, type SportsPlaybackOption } from "../../../../features/sports/services/playbackOptions";
 import { replaceSportsLiveSession } from "../../../../features/sports/services/replaceLiveSession";
 import { SportsPlaybackChoices } from "../../../../features/sports/components/SportsPlaybackChoices";
 
@@ -97,6 +97,7 @@ export function SportsPageClient(): React.ReactElement {
 
   const liveRequestVersionRef = useRef(0);
   const liveStartLock = useRef(false);
+  const [liveBusy, setLiveBusy] = useState(false);
   const choicesRequest = useRef(0);
   const [playbackChoices, setPlaybackChoices] = useState<Readonly<{
     channelId: string;
@@ -164,22 +165,26 @@ export function SportsPageClient(): React.ReactElement {
   }
 
   async function handleWatchLive(atlasChannelId: string): Promise<void> {
+    if (liveStartLock.current) return;
     const generation = ++choicesRequest.current;
+    setLiveBusy(true);
     setLivePlaybackError(null);
     try {
       const options = await loadSportsPlaybackOptions(atlasChannelId);
       if (generation !== choicesRequest.current) return;
-      if (options.length > 1) setPlaybackChoices({ channelId: atlasChannelId, options });
-      else if (options.length === 1 && !options[0].configured) throw new Error("Playback setup is pending.");
-      else await openLivePlayback(atlasChannelId, options[0]?.optionId);
+      setPlaybackChoices({ channelId: atlasChannelId, options });
+      await openLivePlayback(atlasChannelId, preferredSportsPlaybackOption(options));
     } catch {
       if (generation === choicesRequest.current) setLivePlaybackError("Playback choices or the selected feed are temporarily unavailable.");
+    } finally {
+      if (generation === choicesRequest.current) setLiveBusy(false);
     }
   }
 
   async function openLivePlayback(atlasChannelId: string, optionId?: string): Promise<void> {
     if (liveStartLock.current) throw new Error("A live playback change is already in progress.");
     liveStartLock.current = true;
+    setLiveBusy(true);
     const requestVersion = liveRequestVersionRef.current + 1;
 
     liveRequestVersionRef.current = requestVersion;
@@ -204,6 +209,7 @@ export function SportsPageClient(): React.ReactElement {
       throw watchError;
     } finally {
       liveStartLock.current = false;
+      setLiveBusy(false);
     }
 
     if (liveRequestVersionRef.current !== requestVersion) {
@@ -242,6 +248,7 @@ export function SportsPageClient(): React.ReactElement {
 
     if (liveStartLock.current) throw new Error("A live playback change is already in progress.");
     liveStartLock.current = true;
+    setLiveBusy(true);
     let replacement: SportsLiveSessionResult;
     try {
       replacement = await replaceSportsLiveSession({
@@ -251,7 +258,7 @@ export function SportsPageClient(): React.ReactElement {
     } catch (error) {
       setActiveLiveSession(null);
       throw error;
-    } finally { liveStartLock.current = false; }
+    } finally { liveStartLock.current = false; setLiveBusy(false); }
 
     if (
       liveRequestVersionRef.current !== requestVersion
@@ -549,13 +556,6 @@ export function SportsPageClient(): React.ReactElement {
       permission={sportsRoute.permission}
       title="Sports"
     >
-      {playbackChoices ? <SportsPlaybackChoices key={playbackChoices.channelId}
-        options={playbackChoices.options}
-        onCancel={() => { choicesRequest.current += 1; setPlaybackChoices(null); }}
-        onChoose={async optionId => {
-          await openLivePlayback(playbackChoices.channelId, optionId);
-          setPlaybackChoices(null);
-        }} /> : null}
       {livePlaybackError !== null ? (
         <section
           aria-label="Sports live playback error"
@@ -565,28 +565,26 @@ export function SportsPageClient(): React.ReactElement {
         </section>
       ) : null}
 
-      {activeLiveSession !== null ? (
-        <section
-          aria-label="Sports live playback"
-          className="requests-message-panel"
-        >
-          <div className="requests-toolbar">
-            <button
-              aria-label="Close live playback"
-              className="requests-refresh-button"
-              onClick={closeLivePlayback}
-              type="button"
-            >
-              Close live playback
-            </button>
-          </div>
-
-          <button type="button" onClick={() => { void handleWatchLive(activeLiveSession.atlasChannelId); }}>Change feed</button>
-          <AtlasTheaterPlayer
-            key={activeLiveSession.atlasChannelId}
-            session={activeLiveSession.session}
-            sessionResolver={resolveSportsLiveSession}
+      {activeLiveSession !== null || playbackChoices !== null ? (
+        <section aria-label="Sports live playback" className="requests-message-panel">
+          <SportsPlaybackChoices
+            options={playbackChoices?.options ?? []}
+            activeOptionId={activeLiveSession?.playbackOptionId}
+            busy={liveBusy}
+            onCancel={closeLivePlayback}
+            onChoose={async optionId => {
+              const channelId = playbackChoices?.channelId ?? activeLiveSessionRef.current?.atlasChannelId;
+              if (!channelId) return;
+              await openLivePlayback(channelId, optionId);
+            }}
           />
+          {activeLiveSession !== null ? (
+            <AtlasTheaterPlayer
+              key={activeLiveSession.atlasChannelId}
+              session={activeLiveSession.session}
+              sessionResolver={resolveSportsLiveSession}
+            />
+          ) : null}
         </section>
       ) : null}
 
