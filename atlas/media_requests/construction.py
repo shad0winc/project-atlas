@@ -17,6 +17,7 @@ from .provider import MediaRequestProvider
 from .repository import JsonMediaRequestRepository, MediaRequestRepositoryError
 from .service import EventPublisher, MediaRequestService
 from .submission_recovery import SubmissionRecoveryRepository, SubmissionRecoveryService
+from .submission_events import SubmissionEventJournalPublisher
 
 
 def open_request_repository(root: str | Path) -> JsonMediaRequestRepository:
@@ -60,9 +61,9 @@ def build_request_service(
     event_publisher: EventPublisher | None = None,
 ) -> MediaRequestService:
     """Pair every consumer with the service required by its repository."""
-    service_type = (
-        SubmissionRecoveryService
-        if isinstance(repository, SubmissionRecoveryRepository)
-        else MediaRequestService
-    )
-    return service_type(repository, providers, event_publisher=event_publisher)
+    if isinstance(repository, SubmissionRecoveryRepository):
+        return SubmissionRecoveryService(
+            repository, providers, event_publisher=event_publisher,
+            submission_event_publisher=SubmissionEventJournalPublisher.from_environment().publish,
+        )
+    return MediaRequestService(repository, providers, event_publisher=event_publisher)

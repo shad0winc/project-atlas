@@ -292,10 +292,13 @@ class SubmissionRecoveryRepository(JsonMediaRequestRepository):
 class SubmissionRecoveryService(MediaRequestService):
     """Opt-in acquisition service. Uncertain receipt-free attempts stay blocked."""
 
-    def __init__(self, repository, providers, **kwargs):
+    def __init__(self, repository, providers, *, submission_event_publisher=None, **kwargs):
         if not isinstance(repository, SubmissionRecoveryRepository):
             raise MediaRequestServiceError("Submission recovery requires its versioned repository")
         super().__init__(repository, providers, **kwargs)
+        if submission_event_publisher is not None and not callable(submission_event_publisher):
+            raise MediaRequestServiceError("Submission event publisher must be callable")
+        self._submission_event_publisher = submission_event_publisher
 
     def submit_request(self, request_id):
         request = self.get_request(request_id)
@@ -348,13 +351,18 @@ class SubmissionRecoveryService(MediaRequestService):
             raise MediaRequestServiceError("Submission receipt remains unverified") from None
 
     def drain_submission_events(self):
-        """At-least-once delivery; consumers must deduplicate stable metadata IDs."""
-        if self._event_publisher is None:
+        """Acknowledge only verified publication; retain failures for reconciliation.
+
+        Production factories supply the shared replay-safe publisher. Explicit
+        service callers can still inject their own publication contract.
+        """
+        publisher = self._submission_event_publisher or self._event_publisher
+        if publisher is None:
             return 0
         delivered = 0
         for event_id, event in self.repository.pending_submission_events().items():
             try:
-                self._event_publisher(event["event"], event["payload"])
+                publisher(event["event"], event["payload"])
                 self.repository.acknowledge_submission_event(event_id)
                 delivered += 1
             except Exception:
