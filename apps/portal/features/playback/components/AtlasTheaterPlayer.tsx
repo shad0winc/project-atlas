@@ -10,6 +10,7 @@ import { resolvePlaybackSession } from "../services/session";
 import type { SubtitleSelection } from "../services/session";
 import { bootstrapPlaybackStream } from "../services/stream";
 import { refreshPlaybackForRetry, retryResumePosition } from "../services/retry";
+import { safeLiveSeekPosition } from "../services/live-seek";
 import { nextEpisodeTarget } from "../services/episode-navigation";
 import { readResume, resumeKey, restoreContinuity, writeResume } from "../services/continuity";
 import type { PlaybackSession, PlaybackTrack } from "../types/session";
@@ -153,6 +154,7 @@ export function AtlasTheaterPlayer({
     let restoring = false;
     let restored = false;
     let lastSaved = 0;
+    let lastLivePosition: number | null = null;
     setAutoplayBlocked(false);
     const savePosition = () => {
       if (!restored) return;
@@ -174,7 +176,17 @@ export function AtlasTheaterPlayer({
       savePosition();
       if (restored && !disposed) shouldPlayRef.current = false;
     };
+    const guardLiveSeek = () => {
+      if (disposed || activeSession.sourceType !== "live") return;
+      const target = safeLiveSeekPosition(video, video.currentTime) ?? lastLivePosition;
+      if (target !== null && Math.abs(video.currentTime - target) > 0.05) {
+        try { video.currentTime = target; } catch { /* The live window may be moving. */ }
+      }
+    };
     const updatePosition = () => {
+      if (activeSession.sourceType === "live" && !video.seeking && Number.isFinite(video.currentTime)) {
+        lastLivePosition = video.currentTime;
+      }
       void restorePlaybackPosition();
       if (Date.now() - lastSaved >= 5000) { savePosition(); lastSaved = Date.now(); }
     };
@@ -182,6 +194,7 @@ export function AtlasTheaterPlayer({
       video.addEventListener(event, restorePlaybackPosition);
     }
     video.addEventListener("timeupdate", updatePosition);
+    video.addEventListener("seeking", guardLiveSeek);
     video.addEventListener("pause", pausePlayback);
     video.addEventListener("ended", savePosition);
     window.addEventListener("pagehide", savePosition);
@@ -270,6 +283,7 @@ export function AtlasTheaterPlayer({
         video.removeEventListener(event, restorePlaybackPosition);
       }
       video.removeEventListener("timeupdate", updatePosition);
+      video.removeEventListener("seeking", guardLiveSeek);
       video.removeEventListener("pause", pausePlayback);
       video.removeEventListener("ended", savePosition);
       window.removeEventListener("pagehide", savePosition);
@@ -371,6 +385,9 @@ export function AtlasTheaterPlayer({
 
       <div className="atlas-theater-player-meta">
         <span>Powered by Jellyfin</span>
+        {activeSession.sourceType === "live" ? (
+          <span>Live seeking keeps a seven-second buffer.</span>
+        ) : null}
         {autoplayBlocked ? (
           <div role="status">
             <span>Playback is paused. </span>
