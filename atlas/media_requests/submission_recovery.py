@@ -299,6 +299,7 @@ class SubmissionRecoveryService(MediaRequestService):
         if submission_event_publisher is not None and not callable(submission_event_publisher):
             raise MediaRequestServiceError("Submission event publisher must be callable")
         self._submission_event_publisher = submission_event_publisher
+        self._submission_event_attempts = 0
 
     def submit_request(self, request_id):
         request = self.get_request(request_id)
@@ -350,17 +351,28 @@ class SubmissionRecoveryService(MediaRequestService):
         except Exception:
             raise MediaRequestServiceError("Submission receipt remains unverified") from None
 
-    def drain_submission_events(self):
+    @property
+    def submission_event_attempts(self):
+        """Publication attempts in this service's most recent drain pass."""
+        return self._submission_event_attempts
+
+    def drain_submission_events(self, *, limit=100, offset=0):
         """Acknowledge only verified publication; retain failures for reconciliation.
 
         Production factories supply the shared replay-safe publisher. Explicit
         service callers can still inject their own publication contract.
         """
+        self._submission_event_attempts = 0
+        from .submission_batches import submission_batch
+        events = submission_batch(
+            self.repository.pending_submission_events().items(), limit=limit, offset=offset,
+        )
         publisher = self._submission_event_publisher or self._event_publisher
         if publisher is None:
             return 0
         delivered = 0
-        for event_id, event in self.repository.pending_submission_events().items():
+        for event_id, event in events:
+            self._submission_event_attempts += 1
             try:
                 publisher(event["event"], event["payload"])
                 self.repository.acknowledge_submission_event(event_id)
