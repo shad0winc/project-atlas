@@ -83,7 +83,7 @@ export function AtlasTheaterPlayer({
 }): React.ReactElement {
   const videoRef = useRef<HTMLVideoElement>(null);
   const resumeAtRef = useRef<number | null>(null);
-  const shouldPlayRef = useRef(session.sourceType !== "live");
+  const shouldPlayRef = useRef(true);
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const retryRequestRef = useRef<AbortController | null>(null);
 
