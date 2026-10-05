@@ -4,8 +4,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 PRIVATE_API = ROOT / "modules" / "sports" / "src" / "private_api.py"
-EXPECTED = {"provider","provider_event_id","name","sport","league","start_at","status","requested"}
-FORBIDDEN = {"id","provider_league_id","home_team","away_team","home_team_id","away_team_id","duration_minutes","stream_url"}
+EXPECTED = {"provider","provider_event_id","name","sport","league","start_at","status","requested","provider_league_id","home_team_id","away_team_id"}
+FORBIDDEN = {"id","home_team","away_team","duration_minutes","stream_url"}
 
 def _safe_event_keys() -> set[str]:
     tree = ast.parse(PRIVATE_API.read_text(encoding="utf-8"))

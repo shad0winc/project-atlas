@@ -130,6 +130,9 @@ def test_list_sports_events_is_authenticated_user_scoped() -> None:
                 "start_at": "2026-08-17T20:00:00Z",
                 "status": "scheduled",
                 "requested": False,
+                "provider_league_id": None,
+                "home_team_id": None,
+                "away_team_id": None,
             }
         ]
     }

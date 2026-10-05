@@ -608,9 +608,15 @@ class TheSportsDBProvider(SportsProvider):
         ] = {}
 
         for team_id in team_ids or []:
-            for event in self.fetch_team_events(
-                team_id
-            ):
+            # A game may move out of the next-events list as it starts.
+            # Recent events contribute only provider-reported live games.
+            recent_response = self.request_json("eventslast.php", {"id": team_id})
+            recent = recent_response.get("results") or recent_response.get("events") or []
+            live_recent = [
+                event for event in recent
+                if isinstance(event, dict) and self.normalize_status(event) == "live"
+            ]
+            for event in [*self.fetch_team_events(team_id), *live_recent]:
                 event_id = str(
                     event.get(
                         "idEvent",
@@ -741,6 +747,7 @@ class TheSportsDBProvider(SportsProvider):
             "live",
             "in progress",
             "in_progress",
+            "q1", "q2", "q3", "q4", "ht", "ot",
         }:
             return "live"
 

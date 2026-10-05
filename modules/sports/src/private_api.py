@@ -233,6 +233,9 @@ class Handler(BaseHTTPRequestHandler):
             "start_at": event.get("start_at"),
             "status": str(event.get("status", "")).strip(),
             "requested": bool(event.get("requested", False)),
+            "provider_league_id": str(event.get("provider_league_id") or "").strip() or None,
+            "home_team_id": str(event.get("home_team_id") or "").strip() or None,
+            "away_team_id": str(event.get("away_team_id") or "").strip() or None,
         }
 
     @staticmethod

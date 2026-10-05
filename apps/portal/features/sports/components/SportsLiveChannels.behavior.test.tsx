@@ -51,6 +51,56 @@ async function mount(watch = vi.fn(async () => {})) {
   return watch;
 }
 describe("standalone live channel discovery", () => {
+  it("uses Events search and the page's channel follows without a duplicate save-state read", async () => {
+    const changed = vi.fn(async () => {});
+    const channelFollow = {
+      subscriptionId: "channel-save",
+      type: "channel" as const,
+      provider: "atlas",
+      providerId: ready.atlasChannelId,
+      name: ready.name,
+      userId: "owner",
+      enabled: true,
+      record: false,
+      createdAt: null,
+    };
+    await act(async () =>
+      root.render(
+        <SportsLiveChannels
+          onWatchLive={vi.fn(async () => {})}
+          searchQuery="Red Zone"
+          managedFollows={[channelFollow]}
+          onFollowsChanged={changed}
+        />,
+      ),
+    );
+    await flush();
+    expect(container.textContent).toContain("NFL RedZone");
+    expect(container.textContent).toContain("Schedule unavailable");
+    expect(container.querySelector("input")).toBeNull();
+    expect(loadSportsFollows).not.toHaveBeenCalled();
+    const unfollow = container.querySelector(
+      '[aria-label="Unfollow NFL RedZone"]',
+    ) as HTMLButtonElement;
+    await act(async () => unfollow.click());
+    await flush();
+    expect(unfollowSports).toHaveBeenCalledWith("channel-save");
+    expect(changed).toHaveBeenCalledOnce();
+    await act(async () =>
+      root.render(
+        <SportsLiveChannels
+          onWatchLive={vi.fn(async () => {})}
+          searchQuery="Monday Night Football"
+          managedFollows={[]}
+          onFollowsChanged={changed}
+        />,
+      ),
+    );
+    expect(container.textContent).toContain(
+      "No live channels match your search.",
+    );
+  });
+
   it("finds RedZone including the spaced search spelling without opening playback", async () => {
     const watch = await mount();
     await act(async () => {
