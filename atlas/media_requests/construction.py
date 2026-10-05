@@ -67,3 +67,19 @@ def build_request_service(
             submission_event_publisher=SubmissionEventJournalPublisher.from_environment().publish,
         )
     return MediaRequestService(repository, providers, event_publisher=event_publisher)
+
+
+def validate_default_acquisition_activation(repository: JsonMediaRequestRepository) -> None:
+    """Require explicit schema-2/recovery preparation before default routing opt-in.
+
+    No configuration/provider access and no state writes occur in this guard.
+    This cannot establish that other deployed processes have matching settings.
+    """
+    from .providers.acquisition_config import acquisition_routing_enabled
+    from .provider import MediaRequestProviderError
+
+    if not acquisition_routing_enabled():
+        return
+    if (not isinstance(repository, SubmissionRecoveryRepository)
+            or os.getenv("ATLAS_SUBMISSION_RECOVERY_ENABLED", "0").strip() != "1"):
+        raise MediaRequestProviderError("Acquisition routing requires schema 2 and receipt recovery opt-in")

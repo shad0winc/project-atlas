@@ -812,6 +812,23 @@ def default_jellyseerr_media_request_provider(
         port = os.getenv("JELLYSEERR_PORT", "5055").strip() or "5055"
         base_url = f"http://{host}:{port}"
 
+    from .acquisition_config import acquisition_routing_enabled, configured_acquisition_provider
+
+    if acquisition_routing_enabled():
+        return configured_acquisition_provider(
+            base_url=base_url,
+            api_key=os.getenv("ATLAS_JELLYSEERR_API_KEY", ""),
+            category_servers={
+                category: _environment_server_id(name)
+                for category, name in (
+                    ("movie", "ATLAS_JELLYSEERR_MOVIE_SERVER_ID"),
+                    ("tv", "ATLAS_JELLYSEERR_TV_SERVER_ID"),
+                    ("anime_movie", "ATLAS_JELLYSEERR_ANIME_MOVIE_SERVER_ID"),
+                    ("anime_tv", "ATLAS_JELLYSEERR_ANIME_TV_SERVER_ID"),
+                )
+            },
+        )
+
     return JellyseerrMediaRequestProvider(
         base_url=base_url,
         api_key=os.getenv("ATLAS_JELLYSEERR_API_KEY", ""),

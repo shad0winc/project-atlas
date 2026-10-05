@@ -22,7 +22,7 @@ from atlas.media_requests import (
 )
 
 from atlas_api.events import RuntimeEventJournalPublisher
-from atlas.media_requests.construction import build_request_service, open_request_repository
+from atlas.media_requests.construction import build_request_service, open_request_repository, validate_default_acquisition_activation
 
 
 DEFAULT_REQUESTS_ROOT = Path(
@@ -288,6 +288,7 @@ def build_default_media_requests_api_service(
 
     try:
         repository = open_request_repository(root_value)
+        validate_default_acquisition_activation(repository)
         provider = (
             default_jellyseerr_media_request_provider()
         )
