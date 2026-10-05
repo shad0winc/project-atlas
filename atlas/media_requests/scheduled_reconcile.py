@@ -19,8 +19,8 @@ from .reconciler import (
     ReconciliationOutcome,
     reconcile_active_requests,
 )
-from .repository import JsonMediaRequestRepository
 from .service import MediaRequestService
+from .construction import build_request_service, open_request_repository
 
 
 DEFAULT_REQUESTS_ROOT = Path(
@@ -61,15 +61,13 @@ def build_default_service() -> MediaRequestService:
             "ATLAS_REQUESTS_DIR is required"
         )
 
-    repository = JsonMediaRequestRepository(
-        root_value,
-    )
+    repository = open_request_repository(root_value)
 
     provider: MediaRequestProvider = (
         default_jellyseerr_media_request_provider()
     )
 
-    return MediaRequestService(
+    return build_request_service(
         repository,
         (provider,),
         event_publisher=_publish_request_event,

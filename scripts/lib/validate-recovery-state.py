@@ -138,9 +138,9 @@ def _validate_dislikes(identity_root: Path) -> str:
 
 
 def _validate_requests(root: Path) -> str:
-    from atlas.media_requests.repository import JsonMediaRequestRepository
+    from atlas.media_requests.construction import open_request_repository
 
-    requests = JsonMediaRequestRepository(root).list()
+    requests = open_request_repository(root).list()
     return f"{len(requests)} requests"
 
 
