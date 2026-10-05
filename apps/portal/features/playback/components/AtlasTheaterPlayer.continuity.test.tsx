@@ -125,6 +125,52 @@ describe("mounted player continuity",()=>{
     expect(playing).toBe(false);
     expect(play).toHaveBeenCalledTimes(previousCalls);
   });
+  it("clamps live scrubbing at both edges without resuming a paused player", async () => {
+    hlsMock.supported=true;
+    await act(async()=>root.render(<AtlasTheaterPlayer session={{...session,sourceType:"live",canSeek:false}}/>));await flush();
+    const video=container.querySelector("video")!;
+    Object.defineProperties(video, {
+      buffered:{configurable:true,value:{length:1,start:()=>0.066733,end:()=>30.047249}},
+      seekable:{configurable:true,value:{length:1,start:()=>0,end:()=>30.096733333333333}}
+    });
+    await act(async()=>video.pause());
+    const previousCalls=play.mock.calls.length;
+    await act(async()=>{video.currentTime=0;video.dispatchEvent(new Event("seeking"));});
+    expect(video.currentTime).toBe(7);
+    await act(async()=>{video.currentTime=30.096733333333333;video.dispatchEvent(new Event("seeking"));});
+    expect(video.currentTime).toBeCloseTo(23.047249);
+    expect(playing).toBe(false);expect(play).toHaveBeenCalledTimes(previousCalls);
+    Object.defineProperties(video, {
+      buffered:{configurable:true,value:{length:1,start:()=>100.2,end:()=>130}},
+      seekable:{configurable:true,value:{length:1,start:()=>100,end:()=>135}}
+    });
+    await act(async()=>{video.currentTime=7;video.dispatchEvent(new Event("seeking"));});
+    expect(video.currentTime).toBeCloseTo(100.45);
+    await act(async()=>root.render(null));await flush();
+    video.currentTime=0;video.dispatchEvent(new Event("seeking"));
+    expect(video.currentTime).toBe(0);
+  });
+  it("leaves library scrubbing unchanged", async () => {
+    await act(async()=>root.render(<AtlasTheaterPlayer session={session}/>));await flush();
+    const video=container.querySelector("video")!;
+    Object.defineProperty(video,"buffered",{configurable:true,value:{length:1,start:()=>0,end:()=>30}});
+    await act(async()=>{video.currentTime=0;video.dispatchEvent(new Event("seeking"));});
+    expect(video.currentTime).toBe(0);
+    await act(async()=>{video.currentTime=499;video.dispatchEvent(new Event("seeking"));});
+    expect(video.currentTime).toBe(499);
+  });
+  it("restores the last playback position when the live window cannot support seeking", async () => {
+    hlsMock.supported=true;
+    await act(async()=>root.render(<AtlasTheaterPlayer session={{...session,sourceType:"live",canSeek:false}}/>));await flush();
+    const video=container.querySelector("video")!;
+    await act(async()=>{video.currentTime=2;video.dispatchEvent(new Event("timeupdate"));});
+    Object.defineProperties(video, {
+      buffered:{configurable:true,value:{length:1,start:()=>0,end:()=>10}},
+      seekable:{configurable:true,value:{length:1,start:()=>0,end:()=>10}}
+    });
+    await act(async()=>{video.currentTime=0;video.dispatchEvent(new Event("seeking"));});
+    expect(video.currentTime).toBe(2);
+  });
   it("reports unsupported playback when neither HLS path is available", async () => {
     vi.mocked(HTMLMediaElement.prototype.canPlayType).mockReturnValue("");
     await act(async()=>root.render(<AtlasTheaterPlayer session={session}/>));await flush();
