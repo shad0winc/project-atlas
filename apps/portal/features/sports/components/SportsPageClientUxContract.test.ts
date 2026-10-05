@@ -96,7 +96,7 @@ describe("Sports page UX coordination", () => {
     );
 
     expect(source).toContain(
-      "Close live playback"
+      "onCancel={closeLivePlayback}"
     );
   });
 
