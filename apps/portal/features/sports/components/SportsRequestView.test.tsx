@@ -12,10 +12,41 @@ const baseProps = {
   onUnfollow: vi.fn(),
   onSetRecording: vi.fn(),
   onBrowse: vi.fn(),
-  onRequestEvent: vi.fn()
+  onRequestEvent: vi.fn(),
 };
 
 describe("SportsRequestView", () => {
+  it("places registered channels inside Events discovery and keeps channel saves manageable", () => {
+    const props = {
+      ...baseProps,
+      events: [],
+      eventChannels: <p>RedZone channel result</p>,
+      follows: [
+        {
+          subscriptionId: "channel-save",
+          type: "channel" as const,
+          provider: "atlas",
+          providerId: "sports-live-nfl-redzone",
+          name: "NFL RedZone",
+          userId: "owner",
+          enabled: true,
+          record: false,
+          createdAt: null,
+        },
+      ],
+    };
+    const events = renderToStaticMarkup(
+      <SportsRequestView {...props} searchType="event" />,
+    );
+    const teams = renderToStaticMarkup(
+      <SportsRequestView {...props} searchType="team" />,
+    );
+    expect(events).toContain("RedZone channel result");
+    expect(events).toContain("Events and channels");
+    expect(events).toContain("Unfollow");
+    expect(teams).not.toContain("RedZone channel result");
+  });
+
   it("renders discovery, following, and upcoming event surfaces", () => {
     const markup = renderToStaticMarkup(
       <SportsRequestView
@@ -29,10 +60,10 @@ describe("SportsRequestView", () => {
             league: "Atlas Test League",
             startAt: "2026-08-17T20:00:00.000Z",
             status: "scheduled",
-            requested: false
-          }
+            requested: false,
+          },
         ]}
-      />
+      />,
     );
 
     expect(markup).toContain("Find your Sports");
@@ -53,10 +84,10 @@ describe("SportsRequestView", () => {
             id: "team-001",
             name: "Atlas United",
             sport: "Soccer",
-            league: "Atlas Test League"
-          }
+            league: "Atlas Test League",
+          },
         ]}
-      />
+      />,
     );
 
     expect(markup).toContain("Atlas United");
@@ -79,10 +110,10 @@ describe("SportsRequestView", () => {
             userId: "usr-001",
             enabled: true,
             record: false,
-            createdAt: "2026-08-30T20:00:00.000Z"
-          }
+            createdAt: "2026-08-30T20:00:00.000Z",
+          },
         ]}
-      />
+      />,
     );
 
     expect(markup).toContain("Following");
@@ -105,7 +136,7 @@ describe("SportsRequestView", () => {
             userId: "usr-001",
             enabled: true,
             record: false,
-            createdAt: "2026-08-30T20:00:00.000Z"
+            createdAt: "2026-08-30T20:00:00.000Z",
           },
           {
             subscriptionId: "sub-event-002",
@@ -116,10 +147,10 @@ describe("SportsRequestView", () => {
             userId: "usr-001",
             enabled: true,
             record: true,
-            createdAt: "2026-08-30T20:00:00.000Z"
-          }
+            createdAt: "2026-08-30T20:00:00.000Z",
+          },
         ]}
-      />
+      />,
     );
 
     expect(markup).toContain("Atlas United vs Atlas City");
@@ -144,8 +175,8 @@ describe("SportsRequestView", () => {
             league: "Atlas Test League",
             startAt,
             status: "scheduled",
-            requested: true
-          }
+            requested: true,
+          },
         ]}
         follows={[
           {
@@ -157,17 +188,15 @@ describe("SportsRequestView", () => {
             userId: "usr-001",
             enabled: true,
             record: false,
-            createdAt: "2026-08-30T20:00:00.000Z"
-          }
+            createdAt: "2026-08-30T20:00:00.000Z",
+          },
         ]}
-      />
+      />,
     );
 
     expect(markup).toContain("Atlas United vs Atlas City");
 
-    expect(
-      markup.split(expectedStart).length - 1
-    ).toBe(2);
+    expect(markup.split(expectedStart).length - 1).toBe(2);
 
     expect(markup).toContain("Record event");
     expect(markup).toContain("Unfollow");
@@ -190,8 +219,8 @@ describe("SportsRequestView", () => {
             league: "NFL",
             startAt,
             status: "scheduled",
-            requested: true
-          }
+            requested: true,
+          },
         ]}
         follows={[
           {
@@ -203,10 +232,10 @@ describe("SportsRequestView", () => {
             userId: "usr-001",
             enabled: true,
             record: false,
-            createdAt: "2026-09-19T20:00:00.000Z"
-          }
+            createdAt: "2026-09-19T20:00:00.000Z",
+          },
         ]}
-      />
+      />,
     );
 
     expect(markup).toContain("Atlas Rams vs Atlas Giants");
@@ -216,7 +245,7 @@ describe("SportsRequestView", () => {
     expect(markup).toContain("Unfollow");
   });
 
-  it("shows Watch Live only for an authoritatively available followed event", () => {
+  it("keeps My Sports management free of duplicate live playback controls", () => {
     const markup = renderToStaticMarkup(
       <SportsRequestView
         {...baseProps}
@@ -229,7 +258,7 @@ describe("SportsRequestView", () => {
             league: "Atlas Test League",
             startAt: "2026-09-15T01:00:00.000Z",
             status: "live",
-            requested: true
+            requested: true,
           },
           {
             provider: "thesportsdb",
@@ -239,8 +268,8 @@ describe("SportsRequestView", () => {
             league: "Atlas Test League",
             startAt: "2026-09-15T02:00:00.000Z",
             status: "scheduled",
-            requested: true
-          }
+            requested: true,
+          },
         ]}
         follows={[
           {
@@ -252,7 +281,7 @@ describe("SportsRequestView", () => {
             userId: "usr-001",
             enabled: true,
             record: false,
-            createdAt: "2026-09-14T20:00:00.000Z"
+            createdAt: "2026-09-14T20:00:00.000Z",
           },
           {
             subscriptionId: "sub-unavailable",
@@ -263,34 +292,30 @@ describe("SportsRequestView", () => {
             userId: "usr-001",
             enabled: true,
             record: false,
-            createdAt: "2026-09-14T20:00:00.000Z"
-          }
+            createdAt: "2026-09-14T20:00:00.000Z",
+          },
         ]}
         liveAvailabilityByEvent={{
           "thesportsdb:event-live": {
             available: true,
-            atlasChannelId: "sports-live-source-001"
+            atlasChannelId: "sports-live-source-001",
           },
           "thesportsdb:event-unavailable": {
             available: false,
-            atlasChannelId: null
-          }
+            atlasChannelId: null,
+          },
         }}
         onWatchLive={vi.fn()}
-      />
+      />,
     );
 
-    expect(
-      markup.split("Watch Live").length - 1
-    ).toBe(1);
-
-    expect(markup).toContain(
-      'data-live-channel-id="sports-live-source-001"'
-    );
+    expect(markup.split("Watch Live").length - 1).toBe(0);
 
     expect(markup).not.toContain(
-      'data-live-channel-id="event-unavailable"'
+      'data-live-channel-id="sports-live-source-001"',
     );
+
+    expect(markup).not.toContain('data-live-channel-id="event-unavailable"');
   });
 
   it("preserves requested event identity and disabled state", () => {
@@ -306,10 +331,10 @@ describe("SportsRequestView", () => {
             league: "Atlas Test League",
             startAt: "2026-08-17T20:00:00.000Z",
             status: "scheduled",
-            requested: true
-          }
+            requested: true,
+          },
         ]}
-      />
+      />,
     );
 
     expect(markup).toContain("Requested");
@@ -334,10 +359,10 @@ describe("SportsRequestView", () => {
             league: "NFL",
             startAt: "2026-09-06T17:00:00.000Z",
             status: "scheduled",
-            requested: false
-          }
+            requested: false,
+          },
         ]}
-      />
+      />,
     );
 
     expect(markup).toContain("Detroit Lions vs New Orleans Saints");
@@ -345,5 +370,4 @@ describe("SportsRequestView", () => {
     expect(markup).toContain("Record event");
     expect(markup).not.toContain("View upcoming");
   });
-
 });

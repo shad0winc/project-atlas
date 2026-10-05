@@ -7,6 +7,9 @@ export type SportsEvent = Readonly<{
   startAt: string;
   status: string;
   requested: boolean;
+  providerLeagueId?: string;
+  homeTeamId?: string;
+  awayTeamId?: string;
 }>;
 
 export type SportsSubscription = Readonly<{
@@ -29,6 +32,9 @@ export type SportsEventTransport = Readonly<{
   start_at: string;
   status: string;
   requested: boolean;
+  provider_league_id?: string | null;
+  home_team_id?: string | null;
+  away_team_id?: string | null;
 }>;
 
 export type SportsEventCollectionTransport = Readonly<{
@@ -86,7 +92,10 @@ export function createSportsEvent(input: SportsEventTransport): SportsEvent {
     league: requiredText(input.league, "sportsEvent.league"),
     startAt: normalizedTimestamp(input.start_at, "sportsEvent.startAt"),
     status: requiredText(input.status, "sportsEvent.status"),
-    requested: Boolean(input.requested)
+    requested: Boolean(input.requested),
+    ...(input.provider_league_id?.trim() ? { providerLeagueId: input.provider_league_id.trim() } : {}),
+    ...(input.home_team_id?.trim() ? { homeTeamId: input.home_team_id.trim() } : {}),
+    ...(input.away_team_id?.trim() ? { awayTeamId: input.away_team_id.trim() } : {})
   });
 }
 

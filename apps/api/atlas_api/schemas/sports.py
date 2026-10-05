@@ -30,6 +30,9 @@ class SportsEventResponse(_StrictSportsModel):
     start_at: datetime
     status: str
     requested: bool
+    provider_league_id: str | None = None
+    home_team_id: str | None = None
+    away_team_id: str | None = None
 
     @field_validator(
         "provider",

@@ -14,9 +14,16 @@ import type { SportsFollow } from "../types/sports";
 
 export function SportsLiveChannels({
   onWatchLive,
+  searchQuery,
+  managedFollows,
+  onFollowsChanged,
 }: Readonly<{
   onWatchLive: (atlasChannelId: string) => Promise<void>;
+  searchQuery?: string;
+  managedFollows?: readonly SportsFollow[];
+  onFollowsChanged?: () => Promise<void>;
 }>): React.ReactElement {
+  const externallyManaged = managedFollows !== undefined;
   const [channels, setChannels] = useState<readonly SportsLiveChannel[]>([]);
   const [follows, setFollows] = useState<readonly SportsFollow[]>([]);
   const [query, setQuery] = useState("");
@@ -41,7 +48,9 @@ export function SportsLiveChannels({
     const controller = new AbortController();
     void Promise.all([
       loadSportsLiveChannels(controller.signal),
-      loadSportsFollows({ signal: controller.signal }),
+      externallyManaged
+        ? Promise.resolve([] as readonly SportsFollow[])
+        : loadSportsFollows({ signal: controller.signal }),
     ])
       .then(([catalog, subscriptions]) => {
         if (!controller.signal.aborted) {
@@ -64,14 +73,19 @@ export function SportsLiveChannels({
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [refresh]);
+  }, [refresh, externallyManaged]);
 
-  const saved = new Map(follows.map((follow) => [follow.providerId, follow]));
+  const channelFollows = (managedFollows ?? follows).filter(
+    (follow) => follow.type === "channel" && follow.provider === "atlas",
+  );
+  const saved = new Map(
+    channelFollows.map((follow) => [follow.providerId, follow]),
+  );
   // Keep a saved channel removable even if it leaves the current catalog.
   const catalogIds = new Set(channels.map((channel) => channel.atlasChannelId));
   const combined = [
     ...channels,
-    ...follows
+    ...channelFollows
       .filter((follow) => !catalogIds.has(follow.providerId))
       .map((follow) => ({
         atlasChannelId: follow.providerId,
@@ -79,7 +93,10 @@ export function SportsLiveChannels({
         playbackConfigured: false,
       })),
   ];
-  const normalizedQuery = query.trim().toLocaleLowerCase().replace(/\s+/g, "");
+  const normalizedQuery = (searchQuery ?? query)
+    .trim()
+    .toLocaleLowerCase()
+    .replace(/\s+/g, "");
   const visible = combined.filter(
     (channel) =>
       (!savedOnly || saved.has(channel.atlasChannelId)) &&
@@ -112,6 +129,7 @@ export function SportsLiveChannels({
             follow,
           ]);
       }
+      await onFollowsChanged?.();
     } catch {
       if (mounted.current)
         setActionError(
@@ -144,41 +162,45 @@ export function SportsLiveChannels({
       aria-labelledby="sports-live-channels-title"
       className="requests-message-panel"
     >
-      <h2 id="sports-live-channels-title">Live channels</h2>
+      <h2 id="sports-live-channels-title">Channels</h2>
       <p>
-        Follow channels to save your favorites here. Scheduled games appear in
-        Events.
+        Search and follow channels alongside events. A configured stream can be
+        off air; program times are unavailable until a guide is linked.
       </p>
-      <div className="requests-toolbar">
-        <label htmlFor="sports-live-channel-search">Search live channels</label>
-        <input
-          id="sports-live-channel-search"
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-        <label>
+      {searchQuery === undefined ? (
+        <div className="requests-toolbar">
+          <label htmlFor="sports-live-channel-search">
+            Search live channels
+          </label>
           <input
-            type="checkbox"
-            checked={savedOnly}
-            onChange={(event) => setSavedOnly(event.target.checked)}
+            id="sports-live-channel-search"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
           />
-          Followed channels only
-        </label>
-        <button
-          type="button"
-          className="requests-refresh-button"
-          disabled={loading || saving !== null}
-          onClick={() => {
-            setLoading(true);
-            setError(null);
-            setActionError(null);
-            setRefresh((value) => value + 1);
-          }}
-        >
-          Refresh live channels
-        </button>
-      </div>
+          <label>
+            <input
+              type="checkbox"
+              checked={savedOnly}
+              onChange={(event) => setSavedOnly(event.target.checked)}
+            />
+            Followed channels only
+          </label>
+          <button
+            type="button"
+            className="requests-refresh-button"
+            disabled={loading || saving !== null}
+            onClick={() => {
+              setLoading(true);
+              setError(null);
+              setActionError(null);
+              setRefresh((value) => value + 1);
+            }}
+          >
+            Refresh live channels
+          </button>
+        </div>
+      ) : null}
       {actionError ? <p role="alert">{actionError}</p> : null}
       {loading ? (
         <p role="status">Loading live channels...</p>
@@ -196,7 +218,7 @@ export function SportsLiveChannels({
         <ul>
           {visible.map((channel) => (
             <li key={channel.atlasChannelId}>
-              <strong>{channel.name}</strong>{" "}
+              <strong>{channel.name}</strong> <span>Schedule unavailable</span>{" "}
               <button
                 type="button"
                 aria-label={`${saved.has(channel.atlasChannelId) ? "Unfollow" : "Follow"} ${channel.name}`}
