@@ -336,6 +336,28 @@ def read_sports_live_availability(
     }
 
 
+@router.get("/{atlas_channel_id}/options", summary="List configured Sports playback choices")
+def read_sports_live_options(
+    current_user: Annotated[AuthenticatedUser, Depends(require_sports_read)],
+    sports: Annotated[SportsAPIService, Depends(get_sports_api_service)],
+    response: Response,
+    atlas_channel_id: Annotated[str, Path(min_length=1, max_length=256)],
+) -> dict[str, object]:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        sources = [source for source in sports.list_live_sources() if source.get("atlas_channel_id") == atlas_channel_id]
+        if len(sources) != 1:
+            raise HTTPException(status_code=404, detail="Sports live channel is not available.")
+        options = sources[0].get("playback_options", [])
+        bindings = {row["atlas_channel_id"] for row in sports.list_live_tv_bindings()}
+        return {"options": [{"option_id": option["option_id"],
+            "label": "Primary" if index == 0 else f"Backup {index}",
+            "configured": option["atlas_channel_id"] in bindings}
+            for index, option in enumerate(options)]}
+    except SportsWriterTransportError as exc:
+        raise HTTPException(status_code=503, detail="Playback choices are temporarily unavailable.") from exc
+
+
 @router.get(
     "/{atlas_channel_id}/session",
     response_model=PlaybackSessionResponse,
@@ -384,6 +406,7 @@ def read_sports_live_session(
         str | None,
         Query(max_length=16),
     ] = None,
+    option: Annotated[str | None, Query(pattern="^(primary|backup-1|backup-2)$")] = None,
 ) -> PlaybackSessionResponse:
     try:
         profile = profiles.get_user(current_user.user_id)
@@ -460,8 +483,24 @@ def read_sports_live_session(
                 detail="Sports live channel is not available.",
             )
 
+    routing_channel_id = atlas_channel_id
+    admission_sources = live_sources
+    configured_options = live_source.get("playback_options", [])
+    if configured_options or option is not None:
+        requested_option = option or "primary"
+        matches = [row for row in configured_options if row.get("option_id") == requested_option]
+        if len(matches) != 1:
+            raise HTTPException(status_code=404, detail="Playback option is not configured.")
+        selected = matches[0]
+        try:
+            sports.verify_live_playback_option(atlas_channel_id=atlas_channel_id, option=selected)
+        except SportsWriterTransportError as exc:
+            raise HTTPException(status_code=503, detail="Playback option is unavailable.") from exc
+        routing_channel_id = selected["atlas_channel_id"]
+        admission_sources = [{**live_source, "resource_source_ids": [selected["resource_source_id"]]}]
+
     try:
-        binding = sports.get_live_tv_binding(atlas_channel_id=atlas_channel_id)
+        binding = sports.get_live_tv_binding(atlas_channel_id=routing_channel_id)
     except SportsLiveTvBindingNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -474,7 +513,7 @@ def read_sports_live_session(
         ) from exc
 
     jellyfin_item_id = str(binding.get("jellyfin_item_id", "")).strip()
-    if binding.get("atlas_channel_id") != atlas_channel_id or not jellyfin_item_id:
+    if binding.get("atlas_channel_id") != routing_channel_id or not jellyfin_item_id:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Sports live channel resolution is unavailable.",
@@ -496,7 +535,7 @@ def read_sports_live_session(
             capacities,
         ) = _sports_resource_candidates(
             atlas_channel_id=atlas_channel_id,
-            live_sources=live_sources,
+            live_sources=admission_sources,
             source_registry=source_registry,
         )
 
@@ -507,6 +546,9 @@ def read_sports_live_session(
             capacities=capacities,
             user_limit=effective_limit,
         )
+        if configured_options and resource_lease.source_id != selected["resource_source_id"]:
+            resource_pool.release(lease_id=resource_lease.lease_id, user_id=current_user.user_id)
+            raise SportsResourcePoolStateError("Playback option received a mismatched resource lease")
     except SportsResourceUserLimitExceeded as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

@@ -106,7 +106,19 @@ def catalog_feed_games(
             }
         )
 
-    return feed_games
+    expanded = []
+    by_id = {source.source_id: source for source in catalog.sources}
+    for game in feed_games:
+        source = by_id[game["_atlas_live_source_id"]]
+        expanded.append(game)
+        for option in source.playback_options[1:]:
+            alternate = dict(game)
+            alternate["id"] = f'{game["id"]}--{option.option_id}'
+            alternate["_atlas_channel_id"] = option.channel_id(source.atlas_channel_id)
+            alternate["stream_url"] = option.stream_url
+            alternate["name"] = f'{game_name(game)} — {option.option_id.replace("-", " ").title()}'
+            expanded.append(alternate)
+    return expanded
 
 
 def game_name(game: dict[str, Any]) -> str:

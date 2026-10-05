@@ -610,8 +610,13 @@ def run_live_source_provisioning_pipeline(
     )
 
     reconciled = 0
+    live_source_registry = live_sources if live_sources is not None else default_live_source_registry()
+    fixed_events = {source.event_key for source in live_source_registry.list_sources() if source.playback_options}
 
     for game in surfaced_games:
+        # Explicitly verified routes are not overwritten by automatic name/slot discovery.
+        if (str(game.get("provider", "")).strip().lower(), str(game.get("provider_event_id", "")).strip()) in fixed_events:
+            continue
         resolution = resolve_event_live_source_content(
             event=game,
             sources=source_records,

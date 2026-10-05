@@ -353,6 +353,24 @@ class Handler(BaseHTTPRequestHandler):
         if not self._require_auth():
             return
 
+        if parsed.path == "/internal/v1/live-playback-option":
+            try:
+                from live_sources import verify_playback_option
+                from dispatcharr_admin import DispatcharrAdminClient
+                query = urllib.parse.parse_qs(parsed.query)
+                atlas_id = query.get("atlas_channel_id", [""])[0]
+                option_id = query.get("option_id", [""])[0]
+                matches = [source for source in default_live_source_registry().list_sources()
+                           if source.atlas_channel_id == atlas_id]
+                if len(matches) != 1:
+                    raise LiveSourceCatalogError("Playback source is unavailable")
+                option = verify_playback_option(matches[0], option_id,
+                    self._source_store().load(), DispatcharrAdminClient.from_environment())
+                self._json(HTTPStatus.OK, {"option": option})
+            except Exception:
+                self._json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "Playback option is unavailable."})
+            return
+
         source_dispatcharr_prefix = (
             "/internal/v1/sources/"
         )
