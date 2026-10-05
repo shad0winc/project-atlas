@@ -8,6 +8,9 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+import base64
+import threading
+import time
 import json
 import os
 import urllib.error
@@ -1458,3 +1461,69 @@ __all__ = [
     "SafeDispatcharrChannel",
     "SafeDispatcharrStream",
 ]
+
+
+# Reuse authentication only; route verification is never cached.
+_lock = threading.Lock()
+_client = None
+_identity = None
+_expires = 0.0
+_blocked_until = 0.0
+
+
+def _token_lifetime(token):
+    # JWT expiry is only a cache hint; Dispatcharr authenticates every request.
+    try:
+        part = token.split(".")[1]
+        if len(part) > 8192:
+            return 60.0
+        payload = json.loads(base64.urlsafe_b64decode(part + "=" * (-len(part) % 4)))
+        expiry = payload.get("exp")
+        if isinstance(expiry, (int, float)) and not isinstance(expiry, bool):
+            return max(0.0, min(3600.0, expiry - time.time() - 30.0))
+    except (IndexError, ValueError, TypeError, AttributeError):
+        pass
+    return 60.0
+
+
+def verify_configured_playback_option(source, option_id, lifecycle_sources):
+    global _client, _identity, _expires, _blocked_until
+    with _lock:
+        identity = tuple(os.environ.get(key, "") for key in (
+            "DISPATCHARR_INTERNAL_URL", "DISPATCHARR_ADMIN_USERNAME",
+            "DISPATCHARR_ADMIN_PASSWORD",
+        ))
+        now = time.monotonic()
+        if identity != _identity:
+            _identity, _client, _expires, _blocked_until = identity, None, 0.0, 0.0
+        if now < _blocked_until:
+            raise DispatcharrAdminError("Dispatcharr verification is temporarily unavailable.")
+        if _client is None or now >= _expires:
+            _client = DispatcharrAdminClient.from_environment()
+            _expires = 0.0
+        try:
+            if not _expires:
+                lifetime = _token_lifetime(_client._access_token())
+                if lifetime <= 0:
+                    _client = None
+                    _blocked_until = time.monotonic() + 10.0
+                    raise DispatcharrAdminError("Dispatcharr authentication must be renewed.")
+                _expires = time.monotonic() + lifetime
+            return _verify_option_route(source, option_id, lifecycle_sources, _client)
+        except DispatcharrAdminError as exc:
+            cause = exc.__cause__
+            status = getattr(cause, "code", None)
+            if status in (401, 403):
+                _client, _expires = None, 0.0
+                _blocked_until = time.monotonic() + 10.0
+            elif status == 429:
+                headers = getattr(cause, "headers", None)
+                retry = headers.get("Retry-After", "") if headers is not None else ""
+                delay = min(300, max(1, int(retry))) if str(retry).isdigit() else 60
+                _blocked_until = time.monotonic() + delay
+            raise
+
+
+def _verify_option_route(source, option_id, lifecycle_sources, client):
+    from live_sources import verify_playback_option
+    return verify_playback_option(source, option_id, lifecycle_sources, client)
