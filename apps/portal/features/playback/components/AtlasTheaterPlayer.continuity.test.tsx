@@ -79,7 +79,7 @@ describe("mounted player continuity",()=>{
     const options=hlsMock.constructed.mock.calls[0][0];
     const xhr={withCredentials:false}; options.xhrSetup(xhr);
     expect(xhr.withCredentials).toBe(true);
-    expect(playing).toBe(false);
+    expect(playing).toBe(true);
     await act(async()=>root.render(null));await flush();
     expect(hlsMock.destroy).toHaveBeenCalledTimes(1);
   });
@@ -88,7 +88,42 @@ describe("mounted player continuity",()=>{
     await act(async()=>root.render(<AtlasTheaterPlayer session={{...session,sourceType:"live",canSeek:false}}/>));await flush();
     expect(container.querySelector("video")!.src).toContain("master.m3u8");
     expect(hlsMock.constructed).not.toHaveBeenCalled();
+    expect(playing).toBe(true);
+  });
+  it("starts live playback only once the media is ready", async () => {
+    hlsMock.supported=true;
+    vi.mocked(HTMLMediaElement.prototype.load).mockImplementation(function(this: HTMLMediaElement) {
+      playing=false;
+      Object.defineProperties(this, {readyState:{configurable:true,value:0},paused:{configurable:true,get:()=>!playing}});
+    });
+    await act(async()=>root.render(<AtlasTheaterPlayer session={{...session,sourceType:"live",canSeek:false}}/>));await flush();
+    expect(play).not.toHaveBeenCalled();
+    const video=container.querySelector("video")!;
+    Object.defineProperty(video,"readyState",{configurable:true,value:2});
+    await act(async()=>video.dispatchEvent(new Event("canplay")));await flush();
+    expect(playing).toBe(true);
+    await act(async()=>video.dispatchEvent(new Event("progress")));await flush();
+    expect(play).toHaveBeenCalledTimes(1);
+  });
+  it("keeps the Play fallback when a browser blocks live startup", async () => {
+    hlsMock.supported=true;blocked=true;
+    await act(async()=>root.render(<AtlasTheaterPlayer session={{...session,sourceType:"live",canSeek:false}}/>));await flush();
     expect(playing).toBe(false);
+    const button=Array.from(container.querySelectorAll("button")).find(x=>x.textContent==="Play")!;
+    expect(button).toBeDefined();
+    blocked=false;await act(async()=>button.click());await flush();
+    expect(playing).toBe(true);
+  });
+  it("preserves a user pause when replacing live captions", async () => {
+    hlsMock.supported=true;
+    const live={...session,sourceType:"live" as const,canSeek:false};
+    await act(async()=>root.render(<AtlasTheaterPlayer session={live} sessionResolver={async()=>({...live})}/>));await flush();
+    const video=container.querySelector("video")!;
+    await act(async()=>video.pause());
+    const previousCalls=play.mock.calls.length;
+    await act(async()=>{const select=container.querySelector("select")!;select.value="off";select.dispatchEvent(new Event("change",{bubbles:true}));});await flush();
+    expect(playing).toBe(false);
+    expect(play).toHaveBeenCalledTimes(previousCalls);
   });
   it("reports unsupported playback when neither HLS path is available", async () => {
     vi.mocked(HTMLMediaElement.prototype.canPlayType).mockReturnValue("");
