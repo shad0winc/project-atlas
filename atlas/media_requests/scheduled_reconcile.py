@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
@@ -21,6 +23,24 @@ from .reconciler import (
 )
 from .service import MediaRequestService
 from .construction import build_request_service, open_request_repository
+from .submission_recovery import SubmissionRecoveryService
+from .submission_reconciler import SubmissionRecoveryOutcome, reconcile_submission_receipts
+
+
+@dataclass(frozen=True)
+class ScheduledRecoveryOutcome:
+    reconciliation: ReconciliationOutcome
+    receipts: SubmissionRecoveryOutcome
+    events_attempted: int
+    events_delivered: int
+    events_pending: int
+
+
+def _submission_recovery_enabled():
+    value = os.getenv("ATLAS_SUBMISSION_RECOVERY_ENABLED", "0").strip()
+    if value not in {"0", "1"}:
+        raise ValueError("Submission recovery opt-in must be 0 or 1")
+    return value == "1"
 
 
 DEFAULT_REQUESTS_ROOT = Path(
@@ -28,6 +48,8 @@ DEFAULT_REQUESTS_ROOT = Path(
 )
 
 REQUEST_EVENT_SOURCE = "atlas-requests"
+SUBMISSION_RECEIPT_LIMIT = 10
+SUBMISSION_EVENT_LIMIT = 25
 
 RequestServiceFactory = Callable[
     [],
@@ -77,26 +99,49 @@ def build_default_service() -> MediaRequestService:
 def run_reconciliation(
     *,
     service_factory: RequestServiceFactory = build_default_service,
-) -> ReconciliationOutcome:
-    """Execute one bounded request reconciliation pass."""
+) -> ReconciliationOutcome | ScheduledRecoveryOutcome:
+    """Execute reconciliation with explicit, default-off submission recovery."""
 
+    enabled = _submission_recovery_enabled()
     service = service_factory()
+    if enabled and not isinstance(service, SubmissionRecoveryService):
+        raise ValueError("Submission recovery opt-in requires an explicitly migrated schema-2 service")
 
     jellyfin = default_jellyfin_provider()
     readiness = JellyfinRequestReadiness(
         jellyfin
     )
 
-    return reconcile_active_requests(
-        service,
-        readiness=readiness,
-    )
+    if not enabled:
+        return reconcile_active_requests(service, readiness=readiness)
+
+    # Minute-based rotation covers a stable backlog without rewriting journals
+    # or leaving permanently unverified items at the front of every pass.
+    minute = int(datetime.now(timezone.utc).timestamp()) // 60
+    try:
+        receipts = reconcile_submission_receipts(service, limit=SUBMISSION_RECEIPT_LIMIT, offset=minute * SUBMISSION_RECEIPT_LIMIT)
+        delivered = service.drain_submission_events(limit=SUBMISSION_EVENT_LIMIT, offset=minute * SUBMISSION_EVENT_LIMIT)
+        pending_after = len(service.repository.pending_submission_events())
+    except Exception:
+        raise RuntimeError("Scheduled submission recovery remains unverified") from None
+    reconciliation = reconcile_active_requests(service, readiness=readiness)
+    return ScheduledRecoveryOutcome(reconciliation, receipts, service.submission_event_attempts, delivered, pending_after)
 
 
 def render_result(
-    outcome: ReconciliationOutcome,
+    outcome: ReconciliationOutcome | ScheduledRecoveryOutcome,
 ) -> str:
-    """Render one deterministic reconciliation summary."""
+    """Render legacy summaries unchanged; opt-in passes include recovery counts."""
+
+    if isinstance(outcome, ScheduledRecoveryOutcome):
+        payload = json.loads(render_result(outcome.reconciliation))
+        payload["submission_recovery"] = {
+            "receipts": asdict(outcome.receipts),
+            "events_attempted": outcome.events_attempted,
+            "events_delivered": outcome.events_delivered,
+            "events_pending": outcome.events_pending,
+        }
+        return json.dumps(payload, indent=2, sort_keys=True)
 
     if not isinstance(
         outcome,
