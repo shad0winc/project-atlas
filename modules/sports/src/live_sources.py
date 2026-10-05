@@ -6,6 +6,8 @@ from dataclasses import dataclass
 import fcntl
 import json
 import os
+import re
+from uuid import UUID
 from pathlib import Path
 import tempfile
 from urllib.parse import urlsplit
@@ -23,6 +25,29 @@ class LiveSourceCatalogError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
+class LivePlaybackOption:
+    option_id: str
+    resource_source_id: str
+    stream_url: str
+    dispatcharr_channel_id: int
+    dispatcharr_channel_uuid: str
+    dispatcharr_stream_id: int
+
+    def channel_id(self, root: str) -> str:
+        return root if self.option_id == "primary" else f"{root}--{self.option_id}"
+
+    def safe_dict(self, root: str) -> dict[str, str]:
+        return {
+            "option_id": self.option_id,
+            "atlas_channel_id": self.channel_id(root),
+            "resource_source_id": self.resource_source_id,
+        }
+
+    def state_dict(self) -> dict[str, object]:
+        return {field: getattr(self, field) for field in self.__dataclass_fields__}
+
+
+@dataclass(frozen=True, slots=True)
 class LiveSource:
     source_id: str
     name: str
@@ -31,6 +56,7 @@ class LiveSource:
     provider_event_id: str | None = None
     standalone: bool = False
     resource_source_ids: tuple[str, ...] = ()
+    playback_options: tuple[LivePlaybackOption, ...] = ()
 
     @property
     def event_key(self) -> tuple[str, str] | None:
@@ -69,6 +95,8 @@ class LiveSource:
                 self.resource_source_ids
             )
 
+        if self.playback_options:
+            result["playback_options"] = [option.state_dict() for option in self.playback_options]
         return result
 
 
@@ -131,6 +159,43 @@ def _stream_url(
     return url
 
 
+def _playback_options(value: object, root_url: str, resources: tuple[str, ...]) -> tuple[LivePlaybackOption, ...]:
+    if not isinstance(value, list) or len(value) > 3:
+        raise LiveSourceCatalogError("playback_options must contain at most three options")
+    options = []
+    for index, row in enumerate(value):
+        fields = {"option_id", "resource_source_id", "stream_url", "dispatcharr_channel_id",
+                  "dispatcharr_channel_uuid", "dispatcharr_stream_id"}
+        if not isinstance(row, dict) or set(row) != fields:
+            raise LiveSourceCatalogError("playback option fields are invalid")
+        if row["option_id"] != ("primary", "backup-1", "backup-2")[index]:
+            raise LiveSourceCatalogError("playback option order is invalid")
+        resource = _required(row["resource_source_id"], "resource_source_id")
+        if not re.fullmatch(r"[A-Za-z0-9_.:-]{1,160}", resource):
+            raise LiveSourceCatalogError("playback option resource is invalid")
+        for field in ("dispatcharr_channel_id", "dispatcharr_stream_id"):
+            if type(row[field]) is not int or row[field] <= 0:
+                raise LiveSourceCatalogError("playback option identity is invalid")
+        try:
+            uuid = str(UUID(row["dispatcharr_channel_uuid"]))
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise LiveSourceCatalogError("playback option UUID is invalid") from exc
+        url = _stream_url(row["stream_url"])
+        parsed, parent = urlsplit(url), urlsplit(root_url)
+        if (parsed.scheme, parsed.netloc) != (parent.scheme, parent.netloc) or not parsed.path.rstrip("/").endswith("/" + uuid):
+            raise LiveSourceCatalogError("playback option URL does not identify its Dispatcharr channel")
+        options.append(LivePlaybackOption(row["option_id"], resource, url,
+            row["dispatcharr_channel_id"], uuid, row["dispatcharr_stream_id"]))
+    if options:
+        if options[0].stream_url != root_url or tuple(o.resource_source_id for o in options) != resources:
+            raise LiveSourceCatalogError("playback option resources and primary URL must match the source")
+        for field in ("resource_source_id", "stream_url", "dispatcharr_channel_id", "dispatcharr_channel_uuid", "dispatcharr_stream_id"):
+            values = [getattr(option, field) for option in options]
+            if len(values) != len(set(values)):
+                raise LiveSourceCatalogError("playback options must have independent routes and accounts")
+    return tuple(options)
+
+
 def _parse_source(
     entry: object,
 ) -> LiveSource:
@@ -147,6 +212,7 @@ def _parse_source(
         "provider_event_id",
         "standalone",
         "resource_source_ids",
+        "playback_options",
     }
 
     if not set(entry).issubset(
@@ -257,9 +323,8 @@ def _parse_source(
             provider_event_id
         ),
         standalone=standalone,
-        resource_source_ids=tuple(
-            resource_source_ids
-        ),
+        resource_source_ids=tuple(resource_source_ids),
+        playback_options=_playback_options(entry.get("playback_options", []), stream_url, tuple(resource_source_ids)),
     )
 
 
@@ -833,4 +898,46 @@ def safe_source_summary(
             source.resource_source_ids
         )
 
+    if source.playback_options:
+        result["playback_options"] = [option.safe_dict(source.atlas_channel_id) for option in source.playback_options]
     return result
+
+
+def verify_playback_option(source, option_id, lifecycle_sources, client):
+    matches = [option for option in source.playback_options if option.option_id == option_id]
+    if len(matches) != 1:
+        raise LiveSourceCatalogError("Playback option is not configured")
+    option = matches[0]
+    if option.stream_url != client._base_url.rstrip("/") + "/proxy/ts/stream/" + option.dispatcharr_channel_uuid:
+        raise LiveSourceCatalogError("Playback URL does not identify the configured Dispatcharr route")
+    account_ids = []
+    for route in source.playback_options:
+        associated = [row for row in lifecycle_sources if row.source_id == route.resource_source_id]
+        if len(associated) != 1:
+            raise LiveSourceCatalogError("Playback account mapping is unavailable")
+        reference = str(associated[0].backend_reference or "").removeprefix("dispatcharr:m3u:")
+        if not reference.isascii() or not reference.isdecimal() or int(reference) <= 0:
+            raise LiveSourceCatalogError("Playback account mapping is invalid")
+        account_ids.append(int(reference))
+    if len(account_ids) != len(set(account_ids)):
+        raise LiveSourceCatalogError("Playback options must use distinct actual accounts")
+    resources = [row for row in lifecycle_sources if row.source_id == option.resource_source_id]
+    if len(resources) != 1 or not resources[0].enabled:
+        raise LiveSourceCatalogError("Playback account is unavailable")
+    resource = resources[0]
+    reference = str(resource.backend_reference or "").removeprefix("dispatcharr:m3u:")
+    if not reference.isascii() or not reference.isdecimal() or int(reference) <= 0:
+        raise LiveSourceCatalogError("Playback account mapping is invalid")
+    account_id = int(reference)
+    token = client._access_token()
+    channel = client._safe_channel(client._json_request("GET",
+        f"/api/channels/channels/{option.dispatcharr_channel_id}/", access_token=token))
+    if channel.channel_id != option.dispatcharr_channel_id or channel.channel_uuid != option.dispatcharr_channel_uuid or channel.stream_ids != (option.dispatcharr_stream_id,):
+        raise LiveSourceCatalogError("Playback route changed")
+    stream = client._json_request("GET", f"/api/channels/streams/{option.dispatcharr_stream_id}/", access_token=token)
+    if not isinstance(stream, dict) or stream.get("id") != option.dispatcharr_stream_id or stream.get("m3u_account") != account_id or stream.get("is_stale") is not False:
+        raise LiveSourceCatalogError("Playback stream account changed")
+    account = client.read_account(account_id=account_id)
+    if account.account_id != account_id or not account.enabled or not account.credentials_configured or not 0 < resource.max_connections <= account.configured_max_connections:
+        raise LiveSourceCatalogError("Playback account capacity changed")
+    return option.safe_dict(source.atlas_channel_id)

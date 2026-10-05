@@ -514,6 +514,7 @@ class SportsWriterBackedAPIService:
             "standalone",
             "atlas_channel_id",
             "resource_source_ids",
+            "playback_options",
         }
 
         normalized: list[
@@ -686,13 +687,37 @@ class SportsWriterBackedAPIService:
                         )
                         else None
                     ),
-                    "resource_source_ids": (
-                        resource_source_ids
-                    ),
+                    "resource_source_ids": resource_source_ids,
+                    **({"playback_options": self._safe_playback_options(raw["playback_options"], atlas_channel_id, resource_source_ids)} if "playback_options" in raw else {}),
                 }
             )
 
         return normalized
+
+    @staticmethod
+    def _safe_playback_options(raw, root, resources):
+        if not isinstance(raw, list) or len(raw) > 3:
+            raise SportsWriterTransportError("Invalid playback options")
+        result = []
+        for index, row in enumerate(raw):
+            option_id = ("primary", "backup-1", "backup-2")[index]
+            channel = root if index == 0 else f"{root}--{option_id}"
+            if (not isinstance(row, dict) or set(row) != {"option_id", "atlas_channel_id", "resource_source_id"}
+                    or row.get("option_id") != option_id or row.get("atlas_channel_id") != channel
+                    or not isinstance(row.get("resource_source_id"), str)
+                    or row["resource_source_id"] not in resources):
+                raise SportsWriterTransportError("Invalid playback option identity")
+            result.append(dict(row))
+        if result and [row["resource_source_id"] for row in result] != resources:
+            raise SportsWriterTransportError("Invalid playback option account mapping")
+        return result
+
+    def verify_live_playback_option(self, *, atlas_channel_id, option):
+        payload = self._request("GET", "/internal/v1/live-playback-option?" + urllib.parse.urlencode({
+            "atlas_channel_id": atlas_channel_id, "option_id": option["option_id"],
+        }))
+        if payload.get("option") != option:
+            raise SportsWriterTransportError("Playback route verification failed")
 
     def get_live_tv_binding(
         self,

@@ -48,7 +48,7 @@ describe("Sports page UX coordination", () => {
 
   it("owns the authenticated Watch Live player lease lifecycle", () => {
     expect(source).toContain(
-      "createSportsLiveSession"
+      "replaceSportsLiveSession"
     );
 
     expect(source).toContain(

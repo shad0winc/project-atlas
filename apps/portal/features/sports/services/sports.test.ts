@@ -212,7 +212,11 @@ describe("Sports Portal service", () => {
     });
 
     const result = await createSportsLiveSession(
-      "sports-event-001"
+      "sports-event-001", {}, "auto", "backup-1"
+    );
+    expect(result.playbackOptionId).toBe("backup-1");
+    expect(mocks.authenticatedAtlasApiRequestWithMetadata).toHaveBeenCalledWith(
+      "/sports/live/sports-event-001/session?option=backup-1", expect.anything()
     );
 
     expect(result.atlasChannelId).toBe(

@@ -88,6 +88,7 @@ export type SportsLiveSessionResult = Readonly<{
   session: PlaybackSession;
   liveSessionId: string;
   ttlSeconds: number;
+  playbackOptionId?: string;
 }>;
 
 type SportsLiveHeartbeatTransport = Readonly<{
@@ -262,7 +263,8 @@ export async function loadSportsLiveAvailability(
 export async function createSportsLiveSession(
   atlasChannelId: string,
   options: SportsRequestOptions = {},
-  subtitle: SubtitleSelection = "auto"
+  subtitle: SubtitleSelection = "auto",
+  playbackOptionId?: string,
 ): Promise<SportsLiveSessionResult> {
   const normalizedChannelId = atlasChannelId.trim();
 
@@ -278,6 +280,7 @@ export async function createSportsLiveSession(
       : subtitle;
 
   const query = new URLSearchParams();
+  if (playbackOptionId !== undefined) query.set("option", playbackOptionId);
 
   if (subtitleValue !== "auto") {
     query.set("subtitle", subtitleValue);
@@ -343,6 +346,7 @@ export async function createSportsLiveSession(
 
     return Object.freeze({
       atlasChannelId: normalizedChannelId,
+      ...(playbackOptionId === undefined ? {} : { playbackOptionId }),
       session,
       liveSessionId,
       ttlSeconds

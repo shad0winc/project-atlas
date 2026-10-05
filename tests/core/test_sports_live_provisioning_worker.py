@@ -125,6 +125,9 @@ def test_surfaced_game_resolves_plans_and_reconciles_once(
         return published_source
 
     class Registry:
+        def list_sources(self):
+            return ()
+
         def set(self, source):
             calls.append(("registry-set", source))
             return source
@@ -527,6 +530,9 @@ def test_dispatcharr_failure_never_publishes_live_source(
     )
 
     class Registry:
+        def list_sources(self):
+            return ()
+
         def set(self, source):
             raise AssertionError(
                 "LiveSource registry must not mutate "
@@ -586,6 +592,9 @@ def test_live_source_persistence_failure_propagates_after_reconciliation(
     )
 
     class Registry:
+        def list_sources(self):
+            return ()
+
         def set(self, value):
             assert value is source
             raise RuntimeError(
@@ -625,6 +634,9 @@ def test_no_authorized_content_does_not_touch_live_source_registry(
     )
 
     class Registry:
+        def list_sources(self):
+            return ()
+
         def set(self, source):
             raise AssertionError(
                 "LiveSource registry must not mutate "
