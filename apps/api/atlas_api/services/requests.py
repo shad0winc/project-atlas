@@ -22,6 +22,7 @@ from atlas.media_requests import (
 )
 
 from atlas_api.events import RuntimeEventJournalPublisher
+from atlas.media_requests.construction import build_request_service, open_request_repository
 
 
 DEFAULT_REQUESTS_ROOT = Path(
@@ -285,15 +286,12 @@ def build_default_media_requests_api_service(
             "ATLAS_REQUESTS_DIR is required."
         )
 
-    repository = JsonMediaRequestRepository(
-        root_value
-    )
-
     try:
+        repository = open_request_repository(root_value)
         provider = (
             default_jellyseerr_media_request_provider()
         )
-        service = MediaRequestService(
+        service = build_request_service(
             repository,
             (provider,),
             event_publisher=(
