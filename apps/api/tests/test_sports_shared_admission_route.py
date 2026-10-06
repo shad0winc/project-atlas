@@ -1,6 +1,6 @@
 from dataclasses import replace
 from types import SimpleNamespace
-from test_sports_live_playback_route import build_harness, USER
+from apps.api.tests.test_sports_live_playback_route import build_harness, USER
 from atlas.sports_shared_admission import SharedAdmissionRoute, SharedAdmissionConfig
 from atlas.sports_resource_pool import SportsResourcePool, SportsResourcePoolStateError
 from atlas.sports_session_registry import SportsSessionRegistry

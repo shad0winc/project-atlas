@@ -1,5 +1,5 @@
 import pytest
-from test_sports_live_playback_route import build_harness, _FakeResourceLease
+from apps.api.tests.test_sports_live_playback_route import build_harness
 from atlas_api.services.playback import PlaybackNotFoundError, PlaybackUnavailableError
 
 @pytest.mark.parametrize('error', [PlaybackNotFoundError('missing'), PlaybackUnavailableError('unknown'), RuntimeError('lost response')])
