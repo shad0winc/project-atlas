@@ -1,6 +1,7 @@
 """Administrator-safe Sports provider/account inventory."""
 
 from __future__ import annotations
+import re
 
 from atlas.sports_resource_pool import (
     SportsResourcePool,
@@ -1078,6 +1079,7 @@ class AdminSportsProviderAccountCreateRequest(
     _StrictAdminSportsModel
 ):
     source_id: str
+    credential_realm: str
     provider_display_name: str
     account_display_name: str
     server_url: str
@@ -1144,6 +1146,7 @@ def create_admin_sports_provider_account(
     normalized_source_id = (
         request.source_id.strip()
     )
+    normalized_credential_realm = request.credential_realm.strip()
     normalized_provider_display_name = (
         request.provider_display_name.strip()
     )
@@ -1151,6 +1154,7 @@ def create_admin_sports_provider_account(
     if (
         not normalized_provider_id
         or not normalized_source_id
+        or not normalized_credential_realm
         or not normalized_provider_display_name
     ):
         raise HTTPException(
@@ -1161,6 +1165,12 @@ def create_admin_sports_provider_account(
                 "Provider and source identities "
                 "are required."
             ),
+        )
+
+    if not re.fullmatch(r"[a-z0-9][a-z0-9.-]{0,127}", normalized_credential_realm):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Credential realm is invalid.",
         )
 
     if (
@@ -1316,6 +1326,7 @@ def create_admin_sports_provider_account(
                 provider_id=(
                     normalized_provider_id
                 ),
+                credential_realm=normalized_credential_realm,
                 provider_display_name=(
                     normalized_provider_display_name
                 ),

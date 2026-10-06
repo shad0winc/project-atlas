@@ -1077,6 +1077,7 @@ class SportsWriterBackedAPIService:
         *,
         source_id: str,
         provider_id: str,
+        credential_realm: str,
         provider_display_name: str,
         account_display_name: str,
         server_url: str,
@@ -1089,6 +1090,7 @@ class SportsWriterBackedAPIService:
 
         normalized_source_id = source_id.strip()
         normalized_provider_id = provider_id.strip()
+        normalized_credential_realm = credential_realm.strip()
         normalized_provider_display_name = (
             provider_display_name.strip()
         )
@@ -1101,6 +1103,7 @@ class SportsWriterBackedAPIService:
         required = (
             normalized_source_id,
             normalized_provider_id,
+            normalized_credential_realm,
             normalized_provider_display_name,
             normalized_account_display_name,
             normalized_server_url,
@@ -1147,6 +1150,7 @@ class SportsWriterBackedAPIService:
             {
                 "source_id": normalized_source_id,
                 "provider_id": normalized_provider_id,
+                "credential_realm": normalized_credential_realm,
                 "provider_display_name": (
                     normalized_provider_display_name
                 ),
@@ -1216,6 +1220,11 @@ class SportsWriterBackedAPIService:
             raise SportsWriterTransportError(
                 "Private Sports service returned "
                 "the wrong created provider."
+            )
+
+        if safe_source.get("credential_realm") != normalized_credential_realm:
+            raise SportsWriterTransportError(
+                "Private Sports service returned a different credential realm."
             )
 
         if safe_source.get("enabled") is not False:
