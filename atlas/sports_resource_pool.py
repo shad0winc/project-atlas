@@ -8,14 +8,17 @@ from dataclasses import dataclass
 import fcntl
 import json
 import os
+import re
 from pathlib import Path
 import tempfile
 import time
 from typing import Any, Iterator
+from types import MappingProxyType
 from uuid import uuid4
 
 
 SPORTS_RESOURCE_POOL_VERSION = 1
+SPORTS_SHARED_RESOURCE_POOL_VERSION = 2
 DEFAULT_SPORTS_RESOURCE_LEASE_TTL_SECONDS = 90
 SPORTS_RESOURCE_POOL_FILE_MODE = 0o660
 
@@ -48,6 +51,7 @@ class SportsResourceLease:
     source_id: str
     created_at: float
     last_seen_at: float
+    sharing_fingerprint: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,6 +81,7 @@ class SportsResourcePool:
         ttl_seconds: int = DEFAULT_SPORTS_RESOURCE_LEASE_TTL_SECONDS,
         clock: Callable[[], float] | None = None,
         lease_id_factory: Callable[[], str] | None = None,
+        sharing_bindings: Mapping[tuple[str, str], str] | None = None,
     ) -> None:
         if (
             isinstance(ttl_seconds, bool)
@@ -86,6 +91,19 @@ class SportsResourcePool:
             raise ValueError(
                 "Sports resource lease TTL must be a positive integer."
             )
+
+        # Only trusted server-side callers may supply evidence-backed bindings.
+        # Copy the mapping so a caller cannot change admission after construction.
+        self.sharing_bindings: dict[tuple[str, str], str] = {}
+        for identity, fingerprint in (sharing_bindings or {}).items():
+            if not isinstance(identity, tuple) or len(identity) != 2:
+                raise ValueError("Sharing binding must identify target and resource")
+            target, source = (_required_identifier(value, "Sharing identity") for value in identity)
+            if not isinstance(fingerprint, str) or not re.fullmatch(r"[0-9a-f]{64}", fingerprint):
+                raise ValueError("Sharing fingerprint must be an exact SHA256")
+            self.sharing_bindings[(target, source)] = fingerprint
+
+        self.sharing_bindings = MappingProxyType(self.sharing_bindings)
 
         self.path = Path(path)
         self.lock_path = self.path.with_name(
@@ -161,14 +179,7 @@ class SportsResourcePool:
                         "Sports session limit reached."
                     )
 
-            active_by_source: dict[str, int] = {}
-
-            for payload in leases.values():
-                source_id = payload["source_id"]
-                active_by_source[source_id] = (
-                    active_by_source.get(source_id, 0)
-                    + 1
-                )
+            active_by_source = _allocation_counts(leases)
 
             selected_source: str | None = None
 
@@ -181,10 +192,16 @@ class SportsResourcePool:
                 if capacity <= 0:
                     continue
 
-                if (
-                    active_by_source.get(source_id, 0)
-                    < capacity
-                ):
+                fingerprint = self.sharing_bindings.get((normalized_target, source_id))
+                joining = fingerprint is not None and any(
+                    row["target_id"] == normalized_target
+                    and row["source_id"] == source_id
+                    and row.get("sharing_fingerprint") == fingerprint
+                    for row in leases.values()
+                )
+                # Revoked/reduced capacity cannot admit new consumers.
+                used = active_by_source.get(source_id, 0)
+                if (joining and used <= capacity) or used < capacity:
                     selected_source = source_id
                     break
 
@@ -211,7 +228,10 @@ class SportsResourcePool:
                 source_id=selected_source,
                 created_at=now,
                 last_seen_at=now,
+                sharing_fingerprint=self.sharing_bindings.get((normalized_target, selected_source)),
             )
+            if lease.sharing_fingerprint is not None:
+                state["version"] = SPORTS_SHARED_RESOURCE_POOL_VERSION
 
             leases[lease_id] = _lease_payload(
                 lease
@@ -219,7 +239,7 @@ class SportsResourcePool:
 
             self._write_state(
                 {
-                    "version": SPORTS_RESOURCE_POOL_VERSION,
+                    "version": state["version"],
                     "leases": leases,
                 }
             )
@@ -262,7 +282,7 @@ class SportsResourcePool:
             ):
                 self._write_state(
                     {
-                        "version": SPORTS_RESOURCE_POOL_VERSION,
+                        "version": state["version"],
                         "leases": leases,
                     }
                 )
@@ -277,6 +297,7 @@ class SportsResourcePool:
                 source_id=payload["source_id"],
                 created_at=payload["created_at"],
                 last_seen_at=now,
+                sharing_fingerprint=payload.get("sharing_fingerprint"),
             )
 
             leases[normalized_lease] = (
@@ -285,7 +306,7 @@ class SportsResourcePool:
 
             self._write_state(
                 {
-                    "version": SPORTS_RESOURCE_POOL_VERSION,
+                    "version": state["version"],
                     "leases": leases,
                 }
             )
@@ -328,7 +349,7 @@ class SportsResourcePool:
             ):
                 self._write_state(
                     {
-                        "version": SPORTS_RESOURCE_POOL_VERSION,
+                        "version": state["version"],
                         "leases": leases,
                     }
                 )
@@ -341,7 +362,7 @@ class SportsResourcePool:
 
             self._write_state(
                 {
-                    "version": SPORTS_RESOURCE_POOL_VERSION,
+                    "version": state["version"],
                     "leases": leases,
                 }
             )
@@ -369,7 +390,7 @@ class SportsResourcePool:
 
             self._write_state(
                 {
-                    "version": SPORTS_RESOURCE_POOL_VERSION,
+                    "version": state["version"],
                     "leases": leases,
                 }
             )
@@ -392,16 +413,7 @@ class SportsResourcePool:
             )
         )
 
-        active_by_source: dict[str, int] = {}
-
-        for lease in lease_objects:
-            active_by_source[lease.source_id] = (
-                active_by_source.get(
-                    lease.source_id,
-                    0,
-                )
-                + 1
-            )
+        active_by_source = _allocation_counts(leases)
 
         sources = tuple(
             SportsResourceSourceSnapshot(
@@ -515,8 +527,8 @@ class SportsResourcePool:
             )
 
         if (
-            payload.get("version")
-            != SPORTS_RESOURCE_POOL_VERSION
+            type(payload.get("version")) is not int
+            or payload["version"] not in {SPORTS_RESOURCE_POOL_VERSION, SPORTS_SHARED_RESOURCE_POOL_VERSION}
         ):
             raise SportsResourcePoolStateError(
                 "Sports resource pool state "
@@ -561,6 +573,11 @@ class SportsResourcePool:
                 "last_seen_at",
             }
 
+            fingerprint = lease.get("sharing_fingerprint")
+            if "sharing_fingerprint" in lease:
+                if payload["version"] != SPORTS_SHARED_RESOURCE_POOL_VERSION or not isinstance(fingerprint, str) or not re.fullmatch(r"[0-9a-f]{64}", fingerprint):
+                    raise SportsResourcePoolStateError("Sharing identity is invalid")
+                expected_keys.add("sharing_fingerprint")
             if set(lease) != expected_keys:
                 raise SportsResourcePoolStateError(
                     "Sports resource lease "
@@ -603,8 +620,11 @@ class SportsResourcePool:
                 "last_seen_at": last_seen_at,
             }
 
+            if fingerprint is not None:
+                validated[normalized_lease]["sharing_fingerprint"] = fingerprint
+
         return {
-            "version": SPORTS_RESOURCE_POOL_VERSION,
+            "version": payload["version"],
             "leases": validated,
         }
 
@@ -779,13 +799,25 @@ def _required_timestamp(
 def _lease_payload(
     lease: SportsResourceLease,
 ) -> dict[str, Any]:
-    return {
+    payload = {
         "user_id": lease.user_id,
         "target_id": lease.target_id,
         "source_id": lease.source_id,
         "created_at": lease.created_at,
         "last_seen_at": lease.last_seen_at,
     }
+    if lease.sharing_fingerprint is not None:
+        payload["sharing_fingerprint"] = lease.sharing_fingerprint
+    return payload
+
+
+def _allocation_counts(leases: Mapping[str, Mapping[str, Any]]) -> dict[str, int]:
+    allocations: dict[str, set[tuple[str, ...]]] = {}
+    for lease_id, row in leases.items():
+        fingerprint = row.get("sharing_fingerprint")
+        identity = ("shared", row["target_id"], fingerprint) if fingerprint else ("exclusive", lease_id)
+        allocations.setdefault(row["source_id"], set()).add(identity)
+    return {source: len(groups) for source, groups in allocations.items()}
 
 
 def _lease_from_payload(
@@ -809,6 +841,7 @@ def _lease_from_payload(
         last_seen_at=float(
             payload["last_seen_at"]
         ),
+        sharing_fingerprint=payload.get("sharing_fingerprint"),
     )
 
 
