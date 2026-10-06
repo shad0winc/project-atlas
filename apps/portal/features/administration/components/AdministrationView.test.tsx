@@ -2,6 +2,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const can = vi.fn<(permission: string) => boolean>();
+vi.mock("./AutomationHealthPanel", () => ({
+  AutomationHealthPanel: () => <section>Automation health</section>
+}));
 
 vi.mock("../../../lib/authorization", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../lib/authorization")>();

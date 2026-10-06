@@ -1,6 +1,7 @@
 """Version 1 routes for the Atlas HTTP API."""
 
 from fastapi import APIRouter
+from .admin_automation_health import router as admin_automation_health_router
 
 from .admin_downloads import router as admin_downloads_router
 from .admin_invitations import router as admin_invitations_router
@@ -33,6 +34,7 @@ router = APIRouter(
 )
 
 router.include_router(health_router)
+router.include_router(admin_automation_health_router)
 router.include_router(auth_router)
 router.include_router(admin_live_sessions_router)
 router.include_router(admin_sports_providers_router)
