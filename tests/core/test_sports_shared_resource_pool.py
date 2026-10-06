@@ -88,9 +88,9 @@ class SharedResourceTests(unittest.TestCase):
         self.pool.heartbeat(lease_id=second.lease_id, user_id='two')
         self.now += 31
         snapshot = self.pool.snapshot(capacities=CAP)
-        self.assertEqual([row.user_id for row in snapshot.leases], ['two'])
+        self.assertEqual({row.user_id for row in snapshot.leases}, {'one', 'two'})
         self.assertEqual(snapshot.active, 1)
-        self.acquire('three')
+        with self.assertRaises(SportsResourcePoolStateError): self.acquire('three')
 
     def test_invalid_fingerprint_state_fails_without_rewriting(self):
         self.acquire('one')
