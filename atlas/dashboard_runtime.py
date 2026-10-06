@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import tempfile
 import shutil
+from datetime import datetime, timezone
 from typing import Any, Mapping
 
 from atlas.health import HealthCheck, HealthReport
@@ -21,6 +22,32 @@ RUNTIME_GROUP_GID = 20000
 
 class DashboardRuntimeError(RuntimeError):
     """Raised when a Dashboard runtime snapshot cannot be read or published."""
+
+
+def publish_scheduler_runtime(scheduler: Any, destination: str | Path) -> Path:
+    """Publish observations after execution without running or registering tasks."""
+    tasks = scheduler.list_tasks()
+    if not isinstance(tasks, list) or len(tasks) > 1000:
+        raise DashboardRuntimeError("Scheduler projection exceeds its budget")
+    fields = (
+        "name", "enabled", "interval_seconds", "status", "due", "next_run",
+        "last_started", "last_success", "last_failure", "consecutive_failures",
+        "run_count", "failure_count", "module",
+    )
+    projected = []
+    for task in tasks:
+        if not isinstance(task, Mapping):
+            raise DashboardRuntimeError("Scheduler task observation is invalid")
+        row = {key: task[key] for key in fields if key in task}
+        if task.get("last_error"):
+            row["last_error"] = "Scheduler task failed."
+        projected.append(row)
+    payload = dict(schema_version=SCHEMA_VERSION,
+                   generated_at=datetime.now(timezone.utc).isoformat(), tasks=projected)
+    scheduler_tasks_from_payload(payload)
+    if len(json.dumps(payload).encode()) > 8 * 1024**2:
+        raise DashboardRuntimeError("Scheduler projection exceeds its budget")
+    return publish_snapshot(payload, destination)
 
 
 def health_report_from_payload(payload: Mapping[str, Any]) -> HealthReport:

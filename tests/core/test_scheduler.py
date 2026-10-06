@@ -337,6 +337,10 @@ class TaskSchedulerTests(unittest.TestCase):
 
 class SchedulerCliTests(unittest.TestCase):
     def setUp(self) -> None:
+        for name in ("chown", "fchown"):
+            ownership = patch("atlas.dashboard_runtime.os." + name, lambda *args: None)
+            ownership.start()
+            self.addCleanup(ownership.stop)
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary_directory.cleanup)
         self.state_file = Path(self.temporary_directory.name) / "tasks.json"
@@ -346,6 +350,7 @@ class SchedulerCliTests(unittest.TestCase):
             {
                 "ATLAS_SCHEDULER_STATE_FILE": str(self.state_file),
                 "ATLAS_RUNTIME_CONFIG_DIR": str(self.runtime_root),
+                "ATLAS_DASHBOARD_SCHEDULER_SNAPSHOT_PATH": str(self.runtime_root / "runtime/dashboard/scheduler.json"),
             },
         )
         self.environment.start()
