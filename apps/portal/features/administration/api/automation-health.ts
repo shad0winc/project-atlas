@@ -22,12 +22,20 @@ export type AutomationHealth = Readonly<{
 }>;
 
 export async function loadAutomationHealth(signal?: AbortSignal): Promise<AutomationHealth> {
-  const report = await authenticatedAtlasApiRequest<AutomationHealth>("/admin/automation-health", {
+  const response = await authenticatedAtlasApiRequest<{
+    schema_version: number; api_version: string; success: boolean;
+    generated_at: string; data: AutomationHealth;
+  }>("/admin/automation-health", {
     method: "GET", cache: "no-store", signal
   });
   const flags = ["enabled", "disabled", "invalid"];
   const timestamp = (value: unknown) => typeof value === "string" && Number.isFinite(Date.parse(value));
   const count = (value: unknown) => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+  if (!response || response.schema_version !== 1 || response.api_version !== "v1" ||
+      response.success !== true || !timestamp(response.generated_at)) {
+    throw new Error("Automation health response is unavailable.");
+  }
+  const report = response.data;
   if (!report || !timestamp(report.observed_at) ||
       !flags.includes(report.api_configuration?.receipt_recovery) ||
       !flags.includes(report.api_configuration?.acquisition_routing) ||
