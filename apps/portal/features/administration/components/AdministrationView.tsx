@@ -6,6 +6,7 @@ import { PORTAL_ROUTES } from "../../../lib/navigation/portal";
 import { LiveSessionManagement } from "./LiveSessionManagement";
 import { ProviderAccountManagement } from "./ProviderAccountManagement";
 import { RoleManagement } from "./RoleManagement";
+import { AutomationHealthPanel } from "./AutomationHealthPanel";
 
 const administrationDestinations = [
   {
@@ -75,6 +76,7 @@ export function AdministrationView(): React.ReactElement {
         ))}
       </div>
 
+      <AutomationHealthPanel />
       <ProviderAccountManagement />
       <LiveSessionManagement />
       <RoleManagement />
