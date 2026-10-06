@@ -213,8 +213,17 @@ def _isolated_cli(
     """Return an isolated scheduler plus the production CLI adapter."""
 
     import atlas.scheduler_cli as scheduler_cli
+    import atlas.dashboard_runtime as dashboard_runtime
 
     from atlas.scheduler import TaskScheduler
+
+    # Unit fixtures exercise atomic publication without requiring root ownership.
+    monkeypatch.setattr(dashboard_runtime.os, "chown", lambda *args: None)
+    monkeypatch.setattr(dashboard_runtime.os, "fchown", lambda *args: None)
+    monkeypatch.setenv(
+        "ATLAS_DASHBOARD_SCHEDULER_SNAPSHOT_PATH",
+        str(tmp_path / "dashboard/scheduler.json"),
+    )
 
     state_file = tmp_path / "tasks.json"
     lock_file = tmp_path / "tasks.lock"
