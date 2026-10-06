@@ -99,4 +99,3 @@ def load_shared_admission(default_path=API_CONFIG_PATH):
         return SharedAdmissionConfig(tuple(routes) if data['enabled'] else ())
     except Exception as error:
         raise SharedAdmissionConfigError('Shared admission configuration is unavailable.') from error
-
