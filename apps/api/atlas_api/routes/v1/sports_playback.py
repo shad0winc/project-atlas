@@ -7,6 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
 
 from atlas.jellyfin_live_streams import LiveStreamOwnershipError
+from atlas.sports_shared_admission import verify_api_shared_admission
 from atlas.user_profiles import UserProfileError, UserProfileStore
 from atlas.live_session_policy import (
     LiveSessionPolicyError,
@@ -539,6 +540,13 @@ def read_sports_live_session(
             source_registry=source_registry,
         )
 
+        resource_pool, candidate_source_ids = verify_api_shared_admission(
+            resource_pool, sports, target_id=atlas_channel_id,
+            user_id=current_user.user_id, jellyfin_item_id=jellyfin_item_id,
+            candidates=candidate_source_ids, capacities=capacities,
+            configured_options=configured_options,
+        )
+
         resource_lease = resource_pool.acquire(
             user_id=current_user.user_id,
             target_id=atlas_channel_id,
@@ -610,6 +618,13 @@ def read_sports_live_session(
             atlas_user_id=current_user.user_id,
         )
     except PlaybackNotFoundError as exc:
+        if getattr(resource_lease, "sharing_fingerprint", None) is not None:
+            # The owned stream ledger may contain an opening/blocked record.
+            # Preserve its session link and allocation for reconciliation.
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Shared live playback requires cleanup reconciliation.",
+            )
         live_sessions.release(
             session_id=live_session.session_id,
             user_id=current_user.user_id,
@@ -623,6 +638,13 @@ def read_sports_live_session(
             detail="Sports live channel is not available.",
         ) from exc
     except PlaybackUnavailableError as exc:
+        if getattr(resource_lease, "sharing_fingerprint", None) is not None:
+            # The owned stream ledger may contain an opening/blocked record.
+            # Preserve its session link and allocation for reconciliation.
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Shared live playback requires cleanup reconciliation.",
+            )
         live_sessions.release(
             session_id=live_session.session_id,
             user_id=current_user.user_id,
@@ -636,6 +658,13 @@ def read_sports_live_session(
             detail="Playback is not configured.",
         ) from exc
     except Exception:
+        if getattr(resource_lease, "sharing_fingerprint", None) is not None:
+            # The owned stream ledger may contain an opening/blocked record.
+            # Preserve its session link and allocation for reconciliation.
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Shared live playback requires cleanup reconciliation.",
+            )
         live_sessions.release(
             session_id=live_session.session_id,
             user_id=current_user.user_id,

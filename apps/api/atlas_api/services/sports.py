@@ -712,6 +712,13 @@ class SportsWriterBackedAPIService:
             raise SportsWriterTransportError("Invalid playback option account mapping")
         return result
 
+    def verify_shared_live_route(self, *, target_id, fingerprint):
+        payload = self._request("GET", "/internal/v1/shared-live-route?" + urllib.parse.urlencode({
+            "atlas_channel_id": target_id,
+        }))
+        if payload != {"route": {"target_id": target_id, "fingerprint": fingerprint}}:
+            raise SportsWriterTransportError("Shared route verification failed")
+
     def verify_live_playback_option(self, *, atlas_channel_id, option):
         payload = self._request("GET", "/internal/v1/live-playback-option?" + urllib.parse.urlencode({
             "atlas_channel_id": atlas_channel_id, "option_id": option["option_id"],

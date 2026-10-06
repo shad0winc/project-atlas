@@ -353,6 +353,18 @@ class Handler(BaseHTTPRequestHandler):
         if not self._require_auth():
             return
 
+        if parsed.path == "/internal/v1/shared-live-route":
+            try:
+                from shared_admission import verify_shared_live_route
+                query = urllib.parse.parse_qs(parsed.query)
+                if set(query) != {"atlas_channel_id"} or len(query["atlas_channel_id"]) != 1:
+                    raise ValueError("Invalid shared route query")
+                receipt = verify_shared_live_route(query["atlas_channel_id"][0], self._source_store().load())
+                self._json(HTTPStatus.OK, {"route": receipt})
+            except Exception:
+                self._json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "Shared route verification is unavailable."})
+            return
+
         if parsed.path == "/internal/v1/live-playback-option":
             try:
                 from dispatcharr_admin import verify_configured_playback_option

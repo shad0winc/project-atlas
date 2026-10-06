@@ -201,6 +201,15 @@ class SportsResourcePool:
                 )
                 # Revoked/reduced capacity cannot admit new consumers.
                 used = active_by_source.get(source_id, 0)
+                if joining and any(
+                    row["source_id"] == source_id
+                    and row.get("sharing_fingerprint") is not None
+                    and now - row["last_seen_at"] >= self.ttl_seconds
+                    for row in leases.values()
+                ):
+                    raise SportsResourcePoolStateError(
+                        "Shared upstream cleanup requires reconciliation."
+                    )
                 if (joining and used <= capacity) or used < capacity:
                     selected_source = source_id
                     break
@@ -288,6 +297,14 @@ class SportsResourcePool:
                 )
                 raise SportsResourceLeaseNotFound(
                     "Sports resource lease was not found."
+                )
+
+            if (
+                payload.get("sharing_fingerprint") is not None
+                and now - payload["last_seen_at"] >= self.ttl_seconds
+            ):
+                raise SportsResourcePoolStateError(
+                    "Expired shared consumer requires cleanup reconciliation."
                 )
 
             refreshed = SportsResourceLease(
@@ -694,10 +711,12 @@ class SportsResourcePool:
             lease_id: payload
             for lease_id, payload
             in leases.items()
+            # A stale shared consumer may still own a physical stream. Keep
+            # its allocation until the caller confirms owned cleanup and releases
+            # it; elapsed time alone is not evidence that the upstream closed.
             if (
-                now
-                - payload["last_seen_at"]
-                < self.ttl_seconds
+                payload.get("sharing_fingerprint") is not None
+                or now - payload["last_seen_at"] < self.ttl_seconds
             )
         }
 

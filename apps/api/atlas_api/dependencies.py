@@ -37,6 +37,7 @@ from atlas.password_recovery import (
 )
 from atlas.user_profiles import UserProfileError, UserProfileStore
 from atlas.sports_resource_pool import SportsResourcePool
+from atlas.sports_shared_admission import load_shared_admission
 from atlas.sports_session_registry import SportsSessionRegistry
 from atlas.live_session_policy import (
     LiveSessionPolicyStore,
@@ -242,9 +243,12 @@ def get_sports_resource_pool() -> SportsResourcePool:
             "ATLAS_SPORTS_RESOURCE_POOL_PATH cannot be empty."
         )
 
-    return SportsResourcePool(
-        Path(raw_path),
-    )
+    pool = SportsResourcePool(Path(raw_path))
+    # Admission loads this independently; configuration errors must never
+    # prevent existing viewers from releasing their owned streams.
+    pool.shared_admission_loader = load_shared_admission
+    return pool
+
 
 
 @lru_cache(maxsize=1)
