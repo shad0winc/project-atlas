@@ -108,10 +108,10 @@ def read_automation_health(
             raise ValueError("Invalid failure count")
         last_success, success_age = _age(task.get("last_success"), instant)
         state = task.get("status")
-        if state not in ("healthy", "running", "failed", "disabled"):
+        if state not in ("healthy", "running", "failed", "degraded", "disabled"):
             raise ValueError("Invalid task status")
         health = "stale" if max(snapshot_age, success_age) > FRESH_SECONDS else (
-            "attention" if failures or state in ("failed", "disabled") else "healthy"
+            "attention" if failures or state in ("failed", "degraded", "disabled") or task.get("enabled") is False else "healthy"
         )
         reconcile = dict(status=health, task_status=state, last_success=last_success,
                          snapshot_age_seconds=snapshot_age, success_age_seconds=success_age,

@@ -6,6 +6,7 @@ import argparse
 import fcntl
 import json
 import os
+import sys
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator, Sequence
@@ -26,6 +27,21 @@ from atlas.sustained_use.scheduler import (
     register_sustained_use_sampling,
 )
 from atlas.scheduler import SchedulerLockedError, TaskScheduler
+from atlas.dashboard_runtime import publish_scheduler_runtime
+
+
+def _publish_execution_snapshot(scheduler: TaskScheduler) -> bool:
+    """Publication failure is visible; completed task outcomes remain intact."""
+    try:
+        runtime = os.environ.get("ATLAS_DASHBOARD_RUNTIME_DIR", str(runtime_config_root() / "runtime/dashboard"))
+        destination = os.environ.get("ATLAS_DASHBOARD_SCHEDULER_SNAPSHOT_PATH", str(Path(runtime) / "scheduler.json"))
+        if not runtime.strip() or not destination.strip():
+            raise ValueError("Empty snapshot path")
+        publish_scheduler_runtime(scheduler, destination)
+        return True
+    except Exception:
+        print("Scheduler snapshot publication failed; completed task records are preserved.", file=sys.stderr)
+        return False
 
 
 def scheduler_state_file() -> Path:
@@ -277,14 +293,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                         force=not args.due_only,
                     )
                     _print_json(result.to_dict())
-                    return 0 if result.result == "success" else 1
+                    published = _publish_execution_snapshot(scheduler)
+                    return (0 if published else 4) if result.result == "success" else 1
 
                 results = scheduler.run_due_tasks()
                 _print_json(
                     [result.to_dict() for result in results]
                 )
+                published = _publish_execution_snapshot(scheduler)
                 return (
-                    0
+                    (0 if published else 4)
                     if all(
                         result.result == "success"
                         for result in results

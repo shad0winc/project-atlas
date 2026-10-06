@@ -63,6 +63,15 @@ class AutomationHealthTests(unittest.TestCase):
         self.write()
         self.assertEqual(self.report()["request_reconciliation"]["status"], "attention")
 
+    def test_native_degraded_and_disabled_tasks_require_attention(self):
+        self.scheduler["tasks"][0]["status"] = "degraded"
+        self.write()
+        self.assertEqual(self.report()["request_reconciliation"]["status"], "attention")
+        self.scheduler["tasks"][0]["status"] = "healthy"
+        self.scheduler["tasks"][0]["enabled"] = False
+        self.write()
+        self.assertEqual(self.report()["request_reconciliation"]["status"], "attention")
+
     def test_missing_malformed_symlink_and_oversize_are_unavailable(self):
         self.registry.unlink()
         self.assertEqual(self.report()["request_registry"], {"status": "unavailable"})

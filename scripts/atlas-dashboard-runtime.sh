@@ -44,19 +44,14 @@ publish_scheduler_snapshot() {
   SCHED_STATE="$state_file" \
   python3 - <<'PYSCHED'
 import os
-from datetime import datetime, timezone
 from pathlib import Path
 
-from atlas.dashboard_runtime import SCHEMA_VERSION, publish_snapshot
+from atlas.dashboard_runtime import publish_scheduler_runtime
 from atlas.scheduler import TaskScheduler
 
-tasks = TaskScheduler(Path(os.environ["SCHED_STATE"])).list_tasks()
-payload = {
-    "schema_version": SCHEMA_VERSION,
-    "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-    "tasks": tasks,
-}
-published = publish_snapshot(payload, Path(os.environ["DASH_DEST"]))
+published = publish_scheduler_runtime(
+    TaskScheduler(Path(os.environ["SCHED_STATE"])), Path(os.environ["DASH_DEST"])
+)
 print(f"Dashboard scheduler runtime snapshot published: {published}")
 PYSCHED
 }
