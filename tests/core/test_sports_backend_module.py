@@ -9,6 +9,7 @@ COMPOSE = MODULE / "docker-compose.yml"
 CONF = MODULE / "module.conf"
 ENV_EXAMPLE = MODULE / ".env.example"
 BACKUP_DOC = ROOT / "docs" / "architecture" / "BACKUP_RECOVERY.md"
+DISPATCHARR_DOCKERFILE = MODULE / "dispatcharr" / "Dockerfile"
 TEAMARR_DOCKERFILE = MODULE / "teamarr" / "Dockerfile"
 TEAMARR_PATCHER = MODULE / "teamarr" / "apply_patch.py"
 
@@ -69,7 +70,7 @@ def test_dispatcharr_explicitly_uses_aio_mode() -> None:
         "ghcr.io/dispatcharr/dispatcharr@"
         "sha256:e764cd3fb3a4b14e0c96eeb830cce645"
         "b44ef0a2494838e21462c71dde5abeb4"
-    ) in compose
+    ) in DISPATCHARR_DOCKERFILE.read_text(encoding="utf-8")
     assert 'DISPATCHARR_ENV: "aio"' in compose
     assert ':/data"' in compose
 
@@ -100,8 +101,10 @@ def test_sports_backend_images_are_immutable_digest_pins() -> None:
         "ghcr.io/dispatcharr/dispatcharr@"
         "sha256:e764cd3fb3a4b14e0c96eeb830cce645"
         "b44ef0a2494838e21462c71dde5abeb4"
-    ) in compose
+    ) in DISPATCHARR_DOCKERFILE.read_text(encoding="utf-8")
 
+    assert "project-atlas/dispatcharr:atlas-head1" in compose
+    assert "dockerfile: modules/sports-backend/dispatcharr/Dockerfile" in compose
     assert (
         "ghcr.io/pharaoh-labs/teamarr@"
         "sha256:d846ec078cde27f68e94f5fc3eec7f1"
