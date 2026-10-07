@@ -76,3 +76,17 @@ Dispatcharr may add execute permission to the `/data` root during startup.
 Verification therefore enforces the security properties of the directory
 rather than one exact mode: the owner must have read/write/execute access and
 group/other must not have write access.
+
+## Dispatcharr HEAD compatibility
+
+The Atlas Dispatcharr derivative uses the same immutable upstream digest. Its
+hash-guarded patch permits HEAD on the TS stream route after the existing network
+access check and channel/stream identity lookup. HEAD returns MPEG-TS headers and
+an empty streaming response, without creating a proxy, selecting an upstream,
+registering a viewer, reserving capacity, or changing Redis accounting. It does
+not assert that the upstream feed is on air. GET behavior is preserved.
+
+The image build runs the real Django REST Framework method contract with
+synthetic settings and fenced upstream operations. A changed upstream source
+hash stops the build. The separate native generation-authority patch workspace
+is not included in this derivative.

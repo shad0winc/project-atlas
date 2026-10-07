@@ -1,6 +1,9 @@
 services:
   atlas-dispatcharr:
-    image: ghcr.io/dispatcharr/dispatcharr@sha256:e764cd3fb3a4b14e0c96eeb830cce645b44ef0a2494838e21462c71dde5abeb4
+    build:
+      context: ../..
+      dockerfile: modules/sports-backend/dispatcharr/Dockerfile
+    image: project-atlas/dispatcharr:atlas-head1
     container_name: atlas-dispatcharr
     restart: unless-stopped
 

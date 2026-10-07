@@ -40,12 +40,12 @@ chown 1000:1000 /mnt/storage/configs/dispatcharr
 docker compose \
     --env-file "$MODULE_ENV_FILE" \
     -f "$COMPOSE_FILE" \
-    pull
+    pull --ignore-buildable
 
 docker compose \
     --env-file "$MODULE_ENV_FILE" \
     -f "$COMPOSE_FILE" \
-    up -d
+    up -d --build
 
 for container in atlas-dispatcharr atlas-teamarr; do
     running=false
