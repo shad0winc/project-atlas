@@ -8,6 +8,9 @@ consumers, so repeating an uncertain close can affect another consumer.
 from __future__ import annotations
 
 from contextlib import contextmanager
+from dataclasses import asdict, dataclass
+import hashlib
+import stat
 import fcntl
 import json
 import math
@@ -22,6 +25,27 @@ from atlas.media.provider import MediaProviderError
 
 class LiveStreamOwnershipError(MediaProviderError):
     pass
+
+
+@dataclass(frozen=True)
+class JellyfinProcessRetirement:
+    """Evidence returned by a trusted, quiesced host-side verifier.
+
+    This is an internal operator contract, not a client-supplied authorization
+    token. The verifier must establish process retirement and upstream closure;
+    quiet Sessions output or zero counters alone do not establish those facts.
+    """
+
+    old_generation: str
+    new_generation: str
+    old_started_at: float
+    new_started_at: float
+    observed_at: float
+    old_process_absent: bool
+    new_provider_healthy: bool
+    admission_quiesced: bool
+    native_upstream_closed: bool
+    native_consumers_absent: bool
 
 
 class OwnedJellyfinLiveStreams:
@@ -195,6 +219,116 @@ class OwnedJellyfinLiveStreams:
                 row["status"] = "blocked"
                 self._write(state)
                 raise
+
+    def reconcile_failed_open_after_retirement(
+        self,
+        *,
+        session_id: str,
+        user_id: str,
+        item_id: str,
+        expected_sha256: str,
+        backup_file: Path,
+        receipt_file: Path,
+        verify_retirement: Callable[[dict], JellyfinProcessRetirement],
+    ) -> None:
+        """Retire one unidentified blocked open after verified provider retirement.
+
+        Admission and the scheduler must be quiesced by the trusted caller.
+        Known stream IDs, uncertain closes, or multiple owners are excluded.
+        The caller releases the exact linked session/lease only after success,
+        using their existing ownership APIs. No provider open/close is issued.
+        """
+        if not all(isinstance(value, str) and value.strip()
+                   for value in (session_id, user_id, item_id)):
+            raise LiveStreamOwnershipError("Recovery ownership is required")
+        if (not isinstance(expected_sha256, str) or len(expected_sha256) != 64
+                or any(value not in "0123456789abcdef" for value in expected_sha256)):
+            raise LiveStreamOwnershipError("Recovery digest is invalid")
+
+        def verify(row: dict) -> JellyfinProcessRetirement:
+            try:
+                evidence = verify_retirement(dict(row))
+            except Exception as exc:
+                raise LiveStreamOwnershipError("Provider retirement is unverified") from exc
+            if not isinstance(evidence, JellyfinProcessRetirement):
+                raise LiveStreamOwnershipError("Provider retirement evidence is invalid")
+            if not all(isinstance(value, str) and value.strip() and len(value) <= 512
+                       for value in (evidence.old_generation, evidence.new_generation)):
+                raise LiveStreamOwnershipError("Provider generation identity is invalid")
+            times = (evidence.old_started_at, evidence.new_started_at,
+                     evidence.observed_at, self.clock())
+            if not all(not isinstance(value, bool) and isinstance(value, (int, float))
+                       and math.isfinite(value) for value in times):
+                raise LiveStreamOwnershipError("Provider retirement timestamp is invalid")
+            if (evidence.old_generation == evidence.new_generation
+                    or not (0 <= times[0] <= row["last_seen"] < times[1] <= times[2] <= times[3])
+                    or times[3] - times[2] > 30
+                    or any(value is not True for value in (
+                        evidence.old_process_absent, evidence.new_provider_healthy,
+                        evidence.admission_quiesced, evidence.native_upstream_closed,
+                        evidence.native_consumers_absent))):
+                raise LiveStreamOwnershipError("Provider retirement is unverified")
+            return evidence
+
+        def archive(path: Path, raw: bytes) -> None:
+            if (not isinstance(path, Path) or not path.is_absolute()
+                    or path in (self.path.absolute(), Path(str(self.path.absolute()) + ".lock"))
+                    or path.parent.resolve() != path.parent
+                    or not path.parent.is_dir()
+                    or path.parent.stat().st_uid != os.geteuid()
+                    or stat.S_IMODE(path.parent.stat().st_mode) & 0o077):
+                raise LiveStreamOwnershipError("Private recovery archive directory is required")
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, "wb") as out:
+                out.write(raw)
+                out.flush()
+                os.fsync(out.fileno())
+            directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
+
+        if backup_file == receipt_file:
+            raise LiveStreamOwnershipError("Recovery archives must be distinct")
+        with self._locked() as state:
+            if not self.path.is_file() or self.path.is_symlink() or self.path.stat().st_nlink != 1:
+                raise LiveStreamOwnershipError("Recovery registry must not be a symlink")
+            raw = self.path.read_bytes()
+            if len(raw) > 8 * 1024**2 or hashlib.sha256(raw).hexdigest() != expected_sha256:
+                raise LiveStreamOwnershipError("Recovery registry changed")
+            row = state["streams"].get(session_id)
+            if (len(state["streams"]) != 1 or row is None
+                    or row["user_id"] != user_id or row["item_id"] != item_id
+                    or row["status"] != "blocked" or row["live_stream_id"] is not None
+                    or not all(isinstance(row[key], str) and row[key].strip()
+                               for key in ("play_session_id", "media_source_id"))):
+                raise LiveStreamOwnershipError("Unidentified failed-open recovery is unavailable")
+            if json.loads(raw) != state:
+                raise LiveStreamOwnershipError("Recovery registry changed")
+            evidence = verify(row)
+            archive(backup_file, raw)
+            receipt = {
+                "version": 1,
+                "status": "prepared",
+                "operation": "retire_unidentified_failed_open",
+                "registry_before_sha256": expected_sha256,
+                "registry_after_sha256": hashlib.sha256(
+                    b'{"streams":{},"version":1}'
+                ).hexdigest(),
+                "session_reference_sha256": hashlib.sha256(session_id.encode()).hexdigest(),
+                "provider_retirement": asdict(evidence),
+                "backup_file": str(backup_file),
+            }
+            archive(receipt_file, json.dumps(receipt, sort_keys=True).encode())
+            confirmed = verify(row)
+            first, second = asdict(evidence), asdict(confirmed)
+            first.pop("observed_at")
+            second.pop("observed_at")
+            if first != second or self.path.read_bytes() != raw:
+                raise LiveStreamOwnershipError("Recovery evidence changed before commit")
+            del state["streams"][session_id]
+            self._write(state)
 
     def heartbeat(self, *, session_id: str, user_id: str) -> None:
         with self._locked() as state:
