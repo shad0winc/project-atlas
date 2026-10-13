@@ -28,6 +28,8 @@ class PlaybackCapabilityService:
     algorithm = "HS256"
     bootstrap_audience = "atlas-playback-bootstrap"
     session_audience = "atlas-playback-session"
+    release_audience = "atlas-sports-session-release"
+    release_seconds = 6 * 60 * 60
     bootstrap_seconds = 120
     session_seconds = 6 * 60 * 60
 
@@ -55,6 +57,30 @@ class PlaybackCapabilityService:
                 "scope": path_prefix,
             },
         )
+
+    def create_live_release(self, *, user_id: str, session_id: str,
+                            target_id: str, lease_id: str) -> str:
+        return self._encode(
+            audience=self.release_audience,
+            lifetime_seconds=self.release_seconds,
+            payload={"kind": "sports_session_release", "sub": self._required(user_id, "user_id"),
+                     "session": self._required(session_id, "session_id"),
+                     "target": self._required(target_id, "target_id"),
+                     "lease": self._required(lease_id, "lease_id")},
+        )
+
+    def authorize_live_release(self, token: str, *, session_id: str) -> dict[str, Any]:
+        if not isinstance(token, str) or len(token) > 4096:
+            raise PlaybackCapabilityError("Live release capability is invalid.")
+        payload = self._decode(token, audience=self.release_audience,
+                               expected_kind="sports_session_release")
+        for name in ("sub", "session", "target", "lease"):
+            value = payload.get(name)
+            if not isinstance(value, str) or not value or len(value) > 256 or value != value.strip():
+                raise PlaybackCapabilityError("Live release capability scope is invalid.")
+        if payload["session"] != session_id:
+            raise PlaybackCapabilityError("Live release capability is out of scope.")
+        return payload
 
     def exchange_bootstrap(self, token: str) -> PlaybackGatewaySession:
         payload = self._decode(

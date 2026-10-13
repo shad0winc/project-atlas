@@ -13,7 +13,11 @@ export async function replaceSportsLiveSession({ current, channelId, optionId, s
   if (current !== null) {
     detach();
     // Do not pass the new request's abort signal to cleanup of an existing stream.
-    await releaseSportsLiveSession(current.liveSessionId);
+    if (current.releaseCapability) {
+      await releaseSportsLiveSession(current.liveSessionId, { releaseCapability: current.releaseCapability });
+    } else {
+      await releaseSportsLiveSession(current.liveSessionId);
+    }
   }
   if (signal?.aborted) throw new Error("Live playback request was cancelled.");
   return createSportsLiveSession(channelId, { signal }, subtitle, optionId);

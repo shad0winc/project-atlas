@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
+from fastapi import Header, APIRouter, Depends, HTTPException, Path, Query, Response, status
 
 from atlas.jellyfin_live_streams import LiveStreamOwnershipError
 from atlas.sports_shared_admission import verify_api_shared_admission
@@ -21,7 +21,7 @@ from atlas_api.dependencies import (
     get_sports_session_registry,
     get_user_profile_store,
 )
-from atlas_api.playback_capabilities import PlaybackCapabilityService
+from atlas_api.playback_capabilities import PlaybackCapabilityError, PlaybackCapabilityService
 from atlas.sports_resource_pool import (
     SportsResourceLeaseNotFound,
     SportsResourcePool,
@@ -676,6 +676,10 @@ def read_sports_live_session(
         raise
 
     try:
+        release_capability = capabilities.create_live_release(
+            user_id=current_user.user_id, session_id=live_session.session_id,
+            target_id=atlas_channel_id, lease_id=resource_lease.lease_id,
+        )
         capability = capabilities.create_bootstrap(
             user_id=current_user.user_id,
             playable_target_id=session.playable_target_id,
@@ -695,6 +699,8 @@ def read_sports_live_session(
         )
         raise
 
+    response.headers["X-Atlas-Live-Release-Capability"] = release_capability
+    response.headers["Cache-Control"] = "no-store"
     response.headers["X-Atlas-Live-Session-ID"] = live_session.session_id
     response.headers["X-Atlas-Live-Session-TTL"] = str(live_sessions.ttl_seconds)
 
@@ -810,9 +816,61 @@ def release_sports_live_session(
     ],
     playback: Annotated[PlaybackService, Depends(get_playback_service)],
 ) -> Response:
+    return _release_owned_session(
+        session_id=session_id, user_id=current_user.user_id,
+        live_sessions=live_sessions, resource_pool=resource_pool, playback=playback,
+    )
+
+
+def require_live_release_capability(
+    session_id: Annotated[str, Path(min_length=1, max_length=256)],
+    release_capability: Annotated[
+        str, Header(alias="X-Atlas-Live-Release-Capability")
+    ],
+    capabilities: Annotated[
+        PlaybackCapabilityService, Depends(get_playback_capability_service)
+    ],
+) -> dict[str, str]:
+    try:
+        claims = capabilities.authorize_live_release(
+            release_capability, session_id=session_id
+        )
+    except PlaybackCapabilityError as exc:
+        raise HTTPException(
+            status_code=401, detail="Live release authorization is invalid."
+        ) from exc
+    return {name: claims[name] for name in ("sub", "session", "target", "lease")}
+
+
+@router.delete("/sessions/{session_id}/release-capability", status_code=204,
+               summary="Release one session with its scoped cleanup capability")
+def release_sports_live_session_with_capability(
+    session_id: Annotated[str, Path(min_length=1, max_length=256)],
+    claims: Annotated[dict[str, str], Depends(require_live_release_capability)],
+    live_sessions: Annotated[SportsSessionRegistry, Depends(get_sports_session_registry)],
+    resource_pool: Annotated[SportsResourcePool, Depends(get_sports_resource_pool)],
+    playback: Annotated[PlaybackService, Depends(get_playback_service)],
+) -> Response:
+    try:
+        record = live_sessions.read_owned_record(session_id=session_id, user_id=claims["sub"])
+    except SportsSessionStateError as exc:
+        raise HTTPException(status_code=503, detail="Live session state is unavailable.") from exc
+    if record is None:
+        raise HTTPException(status_code=404, detail="Live session was not found.")
+    if record.target_id != claims["target"] or record.resource_lease_id != claims["lease"]:
+        raise HTTPException(status_code=401, detail="Live release authorization is out of scope.")
+    return _release_owned_session(
+        session_id=session_id, user_id=record.user_id, live_sessions=live_sessions,
+        resource_pool=resource_pool, playback=playback,
+    )
+
+
+def _release_owned_session(*, session_id: str, user_id: str,
+                           live_sessions: SportsSessionRegistry,
+                           resource_pool: SportsResourcePool, playback: PlaybackService) -> Response:
     try:
         playback.release_live_stream(
-            session_id=session_id, user_id=current_user.user_id
+            session_id=session_id, user_id=user_id
         )
     except LiveStreamOwnershipError as exc:
         raise HTTPException(
@@ -823,7 +881,7 @@ def release_sports_live_session(
     try:
         released = live_sessions.release_record(
             session_id=session_id,
-            user_id=current_user.user_id,
+            user_id=user_id,
         )
     except SportsSessionStateError as exc:
         raise HTTPException(
@@ -841,7 +899,7 @@ def release_sports_live_session(
         try:
             resource_pool.release(
                 lease_id=released.resource_lease_id,
-                user_id=current_user.user_id,
+                user_id=user_id,
             )
         except SportsResourcePoolStateError as exc:
             raise HTTPException(
