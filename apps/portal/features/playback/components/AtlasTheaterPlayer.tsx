@@ -10,6 +10,7 @@ import { resolvePlaybackSession } from "../services/session";
 import type { SubtitleSelection } from "../services/session";
 import { bootstrapPlaybackStream } from "../services/stream";
 import { refreshPlaybackForRetry, retryResumePosition } from "../services/retry";
+import { createPlaybackDiagnostics } from "../services/diagnostics";
 import { safeLiveSeekPosition } from "../services/live-seek";
 import { nextEpisodeTarget } from "../services/episode-navigation";
 import { readResume, resumeKey, restoreContinuity, writeResume } from "../services/continuity";
@@ -237,7 +238,20 @@ export function AtlasTheaterPlayer({
 
         destroyHls = () => hls.destroy();
 
+        const diagnostic = createPlaybackDiagnostics(video);
+        hls.on(Hls.Events.FRAG_LOADED, (_event, data) => {
+          diagnostic("fragment_loaded", { fragmentSequence: data.frag.sn,
+            fragmentStart: data.frag.start, fragmentDuration: data.frag.duration });
+        });
+        hls.on(Hls.Events.FRAG_BUFFERED, (_event, data) => {
+          diagnostic("fragment_buffered", { fragmentSequence: data.frag.sn,
+            fragmentStart: data.frag.start, fragmentDuration: data.frag.duration });
+        });
         hls.on(Hls.Events.ERROR, (_event, data) => {
+          diagnostic("hls_error", { type: data.type, details: data.details,
+            fatal: data.fatal, responseStatus: data.response?.code,
+            fragmentSequence: data.frag?.sn, fragmentStart: data.frag?.start,
+            fragmentDuration: data.frag?.duration });
           if (!data.fatal || disposed) {
             return;
           }
