@@ -204,7 +204,7 @@ class SportsSessionRegistry:
         session_id: str,
         user_id: str,
     ) -> SportsSessionRecord | None:
-        """Atomically remove and return one owned Sports session."""
+        """Remove one owned session, retaining its lease linkage even after expiry."""
 
         normalized_session = _required_identifier(
             session_id,
@@ -214,11 +214,9 @@ class SportsSessionRegistry:
             user_id,
             "Sports-session user ID",
         )
-        now = self._clock()
 
         with self._locked():
             state = self._read_state()
-            changed = self._prune_stale(state, now)
 
             payload = state["sessions"].get(
                 normalized_session
@@ -228,8 +226,6 @@ class SportsSessionRegistry:
                 payload is None
                 or payload["user_id"] != normalized_user
             ):
-                if changed:
-                    self._write_state(state)
                 return None
 
             record = _record(
