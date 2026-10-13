@@ -1,3 +1,4 @@
+import { atlasApiRequest } from "../../../lib/api/client";
 import { AtlasApiError } from "../../../lib/api/errors";
 import {
   authenticatedAtlasApiRequest,
@@ -89,6 +90,7 @@ export type SportsLiveSessionResult = Readonly<{
   liveSessionId: string;
   ttlSeconds: number;
   playbackOptionId?: string;
+  releaseCapability?: string;
 }>;
 
 type SportsLiveHeartbeatTransport = Readonly<{
@@ -322,6 +324,8 @@ export async function createSportsLiveSession(
     );
   }
 
+  const releaseCapability = response.headers.get("X-Atlas-Live-Release-Capability")?.trim() || undefined;
+
   try {
     const ttlHeader =
       response.headers
@@ -349,16 +353,17 @@ export async function createSportsLiveSession(
       ...(playbackOptionId === undefined ? {} : { playbackOptionId }),
       session,
       liveSessionId,
-      ttlSeconds
+      ttlSeconds,
+      ...(releaseCapability === undefined ? {} : { releaseCapability })
     });
   } catch (validationError) {
     try {
       await releaseSportsLiveSession(
-        liveSessionId
+        liveSessionId, { releaseCapability }
       );
     } catch {
       // Preserve the original validation failure.
-      // Server TTL remains the final fail-safe.
+      // Uncertain cleanup retains ownership for reconciliation.
     }
 
     throw validationError;
@@ -429,7 +434,7 @@ export async function heartbeatSportsLiveSession(
 
 export async function releaseSportsLiveSession(
   liveSessionId: string,
-  options: SportsRequestOptions = {}
+  options: SportsRequestOptions & Readonly<{ releaseCapability?: string }> = {}
 ): Promise<void> {
   const normalizedSessionId = liveSessionId.trim();
 
@@ -437,6 +442,17 @@ export async function releaseSportsLiveSession(
     throw new Error(
       "sportsLiveSession.liveSessionId must not be empty."
     );
+  }
+
+  if (options.releaseCapability) {
+    await atlasApiRequest<void>(
+      `/sports/live/sessions/${encodeURIComponent(normalizedSessionId)}/release-capability`,
+      { method: "DELETE", cache: "no-store", signal: options.signal,
+        headers: { "X-Atlas-Live-Release-Capability": options.releaseCapability },
+        retryAuthentication: false,
+        retryPolicy: { maxRetries: 0, baseDelayMs: 250, maxDelayMs: 5_000 } }
+    );
+    return;
   }
 
   await authenticatedAtlasApiRequest<void>(

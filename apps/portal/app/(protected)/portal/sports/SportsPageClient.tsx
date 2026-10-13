@@ -112,12 +112,12 @@ export function SportsPageClient(): React.ReactElement {
   }
 
   async function releaseLiveSessionBestEffort(
-    liveSessionId: string,
+    liveSession: SportsLiveSessionResult,
   ): Promise<void> {
     try {
-      await releaseSportsLiveSession(liveSessionId);
+      await releaseSportsLiveSession(liveSession.liveSessionId, { releaseCapability: liveSession.releaseCapability });
     } catch {
-      // Server TTL remains the final fail-safe if explicit release fails.
+      // Uncertain cleanup retains ownership for reconciliation.
     }
   }
 
@@ -156,10 +156,10 @@ export function SportsPageClient(): React.ReactElement {
           activeLiveSessionRef.current = null;
           setActiveLiveSession(null);
           setLivePlaybackError(
-            "Atlas lost the authenticated live playback lease.",
+            "Atlas could not renew the live playback lease.",
           );
 
-          void releaseLiveSessionBestEffort(liveSessionId);
+          void releaseLiveSessionBestEffort(current);
         });
     }, delayMs);
   }
@@ -213,7 +213,7 @@ export function SportsPageClient(): React.ReactElement {
     }
 
     if (liveRequestVersionRef.current !== requestVersion) {
-      void releaseLiveSessionBestEffort(nextLiveSession.liveSessionId);
+      void releaseLiveSessionBestEffort(nextLiveSession);
       return;
     }
 
@@ -263,7 +263,7 @@ export function SportsPageClient(): React.ReactElement {
     if (
       liveRequestVersionRef.current !== requestVersion
     ) {
-      void releaseLiveSessionBestEffort(replacement.liveSessionId);
+      void releaseLiveSessionBestEffort(replacement);
 
       throw new Error("Sports live playback changed while updating captions.");
     }
@@ -288,7 +288,7 @@ export function SportsPageClient(): React.ReactElement {
     setLivePlaybackError(null);
 
     if (current !== null) {
-      void releaseLiveSessionBestEffort(current.liveSessionId);
+      void releaseLiveSessionBestEffort(current);
     }
   }
 
@@ -325,7 +325,7 @@ export function SportsPageClient(): React.ReactElement {
       activeLiveSessionRef.current = null;
 
       if (current !== null) {
-        void releaseLiveSessionBestEffort(current.liveSessionId);
+        void releaseLiveSessionBestEffort(current);
       }
     };
   }, []);
