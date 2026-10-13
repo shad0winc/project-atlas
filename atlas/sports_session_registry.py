@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import fcntl
 import json
 import os
+import stat
 from pathlib import Path
 import tempfile
 import time
@@ -517,6 +518,10 @@ class SportsSessionRegistry:
             exist_ok=True,
         )
 
+        previous = self.path.stat(follow_symlinks=False) if self.path.exists() else None
+        if previous is not None and not stat.S_ISREG(previous.st_mode):
+            raise SportsSessionStateError("Sports-session state path is invalid.")
+
         descriptor, temporary_name = tempfile.mkstemp(
             prefix=f".{self.path.name}.",
             suffix=".tmp",
@@ -526,6 +531,10 @@ class SportsSessionRegistry:
         temporary_path = Path(temporary_name)
 
         try:
+            if previous is not None:
+                current = os.fstat(descriptor)
+                if (current.st_uid, current.st_gid) != (previous.st_uid, previous.st_gid):
+                    os.fchown(descriptor, previous.st_uid, previous.st_gid)
             os.fchmod(descriptor, 0o600)
 
             with os.fdopen(

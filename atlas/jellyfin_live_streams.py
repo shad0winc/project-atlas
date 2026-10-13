@@ -123,9 +123,16 @@ class OwnedJellyfinLiveStreams:
             yield state
 
     def _write(self, state: dict) -> None:
+        previous = self.path.stat(follow_symlinks=False) if self.path.exists() else None
+        if previous is not None and not stat.S_ISREG(previous.st_mode):
+            raise LiveStreamOwnershipError("Live stream ownership path is invalid")
         fd, name = tempfile.mkstemp(prefix=".live-streams.", dir=self.path.parent)
         try:
             with os.fdopen(fd, "w") as out:
+                if previous is not None:
+                    current = os.fstat(out.fileno())
+                    if (current.st_uid, current.st_gid) != (previous.st_uid, previous.st_gid):
+                        os.fchown(out.fileno(), previous.st_uid, previous.st_gid)
                 os.fchmod(out.fileno(), 0o600)
                 json.dump(state, out, separators=(",", ":"), sort_keys=True)
                 out.flush()
