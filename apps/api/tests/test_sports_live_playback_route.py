@@ -328,6 +328,9 @@ class FakeCapabilities:
     def __init__(self) -> None:
         self.calls: list[dict[str, str]] = []
 
+    def create_live_release(self, **scope: str) -> str:
+        return "release-capability-test-token"
+
     def create_bootstrap(
         self,
         *,

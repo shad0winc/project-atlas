@@ -198,6 +198,17 @@ class SportsSessionRegistry:
 
             return _record(normalized_session, payload)
 
+    def read_owned_record(self, *, session_id: str, user_id: str) -> SportsSessionRecord | None:
+        """Read exact ownership and lease linkage without pruning expired sessions."""
+        normalized_session = _required_identifier(session_id, "Sports-session identifier")
+        normalized_user = _required_identifier(user_id, "Sports-session user ID")
+        with self._locked():
+            state = self._read_state()
+            payload = state["sessions"].get(normalized_session)
+            if payload is None or payload["user_id"] != normalized_user:
+                return None
+            return _record(normalized_session, payload)
+
     def release_record(
         self,
         *,

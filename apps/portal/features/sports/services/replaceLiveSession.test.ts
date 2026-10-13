@@ -29,3 +29,11 @@ describe("replacement at a one-session limit", () => {
     expect(createSportsLiveSession).not.toHaveBeenCalled();
   });
 });
+
+it("carries cleanup authorization through a cancelled replacement", async () => {
+  const controller = new AbortController(); controller.abort();
+  await expect(replaceSportsLiveSession({ current: { ...current, releaseCapability: "cleanup-only" },
+    channelId: current.atlasChannelId, signal: controller.signal, detach: vi.fn() })).rejects.toThrow();
+  expect(releaseSportsLiveSession).toHaveBeenCalledWith("owned-old", { releaseCapability: "cleanup-only" });
+  expect(createSportsLiveSession).not.toHaveBeenCalled();
+});
