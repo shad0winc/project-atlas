@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createTerminalLiveRelease } from "../../../../features/sports/services/terminalLiveRelease";
 
 import { PortalPage } from "../../../../components/portal/PortalPage";
 import { AtlasTheaterPlayer } from "../../../../features/playback/components/AtlasTheaterPlayer";
@@ -97,6 +98,7 @@ export function SportsPageClient(): React.ReactElement {
 
   const liveRequestVersionRef = useRef(0);
   const liveStartLock = useRef(false);
+  const terminalRelease = useRef(createTerminalLiveRelease()).current;
   const [liveBusy, setLiveBusy] = useState(false);
   const choicesRequest = useRef(0);
   const [playbackChoices, setPlaybackChoices] = useState<Readonly<{
@@ -121,8 +123,51 @@ export function SportsPageClient(): React.ReactElement {
     }
   }
 
+  async function retryTerminalRelease(): Promise<void> {
+    const failed = terminalRelease.current();
+    if (failed === null || liveStartLock.current) return;
+    liveStartLock.current = true;
+    setLiveBusy(true);
+    try {
+      const released = await terminalRelease.release((owned) =>
+        releaseSportsLiveSession(owned.liveSessionId, {
+          releaseCapability: owned.releaseCapability,
+        }),
+      );
+      if (released) {
+        if (activeLiveSessionRef.current?.liveSessionId === failed.liveSessionId) {
+          activeLiveSessionRef.current = null;
+        }
+        setLivePlaybackError("Live playback failed. The session was released; you can select Watch Live to try again.");
+      } else {
+        setLivePlaybackError("Live playback failed and session cleanup could not be confirmed. Select Close to retry cleanup before starting another feed.");
+      }
+    } finally {
+      liveStartLock.current = false;
+      setLiveBusy(false);
+    }
+  }
+
+  function handleTerminalPlaybackError(failedSession: PlaybackSession): void {
+    if (liveStartLock.current || !terminalRelease.markFailed(
+      activeLiveSessionRef.current, failedSession,
+    )) return;
+    const failed = terminalRelease.current();
+    if (failed === null) return;
+    choicesRequest.current += 1;
+    liveRequestVersionRef.current += 1;
+    clearLiveHeartbeat();
+    setActiveLiveSession(null);
+    setPlaybackChoices((choices) => choices ?? {
+      channelId: failed.atlasChannelId, options: [],
+    });
+    setLivePlaybackError("Live playback failed. Releasing the session…");
+    void retryTerminalRelease();
+  }
+
   function scheduleLiveHeartbeat(liveSession: SportsLiveSessionResult): void {
     clearLiveHeartbeat();
+    if (terminalRelease.blocksHeartbeat(liveSession.liveSessionId)) return;
 
     const { liveSessionId, ttlSeconds } = liveSession;
 
@@ -133,7 +178,8 @@ export function SportsPageClient(): React.ReactElement {
         .then((heartbeat) => {
           const current = activeLiveSessionRef.current;
 
-          if (current === null || current.liveSessionId !== liveSessionId) {
+          if (current === null || current.liveSessionId !== liveSessionId ||
+              terminalRelease.blocksHeartbeat(liveSessionId)) {
             return;
           }
 
@@ -148,7 +194,8 @@ export function SportsPageClient(): React.ReactElement {
         .catch(() => {
           const current = activeLiveSessionRef.current;
 
-          if (current === null || current.liveSessionId !== liveSessionId) {
+          if (current === null || current.liveSessionId !== liveSessionId ||
+              terminalRelease.blocksHeartbeat(liveSessionId)) {
             return;
           }
 
@@ -166,6 +213,10 @@ export function SportsPageClient(): React.ReactElement {
 
   async function handleWatchLive(atlasChannelId: string): Promise<void> {
     if (liveStartLock.current) return;
+    if (terminalRelease.current() !== null) {
+      setLivePlaybackError("Select Close to retry session cleanup before starting another feed.");
+      return;
+    }
     const generation = ++choicesRequest.current;
     setLiveBusy(true);
     setLivePlaybackError(null);
@@ -182,6 +233,7 @@ export function SportsPageClient(): React.ReactElement {
   }
 
   async function openLivePlayback(atlasChannelId: string, optionId?: string): Promise<void> {
+    if (terminalRelease.current() !== null) throw new Error("Session cleanup must succeed before starting another feed.");
     if (liveStartLock.current) throw new Error("A live playback change is already in progress.");
     liveStartLock.current = true;
     setLiveBusy(true);
@@ -276,6 +328,10 @@ export function SportsPageClient(): React.ReactElement {
   }
 
   function closeLivePlayback(): void {
+    if (terminalRelease.current() !== null) {
+      void retryTerminalRelease();
+      return;
+    }
     choicesRequest.current += 1;
     setPlaybackChoices(null);
     liveRequestVersionRef.current += 1;
@@ -324,11 +380,15 @@ export function SportsPageClient(): React.ReactElement {
 
       activeLiveSessionRef.current = null;
 
-      if (current !== null) {
+      if (terminalRelease.current() !== null) {
+        void terminalRelease.release((owned) => releaseSportsLiveSession(
+          owned.liveSessionId, { releaseCapability: owned.releaseCapability },
+        ));
+      } else if (current !== null) {
         void releaseLiveSessionBestEffort(current);
       }
     };
-  }, []);
+  }, [terminalRelease]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -583,6 +643,7 @@ export function SportsPageClient(): React.ReactElement {
               key={activeLiveSession.atlasChannelId}
               session={activeLiveSession.session}
               sessionResolver={resolveSportsLiveSession}
+              onTerminalError={handleTerminalPlaybackError}
             />
           ) : null}
         </section>

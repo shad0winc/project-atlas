@@ -63,7 +63,8 @@ export function AtlasTheaterPlayer({
   onFavorite,
   canDislike = false,
   dislikeExpectedUserId,
-  onDisliked
+  onDisliked,
+  onTerminalError
 }: {
   session: PlaybackSession;
   viewerId?: string;
@@ -82,8 +83,11 @@ export function AtlasTheaterPlayer({
   canDislike?: boolean;
   dislikeExpectedUserId?: string;
   onDisliked?: () => void | Promise<void>;
+  onTerminalError?: (failedSession: PlaybackSession) => void;
 }): React.ReactElement {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const terminalErrorRef = useRef(onTerminalError);
+  useEffect(() => { terminalErrorRef.current = onTerminalError; }, [onTerminalError]);
   const resumeAtRef = useRef<number | null>(null);
   const shouldPlayRef = useRef(true);
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
@@ -144,6 +148,7 @@ export function AtlasTheaterPlayer({
 
     const controller = new AbortController();
     let disposed = false;
+    let terminalErrorReported = false;
     let destroyHls: (() => void) | undefined;
     let sourceAttached = false;
 
@@ -252,10 +257,11 @@ export function AtlasTheaterPlayer({
             fatal: data.fatal, responseStatus: data.response?.code,
             fragmentSequence: data.frag?.sn, fragmentStart: data.frag?.start,
             fragmentDuration: data.frag?.duration });
-          if (!data.fatal || disposed) {
+          if (!data.fatal || disposed || terminalErrorReported) {
             return;
           }
 
+          terminalErrorReported = true;
           restored = false;
           resumeAtRef.current = retryResumePosition(
             activeSession.canSeek,
@@ -268,6 +274,7 @@ export function AtlasTheaterPlayer({
           });
 
           hls.destroy();
+          terminalErrorRef.current?.(activeSession);
         });
 
         hls.attachMedia(video);
