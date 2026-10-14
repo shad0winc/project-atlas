@@ -650,6 +650,27 @@ Do not rewrite failed transaction history as success after a later recovery.
 
 ---
 
+### 16.1 Retained Sports live ownership
+
+For 409 live-session conflicts or a failed player, inspect the response detail
+and exact owner/session/lease/stream records before retrying. A hidden player is
+not proof of cleanup. Follow the
+[Sports release and reconciliation procedure](../operations/SPORTS_SESSION_RELEASE_CAPABILITY.md)
+for fresh native idle proof, protected preimages, scoped release and verification.
+Never use broad registry deletion or a provider restart as routine cleanup.
+
+An Administration status refresh and guarded stale-session reconciliation action
+are planned v1.0 requirements. They are not currently available controls. Status
+refresh must be read-only; reconciliation must enforce administrator permission,
+exact ownership and current native-idle evidence, block active or uncertain
+consumers, and preserve durable audit evidence. This does not change the
+read-only Service Lifecycle Portal contract in section 3.1.
+
+See the [dated RC evidence](../releases/V1_RC_STATUS_20261014.md) for deployed
+scope and observed acceptance limits.
+
+---
+
 ## 17. Storage and VPN Failures
 
 ### 17.1 Storage
