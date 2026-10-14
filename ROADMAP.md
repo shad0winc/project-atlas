@@ -46,11 +46,17 @@ reserved for this release.
 
 # Current Release
 
-## v0.9.x — Release Candidate Development
+## v1.0.0-rc.1 — Release Candidate Development
 
 **Status:** Active development
 
 **Primary objective:** Complete the stable v1.0 Media and Sports experience.
+
+The dated [October 14 RC status](docs/releases/V1_RC_STATUS_20261014.md)
+records current source, deployed scopes, observed acceptance and open gates.
+Historical checked milestones below retain their original scope; they do not
+certify later requirements or every current runtime path.
+
 
 The v1.0 scope is feature-frozen around user experience, reliability,
 operations, and production readiness. Features that are not required for that
@@ -419,6 +425,22 @@ with backend services.
 
 ### Media Experience
 
+The following experience refinements were requested for v1.0 on October 14.
+They extend existing browsing and search; implementation and acceptance remain
+open unless the dated status record explicitly says otherwise.
+
+- [ ] Present movie/series artwork and a fuller synopsis with useful title details
+- [ ] Offer an explicit trailer action when a supported trailer is available,
+      with clear missing-artwork/description/trailer fallbacks
+- [ ] Expand search/filter/sort options using normalized provider metadata;
+      confirm supported fields before exposing each option
+- [ ] Measure request acceptance, search/queue, transfer, import and playable
+      availability separately; improve the measured bottleneck and progress feedback
+- [ ] Implement and validate the agreed approximately 24-hour seeding stop policy
+      for Atlas-managed torrents, preserving media/hardlinks; settle accumulated
+      versus elapsed time and downstream resume/removal behavior first
+
+
 - [x] Browse available media
 - [x] Search available media
 - [ ] Open media in Jellyfin
@@ -492,6 +514,23 @@ with backend services.
 
 ### Sports Experience
 
+- [x] Deploy signed per-session release authorization through PR272/PR273
+- [x] Deploy terminal managed-HLS cleanup through PR274/PR275
+- [x] Observe failed-viewer ownership removal while the second canary viewer
+      continues, followed by final Close and native idle (October 14)
+- [ ] Resolve the intermittent HLS playback/decode failure; incognito causality
+      remains unestablished
+- [ ] Close retained-owner recovery when live open fails before returning a
+      usable browser session handle
+- [ ] Complete the broader distinct-event/capacity/expiry/restart/failure matrix
+      before enabling general shared admission
+
+The checked cleanup outcome is scoped to the existing two-viewer Rams canary.
+Shadow's reported 204 request method/path was not independently confirmed.
+The [dated evidence record](docs/releases/V1_RC_STATUS_20261014.md) preserves
+that limitation and does not claim final Sports or v1.0 certification.
+
+
 - [x] Sports module foundation
 - [x] Sports provider framework
 - [x] Sports feed service
@@ -558,6 +597,8 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 - [ ] Request queue
 - [ ] Media operations
 - [ ] Sports operations
+- [ ] Separate read-only live-session status refresh from guarded stale-session
+      reconciliation; refuse active/uncertain consumers and retain audit evidence
 - [ ] Retention status
 - [ ] Cleanup status
 - [ ] Module status
@@ -873,6 +914,8 @@ The Administration Portal is a v1.0 release requirement. Atlas v1.0 must not be 
 - [x] Document maintenance windows
 - [x] Document known limitations
 - [ ] Publish v1.0 release notes
+- [ ] Reconcile final guides/checklists with the current deployment and evidence
+      ledger; preserve historical failure records and scoped acceptance limits
 
 ### Release
 

@@ -215,6 +215,25 @@ This evidence is required for rollback and auditability.
 
 ---
 
+### 9.1 Verify source archives by owning scope
+
+A scoped update may preserve different Core, Ingress and Sports commits. Verify
+new Ingress payloads against the transaction's `ingress-source.tar.gz` and
+running Ingress services. Verify the immutable scheduler generation against its
+owning `core-source.tar.gz`, source digest and deployment marker. An Ingress
+update must not be used to overlay newer API files into the preserved Core
+scheduler generation or to force unrelated scopes to the same revision.
+
+Bind post-verification to the actual new image IDs and relevant deployed source,
+not a prior deployment's image assumption. Preserve transaction evidence when
+an extra observer fails. Correct an identified verification assumption with
+read-only evidence before considering another deployment.
+
+The [October 14 RC evidence](../releases/V1_RC_STATUS_20261014.md) records this
+scope distinction and the corrected post-deployment verification.
+
+---
+
 ## 10. Preserve Durable Rollback Image References
 
 Mutable image tags are not rollback identities.
