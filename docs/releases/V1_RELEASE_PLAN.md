@@ -412,6 +412,38 @@ ongoing-series acceptance requirements. It does not by itself close the
 remaining release-candidate, broader journey, accessibility, performance,
 sustained-use, pilot, stabilization, or final v1.0 approval gates.
 
+## 8.5 October 14 experience and recovery requirements
+
+These requirements are part of the requested v1.0 completion work. Recording
+scope does not claim implementation or production acceptance. See the
+[dated RC status](V1_RC_STATUS_20261014.md) for current evidence.
+
+- Media detail should provide movie/series imagery, a fuller synopsis and useful
+  title information, with a user-selected trailer when available. Netflix and
+  Prime Video are experience references; provider metadata and accessible,
+  responsive behavior determine Atlas's supported presentation.
+- Expanded search should expose only supported normalized filters and sorting,
+  preserve explicit season scope and permissions, and distinguish provider
+  failure from an authoritative empty result.
+- Request performance must be measured across acceptance, provider receipt,
+  search/queue, download, import and playable availability. A historical
+  six-hour movie journey is an investigation report, not proof of an Atlas
+  timing defect. Do not accelerate by replaying ambiguous mutations or bypassing
+  VPN, audio/quality policy or existing ownership controls.
+- An approximately 24-hour seeding stop policy must settle accumulated versus
+  elapsed seeding time, managed-torrent scope and applicable tracker exceptions.
+  Verify client/category/per-torrent settings and Sonarr/Radarr resume/removal
+  interactions; stopping seeding must preserve library media and hardlinks.
+- Administration needs separate read-only status refresh and exact stale-owner
+  reconciliation. Mutation requires administrator authorization, fresh native
+  idle evidence, owner/session/lease binding, durable intent and preimages,
+  audited outcome and post-verification. Active or uncertain consumers block it.
+  This requirement does not add generic service lifecycle mutation controls.
+
+The HLS stability defect and live-open ownership recovery remain open. Passing
+one allowlisted cleanup sequence does not enable general Sports admission or
+certify all browser lifecycle paths.
+
 # 9. Acceptance Criteria
 
 Atlas v1.0 is eligible for release only when every applicable acceptance

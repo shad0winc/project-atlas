@@ -189,6 +189,23 @@ Blind replay can create duplicate or conflicting provider mutations.
 
 ---
 
+### 9.1 Slow request-to-playable journeys
+
+Measure request acceptance, approval/provider receipt, search/queue admission,
+actual transfer, import/hardlink completion, Jellyfin discovery and Atlas
+playable status separately. Record timestamps with explicit timezone and correlate
+exact request/provider/download/library identities privately. A historical
+six-hour report without stage timing cannot identify the bottleneck.
+
+Use existing history first; a representative new request is a later acceptance
+step after current recovery/documentation work. Do not replay ambiguous requests
+or weaken VPN, audio/quality, duplicate-request or ownership safeguards to make
+a journey faster. Acquisition-routing activation and seeding policy changes are
+separate controlled changes. See the
+[dated RC status](../releases/V1_RC_STATUS_20261014.md).
+
+---
+
 ## 10. Request Reconciliation Required
 
 A reconciliation-required request state means Atlas cannot safely prove the
@@ -230,6 +247,31 @@ If Sports is unavailable:
 5. verify that retained subscriptions/recordings remain intact.
 
 Provider failure must not silently erase Sports durable state.
+
+---
+
+### 12.1 Live playback failures and retained sessions
+
+For a live 409, inspect the response detail; the status alone does not identify
+which conflict occurred. Capture sanitized session/lease/stream counts and
+exact ownership linkage. If Close hides the UI but ownership remains, the page
+may no longer hold a successful session handle. Do not repeatedly open another
+feed to try to bypass the limit.
+
+Terminal managed-HLS cleanup can report release success before a later Close,
+so a second DELETE need not appear. Confirm server ownership and the survivor's
+playback rather than inferring success from UI alone. After final Close, verify
+native clients/account counters, owners/metadata, processes and upstream peers.
+
+For decoder failures, preserve bounded opt-in browser HLS events and available
+stream-specific server/segment evidence before cache disposal. Do not attribute
+the failure to incognito, a metadata 503 or startup PPS warnings without correlated
+evidence. Exact media/live-stream IDs shared by viewers do not identify a unique
+viewer or prove physical sharing.
+
+Use [Sports release operations](../operations/SPORTS_SESSION_RELEASE_CAPABILITY.md)
+for guarded reconciliation. Live player recovery is distinct from recorder PID
+recovery below.
 
 ---
 

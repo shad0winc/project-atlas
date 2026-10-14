@@ -3,7 +3,7 @@
 **Document Status:** Approved
 **Applies To:** All Atlas Releases
 **Document Owner:** Project Atlas Engineering
-**Last Updated:** 2026-08-02
+**Last Updated:** 2026-10-14
 
 ---
 
@@ -36,6 +36,10 @@ items defined in this document establish the minimum release gate.
 ---
 
 ## 1.3 Relationship to Other Documents
+
+The [October 14 RC status](V1_RC_STATUS_20261014.md) is a dated evidence record,
+not a completed checklist or final certification. Preserve the generic checklist
+for each release and record Pass/Fail/Not Applicable with supporting evidence.
 
 This checklist should be executed together with:
 
@@ -363,6 +367,14 @@ Critical items may never be waived.
 
 ## Media Experience
 
+- [ ] Artwork, fuller synopsis and useful movie/series details verified
+- [ ] Available trailers open only through an explicit user action; missing
+      metadata/trailer and provider-outage states remain usable
+- [ ] Supported search filters/sorting tested for permissions, empty results,
+      provider failures and responsive/accessibility behavior
+- [ ] Request-to-playable timing recorded by stage and any bottleneck remediation validated
+- [ ] Agreed seeding stop policy verified without loss of imported media or hardlinks
+
 - [ ] Media browsing is understandable
 - [ ] Media search is reliable
 - [ ] Empty results provide useful guidance
@@ -382,6 +394,13 @@ Critical items may never be waived.
 - [ ] Removing a favorite updates protection consistently
 
 ## Playback
+
+- [ ] Managed-HLS terminal cleanup releases the failed owner and preserves a
+      surviving shared viewer; exact request evidence and limitations recorded
+- [ ] Final viewer Close leaves Atlas ownership and native playback idle
+- [ ] Live-open failure retains an actionable recovery path without unsafe replay
+- [ ] Intermittent decode/stability failures resolved or handled through the
+      applicable release-policy decision; no unsupported incognito diagnosis
 
 - [ ] Available media opens correctly
 - [ ] Jellyfin handoff is understandable
@@ -444,6 +463,11 @@ Critical items may never be waived.
 - [ ] Failures provide actionable guidance
 
 ## Media and Module Operations
+
+- [ ] Read-only live-session refresh cannot release ownership
+- [ ] Stale-session reconciliation enforces administrator permissions, exact
+      linkage, fresh native idle proof, durable intent/preimages and audit result
+- [ ] Active consumers, uncertain closure and stale observations block reconciliation
 
 - [ ] Supported media operations work
 - [ ] Supported sports operations work

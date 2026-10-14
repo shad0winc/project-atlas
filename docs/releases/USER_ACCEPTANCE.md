@@ -1282,6 +1282,26 @@ ______________________________________________
 
 ---
 
+## October 14 additional Media and Administration acceptance
+
+These workflows remain pending; the dated requirements do not fill the generic
+acceptance result/approval fields.
+
+| Workflow | Required evidence |
+| --- | --- |
+| Rich movie/series details | Artwork, full synopsis, supported title details, missing metadata and unavailable-trailer fallbacks; responsive/accessibility review |
+| Trailer | Explicit user action, supported provider identity, no unintended autoplay, useful failure state |
+| Expanded search | Supported normalized filters/sorting, intended result, empty result, provider outage and permission boundaries |
+| Request timing | Stage timestamps through playable status, correlated identities, observed bottleneck and verified remediation |
+| Seeding stop | Agreed time semantics/scope; client and downstream handling; stop at the configured limit with import, media and hardlinks preserved |
+| Administration refresh | Current status visible; zero ownership/provider mutations |
+| Stale-session reconciliation | Authorized exact-owner release with current native-idle proof, durable intent/preimages, audit and post-verification; unauthorized, active, uncertain and stale cases blocked |
+
+See [current RC evidence](V1_RC_STATUS_20261014.md) for the separate observed
+Sports cleanup result and its limits.
+
+---
+
 # 9. Performance Experience
 
 Representative workflows should respond within a range that feels reliable and
