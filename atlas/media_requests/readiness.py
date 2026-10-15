@@ -156,10 +156,19 @@ class JellyfinRequestReadiness:
         )
 
         for episode in episodes:
-            episode_season = getattr(
-                episode,
-                "season_number",
-                None,
+            episode_season = (
+                episode.get(
+                    "season_number"
+                )
+                if isinstance(
+                    episode,
+                    dict,
+                )
+                else getattr(
+                    episode,
+                    "season_number",
+                    None,
+                )
             )
 
             if (
@@ -168,10 +177,19 @@ class JellyfinRequestReadiness:
             ):
                 continue
 
-            episode_id = getattr(
-                episode,
-                "id",
-                None,
+            episode_id = (
+                episode.get(
+                    "id"
+                )
+                if isinstance(
+                    episode,
+                    dict,
+                )
+                else getattr(
+                    episode,
+                    "id",
+                    None,
+                )
             )
 
             if (
