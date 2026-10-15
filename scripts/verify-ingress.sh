@@ -12,6 +12,7 @@ source "$PROJECT_DIR/scripts/lib/audit-runtime.sh"
 source "$PROJECT_DIR/scripts/lib/favorites-runtime.sh"
 source "$PROJECT_DIR/scripts/lib/dislikes-runtime.sh"
 source "$PROJECT_DIR/scripts/lib/password-recovery-runtime.sh"
+source "$PROJECT_DIR/scripts/lib/requests-runtime.sh"
 
 EXPECTED_CADDY_MEMORY=536870912
 EXPECTED_CADDY_CPUS=1000000000
@@ -94,6 +95,44 @@ if atlas_password_recovery_runtime_verify >/dev/null 2>&1; then
   pass "Password recovery runtime ownership / access contract"
 else
   fail "Password recovery runtime ownership / access contract"
+fi
+
+if atlas_requests_runtime_verify >/dev/null 2>&1; then
+  pass "Request runtime ownership / access contract"
+else
+  fail "Request runtime ownership / access contract"
+fi
+
+if docker inspect atlas-api >/dev/null 2>&1; then
+  if docker exec atlas-api sh -lc '
+    set -eu
+
+    requests=/mnt/storage/configs/atlas/runtime/requests
+    registry="$requests/requests.json"
+    lock="$requests/requests.lock"
+
+    test -d "$requests"
+    test -r "$requests"
+    test -w "$requests"
+    test -x "$requests"
+
+    if [ -e "$registry" ]; then
+      test -r "$registry"
+      test -w "$registry"
+    fi
+
+    if [ -e "$lock" ]; then
+      test -r "$lock"
+      test -w "$lock"
+    fi
+  '
+  then
+    pass "Atlas API Request persistence access"
+  else
+    fail "Atlas API Request persistence access"
+  fi
+else
+  fail "Atlas API Request persistence access"
 fi
 
 if docker inspect atlas-api >/dev/null 2>&1; then
