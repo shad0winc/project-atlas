@@ -9,7 +9,9 @@ import urllib.parse
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
+from uuid import UUID
 
+from atlas_live_policy_claim import AtlasLivePolicyUnavailable, claims_for_channel
 from dispatcharr_channel_bindings import (
     default_dispatcharr_channel_binding_registry,
 )
@@ -144,6 +146,16 @@ class Handler(BaseHTTPRequestHandler):
         return hmac.compare_digest(
             supplied[7:].strip(),
             expected,
+        )
+
+    def _live_policy_authorized(self) -> bool:
+        expected = os.getenv("ATLAS_SPORTS_LIVE_POLICY_TOKEN", "")
+        supplied = self.headers.get("Authorization", "")
+        return (
+            len(expected) >= 32
+            and expected != os.getenv("ATLAS_SPORTS_WRITER_TOKEN", "")
+            and supplied.startswith("Bearer ")
+            and hmac.compare_digest(supplied[7:], expected)
         )
 
     def _json(
@@ -349,6 +361,66 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlsplit(self.path)
         if parsed.path == "/health":
             self._json(HTTPStatus.OK, {"status": "ok"})
+            return
+        classification_prefix = "/internal/v1/live-policy-classification/"
+        if parsed.path.startswith(classification_prefix):
+            if not self._live_policy_authorized():
+                self._json(HTTPStatus.UNAUTHORIZED, {"error": "Unauthorized."})
+                return
+            if parsed.query or len(parsed.path) > 320:
+                self._json(HTTPStatus.BAD_REQUEST, {"error": "Invalid channel identity."})
+                return
+            channel_uuid = urllib.parse.unquote(parsed.path[len(classification_prefix):])
+            try:
+                if str(UUID(channel_uuid)) != channel_uuid:
+                    raise ValueError("noncanonical UUID")
+            except (TypeError, ValueError, AttributeError):
+                self._json(HTTPStatus.BAD_REQUEST, {"error": "Invalid channel identity."})
+                return
+            try:
+                registry = default_dispatcharr_channel_binding_registry()
+                # A missing registry is uncertain, even though the generic
+                # store reader represents it as an empty initial document.
+                if not registry.path.is_file():
+                    raise OSError("Channel binding registry unavailable")
+                managed = registry.classify_channel_uuid(channel_uuid)
+            except (OSError, ValueError, TypeError, AttributeError):
+                self._backend_unavailable()
+                return
+            self._json(HTTPStatus.OK, {
+                "channel_uuid": channel_uuid,
+                "managed": managed,
+            })
+            return
+        live_policy_prefix = "/internal/v1/live-policy/"
+        if parsed.path.startswith(live_policy_prefix):
+            if not self._live_policy_authorized():
+                self._json(HTTPStatus.UNAUTHORIZED, {"error": "Unauthorized."})
+                return
+            if parsed.query or len(parsed.path) > 320:
+                self._json(HTTPStatus.BAD_REQUEST, {"error": "Invalid channel identity."})
+                return
+            channel_uuid = urllib.parse.unquote(parsed.path[len(live_policy_prefix):])
+            if "/" in channel_uuid:
+                self._json(HTTPStatus.BAD_REQUEST, {"error": "Invalid channel identity."})
+                return
+            try:
+                claims = claims_for_channel(
+                    channel_uuid=channel_uuid,
+                    lifecycle_sources=self._source_store().load(),
+                    channel_bindings=default_dispatcharr_channel_binding_registry().list_bindings(),
+                    live_sources=default_live_source_registry().list_sources(),
+                )
+            except (
+                AtlasLivePolicyUnavailable,
+                SourceLifecycleError,
+                LiveSourceCatalogError,
+                OSError,
+                ValueError,
+            ):
+                self._backend_unavailable()
+                return
+            self._json(HTTPStatus.OK, {"claims": [claim.to_mapping() for claim in claims]})
             return
         if not self._require_auth():
             return
@@ -989,6 +1061,7 @@ class Handler(BaseHTTPRequestHandler):
             allowed_fields = {
                 "source_id",
                 "provider_id",
+                "credential_realm",
                 "provider_display_name",
                 "account_display_name",
                 "server_url",
@@ -1022,6 +1095,7 @@ class Handler(BaseHTTPRequestHandler):
             required_text_fields = (
                 "source_id",
                 "provider_id",
+                "credential_realm",
                 "provider_display_name",
                 "account_display_name",
                 "server_url",
@@ -1114,6 +1188,11 @@ class Handler(BaseHTTPRequestHandler):
                         "provider_id": (
                             normalized[
                                 "provider_id"
+                            ]
+                        ),
+                        "credential_realm": (
+                            normalized[
+                                "credential_realm"
                             ]
                         ),
                         "provider_display_name": (
@@ -2106,6 +2185,16 @@ class Handler(BaseHTTPRequestHandler):
                         "provider_id cannot "
                         "be changed"
                     )
+
+                if "credential_realm" in payload:
+                    requested_realm = payload["credential_realm"]
+                    if current.credential_realm is not None:
+                        if requested_realm != current.credential_realm:
+                            raise SourceLifecycleError("credential_realm cannot be changed")
+                    elif current.enabled or requested_realm is None:
+                        raise SourceLifecycleError(
+                            "credential_realm can only be assigned to a disabled source"
+                        )
 
                 merged = (
                     current.to_mapping()
