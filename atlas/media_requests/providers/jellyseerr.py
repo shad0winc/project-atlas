@@ -401,6 +401,10 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
             )
 
         status = _normalize_status(resource)
+        status = self._season_scoped_status(
+            resource,
+            status,
+        )
         updated_at = _required_timestamp(
             resource.get("updatedAt")
             or resource.get("createdAt"),
@@ -518,6 +522,58 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
                 normalized_type
             ),
         )
+
+    def _season_scoped_status(
+        self,
+        resource: Mapping[str, Any],
+        status: MediaRequestStatus,
+    ) -> MediaRequestStatus:
+        """Promote exact available TV seasons without trusting series-wide state."""
+
+        if status in {
+            MediaRequestStatus.REJECTED,
+            MediaRequestStatus.FAILED,
+            MediaRequestStatus.AVAILABLE,
+        }:
+            return status
+
+        media = resource.get("media")
+        seasons = resource.get("seasons")
+
+        if (
+            not isinstance(media, Mapping)
+            or media.get("mediaType") != "tv"
+            or not isinstance(seasons, list)
+            or len(seasons) != 1
+            or not isinstance(seasons[0], Mapping)
+        ):
+            return status
+
+        season_number = seasons[0].get("seasonNumber")
+        provider_media_id = media.get("tmdbId")
+
+        if (
+            type(season_number) is not int
+            or season_number <= 0
+            or provider_media_id is None
+        ):
+            return status
+
+        try:
+            detail = self.get_tv_detail(provider_media_id)
+        except MediaRequestProviderError:
+            return status
+
+        for season in detail.seasons:
+            if (
+                season.season_number == season_number
+                and season.availability
+                is MediaDiscoveryAvailability.AVAILABLE
+            ):
+                return MediaRequestStatus.PROCESSING
+
+        return status
+
 
     def get_tv_detail(
         self,
