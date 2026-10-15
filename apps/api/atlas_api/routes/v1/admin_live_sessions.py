@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict
 
+from atlas.sports_session_registry import SportsSessionRegistry, SportsSessionStateError
 from atlas.live_session_policy import LiveSessionPolicyError, LiveSessionPolicyStore
 from atlas.user_profiles import UserProfileError, UserProfileStore
 from atlas_api.auth.models import AuthenticatedUser
@@ -17,6 +19,7 @@ from atlas_api.dependencies import (
     get_live_session_registry,
     get_security_audit_writer,
     get_user_profile_store,
+    get_sports_session_registry,
 )
 from atlas_api.security.dependencies import require_permission
 from atlas_api.services.identity_writer import IdentityWriterClient, IdentityWriterError
@@ -106,6 +109,36 @@ def read_admin_live_session_policy(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Live-session policy is unavailable.",
         ) from error
+
+
+@router.get("/sports")
+def read_admin_sports_session_observation(
+    _user: AuthenticatedUser = Depends(require_live_sessions_manage),
+    sports_sessions: SportsSessionRegistry = Depends(get_sports_session_registry),
+) -> dict[str, Any]:
+    """Observe all retained Sports ownership without pruning expired records."""
+    try:
+        snapshot = sports_sessions.observe_retained()
+    except SportsSessionStateError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Sports session observation is unavailable.",
+        ) from error
+    sessions = [
+        {"session_id": row.session_id, "user_id": row.user_id,
+         "target_id": row.target_id, "age_seconds": row.age_seconds,
+         "heartbeat_age_seconds": row.heartbeat_age_seconds,
+         "heartbeat_expired": row.heartbeat_age_seconds >= sports_sessions.ttl_seconds}
+        for row in snapshot.sessions
+    ]
+    expired = sum(row["heartbeat_expired"] for row in sessions)
+    return {
+        "observed_at": datetime.fromtimestamp(snapshot.observed_at, timezone.utc).isoformat(),
+        "state_sha256": snapshot.state_sha256,
+        "ttl_seconds": sports_sessions.ttl_seconds,
+        "retained_count": len(sessions), "recent_count": len(sessions) - expired,
+        "expired_count": expired, "sessions": sessions,
+    }
 
 
 @router.patch("/default")

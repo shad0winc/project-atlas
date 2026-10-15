@@ -10,6 +10,7 @@ from atlas.user_profiles import UserProfileStore
 from atlas_api.auth.models import AuthenticatedUser
 from atlas_api.dependencies import (
     get_current_user,
+    get_sports_session_registry,
     get_identity_writer_client,
     get_live_session_policy_store,
     get_live_session_registry,
@@ -276,3 +277,43 @@ def test_admin_policy_read_includes_safe_active_session_state(tmp_path: Path) ->
         "last_seen_at",
     ):
         assert forbidden not in response_text
+
+
+def test_sports_observation_retains_expired_ownership_without_writing(tmp_path: Path) -> None:
+    import json
+    from atlas.sports_session_registry import SportsSessionRegistry
+    client, _, writer, audit, _, target = _fixture(tmp_path)
+    now = [100.0]
+    path = tmp_path / "sports-sessions.json"
+    store = SportsSessionRegistry(path, clock=lambda: now[0])
+    record = store.admit(user_id=target["user_id"], target_id="canary", limit=1, resource_lease_id="lease")
+    before = path.read_bytes()
+    now[0] = 1000.0
+    client.app.dependency_overrides[get_sports_session_registry] = lambda: store
+    for _ in range(2):
+        response = client.get("/api/v1/admin/live-sessions/sports")
+        assert response.status_code == 200
+        body = response.json()
+        assert (body["recent_count"], body["expired_count"], body["retained_count"]) == (0, 1, 1)
+        assert body["sessions"][0]["session_id"] == record.session_id
+        assert body["sessions"][0]["heartbeat_expired"] is True
+        assert set(body["sessions"][0]) == {"session_id", "user_id", "target_id", "age_seconds", "heartbeat_age_seconds", "heartbeat_expired"}
+        assert path.read_bytes() == before
+    assert json.loads(path.read_bytes())["sessions"][record.session_id]["resource_lease_id"] == "lease"
+    assert writer.default_limits == [] and audit.events == []
+
+
+def test_sports_observation_missing_state_is_unavailable_not_empty(tmp_path: Path) -> None:
+    from atlas.sports_session_registry import SportsSessionRegistry
+    client, _, _, _, _, _ = _fixture(tmp_path)
+    path = tmp_path / "absent" / "sports.json"
+    client.app.dependency_overrides[get_sports_session_registry] = lambda: SportsSessionRegistry(path)
+    assert client.get("/api/v1/admin/live-sessions/sports").status_code == 503
+    assert not path.parent.exists()
+
+
+def test_member_cannot_read_durable_sports_ownership(tmp_path: Path) -> None:
+    client, _, writer, audit, _, _ = _fixture(tmp_path, role="member")
+    assert client.get("/api/v1/admin/live-sessions/sports").status_code == 403
+    assert writer.default_limits == []
+    assert all(name == "security.authorization.denied" for name, _ in audit.events)
