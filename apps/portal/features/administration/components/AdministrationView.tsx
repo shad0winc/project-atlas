@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Card } from "../../../components/ui/Card";
 import { usePermission } from "../../../lib/authorization";
 import { PORTAL_ROUTES } from "../../../lib/navigation/portal";
+import { SportsSessionStatus } from "./SportsSessionStatus";
 import { LiveSessionManagement } from "./LiveSessionManagement";
 import { ProviderAccountManagement } from "./ProviderAccountManagement";
 import { RoleManagement } from "./RoleManagement";
@@ -78,6 +79,7 @@ export function AdministrationView(): React.ReactElement {
 
       <AutomationHealthPanel />
       <ProviderAccountManagement />
+      <SportsSessionStatus />
       <LiveSessionManagement />
       <RoleManagement />
     </section>

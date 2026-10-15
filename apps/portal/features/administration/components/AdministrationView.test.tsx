@@ -1,3 +1,4 @@
+vi.mock("./SportsSessionStatus", () => ({ SportsSessionStatus: () => <section>Sports live sessions</section> }));
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

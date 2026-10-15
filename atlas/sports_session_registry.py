@@ -6,6 +6,7 @@ from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
 import fcntl
+import hashlib
 import json
 import os
 import stat
@@ -54,6 +55,13 @@ class SportsSessionSnapshot:
     target_id: str
     age_seconds: int
     heartbeat_age_seconds: int
+
+
+@dataclass(frozen=True, slots=True)
+class SportsRetainedObservation:
+    observed_at: float
+    state_sha256: str
+    sessions: tuple[SportsSessionSnapshot, ...]
 
 
 class SportsSessionRegistry:
@@ -363,6 +371,42 @@ class SportsSessionRegistry:
                 )
             )
 
+    def observe_retained(self) -> SportsRetainedObservation:
+        """Read an atomic durable snapshot without pruning, writes or lock creation.
+
+        Expired heartbeat evidence is not native-idle or release authorization.
+        Missing/invalid state is unavailable rather than an authoritative empty.
+        """
+        try:
+            fd = os.open(self.path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            try:
+                info = os.fstat(fd)
+                if not stat.S_ISREG(info.st_mode) or info.st_size > 8 * 1024**2:
+                    raise SportsSessionStateError("Sports-session state is unavailable.")
+                with os.fdopen(fd, "rb", closefd=False) as source:
+                    raw = source.read(8 * 1024**2 + 1)
+                if len(raw) > 8 * 1024**2:
+                    raise SportsSessionStateError("Sports-session state is unavailable.")
+            finally:
+                os.close(fd)
+            state = self._normalize_state(json.loads(raw))
+        except (OSError, ValueError) as exc:
+            raise SportsSessionStateError("Sports-session state is unavailable.") from exc
+        now = self._clock()
+        sessions = tuple(
+            SportsSessionSnapshot(
+                session_id=session_id,
+                user_id=row["user_id"],
+                target_id=row["target_id"],
+                age_seconds=int(max(0.0, now - row["created_at"])),
+                heartbeat_age_seconds=int(max(0.0, now - row["last_seen_at"])),
+            )
+            for session_id, row in sorted(state["sessions"].items())
+        )
+        return SportsRetainedObservation(
+            observed_at=now, state_sha256=hashlib.sha256(raw).hexdigest(), sessions=sessions,
+        )
+
     @contextmanager
     def _locked(self) -> Iterator[None]:
         self.path.parent.mkdir(
@@ -412,6 +456,9 @@ class SportsSessionRegistry:
                 "Sports-session state is unavailable."
             ) from exc
 
+        return self._normalize_state(payload)
+
+    def _normalize_state(self, payload: object) -> dict[str, object]:
         if not isinstance(payload, dict):
             raise SportsSessionStateError(
                 "Sports-session state is invalid."
