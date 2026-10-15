@@ -155,6 +155,17 @@ def prepare_runtime(tmp_path: Path, *, branch: str = "main") -> dict[str, str]:
     )
 
     write_executable(
+        project / "scripts" / "lib" / "requests-runtime.sh",
+        """
+        #!/usr/bin/env bash
+        atlas_requests_runtime_provision() {
+          echo requests-runtime:provision >> "$ATLAS_TEST_EVENTS"
+          return "${ATLAS_TEST_REQUESTS_RUNTIME_STATUS:-0}"
+        }
+        """,
+    )
+
+    write_executable(
         project / "scripts" / "lib" / "sports-runtime.sh",
         """
         #!/usr/bin/env bash
@@ -2046,3 +2057,21 @@ def test_update_refuses_when_scheduler_deployment_execution_lock_is_owned(
     # The durable deployment transaction lock must not be acquired when
     # Scheduler already owns the execution exclusion boundary.
     assert not lock_path(environment).exists()
+
+
+def test_requests_runtime_provisioning_failure_aborts_ingress(
+    tmp_path: Path,
+) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_REQUESTS_RUNTIME_STATUS"] = "1"
+
+    result = run_update(environment, "ingress")
+
+    assert result.returncode != 0
+    assert "Request runtime provisioning failed" in result.stderr
+
+    events = event_lines(environment)
+
+    assert "requests-runtime:provision" in events
+    assert "sports-runtime:provision" not in events
+    assert "ingress-verify" not in events
