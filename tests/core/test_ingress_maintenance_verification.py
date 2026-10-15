@@ -115,6 +115,7 @@ def _run_verifier(
     dislikes_access_status: str = "0",
     password_recovery_runtime_status: str = "0",
     password_recovery_access_status: str = "0",
+    requests_runtime_status: str = "0",
 ) -> subprocess.CompletedProcess[str]:
     project = tmp_path / "project"
     runtime = tmp_path / "runtime"
@@ -199,6 +200,25 @@ def _run_verifier(
     )
     password_recovery_runtime.chmod(0o755)
 
+    requests_runtime = (
+        project
+        / "scripts"
+        / "lib"
+        / "requests-runtime.sh"
+    )
+    requests_runtime.write_text(
+        textwrap.dedent(
+            """
+            #!/usr/bin/env bash
+            atlas_requests_runtime_verify() {
+              return "${ATLAS_TEST_REQUESTS_RUNTIME_STATUS:-0}"
+            }
+            """
+        ).lstrip(),
+        encoding="utf-8",
+    )
+    requests_runtime.chmod(0o755)
+
     if maintenance:
         maintenance_dir = runtime / "maintenance"
         maintenance_dir.mkdir()
@@ -221,6 +241,7 @@ def _run_verifier(
             "ATLAS_TEST_PASSWORD_RECOVERY_ACCESS_STATUS": (
                 password_recovery_access_status
             ),
+            "ATLAS_TEST_REQUESTS_RUNTIME_STATUS": requests_runtime_status,
         }
     )
     return subprocess.run(
@@ -352,3 +373,18 @@ def test_normal_mode_fails_if_api_cannot_access_password_recovery_persistence(
     assert result.returncode != 0
     assert "Atlas API Password Recovery persistence access" in result.stderr
     assert "Atlas Ingress Status: FAIL" in result.stderr
+
+
+def test_requests_runtime_verification_failure_blocks_ingress(
+    tmp_path: Path,
+) -> None:
+    result = _run_verifier(
+        tmp_path,
+        maintenance=True,
+        requests_runtime_status="1",
+    )
+
+    assert result.returncode != 0
+
+    output = result.stdout + result.stderr
+    assert "Request runtime ownership / access contract" in output
