@@ -89,3 +89,21 @@ describe("Sports Portal types", () => {
     expect(events[0]?.id).toBe("event-090");
   });
 });
+
+
+describe("Sports metadata observation transport", () => {
+  const raw = { provider: "espn", provider_event_id: "football-nfl-1", name: "Game", sport: "Football", league: "NFL", start_at: "2026-10-16T12:00:00Z", status: "live", requested: false };
+  it("preserves original metadata observation and expiry", () => {
+    const event = createSportsEvent({ ...raw, metadata_observed_at: "2026-10-16T12:00:00Z", metadata_expires_at: "2026-10-16T12:01:00Z" });
+    expect(event.metadataExpiresAt).toBe("2026-10-16T12:01:00.000Z");
+    expect(event.metadataObservedAt).toBe("2026-10-16T12:00:00.000Z");
+  });
+  it("rejects partial, naive, reversed and excessive lifetimes", () => {
+    for (const age of [
+      { metadata_observed_at: "2026-10-16T12:00:00Z" },
+      { metadata_observed_at: "2026-10-16T12:00:00", metadata_expires_at: "2026-10-16T12:01:00Z" },
+      { metadata_observed_at: "2026-10-16T12:00:00Z", metadata_expires_at: "2026-10-16T11:59:00Z" },
+      { metadata_observed_at: "2026-10-16T12:00:00Z", metadata_expires_at: "2026-10-16T14:00:00Z" },
+    ]) expect(() => createSportsEvent({ ...raw, ...age })).toThrow();
+  });
+});

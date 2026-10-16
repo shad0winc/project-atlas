@@ -244,3 +244,13 @@ updates provision schema-1 state after doctor and before backup; no upstream
 request is performed. See [runtime packaging](../operations/SPORTS_METADATA_PACKAGING.md).
 This does not enable the worker or private metadata queries. Format-3 production
 restore/rollback evidence and enabled-policy integration remain open.
+
+## Explicit cache-only discovery provider
+
+The private writer resolves explicit `provider=espn` searches, schedules and
+follow targets through fresh cached metadata. Source IDs and original metadata
+expiry survive the API and Portal event transport. This adapter is absent from
+the controller/playback provider registry, and ESPN recording enable is rejected.
+See [discovery contract](../operations/SPORTS_METADATA_DISCOVERY.md). The packaged
+policy stays disabled; default Portal search aggregation and existing SportsDB
+follow mappings remain outstanding.

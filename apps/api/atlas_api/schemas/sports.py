@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 
 def _required_text(value: Any, field_name: str) -> str:
@@ -33,6 +33,21 @@ class SportsEventResponse(_StrictSportsModel):
     provider_league_id: str | None = None
     home_team_id: str | None = None
     away_team_id: str | None = None
+    metadata_observed_at: datetime | None = None
+    metadata_expires_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def validate_metadata_age(self):
+        observed, expires = self.metadata_observed_at, self.metadata_expires_at
+        if observed is None and expires is None:
+            return self
+        if (observed is None or expires is None or observed.tzinfo is None
+            or expires.tzinfo is None or observed.utcoffset() is None
+            or expires.utcoffset() is None):
+            raise ValueError("Metadata observation and expiry must be paired aware timestamps")
+        if not 0 < (expires - observed).total_seconds() <= 3600:
+            raise ValueError("Invalid metadata lifetime")
+        return self
 
     @field_validator(
         "provider",
