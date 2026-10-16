@@ -82,3 +82,13 @@ that an in-flight provider request used the captured policy generation. Future
 live restore must quiesce the private writer and reconcile both artifacts. No
 live policy/database apply or rollback support is introduced here; format-3 live
 restore remains explicitly blocked before deployment actions.
+
+## Unified Sports bundle preparation
+
+`SPORTS_RECOVERY_BUNDLE.md` defines a new isolated preparation primitive for the
+native backend artifacts plus metadata database/policy pair. It requires an
+explicit version-2 paired policy snapshot, preserves database alias/budget bytes,
+records publication ownership separately from private staging permissions, and
+always marks the bundle not ready for live apply. Live format-2/3 blocks and the
+existing filesystem replacement registry remain unchanged. Legacy database-only
+snapshot validation remains available; unified preparation never guesses policy.

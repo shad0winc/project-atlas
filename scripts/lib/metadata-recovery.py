@@ -65,9 +65,10 @@ def source_identity(provider,route,event_id):
             isinstance(route,str) and re.fullmatch(r'[0-9]{1,32}',route))
 
 
-def validate_database(path):
+def validate_database(path, *, immutable=False):
     require(0 < regular(path).st_size <= MAX_DATABASE_BYTES)
-    connection=sqlite3.connect(path.as_uri()+'?mode=ro',uri=True,timeout=1)
+    uri=path.as_uri()+'?mode=ro'+('&immutable=1' if immutable else '')
+    connection=sqlite3.connect(uri,uri=True,timeout=1)
     deadline=time.monotonic()+10
     connection.set_progress_handler(lambda:int(time.monotonic()>deadline),1000)
     try:
