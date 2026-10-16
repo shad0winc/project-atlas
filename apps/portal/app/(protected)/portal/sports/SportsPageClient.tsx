@@ -34,6 +34,9 @@ import { upcomingSportsEvents } from "../../../../features/sports/services/upcom
 import { startLiveAvailabilityRefresh } from "../../../../features/sports/services/liveAvailabilityRefresh";
 import { PORTAL_ROUTES } from "../../../../lib/navigation/portal";
 
+import { loadSportsDiscoveryProviders } from "../../../../features/sports/services/sports";
+import { searchFederatedSports, type SportsDiscoverySnapshot } from "../../../../features/sports/services/federatedDiscovery";
+
 import { followedLiveEvents } from "../../../../features/sports/services/currentlyLive";
 import { SportsCurrentlyLive } from "../../../../features/sports/components/SportsCurrentlyLive";
 import { SportsLiveChannels } from "../../../../features/sports/components/SportsLiveChannels";
@@ -60,6 +63,8 @@ export function SportsPageClient(): React.ReactElement {
   const [searchResults, setSearchResults] = useState<
     readonly SportsSearchResult[]
   >([]);
+  const [discovery, setDiscovery] = useState<SportsDiscoverySnapshot | null>(null);
+  const discoveryAbort = useRef<AbortController | null>(null);
   const [searchType, setSearchType] = useState<SportsSearchType>("event");
   const [channelQuery, setChannelQuery] = useState("");
   const [freshFollowedEvents, setFreshFollowedEvents] = useState<
@@ -374,6 +379,7 @@ export function SportsPageClient(): React.ReactElement {
 
   useEffect(() => {
     return () => {
+      discoveryAbort.current?.abort();
       liveRequestVersionRef.current += 1;
       clearLiveHeartbeat();
 
@@ -468,7 +474,18 @@ export function SportsPageClient(): React.ReactElement {
   ): Promise<void> {
     setSearchType(type);
     if (type === "event") setChannelQuery(query);
-    setSearchResults(await searchSports(type, query));
+    discoveryAbort.current?.abort();
+    const controller = new AbortController();
+    discoveryAbort.current = controller;
+    await searchFederatedSports({
+      type, query, signal: controller.signal,
+      loadProviders: signal => loadSportsDiscoveryProviders({ signal }),
+      search: searchSports,
+      publish: snapshot => {
+        setDiscovery(snapshot);
+        setSearchResults(snapshot.results);
+      },
+    });
   }
 
   async function handleFollow(
@@ -687,6 +704,7 @@ export function SportsPageClient(): React.ReactElement {
         <SportsRequestView
           events={events}
           scheduleUnavailable={liveMetadataUnavailable}
+          discoveryState={discovery?.state}
           followedEvents={followedEvents}
           follows={follows}
           eventChannels={

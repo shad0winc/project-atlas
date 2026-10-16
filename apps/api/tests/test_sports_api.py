@@ -385,3 +385,22 @@ def test_independent_event_metadata_preserves_provider_identity_and_age() -> Non
     assert event["provider_league_id"] == "football/nfl"
     assert event["metadata_observed_at"] == "2026-10-16T12:00:00Z"
     assert event["metadata_expires_at"] == "2026-10-16T12:01:00Z"
+
+
+def test_discovery_configuration_uses_authenticated_sports_boundary() -> None:
+    service = FakeSportsService()
+    document = {"version":1,"providers":[{"provider":"thesportsdb","enabled":True},{"provider":"espn","enabled":False}]}
+    service.discovery_providers = lambda: document
+    response = build_client(service).get("/api/v1/sports/discovery/providers")
+    assert response.status_code == 200
+    assert response.json() == document
+
+
+def test_discovery_configuration_transport_failure_remains_unavailable() -> None:
+    service = FakeSportsService()
+    def unavailable():
+        raise SportsWriterTransportError("Private failure")
+    service.discovery_providers = unavailable
+    response = build_client(service).get("/api/v1/sports/discovery/providers")
+    assert response.status_code == 503
+    assert response.json() == {"detail":"Sports discovery configuration is unavailable."}

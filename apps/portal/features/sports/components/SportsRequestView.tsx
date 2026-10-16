@@ -19,6 +19,7 @@ export type SportsRequestInput = Readonly<{
 export type SportsRequestViewProps = Readonly<{
   events: readonly SportsEvent[];
   scheduleUnavailable?: boolean;
+  discoveryState?: "loading" | "complete" | "partial" | "unavailable";
   eventChannels?: ReactNode;
   followedEvents?: readonly SportsEvent[];
   follows: readonly SportsFollow[];
@@ -48,6 +49,7 @@ export type SportsRequestViewProps = Readonly<{
 export function SportsRequestView({
   events,
   scheduleUnavailable = false,
+  discoveryState,
   eventChannels,
   followedEvents = [],
   follows,
@@ -157,6 +159,16 @@ export function SportsRequestView({
         </button>
       </form>
 
+      {discoveryState === "partial" || discoveryState === "unavailable" ? (
+        <section aria-live="polite" className="requests-message-panel">
+          <p>{discoveryState === "partial"
+            ? "Some Sports results are unavailable. Showing results from available sources."
+            : "Sports search is unavailable. Try again shortly."}</p>
+        </section>
+      ) : discoveryState === "loading" ? (
+        <p role="status">Searching Sports sources...</p>
+      ) : null}
+
       {error && !error.identity.startsWith("browse:") ? (
         <section aria-live="polite" className="requests-mutation-error">
           <strong>Sports action failed</strong>
@@ -219,7 +231,7 @@ export function SportsRequestView({
 
                   <button
                     className="requests-refresh-button"
-                    disabled={result.requested || pending === requestIdentity}
+                    disabled={pending === "search" || result.requested || pending === requestIdentity}
                     onClick={() => {
                       void mutate(requestIdentity, () =>
                         onRequestEvent({
@@ -239,7 +251,7 @@ export function SportsRequestView({
 
                   <button
                     className="requests-refresh-button"
-                    disabled={pending === recordingIdentity}
+                    disabled={pending === "search" || pending === recordingIdentity}
                     onClick={() => {
                       void mutate(recordingIdentity, () =>
                         onSetRecording(event, !recording),
@@ -271,12 +283,13 @@ export function SportsRequestView({
                       {result.league ? ` - ${result.league}` : ""}
                     </p>
                     <h3>{result.name}</h3>
+                    <p className="request-card-kind">Schedule source: {provider === "espn" ? "ESPN" : provider === "thesportsdb" ? "TheSportsDB" : provider}</p>
                   </div>
                 </div>
 
                 <button
                   className="requests-refresh-button"
-                  disabled={pending === `browse:${identity}`}
+                  disabled={pending === "search" || pending === `browse:${identity}`}
                   onClick={() => {
                     void mutate(`browse:${identity}`, () =>
                       onBrowse(result.kind, result.id, provider),
@@ -301,7 +314,7 @@ export function SportsRequestView({
 
                 <button
                   className="requests-refresh-button"
-                  disabled={pending === identity}
+                  disabled={pending === "search" || pending === identity}
                   onClick={() => {
                     void mutate(identity, async () => {
                       if (existing) {
@@ -390,7 +403,7 @@ export function SportsRequestView({
 
                     <button
                       className="requests-refresh-button"
-                      disabled={pending === `record:${follow.subscriptionId}`}
+                      disabled={pending === "search" || pending === `record:${follow.subscriptionId}`}
                       onClick={() => {
                         void mutate(`record:${follow.subscriptionId}`, () =>
                           onSetRecording(
@@ -417,7 +430,7 @@ export function SportsRequestView({
                   <>
                     <button
                       className="requests-refresh-button"
-                      disabled={pending === `browse:${follow.subscriptionId}`}
+                      disabled={pending === "search" || pending === `browse:${follow.subscriptionId}`}
                       onClick={() => {
                         const browseType: "team" | "league" =
                           follow.type === "team" ? "team" : "league";
@@ -539,7 +552,7 @@ export function SportsRequestView({
                   className="requests-refresh-button"
                   data-provider={event.provider}
                   data-provider-event-id={event.providerEventId}
-                  disabled={event.requested || pending === pendingIdentity}
+                  disabled={pending === "search" || event.requested || pending === pendingIdentity}
                   onClick={() => {
                     void mutate(pendingIdentity, () =>
                       onRequestEvent({
@@ -559,7 +572,7 @@ export function SportsRequestView({
 
                 <button
                   className="requests-refresh-button"
-                  disabled={pending === recordingIdentity}
+                  disabled={pending === "search" || pending === recordingIdentity}
                   onClick={() => {
                     void mutate(recordingIdentity, () =>
                       onSetRecording(event, !recording),

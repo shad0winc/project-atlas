@@ -161,3 +161,13 @@ class SportsLiveChannelResponse(_StrictSportsModel):
 
 class SportsLiveChannelListResponse(_StrictSportsModel):
     channels: list[SportsLiveChannelResponse]
+
+
+class SportsDiscoveryProviderResponse(_StrictSportsModel):
+    provider: str
+    enabled: bool
+
+
+class SportsDiscoveryProvidersResponse(_StrictSportsModel):
+    version: int
+    providers: list[SportsDiscoveryProviderResponse]
