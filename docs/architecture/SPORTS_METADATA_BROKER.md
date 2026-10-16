@@ -235,3 +235,12 @@ clean exit. Before enabling this configuration in Compose, provide a stop grace
 period of at least 30 seconds alongside the private state/policy mounts and tested
 recovery path. Public maintenance alone does not pause this worker. Details and an
 uninstalled policy example are in `docs/operations/SPORTS_METADATA_REFRESH.md`.
+
+## Dormant runtime packaging
+
+The writer image now carries an immutable disabled refresh policy, a narrow
+writer-only metadata state bind, and 35-second shutdown grace. Canonical ingress
+updates provision schema-1 state after doctor and before backup; no upstream
+request is performed. See [runtime packaging](../operations/SPORTS_METADATA_PACKAGING.md).
+This does not enable the worker or private metadata queries. Format-3 production
+restore/rollback evidence and enabled-policy integration remain open.
