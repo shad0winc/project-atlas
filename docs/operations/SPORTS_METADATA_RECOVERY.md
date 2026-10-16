@@ -63,3 +63,22 @@ in any relevant live quiescence boundary, select refresh policy within budget,
 and complete user discovery/follow/playback acceptance. Public maintenance alone
 does not pause background refresh. Capture uses SQLite consistency and the shared
 writer lock rather than assuming maintenance stops the writer.
+
+## Persistent policy artifact
+
+The outer recovery format remains 3. Existing metadata manifest version 1 archives
+remain readable. When `private/sports-metadata-policy` is present alongside the
+metadata database, capture requires its strict server-owned directory/file
+contract and validates policy bytes with the worker's parser. Metadata manifest
+version 2 adds `policy_sha256` and exactly one `refresh-policy.json` artifact
+(mode 0600, at most 16 KiB). Archive and staged validation enforce the checksum,
+policy schema and exact member set. Invalid or incomplete installed policy fails
+the backup instead of silently producing a database-only archive. A policy without
+a metadata database also fails; absent legacy installations remain absent.
+
+The captured policy is a separate configuration observation. SQLite backup under
+the shared metadata lock preserves database consistency, but does not assert
+that an in-flight provider request used the captured policy generation. Future
+live restore must quiesce the private writer and reconcile both artifacts. No
+live policy/database apply or rollback support is introduced here; format-3 live
+restore remains explicitly blocked before deployment actions.
