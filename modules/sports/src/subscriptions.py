@@ -205,6 +205,9 @@ def update_subscription_recording(
                     "Recording intent is only supported for event subscriptions."
                 )
 
+            if record and str(normalized.get("provider", "")).strip().lower() == "espn":
+                raise ValueError("Recording is not supported for independent metadata events.")
+
             normalized["record"] = bool(record)
             updated_subscription = normalized
             updated_records.append(normalized)

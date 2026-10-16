@@ -133,6 +133,8 @@ def test_list_sports_events_is_authenticated_user_scoped() -> None:
                 "provider_league_id": None,
                 "home_team_id": None,
                 "away_team_id": None,
+                "metadata_observed_at": None,
+                "metadata_expires_at": None,
             }
         ]
     }
@@ -362,3 +364,24 @@ def test_search_sports_events_is_authenticated_user_scoped() -> None:
     assert response.status_code == 200
     assert response.json()["events"][0]["provider_event_id"] == "event-090"
     assert response.json()["events"][0]["requested"] is True
+
+
+def test_independent_event_metadata_preserves_provider_identity_and_age() -> None:
+    service = FakeSportsService()
+    def metadata_events(**kwargs):
+        assert kwargs["provider_name"] == "espn"
+        assert kwargs["user_id"] == USER.user_id
+        return [{"provider":"espn", "provider_event_id":"football-nfl-401873007",
+                 "name":"Dallas Cowboys at Green Bay Packers", "sport":"Football", "league":"NFL",
+                 "start_at":"2026-10-19T00:20:00Z", "status":"scheduled", "requested":False,
+                 "provider_league_id":"football/nfl", "metadata_observed_at":"2026-10-16T12:00:00Z",
+                 "metadata_expires_at":"2026-10-16T12:01:00Z"}]
+    service.list_events_for_user = metadata_events
+    response = build_client(service).get("/api/v1/sports/events", params={"provider":"espn"})
+    assert response.status_code == 200
+    event = response.json()["events"][0]
+    assert event["provider"] == "espn"
+    assert event["provider_event_id"] == "football-nfl-401873007"
+    assert event["provider_league_id"] == "football/nfl"
+    assert event["metadata_observed_at"] == "2026-10-16T12:00:00Z"
+    assert event["metadata_expires_at"] == "2026-10-16T12:01:00Z"

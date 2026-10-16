@@ -10,6 +10,8 @@ export type SportsEvent = Readonly<{
   providerLeagueId?: string;
   homeTeamId?: string;
   awayTeamId?: string;
+  metadataObservedAt?: string;
+  metadataExpiresAt?: string;
 }>;
 
 export type SportsSubscription = Readonly<{
@@ -35,6 +37,8 @@ export type SportsEventTransport = Readonly<{
   provider_league_id?: string | null;
   home_team_id?: string | null;
   away_team_id?: string | null;
+  metadata_observed_at?: string | null;
+  metadata_expires_at?: string | null;
 }>;
 
 export type SportsEventCollectionTransport = Readonly<{
@@ -83,8 +87,23 @@ function normalizedTimestamp(value: unknown, fieldName: string): string {
   return parsed.toISOString();
 }
 
+function metadataAge(input: SportsEventTransport): Pick<SportsEvent, "metadataObservedAt" | "metadataExpiresAt"> {
+  if (input.metadata_observed_at == null && input.metadata_expires_at == null) return {};
+  for (const value of [input.metadata_observed_at, input.metadata_expires_at]) {
+    if (typeof value !== "string" || !/(Z|[+-]\d{2}:\d{2})$/.test(value.trim())) {
+      throw new Error("Sports metadata requires paired aware observation and expiry timestamps.");
+    }
+  }
+  const observed = normalizedTimestamp(input.metadata_observed_at, "sportsEvent.metadataObservedAt");
+  const expires = normalizedTimestamp(input.metadata_expires_at, "sportsEvent.metadataExpiresAt");
+  const lifetime = Date.parse(expires) - Date.parse(observed);
+  if (lifetime <= 0 || lifetime > 3_600_000) throw new Error("Sports metadata age is invalid.");
+  return { metadataObservedAt: observed, metadataExpiresAt: expires };
+}
+
 export function createSportsEvent(input: SportsEventTransport): SportsEvent {
   return Object.freeze({
+    ...metadataAge(input),
     provider: requiredText(input.provider, "sportsEvent.provider"),
     providerEventId: requiredText(input.provider_event_id, "sportsEvent.providerEventId"),
     name: requiredText(input.name, "sportsEvent.name"),
