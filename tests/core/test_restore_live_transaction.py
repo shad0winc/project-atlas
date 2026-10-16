@@ -44,6 +44,7 @@ atlas_deployment_release_lock() { echo lock:release >> "$EVENTS"; }
 atlas_maintenance_enable() { echo maintenance:enable >> "$EVENTS"; }
 atlas_maintenance_disable() { echo maintenance:disable >> "$EVENTS"; }
 atlas_restore_stop_writers() { echo writers:stop >> "$EVENTS"; }
+atlas_restore_require_writers_quiesced() { echo writers:quiesced >> "$EVENTS"; }
 atlas_restore_start_writers() { echo writers:start >> "$EVENTS"; }
 atlas_restore_wait_for_writers() { echo writers:ready >> "$EVENTS"; }
 atlas_restore_create_pre_restore_recovery_point() {
@@ -106,6 +107,7 @@ atlas_restore_apply_live "$STAGE"
         "maintenance:verify",
         "writers:stop",
         "backup:create",
+        "writers:quiesced",
         "state:apply",
         "consumers:live",
         "writers:start",
@@ -189,7 +191,7 @@ atlas_restore_validate_live_consumers() {
     events = Path(env["EVENTS"]).read_text(encoding="utf-8").splitlines()
     assert events.index("state:apply") < events.index("consumers:fail")
     assert events.index("consumers:fail") < events.index("state:revert")
-    assert events.index("state:revert") < events.index("writers:start")
+    assert "writers:start" not in events
     assert "lock:release" not in events
     assert "maintenance:disable" not in events
 
@@ -237,6 +239,7 @@ atlas_maintenance_flag() { printf '%s\n' "$MAINTENANCE_FLAG"; }
 atlas_restore_load_recovery_library() { :; }
 atlas_backup_recovery_validate_archive() { :; }
 atlas_restore_stop_writers() { echo writers:stop >> "$EVENTS"; }
+atlas_restore_require_writers_quiesced() { echo writers:quiesced >> "$EVENTS"; }
 atlas_restore_start_writers() { echo writers:start >> "$EVENTS"; }
 atlas_restore_wait_for_writers() { echo writers:ready >> "$EVENTS"; }
 atlas_restore_validate_live_consumers() { echo consumers:live >> "$EVENTS"; }

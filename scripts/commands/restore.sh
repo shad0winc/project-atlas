@@ -222,7 +222,7 @@ atlas_restore_plan() {
   atlas_backup_recovery_validate_staged_restore "$root" || return 1
 
   echo
-  echo 'Writer quiesce set: atlas-api, atlas-sports-controller, atlas-notifications-worker'
+  echo 'Writer quiesce set: atlas-api, atlas-sports-controller, atlas-notifications-worker, atlas-sports-writer'
   echo 'Deployment/update mutual exclusion: required'
   echo 'Maintenance before live mutation: required'
   echo 'Pre-restore recovery point: required'
@@ -256,7 +256,8 @@ atlas_restore_writer_containers() {
   printf '%s\n' \
     'atlas-api' \
     'atlas-sports-controller' \
-    'atlas-notifications-worker'
+    'atlas-notifications-worker' \
+    'atlas-sports-writer'
 }
 
 atlas_restore_writer_state() {
@@ -287,28 +288,64 @@ atlas_restore_require_writers_running() {
   done < <(atlas_restore_writer_containers)
 }
 
+atlas_restore_writer_is_quiesced() {
+  local container="$1"
+  local state
+
+  state="$(docker inspect --format \
+    '{{.State.Running}}|{{.State.Status}}|{{.State.ExitCode}}|{{.State.OOMKilled}}' \
+    "$container" 2>/dev/null)" || {
+    printf 'ERROR: unable to verify stopped restore writer: %s\n' "$container" >&2
+    return 1
+  }
+  case "$state" in
+    'false|exited|0|false'|'false|exited|143|false')
+      return 0
+      ;;
+    *)
+      printf 'ERROR: restore writer did not stop cleanly: %s\n' "$container" >&2
+      return 1
+      ;;
+  esac
+}
+
+atlas_restore_require_writers_quiesced() {
+  local container
+  while IFS= read -r container; do
+    atlas_restore_writer_is_quiesced "$container" || return 1
+  done < <(atlas_restore_writer_containers)
+}
+
 atlas_restore_stop_writers() {
   local container
 
   while IFS= read -r container; do
-    docker stop --time 30 "$container" >/dev/null || {
+    # The private metadata worker has a 25-second join deadline. Give its
+    # container the same 35-second allowance as canonical Compose packaging.
+    docker stop --time 35 "$container" >/dev/null || {
       printf 'ERROR: unable to quiesce restore writer: %s\n' \
         "$container" >&2
       return 1
     }
+    atlas_restore_writer_is_quiesced "$container" || return 1
   done < <(atlas_restore_writer_containers)
+  atlas_restore_require_writers_quiesced
 }
 
 atlas_restore_start_writers() {
-  local container
+  local container index
+  local -a containers=()
+  mapfile -t containers < <(atlas_restore_writer_containers)
 
-  while IFS= read -r container; do
+  # Start the private writer before its API/controller consumers.
+  for ((index = ${#containers[@]} - 1; index >= 0; index--)); do
+    container="${containers[$index]}"
     docker start "$container" >/dev/null || {
       printf 'ERROR: unable to start restore writer: %s\n' \
         "$container" >&2
       return 1
     }
-  done < <(atlas_restore_writer_containers)
+  done
 }
 
 atlas_restore_wait_for_writers() {
@@ -722,6 +759,12 @@ atlas_restore_apply_live_locked() {
     return 1
   fi
 
+  # Backups can take time. Recheck the whole writer set at the mutation boundary.
+  if ! atlas_restore_require_writers_quiesced; then
+    atlas_restore_cleanup_before_mutation "$identifier" || true
+    return 1
+  fi
+
   if ! atlas_backup_recovery_apply_staged_state "$requested" "$transaction"; then
     if [[ -d "$transaction" ]]; then
       atlas_restore_attach_recovery_point "$identifier" "$transaction" || true
@@ -729,8 +772,14 @@ atlas_restore_apply_live_locked() {
         "$transaction" "$identifier" "$baseline_record" \
         "$requested" "$staged_digest" || true
     fi
-    atlas_restore_start_writers >/dev/null 2>&1 || true
-    atlas_restore_wait_for_writers >/dev/null 2>&1 || true
+    # An incomplete automatic revert must never restart consumers of mixed state.
+    if [[ -f "$transaction/status" && ! -L "$transaction/status" &&
+          "$(<"$transaction/status")" == 'reverted' ]] &&
+       atlas_restore_validate_live_consumers
+    then
+      atlas_restore_start_writers >/dev/null 2>&1 || true
+      atlas_restore_wait_for_writers >/dev/null 2>&1 || true
+    fi
     atlas_restore_report_held_failure \
       "$identifier" 'transactional state application failed.'
     return 1
@@ -750,7 +799,9 @@ atlas_restore_apply_live_locked() {
     }
 
   if ! atlas_restore_validate_live_consumers; then
-    if atlas_backup_recovery_revert_applied_state "$transaction"; then
+    if atlas_backup_recovery_revert_applied_state "$transaction" &&
+       atlas_restore_validate_live_consumers
+    then
       atlas_restore_start_writers >/dev/null 2>&1 || true
       atlas_restore_wait_for_writers >/dev/null 2>&1 || true
     fi
@@ -815,8 +866,6 @@ atlas_restore_resume_live() {
     return 1
   }
   atlas_restore_validate_live_consumers || {
-    atlas_restore_start_writers >/dev/null 2>&1 || true
-    atlas_restore_wait_for_writers >/dev/null 2>&1 || true
     atlas_restore_report_held_failure \
       "$identifier" 'live state remains invalid; resume refused.'
     return 1
@@ -847,8 +896,6 @@ atlas_restore_abort_live() {
   fi
 
   atlas_restore_validate_live_consumers || {
-    atlas_restore_start_writers >/dev/null 2>&1 || true
-    atlas_restore_wait_for_writers >/dev/null 2>&1 || true
     atlas_restore_report_held_failure \
       "$identifier" 'reverted live state failed consumer validation.'
     return 1
