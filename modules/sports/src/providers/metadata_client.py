@@ -37,10 +37,36 @@ class MetadataWriterClient:
             raise ValueError('Invalid team directory request')
         return self._fetch('teams', route)
 
+    def fetch_schedule(self, route, start_at, end_at):
+        from providers.metadata_schedule import schedule_days, parse_schedule, reevaluate_schedule
+        schedule_days(route, start_at, end_at, self.clock())
+        document = self._request_document('schedule', {
+            'route': route, 'start_at': start_at, 'end_at': end_at,
+        })
+        try:
+            schedule = parse_schedule(document, route=route, start_at=start_at, end_at=end_at)
+            now = self.clock()
+            if not math.isfinite(now) or not 0 <= now-schedule.evaluated_at <= 30:
+                raise MetadataUnavailable('writer-snapshot-age')
+            return reevaluate_schedule(schedule, now)
+        except (ValueError, TypeError, KeyError):
+            raise MetadataUnavailable('writer-response') from None
+
     def _fetch(self, kind, route, day=None):
         query = {'route': route}
         if day is not None:
             query['day'] = day.isoformat()
+        document = self._request_document(kind, query)
+        try:
+            snapshot = parse_snapshot(document, kind=kind, route=route, day=day)
+            now = self.clock()
+            if not math.isfinite(now) or not snapshot.observed_at <= now < snapshot.expires_at:
+                raise MetadataUnavailable('writer-snapshot-age')
+            return snapshot
+        except (ValueError, TypeError, KeyError):
+            raise MetadataUnavailable('writer-response') from None
+
+    def _request_document(self, kind, query):
         request = urllib.request.Request(
             self.base_url + '/internal/v1/metadata/' + kind + '?' + urllib.parse.urlencode(query),
             headers={'Authorization': 'Bearer ' + self.token, 'Accept': 'application/json'},
@@ -52,11 +78,7 @@ class MetadataWriterClient:
                 raw = response.read(4_000_001)
             if len(raw) > 4_000_000:
                 raise MetadataUnavailable('writer-response-budget')
-            snapshot = parse_snapshot(json.loads(raw, object_pairs_hook=_unique), kind=kind, route=route, day=day)
-            now = self.clock()
-            if not math.isfinite(now) or not snapshot.observed_at <= now < snapshot.expires_at:
-                raise MetadataUnavailable('writer-snapshot-age')
-            return snapshot
+            return json.loads(raw, object_pairs_hook=_unique)
         except urllib.error.HTTPError as error:
             status = error.code
             error.close()
