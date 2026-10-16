@@ -29,6 +29,7 @@ def test_writer_set_is_exact_and_bounded() -> None:
         "atlas-api",
         "atlas-sports-controller",
         "atlas-notifications-worker",
+        "atlas-sports-writer",
     ]
 
 
@@ -60,6 +61,7 @@ def test_stop_and_start_target_only_declared_writers(tmp_path: Path) -> None:
     docker.write_text(
         "#!/usr/bin/env bash\n"
         "echo \"$*\" >> \"$EVENTS\"\n"
+        "if [[ \"$1\" == inspect ]]; then echo 'false|exited|0|false'; fi\n"
         "exit 0\n",
         encoding="utf-8",
     )
@@ -76,13 +78,17 @@ def test_stop_and_start_target_only_declared_writers(tmp_path: Path) -> None:
     )
 
     assert result.returncode == 0, result.stderr
-    assert events.read_text(encoding="utf-8").splitlines() == [
-        "stop --time 30 atlas-api",
-        "stop --time 30 atlas-sports-controller",
-        "stop --time 30 atlas-notifications-worker",
-        "start atlas-api",
-        "start atlas-sports-controller",
+    actions = [line for line in events.read_text(encoding="utf-8").splitlines()
+               if not line.startswith("inspect ")]
+    assert actions == [
+        "stop --time 35 atlas-api",
+        "stop --time 35 atlas-sports-controller",
+        "stop --time 35 atlas-notifications-worker",
+        "stop --time 35 atlas-sports-writer",
+        "start atlas-sports-writer",
         "start atlas-notifications-worker",
+        "start atlas-sports-controller",
+        "start atlas-api",
     ]
 
 
