@@ -14,6 +14,7 @@ vi.mock("../../../lib/services/authenticated", () => ({
 import {
   createSportsLiveSession,
   heartbeatSportsLiveSession,
+  loadSportsDiscoveryProviders,
   loadSportsEvents,
   loadSportsLiveAvailability,
   releaseSportsLiveSession,
@@ -25,6 +26,13 @@ describe("Sports Portal service", () => {
   beforeEach(() => {
     mocks.authenticatedAtlasApiRequest.mockReset();
     mocks.authenticatedAtlasApiRequestWithMetadata.mockReset();
+  });
+
+  it("loads authenticated source configuration without retries", async () => {
+    const document = { version: 1, providers: [{ provider: "thesportsdb", enabled: true }, { provider: "espn", enabled: false }] };
+    mocks.authenticatedAtlasApiRequest.mockResolvedValue(document);
+    expect(await loadSportsDiscoveryProviders()).toEqual(document.providers);
+    expect(mocks.authenticatedAtlasApiRequest).toHaveBeenCalledWith("/sports/discovery/providers", expect.objectContaining({ cache: "no-store", retryPolicy: expect.objectContaining({ maxRetries: 0 }) }));
   });
 
   it("loads authenticated Sports events", async () => {

@@ -252,5 +252,7 @@ follow targets through fresh cached metadata. Source IDs and original metadata
 expiry survive the API and Portal event transport. This adapter is absent from
 the controller/playback provider registry, and ESPN recording enable is rejected.
 See [discovery contract](../operations/SPORTS_METADATA_DISCOVERY.md). The packaged
-policy stays disabled; default Portal search aggregation and existing SportsDB
-follow mappings remain outstanding.
+policy stays disabled; existing SportsDB follow mappings remain outstanding.
+Portal search now aggregates explicitly configured sources through an authenticated
+configuration-only capability boundary, preserving partial results and source
+identities. Effective capability health and production activation remain open.
