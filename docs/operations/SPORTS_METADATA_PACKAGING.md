@@ -6,17 +6,19 @@ health, or authorize any playback source.
 
 ## Deployment contract
 
-The private writer image contains `metadata-refresh.disabled.json`, exactly
-`{"version":1,"enabled":false}`. Compose points refresh configuration to that
-immutable image file. Both the background worker and private metadata requests
-remain disabled. There is no operator-variable override in this revision.
-Enabling refresh requires a subsequent reviewed configuration integration with
-policy backup/rollback evidence. No enabled policy is generated here.
+The private writer image retains `metadata-refresh.disabled.json` as a disabled
+fallback artifact. Canonical Compose reads `/srv/sports-metadata-policy/refresh.json`
+from a separate server-owned, read-only directory bind. Provisioning creates only
+`{"version":1,"enabled":false}` when this directory is absent; subsequent updates
+validate and preserve the exact existing policy bytes. No enabled policy is
+installed by this integration. See `SPORTS_METADATA_POLICY.md` for ownership,
+recovery and activation limits.
 
 The writer alone mounts
 `${ATLAS_RUNTIME_CONFIG_DIR:-/mnt/storage/configs/atlas}/private/sports-metadata`
 at `/srv/sports-metadata` read/write. Long bind syntax sets
 `create_host_path: false`; Docker cannot silently create a root-owned directory.
+The policy bind is also writer-only, read-only and uses `create_host_path: false`.
 API, controller, Portal, Caddy and media services receive no new mount.
 `stop_grace_period: 35s` exceeds the worker's 25-second join deadline.
 
@@ -51,8 +53,8 @@ records; do not remove state merely because an older image ignores it.
 
 This revision does not bypass the existing degraded SportsDB doctor gate.
 The canonical pre-update doctor runs before this bootstrap, so a failed doctor
-creates no new metadata directory. Production activation, policy persistence,
-capability health, existing-follow identity mapping, discovery and Sports UAT
+creates no new metadata directory. Production activation, live policy/database restore and rollback acceptance,
+capability health, existing-follow identity mapping and Sports UAT
 remain open.
 
 ## Validation

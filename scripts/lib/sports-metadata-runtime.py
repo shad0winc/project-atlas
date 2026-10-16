@@ -74,7 +74,7 @@ def validate_state(project, root, uid, gid):
         recovery.validate_database(root / 'metadata.sqlite')
 
 
-def provision(project, runtime, uid, gid):
+def provision_state(project, runtime, uid, gid):
     require(os.geteuid() in {0, uid})
     require(os.geteuid() == 0 or os.getegid() == gid)
     # Do not create a missing storage root, or follow symbolic ancestors.
@@ -122,6 +122,62 @@ def provision(project, runtime, uid, gid):
     validate_state(project, root, uid, gid)
 
 
+def policy_helper(project):
+    spec = importlib.util.spec_from_file_location(
+        'atlas_metadata_policy', project / 'scripts/lib/sports-metadata-policy.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def provision_policy(project, runtime, uid, gid):
+    helper = policy_helper(project)
+    owner = 0 if os.geteuid() == 0 else uid
+    private = runtime / 'private'
+    directory(private, owner, 0 if owner == 0 else gid)
+    root = private / 'sports-metadata-policy'
+    if root.exists() or root.is_symlink():
+        helper.read_directory(root, owner, gid)
+        return
+    stage = Path(tempfile.mkdtemp(prefix='.sports-metadata-policy-new-', dir=private))
+    try:
+        descriptor = os.open(stage / 'refresh.json',
+                             os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(descriptor, 'wb') as handle:
+            handle.write(helper.DISABLED_POLICY)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chown(stage / 'refresh.json', owner, gid)
+        os.chmod(stage / 'refresh.json', 0o640)
+        os.chown(stage, owner, gid)
+        os.chmod(stage, 0o750)
+        helper.read_directory(stage, owner, gid)
+        descriptor = os.open(stage, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+        # Do not replace a concurrent installation, even an empty directory.
+        # A hard link cannot publish a directory; serialize canonical installers
+        # with the existing update lock and refuse any observed target.
+        require(not root.exists() and not root.is_symlink())
+        os.rename(stage, root)
+        descriptor = os.open(private, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+    finally:
+        if stage.exists():
+            shutil.rmtree(stage)
+    helper.read_directory(root, owner, gid)
+
+
+def provision(project, runtime, uid, gid):
+    provision_state(project, runtime, uid, gid)
+    provision_policy(project, runtime, uid, gid)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('action', choices=('provision',))
@@ -129,7 +185,7 @@ def main():
     parser.add_argument('path', type=Path)
     args = parser.parse_args()
     provision(args.project, args.path, *writer_identity(args.project))
-    print('SPORTS_METADATA_RUNTIME=PASS; REFRESH_POLICY=UNCHANGED')
+    print('SPORTS_METADATA_RUNTIME=PASS; REFRESH_POLICY=VALIDATED')
 
 
 if __name__ == '__main__':

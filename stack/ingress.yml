@@ -212,13 +212,19 @@ services:
         target: /srv/sports-metadata
         bind:
           create_host_path: false
+      - type: bind
+        source: ${ATLAS_RUNTIME_CONFIG_DIR:-/mnt/storage/configs/atlas}/private/sports-metadata-policy
+        target: /srv/sports-metadata-policy
+        read_only: true
+        bind:
+          create_host_path: false
       - /mnt/storage/configs/sportyfin/state:/mnt/storage/configs/sportyfin/state:rw
       - /mnt/storage/configs/sportyfin/config:/mnt/storage/configs/sportyfin/config:ro
     expose:
       - "8003"
     environment:
       ATLAS_SPORTS_METADATA_STATE_DIR: /srv/sports-metadata
-      ATLAS_SPORTS_METADATA_REFRESH_FILE: /srv/sports/metadata-refresh.disabled.json
+      ATLAS_SPORTS_METADATA_REFRESH_FILE: /srv/sports-metadata-policy/refresh.json
       ATLAS_SPORTS_WRITER_TOKEN: "${ATLAS_SPORTS_WRITER_TOKEN:?ATLAS_SPORTS_WRITER_TOKEN is required}"
       SPORTS_LIVE_SOURCE_CATALOG_PATH: "${SPORTS_LIVE_SOURCE_CATALOG_PATH:-/mnt/storage/configs/sportyfin/state/live-sources.json}"
       SPORTS_SUBSCRIPTIONS_FILE: "${SPORTS_SUBSCRIPTIONS_FILE:-/mnt/storage/configs/sportyfin/state/subscriptions.json}"

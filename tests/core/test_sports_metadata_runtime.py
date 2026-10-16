@@ -29,7 +29,7 @@ class MetadataRuntimeTests(unittest.TestCase):
     def provision(self):
         runtime.provision(ROOT, self.path, self.uid, self.gid)
 
-    def test_initial_schema_private_and_no_policy(self):
+    def test_initial_schema_private_and_disabled_policy(self):
         self.provision()
         self.assertEqual({p.name for p in self.state.iterdir()}, {'metadata.sqlite', 'metadata.sqlite.lock'})
         self.assertEqual(stat.S_IMODE(self.state.stat().st_mode), 0o700)
@@ -40,6 +40,9 @@ class MetadataRuntimeTests(unittest.TestCase):
             self.assertEqual(db.execute('SELECT version FROM metadata_schema').fetchall(), [(1,)])
             self.assertEqual(db.execute('SELECT COUNT(*) FROM metadata_attempts').fetchone(), (0,))
         self.assertFalse((self.state / 'refresh.json').exists())
+        policy = self.path / 'private/sports-metadata-policy'
+        self.assertEqual(runtime.policy_helper(ROOT).read_directory(policy, self.uid, self.gid),
+                         b'{"version":1,"enabled":false}\n')
 
     def test_second_provision_preserves_alias_and_budget(self):
         self.provision()
@@ -168,7 +171,7 @@ with store.locked(), store.connection() as connection:
         self.assertIn('stop_grace_period: 35s', compose)
         self.assertIn('create_host_path: false', compose)
         self.assertIn('target: /srv/sports-metadata', compose)
-        self.assertIn('ATLAS_SPORTS_METADATA_REFRESH_FILE: /srv/sports/metadata-refresh.disabled.json', compose)
+        self.assertIn('ATLAS_SPORTS_METADATA_REFRESH_FILE: /srv/sports-metadata-policy/refresh.json', compose)
         self.assertNotIn('target: /mnt/storage/configs/atlas/private', compose)
 
     def test_update_provisions_after_doctor_before_backup(self):
