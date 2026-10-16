@@ -59,6 +59,7 @@ export function startFollowedSportsRefresh({
     controller?.abort();
     controller = new AbortController();
     const active = controller;
+    let nextDelay = intervalMs;
     publish(providers, null);
     if (document.visibilityState !== "hidden") {
       const results = await Promise.allSettled(
@@ -71,11 +72,19 @@ export function startFollowedSportsRefresh({
       );
       if (stopped || active.signal.aborted) return;
       publish(providers, results);
+      const now = Date.now();
+      const expiries = results.flatMap(result => result.status === "fulfilled"
+        ? result.value.map(event => Date.parse(event.metadataExpiresAt ?? "") - now)
+          .filter(delay => Number.isFinite(delay) && delay > 0)
+        : []);
+      // Clear the live projection and revalidate when its source observation
+      // expires, even when that is sooner than the normal refresh interval.
+      nextDelay = Math.max(1, Math.min(intervalMs, ...expiries));
     }
     if (!stopped && providers.length > 0)
       timer = setTimeout(() => {
         void refresh();
-      }, intervalMs);
+      }, nextDelay);
   }
   function visibilityChanged(): void {
     if (timer !== null) clearTimeout(timer);

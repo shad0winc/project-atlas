@@ -10,7 +10,15 @@ export function followedLiveEvents(
     .filter((event) => {
       const key = `${event.provider}:${event.providerEventId}`;
       const start = Date.parse(event.startAt);
+      const needsMetadataAge = event.provider === "espn" || event.metadataObservedAt !== undefined || event.metadataExpiresAt !== undefined;
+      const observed = Date.parse(event.metadataObservedAt ?? "");
+      const expires = Date.parse(event.metadataExpiresAt ?? "");
+      const metadataFresh = !needsMetadataAge || (
+        Number.isFinite(observed) && Number.isFinite(expires) &&
+        observed <= now && now < expires && expires > observed && expires - observed <= 3_600_000
+      );
       if (
+        !metadataFresh ||
         seen.has(key) ||
         event.status !== "live" ||
         !Number.isFinite(start) ||

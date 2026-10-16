@@ -104,3 +104,23 @@ def test_sports_subscription_response_keeps_atlas_and_provider_ids_distinct() ->
     assert response.subscription_id != response.provider_event_id
     assert response.user_id == "usr-atlas-001"
     assert response.type == "event"
+
+
+def test_metadata_observation_requires_paired_aware_bounded_age() -> None:
+    from pydantic import ValidationError
+    from atlas_api.schemas.sports import SportsEventResponse
+    base = dict(provider="espn", provider_event_id="football-nfl-1", name="Game", sport="Football", league="NFL", start_at="2026-10-16T12:00:00Z", status="live", requested=False)
+    valid = dict(metadata_observed_at="2026-10-16T12:00:00Z", metadata_expires_at="2026-10-16T12:01:00Z")
+    assert SportsEventResponse(**base, **valid).metadata_expires_at is not None
+    for age in (
+        dict(metadata_observed_at="2026-10-16T12:00:00Z"),
+        dict(metadata_observed_at="2026-10-16T12:00:00", metadata_expires_at="2026-10-16T12:01:00Z"),
+        dict(metadata_observed_at="2026-10-16T12:00:00Z", metadata_expires_at="2026-10-16T11:00:00Z"),
+        dict(metadata_observed_at="2026-10-16T12:00:00Z", metadata_expires_at="2026-10-16T14:00:00Z"),
+    ):
+        try:
+            SportsEventResponse(**base, **age)
+        except ValidationError:
+            pass
+        else:
+            raise AssertionError("Invalid metadata age accepted")

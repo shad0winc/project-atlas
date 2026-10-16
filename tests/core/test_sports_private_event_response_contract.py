@@ -4,7 +4,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 PRIVATE_API = ROOT / "modules" / "sports" / "src" / "private_api.py"
-EXPECTED = {"provider","provider_event_id","name","sport","league","start_at","status","requested","provider_league_id","home_team_id","away_team_id"}
+EXPECTED = {"provider","provider_event_id","name","sport","league","start_at","status","requested","provider_league_id","home_team_id","away_team_id","metadata_observed_at","metadata_expires_at"}
 FORBIDDEN = {"id","home_team","away_team","duration_minutes","stream_url"}
 
 def _safe_event_keys() -> set[str]:
