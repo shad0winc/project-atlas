@@ -166,6 +166,17 @@ def prepare_runtime(tmp_path: Path, *, branch: str = "main") -> dict[str, str]:
     )
 
     write_executable(
+        project / "scripts" / "lib" / "sports-metadata-runtime.sh",
+        """
+        #!/usr/bin/env bash
+        atlas_sports_metadata_runtime_provision() {
+          echo sports-metadata-runtime:provision >> "$ATLAS_TEST_EVENTS"
+          return "${ATLAS_TEST_SPORTS_METADATA_RUNTIME_STATUS:-0}"
+        }
+        """,
+    )
+
+    write_executable(
         project / "scripts" / "lib" / "sports-runtime.sh",
         """
         #!/usr/bin/env bash
@@ -2075,3 +2086,23 @@ def test_requests_runtime_provisioning_failure_aborts_ingress(
     assert "requests-runtime:provision" in events
     assert "sports-runtime:provision" not in events
     assert "ingress-verify" not in events
+
+
+def test_metadata_bootstrap_failure_aborts_before_maintenance(tmp_path: Path) -> None:
+    environment = prepare_runtime(tmp_path)
+    environment["ATLAS_TEST_SPORTS_METADATA_RUNTIME_STATUS"] = "1"
+    result = run_update(environment, "ingress")
+    assert result.returncode != 0
+    assert "Sports metadata bootstrap failed before maintenance" in result.stderr
+    events = event_lines(environment)
+    assert "sports-metadata-runtime:provision" in events
+    assert "maintenance:enable" not in events
+
+
+def test_metadata_bootstrap_precedes_maintenance(tmp_path: Path) -> None:
+    environment = prepare_runtime(tmp_path)
+    result = run_update(environment, "ingress")
+    assert result.returncode == 0, result.stderr
+    events = event_lines(environment)
+    assert events.index("doctor") < events.index("sports-metadata-runtime:provision")
+    assert events.index("sports-metadata-runtime:provision") < events.index("maintenance:enable")
