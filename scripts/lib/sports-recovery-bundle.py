@@ -121,7 +121,7 @@ def sqlite_valid(path):
 
 
 def ownership_plan(identities):
-    require(isinstance(identities, dict) and set(identities) == {'dispatcharr', 'teamarr', 'writer'})
+    require(isinstance(identities, dict) and set(identities) == {'dispatcharr', 'dispatcharr_jwt', 'teamarr', 'writer'})
     for identity in identities.values():
         require(isinstance(identity, (list, tuple)) and len(identity) == 2
                 and all(type(value) is int and 0 <= value < 2**31 for value in identity))
@@ -198,7 +198,8 @@ def prepare(root, identities, *, scratch_parent=Path('/tmp')):
         if captured:
             for name in ('dispatcharr', 'teamarr'): (work / name).mkdir(mode=0o700)
             for surface, relative, limit in NATIVE:
-                role = 'dispatcharr' if surface.startswith('dispatcharr') else 'teamarr'
+                role = {'dispatcharr-database': 'dispatcharr',
+                        'dispatcharr-jwt': 'dispatcharr_jwt', 'teamarr-database': 'teamarr'}[surface]
                 output = relative.removeprefix('backend-recovery/')
                 copy_checked(root / relative, work / output, native_hashes[relative], limit)
                 records.append({'surface': surface, 'path': output, 'sha256': native_hashes[relative],
@@ -222,7 +223,7 @@ def prepare(root, identities, *, scratch_parent=Path('/tmp')):
         ):
             records.append({'surface': surface, 'path': relative, 'sha256': digest,
                             'publish_owner': owner, 'publish_mode': mode, 'state': 'prepared-copy'})
-        result = {'version': 1, 'native_backend': 'captured' if captured else 'absent-unresolved',
+        result = {'version': 2, 'native_backend': 'captured' if captured else 'absent-unresolved',
                   'ready_for_live_apply': False, 'ownership_plan': identities,
                   'publish_directories': {'sports-metadata': {'owner': identities['writer'], 'mode': '0700'},
                                          'sports-metadata-policy': {'owner': [0, identities['writer'][1]], 'mode': '0750'}},
@@ -270,7 +271,7 @@ def validate_bundle(root):
         'version', 'native_backend', 'ready_for_live_apply', 'ownership_plan',
         'publish_directories', 'source_native_contract_sha256',
         'source_metadata_manifest_sha256', 'files'})
-    require(type(manifest['version']) is int and manifest['version'] == 1
+    require(type(manifest['version']) is int and manifest['version'] == 2
             and manifest['ready_for_live_apply'] is False
             and manifest['native_backend'] in {'captured', 'absent-unresolved'})
     identities = ownership_plan(manifest['ownership_plan'])
@@ -289,7 +290,8 @@ def validate_bundle(root):
     if manifest['native_backend'] == 'captured':
         directories |= {'dispatcharr', 'teamarr'}
         for surface, relative, limit in NATIVE:
-            role = 'dispatcharr' if surface.startswith('dispatcharr') else 'teamarr'
+            role = {'dispatcharr-database': 'dispatcharr',
+                        'dispatcharr-jwt': 'dispatcharr_jwt', 'teamarr-database': 'teamarr'}[surface]
             expected[surface] = (relative.removeprefix('backend-recovery/'), identities[role], '0600', limit,
                                  'native-restore-required' if surface == 'dispatcharr-database' else 'prepared-copy')
     require(isinstance(manifest['files'], list) and len(manifest['files']) == len(expected))
