@@ -138,3 +138,20 @@ describe("followed Sports refresh", () => {
     expect(load).toHaveBeenCalledTimes(1);
   });
 });
+
+
+describe("metadata expiry refresh", () => {
+  it("clears the live projection at observation expiry before a pending revalidation", async () => {
+    vi.setSystemTime(new Date("2026-10-16T12:00:00Z"));
+    const fresh = { ...event, provider: "espn", metadataObservedAt: new Date(Date.now()).toISOString(), metadataExpiresAt: new Date(Date.now() + 5000).toISOString() };
+    const load = vi.fn().mockResolvedValueOnce([fresh]).mockImplementationOnce(() => new Promise(() => {}));
+    const publish = vi.fn();
+    stop = startFollowedSportsRefresh({ follows: [{ ...saved("event", "game"), provider: "espn" }], load, publish });
+    await flush();
+    await vi.advanceTimersByTimeAsync(4999);
+    expect(load).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(publish.mock.lastCall?.[1]).toBeNull();
+  });
+});

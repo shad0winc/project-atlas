@@ -47,6 +47,9 @@ _metadata_refresher = None
 
 def _provider(name: str):
     normalized = name.strip().lower()
+    if normalized == "espn":
+        from providers.metadata_discovery import configured_discovery_provider
+        return configured_discovery_provider()
     providers = {
         provider.name: provider
         for provider in enabled_providers()
@@ -237,6 +240,8 @@ class Handler(BaseHTTPRequestHandler):
             "provider_league_id": str(event.get("provider_league_id") or "").strip() or None,
             "home_team_id": str(event.get("home_team_id") or "").strip() or None,
             "away_team_id": str(event.get("away_team_id") or "").strip() or None,
+            "metadata_observed_at": event.get("metadata_observed_at"),
+            "metadata_expires_at": event.get("metadata_expires_at"),
         }
 
     @staticmethod

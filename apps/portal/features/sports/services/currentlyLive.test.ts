@@ -79,3 +79,16 @@ describe("Currently Live", () => {
     expect(sportsLocalStart("invalid")).toBe("Start time unavailable");
   });
 });
+
+
+describe("independent metadata freshness", () => {
+  it("requires the provider observation to remain fresh and never guesses live from time", () => {
+    const saved = { ...follow("event", "game"), provider: "espn" };
+    const fresh = { ...event, provider: "espn", metadataObservedAt: new Date(now - 1000).toISOString(), metadataExpiresAt: new Date(now + 1000).toISOString() };
+    expect(followedLiveEvents([fresh], [saved], now)).toEqual([fresh]);
+    expect(followedLiveEvents([fresh], [saved], now + 1000)).toEqual([]);
+    expect(followedLiveEvents([{ ...fresh, metadataObservedAt: undefined }], [saved], now)).toEqual([]);
+    expect(followedLiveEvents([{ ...fresh, metadataObservedAt: new Date(now + 500).toISOString() }], [saved], now)).toEqual([]);
+    expect(followedLiveEvents([{ ...fresh, status: "scheduled" }], [saved], now)).toEqual([]);
+  });
+});
