@@ -353,6 +353,27 @@ class Handler(BaseHTTPRequestHandler):
         if not self._require_auth():
             return
 
+        if parsed.path in {"/internal/v1/metadata/day", "/internal/v1/metadata/teams"}:
+            from providers.metadata_service import query_metadata
+            from providers.metadata_broker import MetadataUnavailable
+            try:
+                query = urllib.parse.parse_qs(parsed.query, keep_blank_values=True,
+                                              strict_parsing=True, max_num_fields=4)
+                document = query_metadata(parsed.path, query)
+                self._json(HTTPStatus.OK, document)
+            except ValueError:
+                self._json(HTTPStatus.BAD_REQUEST, {"error": "Invalid metadata query."})
+            except MetadataUnavailable as error:
+                self._json(HTTPStatus.SERVICE_UNAVAILABLE, {
+                    "error": "Independent Sports metadata is unavailable.",
+                    "retry_after_seconds": max(0, min(3600, int(error.retry_after))),
+                })
+            except Exception:
+                self._json(HTTPStatus.SERVICE_UNAVAILABLE, {
+                    "error": "Independent Sports metadata is unavailable.",
+                })
+            return
+
         if parsed.path == "/internal/v1/shared-live-route":
             try:
                 from shared_admission import verify_shared_live_route

@@ -1,6 +1,7 @@
-"""Inactive ESPN metadata client/cache. Construct only in the private Sports writer.
+"""Shared ESPN metadata cache; construct only in the private Sports writer.
 
-No default instance, provider registration, runtime path or API route is installed.
+The writer boundary is disabled until an explicit private state directory is supplied.
+No provider registration, production path or deployment provisioning is installed.
 """
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
@@ -17,6 +18,7 @@ import urllib.parse
 import urllib.request
 
 from providers.espn_metadata import MetadataError, ROUTES, parse_scoreboard
+from providers.espn_directory import parse_team_directory
 
 
 class MetadataUnavailable(RuntimeError):
@@ -66,8 +68,16 @@ class ESPNDayTransport:
     def __call__(self, route, day):
         if route not in ROUTES or type(day) is not date:
             raise ValueError('Invalid metadata request')
-        url = ('https://site.api.espn.com/apis/site/v2/sports/' + route
-               + '/scoreboard?' + urllib.parse.urlencode({'dates': day.strftime('%Y%m%d')}))
+        return self._fetch(route, '/scoreboard?' + urllib.parse.urlencode(
+            {'dates': day.strftime('%Y%m%d')}), parse_scoreboard)
+
+    def fetch_teams(self, route):
+        if route not in ROUTES or ROUTES[route][2]:
+            raise ValueError('Invalid team directory request')
+        return self._fetch(route, '/teams?limit=1000', parse_team_directory)
+
+    def _fetch(self, route, suffix, parser):
+        url = 'https://site.api.espn.com/apis/site/v2/sports/' + route + suffix
         request = urllib.request.Request(url, headers={
             'Accept': 'application/json', 'User-Agent': 'Project-Atlas-Sports-Metadata/1.0',
         })
@@ -81,7 +91,7 @@ class ESPNDayTransport:
             if len(raw) > 4_000_000:
                 raise MetadataUnavailable('response-budget')
             payload = json.loads(raw, object_pairs_hook=_unique)
-            parse_scoreboard(route, payload)
+            parser(route, payload)
             return payload
         except urllib.error.HTTPError as error:
             code = error.code
@@ -99,7 +109,9 @@ def _fetch_worker():
     """Fixed child entry point: no state access and only sanitized JSON on stdout."""
     request = json.loads(sys.stdin.buffer.read(4097))
     try:
-        payload = ESPNDayTransport()(request['route'], date.fromisoformat(request['day']))
+        transport = ESPNDayTransport()
+        payload = (transport.fetch_teams(request['route']) if request.get('kind') == 'teams'
+                   else transport(request['route'], date.fromisoformat(request['day'])))
         result = {'outcome': 'success', 'payload': payload}
     except MetadataUnavailable as error:
         result = {'outcome': 'failure', 'category': error.category,
@@ -121,13 +133,21 @@ class BoundedESPNTransport:
     def __call__(self, route, day):
         if route not in ROUTES or type(day) is not date:
             raise ValueError('Invalid metadata request')
+        return self._fetch({'route': route, 'day': day.isoformat()}, parse_scoreboard)
+
+    def fetch_teams(self, route):
+        if route not in ROUTES or ROUTES[route][2]:
+            raise ValueError('Invalid team directory request')
+        return self._fetch({'route': route, 'kind': 'teams'}, parse_team_directory)
+
+    def _fetch(self, request, parser):
         environment = dict(os.environ)
         environment['PYTHONPATH'] = str(Path(__file__).resolve().parents[1])
         arguments = [sys.executable, '-B', '-c',
                      'from providers.metadata_broker import _fetch_worker; _fetch_worker()']
         try:
             response = self.runner(arguments,
-                input=json.dumps({'route': route, 'day': day.isoformat()}).encode(),
+                input=json.dumps(request).encode(),
                 capture_output=True, timeout=self.deadline_seconds, env=environment)
         except subprocess.TimeoutExpired:
             raise MetadataUnavailable('deadline', retry_after=15) from None
@@ -151,7 +171,7 @@ class BoundedESPNTransport:
             if result['outcome'] != 'success':
                 raise ValueError('Invalid worker outcome')
             payload = result['payload']
-            parse_scoreboard(route, payload)
+            parser(request['route'], payload)
             return payload
         except (KeyError, ValueError, TypeError):
             raise MetadataUnavailable('invalid-response', retry_after=15) from None
@@ -172,17 +192,29 @@ class MetadataSnapshot:
         return 'events' if self.events else 'empty'
 
 
+@dataclass(frozen=True)
+class MetadataDirectorySnapshot:
+    route: str
+    teams: tuple
+    observed_at: float
+    expires_at: float
+    cache_hit: bool
+    stale: bool = False
+
+
+
 class MetadataBroker:
     def __init__(self, store, *, transport=None, clock=time.time,
-                 hourly_budget=96, current_ttl=60, future_ttl=900):
+                 hourly_budget=96, current_ttl=60, future_ttl=900, directory_ttl=3600):
         if type(hourly_budget) is not int or not 1 <= hourly_budget <= 1000:
             raise ValueError('Invalid metadata request budget')
-        if any(type(v) is not int or not 1 <= v <= 3600 for v in (current_ttl, future_ttl)):
+        if any(type(v) is not int or not 1 <= v <= 3600 for v in (current_ttl, future_ttl, directory_ttl)):
             raise ValueError('Invalid metadata cache lifetime')
         self.store, self.clock = store, clock
         self.transport = transport or BoundedESPNTransport()
         self.hourly_budget = hourly_budget
         self.current_ttl, self.future_ttl = current_ttl, future_ttl
+        self.directory_ttl = directory_ttl
 
     def _request(self, route, day):
         now = self.clock()
@@ -200,16 +232,38 @@ class MetadataBroker:
         if not all(type(v) in (int, float) and math.isfinite(v) for v in (observed, expires)) or observed > now or expires < observed:
             raise MetadataUnavailable('cache-clock')
         try:
-            events = parse_scoreboard(route, json.loads(payload))
+            parser = parse_team_directory if day == '@teams' else parse_scoreboard
+            events = parser(route, json.loads(payload))
         except (ValueError, TypeError):
             raise MetadataUnavailable('cache-invalid') from None
+        if day == '@teams':
+            return MetadataDirectorySnapshot(route, events, observed, expires, cache_hit, stale)
         return MetadataSnapshot(route, day, events, observed, expires, cache_hit, stale)
 
     def fetch_day(self, route, day):
+        if route not in ROUTES or type(day) is not date:
+            raise ValueError('Invalid metadata request')
+        return self._fetch_cached(route, day)
+
+    def fetch_teams(self, route):
+        if route not in ROUTES or ROUTES[route][2]:
+            raise ValueError('Invalid team directory request')
+        return self._fetch_cached(route, None)
+
+    def _fetch_cached(self, route, day):
         # One process-shared lock intentionally bounds all provider concurrency to one.
         # The attempt/unknown-outcome reservation is committed BEFORE network access.
         with self.store.locked():
-            now, today, key_day, key = self._request(route, day)
+            if day is None:
+                now = self.clock()
+                if not math.isfinite(now) or now < 0:
+                    raise MetadataUnavailable('clock')
+                today = None
+                key_day, key = '@teams', route + ':@teams'
+                parser = parse_team_directory
+            else:
+                now, today, key_day, key = self._request(route, day)
+                parser = parse_scoreboard
             with self.store.connection() as connection:
                 row = connection.execute(
                     'SELECT payload, observed, expires FROM metadata_cache WHERE route=? AND day=?',
@@ -231,8 +285,9 @@ class MetadataBroker:
                 connection.execute('INSERT INTO metadata_attempts VALUES (?)', (now,))
                 connection.execute('INSERT OR REPLACE INTO metadata_holds VALUES (?,?)', (key, now+30))
             try:
-                payload = self.transport(route, day)
-                parse_scoreboard(route, payload)
+                payload = (self.transport.fetch_teams(route) if day is None
+                           else self.transport(route, day))
+                parser(route, payload)
                 encoded = json.dumps(payload, separators=(',', ':'), allow_nan=False)
                 if len(encoded.encode()) > 4_000_000:
                     raise MetadataUnavailable('response-budget')
@@ -251,7 +306,9 @@ class MetadataBroker:
             observed = self.clock()
             if not math.isfinite(observed) or observed < now:
                 raise MetadataUnavailable('clock-regressed')
-            expires = observed + (self.future_ttl if day > today else self.current_ttl)
+            ttl = (self.directory_ttl if day is None else
+                   self.future_ttl if day > today else self.current_ttl)
+            expires = observed + ttl
             with self.store.connection() as connection:
                 connection.execute('INSERT OR REPLACE INTO metadata_cache VALUES (?,?,?,?,?)',
                                    (route, key_day, encoded, observed, expires))
