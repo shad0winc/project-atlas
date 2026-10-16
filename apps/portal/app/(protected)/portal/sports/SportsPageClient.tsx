@@ -474,8 +474,9 @@ export function SportsPageClient(): React.ReactElement {
   async function handleFollow(
     type: "team" | "league",
     providerId: string,
+    provider: string,
   ): Promise<void> {
-    const follow = await followSports(type, providerId);
+    const follow = await followSports(type, providerId, { provider });
 
     setFollows((current) =>
       current.some((item) => item.subscriptionId === follow.subscriptionId)
@@ -484,7 +485,9 @@ export function SportsPageClient(): React.ReactElement {
     );
 
     setSearchResults((current) =>
-      current.filter((item) => item.id !== providerId),
+      current.filter((item) =>
+        item.kind !== type || item.id !== providerId || (item.provider ?? "thesportsdb") !== provider,
+      ),
     );
   }
 
@@ -499,14 +502,15 @@ export function SportsPageClient(): React.ReactElement {
   async function handleBrowse(
     type: "team" | "league",
     providerId: string,
+    provider: string,
   ): Promise<void> {
     const loadedEvents = await loadSportsEvents(
       {},
-      type === "team" ? { teamIds: [providerId] } : { leagueIds: [providerId] },
+      type === "team" ? { provider, teamIds: [providerId] } : { provider, leagueIds: [providerId] },
     );
 
     setEvents(upcomingSportsEvents(loadedEvents));
-    setBrowsedSports({ provider: "thesportsdb", type, providerId });
+    setBrowsedSports({ provider, type, providerId });
 
     window.requestAnimationFrame(() => {
       document
@@ -572,7 +576,7 @@ export function SportsPageClient(): React.ReactElement {
     );
 
     if (!eventFollow) {
-      const created = await followSports("event", event.providerEventId);
+      const created = await followSports("event", event.providerEventId, { provider: event.provider });
       eventFollow = created;
       setFollows((current) =>
         current.some((item) => item.subscriptionId === created.subscriptionId)
