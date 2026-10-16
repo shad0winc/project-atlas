@@ -9,6 +9,7 @@ import math
 import os
 from pathlib import Path
 import threading
+import time
 
 from providers.espn_directory import MetadataTeam
 from providers.espn_metadata import (
@@ -19,14 +20,20 @@ from providers.metadata_broker import (
 )
 from providers.metadata_store import MetadataStore
 
-PATHS = {'/internal/v1/metadata/day': 'day', '/internal/v1/metadata/teams': 'teams'}
+PATHS = {'/internal/v1/metadata/day': 'day', '/internal/v1/metadata/teams': 'teams',
+         '/internal/v1/metadata/schedule': 'schedule'}
 STATUSES = {'scheduled', 'live', 'final', 'postponed', 'cancelled', 'unknown'}
 _factory_lock = threading.Lock()
 
 
+def metadata_now():
+    return time.time()
+
+
 def validate_query(path, query):
     kind = PATHS[path]
-    fields = {'route', 'day'} if kind == 'day' else {'route'}
+    fields = ({'route', 'day'} if kind == 'day' else
+              {'route', 'start_at', 'end_at'} if kind == 'schedule' else {'route'})
     if set(query) != fields or any(len(values) != 1 for values in query.values()):
         raise ValueError('Invalid metadata query')
     route = query['route'][0]
@@ -37,6 +44,11 @@ def validate_query(path, query):
         day = date.fromisoformat(query['day'][0])
         if day.isoformat() != query['day'][0]:
             raise ValueError('Invalid metadata date')
+    if kind == 'schedule':
+        from providers.metadata_schedule import schedule_days
+        start_at, end_at = query['start_at'][0], query['end_at'][0]
+        schedule_days(route, start_at, end_at, metadata_now())
+        day = (start_at, end_at)
     return kind, route, day
 
 
@@ -61,6 +73,9 @@ def configured_broker():
 def query_metadata(path, query, *, broker_factory=configured_broker):
     kind, route, day = validate_query(path, query)
     broker = broker_factory()
+    if kind == 'schedule':
+        from providers.metadata_schedule import collect_schedule, schedule_document
+        return schedule_document(collect_schedule(broker, route, *day, now=metadata_now()))
     snapshot = broker.fetch_day(route, day) if kind == 'day' else broker.fetch_teams(route)
     return snapshot_document(snapshot)
 
@@ -114,7 +129,7 @@ def _event(route, row):
     return MetadataEvent('espn', route, _identifier(row['provider_event_id']), _text(row['name'], 'event name'), row['kind'], _stamp(row['start_at']), row['status'], tuple(parsed))
 
 
-def parse_snapshot(document, *, kind, route, day=None):
+def parse_snapshot(document, *, kind, route, day=None, allow_stale=False):
     """Validate the private response independently of the HTTP peer and retain age."""
     common = {'version', 'kind', 'route', 'observed_at', 'expires_at', 'cache_hit', 'stale'}
     fields = common | ({'events', 'requested_day'} if kind == 'day' else {'teams'})
@@ -123,9 +138,9 @@ def parse_snapshot(document, *, kind, route, day=None):
         or document['kind'] != kind or document['route'] != route or route not in ROUTES):
         raise ValueError('Metadata response identity mismatch')
     observed, expires = document['observed_at'], document['expires_at']
-    if any(type(v) not in (float, int) or not math.isfinite(v) or v < 0 for v in (observed, expires)) or expires < observed:
+    if any(type(v) not in (float, int) or not math.isfinite(v) or v < 0 for v in (observed, expires)) or expires < observed or expires-observed > 3600:
         raise ValueError('Invalid metadata age')
-    if any(type(document[field]) is not bool for field in ('cache_hit', 'stale')) or document['stale']:
+    if any(type(document[field]) is not bool for field in ('cache_hit', 'stale')) or (document['stale'] and not allow_stale):
         raise ValueError('Fresh metadata response required')
     if kind == 'day':
         if type(day) is not date or document['requested_day'] != day.isoformat():
@@ -136,7 +151,7 @@ def parse_snapshot(document, *, kind, route, day=None):
         events = tuple(_event(route, row) for row in rows)
         if len({event.identity for event in events}) != len(events):
             raise ValueError('Duplicate event identity')
-        return MetadataSnapshot(route, day.isoformat(), events, observed, expires, document['cache_hit'])
+        return MetadataSnapshot(route, day.isoformat(), events, observed, expires, document['cache_hit'], document['stale'])
     if kind != 'teams' or ROUTES[route][2]:
         raise ValueError('Unsupported metadata directory')
     rows = document['teams']
@@ -150,4 +165,4 @@ def parse_snapshot(document, *, kind, route, day=None):
         teams.append(MetadataTeam(route, _identifier(row['team_id']), _text(row['name'], 'team name'), row['abbreviation']))
     if len({team.identity for team in teams}) != len(teams):
         raise ValueError('Duplicate team identity')
-    return MetadataDirectorySnapshot(route, tuple(teams), observed, expires, document['cache_hit'])
+    return MetadataDirectorySnapshot(route, tuple(teams), observed, expires, document['cache_hit'], document['stale'])

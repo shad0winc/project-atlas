@@ -328,3 +328,53 @@ class MetadataBroker:
             if not row or now-row[1] > max_age:
                 return None
             return self._snapshot(route, key_day, row, now, cache_hit=True, stale=row[2] <= now)
+
+    def read_days(self, route, days):
+        """One coherent cache-only view; never attempts upstream or renews observations."""
+        if route not in ROUTES or not isinstance(days, (list, tuple)) or not 1 <= len(days) <= 9:
+            raise ValueError('Invalid metadata day selection')
+        if any(type(day) is not date for day in days) or len(set(days)) != len(days):
+            raise ValueError('Invalid metadata day selection')
+        with self.store.locked(), self.store.connection() as connection:
+            now = self.clock()
+            if not math.isfinite(now) or now < 0:
+                raise MetadataUnavailable('clock')
+            today = datetime.fromtimestamp(now, timezone.utc).date()
+            if any(not -1 <= (day-today).days <= 7 for day in days):
+                raise ValueError('Metadata request outside bounded horizon')
+            connection.execute('BEGIN')
+            global_hold = connection.execute(
+                'SELECT until_stamp FROM metadata_holds WHERE key=?', ('espn:cooldown',)).fetchone()
+            result = []
+            for day in days:
+                key_day = day.isoformat()
+                hold = connection.execute(
+                    'SELECT until_stamp FROM metadata_holds WHERE key=?',
+                    (route + ':' + key_day,)).fetchone()
+                holds = [row[0] for row in (global_hold, hold) if row]
+                if any(type(value) not in (int, float) or not math.isfinite(value) for value in holds):
+                    raise MetadataUnavailable('cache-invalid')
+                retry = max(0, math.ceil(max(holds, default=now)-now))
+                row = connection.execute(
+                    'SELECT payload,observed,expires FROM metadata_cache WHERE route=? AND day=?',
+                    (route, key_day)).fetchone()
+                if row is None:
+                    result.append(MetadataDayCache(key_day, None, 'missing', min(3600,retry)))
+                    continue
+                try:
+                    snapshot = self._snapshot(route, key_day, row, now,
+                                              cache_hit=True, stale=row[2] <= now)
+                except (MetadataUnavailable, TypeError, ValueError):
+                    result.append(MetadataDayCache(key_day, None, 'invalid', min(3600,retry)))
+                    continue
+                result.append(MetadataDayCache(key_day, snapshot,
+                    'stale' if snapshot.stale else 'fresh', min(3600,retry)))
+            return now, tuple(result)
+
+
+@dataclass(frozen=True)
+class MetadataDayCache:
+    requested_day: str
+    snapshot: MetadataSnapshot | None
+    status: str
+    retry_after_seconds: int
