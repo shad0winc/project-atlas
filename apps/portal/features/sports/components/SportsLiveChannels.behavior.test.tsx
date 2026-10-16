@@ -51,6 +51,22 @@ async function mount(watch = vi.fn(async () => {})) {
   return watch;
 }
 describe("standalone live channel discovery", () => {
+  it("does not list the configured catalog before an Events search", async () => {
+    await act(async () =>
+      root.render(
+        <SportsLiveChannels
+          onWatchLive={vi.fn(async () => {})}
+          searchQuery=""
+          managedFollows={[]}
+        />,
+      ),
+    );
+    await flush();
+    expect(container.textContent).not.toContain("NFL RedZone");
+    expect(container.textContent).toContain("Search for an event or channel above");
+    expect(container.querySelector('[aria-label="Follow NFL RedZone"]')).toBeNull();
+  });
+
   it("uses Events search and the page's channel follows without a duplicate save-state read", async () => {
     const changed = vi.fn(async () => {});
     const channelFollow = {

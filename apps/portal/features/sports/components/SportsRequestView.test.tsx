@@ -16,6 +16,15 @@ const baseProps = {
 };
 
 describe("SportsRequestView", () => {
+  it("reports an unavailable schedule without claiming there are no events", () => {
+    const markup = renderToStaticMarkup(
+      <SportsRequestView {...baseProps} events={[]} scheduleUnavailable />,
+    );
+    expect(markup).toContain("Next 7 days");
+    expect(markup).toContain("Upcoming schedules could not be fully loaded");
+    expect(markup).not.toContain("No upcoming Sports events to show");
+  });
+
   it("places registered channels inside Events discovery and keeps channel saves manageable", () => {
     const props = {
       ...baseProps,

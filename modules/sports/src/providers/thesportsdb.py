@@ -592,7 +592,16 @@ class TheSportsDBProvider(SportsProvider):
         team_ids: list[str] | None = None,
         league_ids: list[str] | None = None,
         date_value: str | None = None,
+        days_ahead: int | None = None,
     ) -> list[dict[str, Any]]:
+        # Interactive schedules can request seven days without changing the
+        # background discovery horizon or bypassing the shared request budget.
+        if days_ahead is not None and (
+            type(days_ahead) is not int or not 0 <= days_ahead <= 7
+        ):
+            raise ValueError("Schedule horizon must be between zero and seven days")
+        discovery_days = self.discovery_days_ahead if days_ahead is None else days_ahead
+
         if date_value is None:
             start_date = datetime.now(
                 timezone.utc
@@ -628,7 +637,7 @@ class TheSportsDBProvider(SportsProvider):
                     events_by_id[event_id] = event
 
         for day_offset in range(
-            self.discovery_days_ahead + 1
+            discovery_days + 1
         ):
             discovery_date = (
                 start_date
