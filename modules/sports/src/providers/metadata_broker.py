@@ -205,16 +205,18 @@ class MetadataDirectorySnapshot:
 
 class MetadataBroker:
     def __init__(self, store, *, transport=None, clock=time.time,
-                 hourly_budget=96, current_ttl=60, future_ttl=900, directory_ttl=3600):
+                 hourly_budget=96, current_ttl=60, future_ttl=900, directory_ttl=3600, past_ttl=None):
+        past_ttl = current_ttl if past_ttl is None else past_ttl
         if type(hourly_budget) is not int or not 1 <= hourly_budget <= 1000:
             raise ValueError('Invalid metadata request budget')
-        if any(type(v) is not int or not 1 <= v <= 3600 for v in (current_ttl, future_ttl, directory_ttl)):
+        if any(type(v) is not int or not 1 <= v <= 3600 for v in (current_ttl, future_ttl, directory_ttl, past_ttl)):
             raise ValueError('Invalid metadata cache lifetime')
         self.store, self.clock = store, clock
         self.transport = transport or BoundedESPNTransport()
         self.hourly_budget = hourly_budget
         self.current_ttl, self.future_ttl = current_ttl, future_ttl
         self.directory_ttl = directory_ttl
+        self.past_ttl = past_ttl
 
     def _request(self, route, day):
         now = self.clock()
@@ -307,7 +309,7 @@ class MetadataBroker:
             if not math.isfinite(observed) or observed < now:
                 raise MetadataUnavailable('clock-regressed')
             ttl = (self.directory_ttl if day is None else
-                   self.future_ttl if day > today else self.current_ttl)
+                   self.future_ttl if day > today else self.past_ttl if day < today else self.current_ttl)
             expires = observed + ttl
             with self.store.connection() as connection:
                 connection.execute('INSERT OR REPLACE INTO metadata_cache VALUES (?,?,?,?,?)',
@@ -343,38 +345,41 @@ class MetadataBroker:
             if any(not -1 <= (day-today).days <= 7 for day in days):
                 raise ValueError('Metadata request outside bounded horizon')
             connection.execute('BEGIN')
-            global_hold = connection.execute(
-                'SELECT until_stamp FROM metadata_holds WHERE key=?', ('espn:cooldown',)).fetchone()
-            result = []
-            for day in days:
-                key_day = day.isoformat()
-                hold = connection.execute(
-                    'SELECT until_stamp FROM metadata_holds WHERE key=?',
-                    (route + ':' + key_day,)).fetchone()
-                holds = [row[0] for row in (global_hold, hold) if row]
-                if any(type(value) not in (int, float) or not math.isfinite(value) for value in holds):
-                    raise MetadataUnavailable('cache-invalid')
-                retry = max(0, math.ceil(max(holds, default=now)-now))
-                row = connection.execute(
-                    'SELECT payload,observed,expires FROM metadata_cache WHERE route=? AND day=?',
-                    (route, key_day)).fetchone()
-                if row is None:
-                    result.append(MetadataDayCache(key_day, None, 'missing', min(3600,retry)))
-                    continue
-                try:
-                    snapshot = self._snapshot(route, key_day, row, now,
-                                              cache_hit=True, stale=row[2] <= now)
-                except (MetadataUnavailable, TypeError, ValueError):
-                    result.append(MetadataDayCache(key_day, None, 'invalid', min(3600,retry)))
-                    continue
-                result.append(MetadataDayCache(key_day, snapshot,
-                    'stale' if snapshot.stale else 'fresh', min(3600,retry)))
-            return now, tuple(result)
+            return now, tuple(self._read_bucket(connection,route,day.isoformat(),now) for day in days)
+
+    def read_teams(self, route):
+        if route not in ROUTES or ROUTES[route][2]:
+            raise ValueError('Invalid team directory request')
+        with self.store.locked(), self.store.connection() as connection:
+            now=self.clock()
+            if not math.isfinite(now) or now<0:
+                raise MetadataUnavailable('clock')
+            connection.execute('BEGIN')
+            return now,self._read_bucket(connection,route,'@teams',now)
+
+    def _read_bucket(self,connection,route,key_day,now):
+        holds=connection.execute(
+            'SELECT until_stamp FROM metadata_holds WHERE key IN (?,?)',
+            ('espn:cooldown',route+':'+key_day)).fetchall()
+        values=[row[0] for row in holds]
+        if any(type(value) not in (int,float) or not math.isfinite(value) for value in values):
+            raise MetadataUnavailable('cache-invalid')
+        retry=min(3600,max(0,math.ceil(max(values,default=now)-now)))
+        row=connection.execute(
+            'SELECT payload,observed,expires FROM metadata_cache WHERE route=? AND day=?',
+            (route,key_day)).fetchone()
+        if row is None:
+            return MetadataDayCache(key_day,None,'missing',retry)
+        try:
+            snapshot=self._snapshot(route,key_day,row,now,cache_hit=True,stale=row[2]<=now)
+        except (MetadataUnavailable,TypeError,ValueError):
+            return MetadataDayCache(key_day,None,'invalid',retry)
+        return MetadataDayCache(key_day,snapshot,'stale' if snapshot.stale else 'fresh',retry)
 
 
 @dataclass(frozen=True)
 class MetadataDayCache:
     requested_day: str
-    snapshot: MetadataSnapshot | None
+    snapshot: MetadataSnapshot | MetadataDirectorySnapshot | None
     status: str
     retry_after_seconds: int

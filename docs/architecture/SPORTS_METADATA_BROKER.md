@@ -202,3 +202,36 @@ Formats 1 and 2 remain readable. The 16 filesystem replacement surfaces are
 unchanged. Older readers reject format 3 rather than silently omitting metadata.
 Live native-backend/metadata restore remains unsupported; format 3 is explicitly
 blocked before live mutation. See `docs/operations/SPORTS_METADATA_RECOVERY.md`.
+
+
+## Optional writer-owned automatic refresh
+
+The private writer can now own an explicitly configured refresh worker for its
+process lifetime. Missing/disabled `ATLAS_SPORTS_METADATA_REFRESH_FILE` starts no
+worker and creates no state. This change installs no policy, mount or environment
+value, so production remains inactive. Explicit policy and private state must be
+ready before startup; invalid enabled state prevents that configured startup.
+
+The worker selects one due job per tick: expired/missing today buckets first,
+then missing team directories, missing dates and other expired observations.
+It reads cache and hold state before selection and uses the same broker admission,
+process deadline, shared rolling budget and cooldown for the selected request.
+UFC gets scoreboard requests only. Policy budgets must cover the nominal chosen
+cadence; that calculation is neither an ESPN quota claim nor a freshness SLA.
+Past-day TTL can be selected independently; the default remains the previous
+current-day TTL when no policy is configured.
+
+Policy is reread per tick. Removing/disabling it pauses subsequent automatic
+admissions after the in-flight operation. Invalid configuration produces no new
+refresh requests. With an explicit refresh-policy environment path, private metadata
+requests also require a valid enabled policy. Cache hits/no-work ticks do not
+advance the worker's provider-success timestamp. The authenticated refresh-status
+endpoint is process observation only; it cannot mark global provider health healthy.
+SportsDB doctor behavior and provider-health.json remain unchanged.
+
+SIGTERM/SIGINT close the worker and server; closing prevents new worker admissions
+and waits up to 25 seconds for in-flight work. A failure to stop does not report a
+clean exit. Before enabling this configuration in Compose, provide a stop grace
+period of at least 30 seconds alongside the private state/policy mounts and tested
+recovery path. Public maintenance alone does not pause this worker. Details and an
+uninstalled policy example are in `docs/operations/SPORTS_METADATA_REFRESH.md`.
