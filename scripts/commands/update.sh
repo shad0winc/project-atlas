@@ -106,6 +106,7 @@ atlas_update_validate_ingress_build_permissions() {
     atlas \
     apps/portal \
     modules/sports/Dockerfile.private-api \
+    modules/sports/config/metadata-refresh.disabled.json \
     modules/sports/src/private_api.py \
     modules/sports/src/games_state.py \
     modules/sports/src/subscriptions.py \
@@ -925,6 +926,17 @@ atlas_update_execute_locked() {
       atlas_deployment_release_lock "$identifier"
 
       echo 'ERROR: Sports Dispatcharr binding bootstrap failed before maintenance.' >&2
+      return 1
+    fi
+
+    source "$ATLAS_PROJECT_DIR/scripts/lib/sports-metadata-runtime.sh"
+
+    if ! atlas_sports_metadata_runtime_provision; then
+      atlas_deployment_set_status \
+        "$(atlas_deployment_record_dir "$identifier")" \
+        aborted
+      atlas_deployment_release_lock "$identifier"
+      echo 'ERROR: Sports metadata bootstrap failed before maintenance.' >&2
       return 1
     fi
 

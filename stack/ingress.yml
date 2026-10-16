@@ -198,6 +198,7 @@ services:
     image: atlas-sports-writer:local
     container_name: atlas-sports-writer
     restart: unless-stopped
+    stop_grace_period: 35s
     read_only: true
     mem_limit: 512m
     cpus: 1.0
@@ -206,11 +207,18 @@ services:
       - atlas-identity
       - atlas
     volumes:
+      - type: bind
+        source: ${ATLAS_RUNTIME_CONFIG_DIR:-/mnt/storage/configs/atlas}/private/sports-metadata
+        target: /srv/sports-metadata
+        bind:
+          create_host_path: false
       - /mnt/storage/configs/sportyfin/state:/mnt/storage/configs/sportyfin/state:rw
       - /mnt/storage/configs/sportyfin/config:/mnt/storage/configs/sportyfin/config:ro
     expose:
       - "8003"
     environment:
+      ATLAS_SPORTS_METADATA_STATE_DIR: /srv/sports-metadata
+      ATLAS_SPORTS_METADATA_REFRESH_FILE: /srv/sports/metadata-refresh.disabled.json
       ATLAS_SPORTS_WRITER_TOKEN: "${ATLAS_SPORTS_WRITER_TOKEN:?ATLAS_SPORTS_WRITER_TOKEN is required}"
       SPORTS_LIVE_SOURCE_CATALOG_PATH: "${SPORTS_LIVE_SOURCE_CATALOG_PATH:-/mnt/storage/configs/sportyfin/state/live-sources.json}"
       SPORTS_SUBSCRIPTIONS_FILE: "${SPORTS_SUBSCRIPTIONS_FILE:-/mnt/storage/configs/sportyfin/state/subscriptions.json}"
