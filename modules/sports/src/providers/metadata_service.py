@@ -53,21 +53,32 @@ def validate_query(path, query):
 
 
 @lru_cache(maxsize=1)
-def _configured_broker(directory):
+def _configured_broker(directory, settings=()):
     path = Path(directory)
     if not path.is_absolute():
         raise MetadataUnavailable('configuration')
     # Provisioning is an operator/deployment responsibility, never an HTTP side effect.
-    return MetadataBroker(MetadataStore(path / 'metadata.sqlite'))
+    return MetadataBroker(MetadataStore(path / 'metadata.sqlite'), **dict(settings))
 
 
-def configured_broker():
+def configured_broker(policy=None):
     directory = os.environ.get('ATLAS_SPORTS_METADATA_STATE_DIR', '')
     if not directory:
         raise MetadataUnavailable('disabled')
+    settings=()
+    if policy is None and os.environ.get('ATLAS_SPORTS_METADATA_REFRESH_FILE',''):
+        from providers.metadata_refresh import load_refresh_policy, RefreshPolicyError
+        try:
+            policy=load_refresh_policy()
+        except RefreshPolicyError:
+            raise MetadataUnavailable('configuration') from None
+        if policy is None:
+            raise MetadataUnavailable('disabled')
+    if policy is not None:
+        settings=policy.broker_settings
     # lru_cache alone may construct twice on simultaneous first requests.
     with _factory_lock:
-        return _configured_broker(directory)
+        return _configured_broker(directory,settings)
 
 
 def query_metadata(path, query, *, broker_factory=configured_broker):
