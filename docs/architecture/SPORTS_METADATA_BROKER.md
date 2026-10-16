@@ -1,15 +1,17 @@
 # Independent Sports metadata broker foundation
 
-Status: inactive source foundation. No default instance, production state path,
-provider registration, API route, worker hook, configuration or migration is
-installed. Importing these modules does not create cache or identity state.
+Status: opt-in private writer boundary; production remains inactive. No production
+state directory, provider registration, worker hook, Compose configuration or
+migration is installed. Importing these modules creates no state. Existing
+SportsDB discovery and provider health behavior remain unchanged.
 
 ## Ownership and storage
 
 The private Sports writer is the intended sole metadata owner. API and background
-consumers will eventually use its authenticated service boundary; they must not
-construct independent upstream clients. That integration is not part of this
-change. Explicit construction takes a caller-provisioned directory owned by the
+consumers use `MetadataWriterClient` for the authenticated service boundary;
+they must not construct independent upstream clients. No controller caller or
+credential configuration is installed yet. Explicit construction takes a
+caller-provisioned directory owned by the
 writer with mode 0700; database and lock files are 0600. No existing shared path is
 chmodded or chowned. Runtime directory provisioning and Compose validation are
 required before activation, particularly because writer and API identities differ.
@@ -89,9 +91,52 @@ parent events: 12 NFL, 12 NBA, two MLB, two NHL, five EPL and one UFC card with
 13 bouts. They do not establish full-league completeness or all-promotion coverage.
 
 Before activation: select/provision writer-owned durable local state; install a reviewed identity import policy including team
-and league aliases; implement the authenticated writer integration and bounded
+and league aliases; complete writer deployment integration and the bounded
 collector; wire search/follows/Upcoming with truthful coverage/freshness; handle
 stale live status explicitly; validate Sunday completeness and reschedules; and
 define effective capability health while retaining individual provider failures.
 Wrestling, smaller fights and boxing fallback remain separate coverage work.
 Do not bypass doctor or rewrite provider-health.json to enable deployment.
+
+
+## Private writer boundary and team discovery
+
+Authenticated GET `/internal/v1/metadata/day` accepts exactly `route` and an ISO
+`day`; `/internal/v1/metadata/teams` accepts exactly `route`. They use the existing
+Sports-writer bearer authorization. Structurally invalid queries cannot initialize state or consume upstream budget.
+Out-of-horizon dates are rejected before any upstream attempt. Without `ATLAS_SPORTS_METADATA_STATE_DIR`, valid requests
+return 503. The explicitly configured absolute directory must already meet the
+store's private ownership/mode contract. The HTTP handler never provisions it.
+A process-local initialization lock prevents simultaneous first requests from
+constructing separate stores. No default production directory is chosen here.
+
+Both endpoints return versioned field allowlists from parsed dataclasses, not
+upstream JSON. Source URLs, provider credentials and users are absent. Original
+observation and expiry times, route/day, cache-hit and stale flags travel with
+the result. The private client validates identities, shapes and age and rejects
+stale/expired responses. There are no automatic retries or redirect following.
+The existing lightweight `/health` endpoint remains process liveness only;
+metadata cache hits do not rewrite individual provider health.
+
+Team directories use the same fixed ESPN origin, child-process deadline, 4 MB
+response limit, SQLite cache, lock, rolling attempt budget and global 429 hold as
+scoreboards. Their cache key uses a reserved `@teams` day discriminator within
+schema 1; no schema migration is required. Directory TTL defaults to one hour.
+Five captured directories cover NFL/NBA/MLB/NHL/EPL: 32/30/30/32/20 teams. UFC is
+not treated as a team league. Directory availability does not depend on whether
+a team has a game in a seven-day window. Public entity IDs include the route;
+this does not authorize cross-provider aliases or enroll canonical owners.
+An empty search query returns no directory suggestions.
+
+The team fixture projects fields from archive SHA256
+817d2edde6e2d377c301de760465a4dfab19bb79d51b8cf369051836fcdda479,
+captured 2026-10-16T02:56:25Z; individual original payload hashes are retained.
+The source topology review confirms writer/controller share the `atlas` network,
+while writer has its own image and state/config mounts. Existing packaging copies
+all providers, so these modules need no new Docker COPY directives. Before use,
+provision a separate durable local writer-owned state mount, validate backup and
+rollback preservation of identity state, configure controller credentials through
+the canonical deployment path, then install the collector/discovery caller. No
+mount, environment credential, alias, production cache or sharing policy is
+modified by this source candidate. End-user search/follow/Upcoming integration
+and effective capability health remain outstanding.
