@@ -145,7 +145,7 @@ class RecoveryAssociationTests(unittest.TestCase):
         manifest = json.loads(path.read_bytes())
         manifest['ownership_plan']['dispatcharr'] = [321, 321]
         for row in manifest['files']:
-            if row['surface'].startswith('dispatcharr'): row['publish_owner'] = [321, 321]
+            if row['surface'] == 'dispatcharr-database': row['publish_owner'] = [321, 321]
         path.write_text(json.dumps(manifest))
         bundle.validate_bundle(self.bundle_root)
         with self.assertRaises(association.AssociationError): association.validate_association(workspace)
@@ -154,6 +154,17 @@ class RecoveryAssociationTests(unittest.TestCase):
         workspace = self.associate()
         fixture_module.write(self.pg_root / 'restored-cluster/postmaster.pid', b'123')
         with self.assertRaises(postgres.PrepareError): association.validate_association(workspace)
+
+    def test_independent_jwt_ownership_change_invalidates_prior_association(self):
+        workspace = self.associate()
+        path = self.bundle_root / 'BUNDLE.json'
+        manifest = json.loads(path.read_bytes())
+        manifest['ownership_plan']['dispatcharr_jwt'] = [123, 456]
+        for row in manifest['files']:
+            if row['surface'] == 'dispatcharr-jwt': row['publish_owner'] = [123, 456]
+        path.write_text(json.dumps(manifest))
+        bundle.validate_bundle(self.bundle_root)
+        with self.assertRaises(association.AssociationError): association.validate_association(workspace)
 
     def test_mutation_between_observations_removes_only_own_new_workspace(self):
         before = self.snapshot()
