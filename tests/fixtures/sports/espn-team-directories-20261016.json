@@ -1,0 +1,1258 @@
+{
+  "source_archive_sha256": "817d2edde6e2d377c301de760465a4dfab19bb79d51b8cf369051836fcdda479",
+  "samples": [
+    {
+      "file": "nfl.json",
+      "route": "football/nfl",
+      "team_count": 32,
+      "raw_payload_sha256": "3fe09b93a01664b6347d3dbafc676cd5f011af792f0e58035353f170d1183014",
+      "payload": {
+        "sports": [
+          {
+            "uid": "s:20",
+            "leagues": [
+              {
+                "uid": "s:20~l:28",
+                "teams": [
+                  {
+                    "team": {
+                      "id": "22",
+                      "uid": "s:20~l:28~t:22",
+                      "displayName": "Arizona Cardinals",
+                      "abbreviation": "ARI"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "1",
+                      "uid": "s:20~l:28~t:1",
+                      "displayName": "Atlanta Falcons",
+                      "abbreviation": "ATL"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "33",
+                      "uid": "s:20~l:28~t:33",
+                      "displayName": "Baltimore Ravens",
+                      "abbreviation": "BAL"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "2",
+                      "uid": "s:20~l:28~t:2",
+                      "displayName": "Buffalo Bills",
+                      "abbreviation": "BUF"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "29",
+                      "uid": "s:20~l:28~t:29",
+                      "displayName": "Carolina Panthers",
+                      "abbreviation": "CAR"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "3",
+                      "uid": "s:20~l:28~t:3",
+                      "displayName": "Chicago Bears",
+                      "abbreviation": "CHI"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "4",
+                      "uid": "s:20~l:28~t:4",
+                      "displayName": "Cincinnati Bengals",
+                      "abbreviation": "CIN"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "5",
+                      "uid": "s:20~l:28~t:5",
+                      "displayName": "Cleveland Browns",
+                      "abbreviation": "CLE"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "6",
+                      "uid": "s:20~l:28~t:6",
+                      "displayName": "Dallas Cowboys",
+                      "abbreviation": "DAL"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "7",
+                      "uid": "s:20~l:28~t:7",
+                      "displayName": "Denver Broncos",
+                      "abbreviation": "DEN"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "8",
+                      "uid": "s:20~l:28~t:8",
+                      "displayName": "Detroit Lions",
+                      "abbreviation": "DET"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "9",
+                      "uid": "s:20~l:28~t:9",
+                      "displayName": "Green Bay Packers",
+                      "abbreviation": "GB"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "34",
+                      "uid": "s:20~l:28~t:34",
+                      "displayName": "Houston Texans",
+                      "abbreviation": "HOU"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "11",
+                      "uid": "s:20~l:28~t:11",
+                      "displayName": "Indianapolis Colts",
+                      "abbreviation": "IND"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "30",
+                      "uid": "s:20~l:28~t:30",
+                      "displayName": "Jacksonville Jaguars",
+                      "abbreviation": "JAX"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "12",
+                      "uid": "s:20~l:28~t:12",
+                      "displayName": "Kansas City Chiefs",
+                      "abbreviation": "KC"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "13",
+                      "uid": "s:20~l:28~t:13",
+                      "displayName": "Las Vegas Raiders",
+                      "abbreviation": "LV"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "24",
+                      "uid": "s:20~l:28~t:24",
+                      "displayName": "Los Angeles Chargers",
+                      "abbreviation": "LAC"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "14",
+                      "uid": "s:20~l:28~t:14",
+                      "displayName": "Los Angeles Rams",
+                      "abbreviation": "LAR"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "15",
+                      "uid": "s:20~l:28~t:15",
+                      "displayName": "Miami Dolphins",
+                      "abbreviation": "MIA"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "16",
+                      "uid": "s:20~l:28~t:16",
+                      "displayName": "Minnesota Vikings",
+                      "abbreviation": "MIN"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "17",
+                      "uid": "s:20~l:28~t:17",
+                      "displayName": "New England Patriots",
+                      "abbreviation": "NE"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "18",
+                      "uid": "s:20~l:28~t:18",
+                      "displayName": "New Orleans Saints",
+                      "abbreviation": "NO"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "19",
+                      "uid": "s:20~l:28~t:19",
+                      "displayName": "New York Giants",
+                      "abbreviation": "NYG"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "20",
+                      "uid": "s:20~l:28~t:20",
+                      "displayName": "New York Jets",
+                      "abbreviation": "NYJ"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "21",
+                      "uid": "s:20~l:28~t:21",
+                      "displayName": "Philadelphia Eagles",
+                      "abbreviation": "PHI"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "23",
+                      "uid": "s:20~l:28~t:23",
+                      "displayName": "Pittsburgh Steelers",
+                      "abbreviation": "PIT"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "25",
+                      "uid": "s:20~l:28~t:25",
+                      "displayName": "San Francisco 49ers",
+                      "abbreviation": "SF"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "26",
+                      "uid": "s:20~l:28~t:26",
+                      "displayName": "Seattle Seahawks",
+                      "abbreviation": "SEA"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "27",
+                      "uid": "s:20~l:28~t:27",
+                      "displayName": "Tampa Bay Buccaneers",
+                      "abbreviation": "TB"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "10",
+                      "uid": "s:20~l:28~t:10",
+                      "displayName": "Tennessee Titans",
+                      "abbreviation": "TEN"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "28",
+                      "uid": "s:20~l:28~t:28",
+                      "displayName": "Washington Commanders",
+                      "abbreviation": "WSH"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "file": "nba.json",
+      "route": "basketball/nba",
+      "team_count": 30,
+      "raw_payload_sha256": "9133e21f5de866c269df1d9e6e49bf20cf84b9e856313cabfbdb4e1845895e99",
+      "payload": {
+        "sports": [
+          {
+            "uid": "s:40",
+            "leagues": [
+              {
+                "uid": "s:40~l:46",
+                "teams": [
+                  {
+                    "team": {
+                      "id": "1",
+                      "uid": "s:40~l:46~t:1",
+                      "displayName": "Atlanta Hawks",
+                      "abbreviation": "ATL"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "2",
+                      "uid": "s:40~l:46~t:2",
+                      "displayName": "Boston Celtics",
+                      "abbreviation": "BOS"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "17",
+                      "uid": "s:40~l:46~t:17",
+                      "displayName": "Brooklyn Nets",
+                      "abbreviation": "BKN"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "30",
+                      "uid": "s:40~l:46~t:30",
+                      "displayName": "Charlotte Hornets",
+                      "abbreviation": "CHA"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "4",
+                      "uid": "s:40~l:46~t:4",
+                      "displayName": "Chicago Bulls",
+                      "abbreviation": "CHI"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "5",
+                      "uid": "s:40~l:46~t:5",
+                      "displayName": "Cleveland Cavaliers",
+                      "abbreviation": "CLE"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "6",
+                      "uid": "s:40~l:46~t:6",
+                      "displayName": "Dallas Mavericks",
+                      "abbreviation": "DAL"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "7",
+                      "uid": "s:40~l:46~t:7",
+                      "displayName": "Denver Nuggets",
+                      "abbreviation": "DEN"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "8",
+                      "uid": "s:40~l:46~t:8",
+                      "displayName": "Detroit Pistons",
+                      "abbreviation": "DET"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "9",
+                      "uid": "s:40~l:46~t:9",
+                      "displayName": "Golden State Warriors",
+                      "abbreviation": "GS"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "10",
+                      "uid": "s:40~l:46~t:10",
+                      "displayName": "Houston Rockets",
+                      "abbreviation": "HOU"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "11",
+                      "uid": "s:40~l:46~t:11",
+                      "displayName": "Indiana Pacers",
+                      "abbreviation": "IND"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "12",
+                      "uid": "s:40~l:46~t:12",
+                      "displayName": "LA Clippers",
+                      "abbreviation": "LAC"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "13",
+                      "uid": "s:40~l:46~t:13",
+                      "displayName": "Los Angeles Lakers",
+                      "abbreviation": "LAL"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "29",
+                      "uid": "s:40~l:46~t:29",
+                      "displayName": "Memphis Grizzlies",
+                      "abbreviation": "MEM"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "14",
+                      "uid": "s:40~l:46~t:14",
+                      "displayName": "Miami Heat",
+                      "abbreviation": "MIA"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "15",
+                      "uid": "s:40~l:46~t:15",
+                      "displayName": "Milwaukee Bucks",
+                      "abbreviation": "MIL"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "16",
+                      "uid": "s:40~l:46~t:16",
+                      "displayName": "Minnesota Timberwolves",
+                      "abbreviation": "MIN"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "3",
+                      "uid": "s:40~l:46~t:3",
+                      "displayName": "New Orleans Pelicans",
+                      "abbreviation": "NO"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "18",
+                      "uid": "s:40~l:46~t:18",
+                      "displayName": "New York Knicks",
+                      "abbreviation": "NY"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "25",
+                      "uid": "s:40~l:46~t:25",
+                      "displayName": "Oklahoma City Thunder",
+                      "abbreviation": "OKC"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "19",
+                      "uid": "s:40~l:46~t:19",
+                      "displayName": "Orlando Magic",
+                      "abbreviation": "ORL"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "20",
+                      "uid": "s:40~l:46~t:20",
+                      "displayName": "Philadelphia 76ers",
+                      "abbreviation": "PHI"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "21",
+                      "uid": "s:40~l:46~t:21",
+                      "displayName": "Phoenix Suns",
+                      "abbreviation": "PHX"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "22",
+                      "uid": "s:40~l:46~t:22",
+                      "displayName": "Portland Trail Blazers",
+                      "abbreviation": "POR"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "23",
+                      "uid": "s:40~l:46~t:23",
+                      "displayName": "Sacramento Kings",
+                      "abbreviation": "SAC"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "24",
+                      "uid": "s:40~l:46~t:24",
+                      "displayName": "San Antonio Spurs",
+                      "abbreviation": "SA"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "28",
+                      "uid": "s:40~l:46~t:28",
+                      "displayName": "Toronto Raptors",
+                      "abbreviation": "TOR"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "26",
+                      "uid": "s:40~l:46~t:26",
+                      "displayName": "Utah Jazz",
+                      "abbreviation": "UTAH"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "27",
+                      "uid": "s:40~l:46~t:27",
+                      "displayName": "Washington Wizards",
+                      "abbreviation": "WSH"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "file": "mlb.json",
+      "route": "baseball/mlb",
+      "team_count": 30,
+      "raw_payload_sha256": "4c2682fcd76868189a5863a9683e865c70e687ae107a6bbae1534934f09a4cf5",
+      "payload": {
+        "sports": [
+          {
+            "uid": "s:1",
+            "leagues": [
+              {
+                "uid": "s:1~l:10",
+                "teams": [
+                  {
+                    "team": {
+                      "id": "29",
+                      "uid": "s:1~l:10~t:29",
+                      "displayName": "Arizona Diamondbacks",
+                      "abbreviation": "ARI"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "11",
+                      "uid": "s:1~l:10~t:11",
+                      "displayName": "Athletics",
+                      "abbreviation": "ATH"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "15",
+                      "uid": "s:1~l:10~t:15",
+                      "displayName": "Atlanta Braves",
+                      "abbreviation": "ATL"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "1",
+                      "uid": "s:1~l:10~t:1",
+                      "displayName": "Baltimore Orioles",
+                      "abbreviation": "BAL"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "2",
+                      "uid": "s:1~l:10~t:2",
+                      "displayName": "Boston Red Sox",
+                      "abbreviation": "BOS"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "16",
+                      "uid": "s:1~l:10~t:16",
+                      "displayName": "Chicago Cubs",
+                      "abbreviation": "CHC"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "4",
+                      "uid": "s:1~l:10~t:4",
+                      "displayName": "Chicago White Sox",
+                      "abbreviation": "CHW"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "17",
+                      "uid": "s:1~l:10~t:17",
+                      "displayName": "Cincinnati Reds",
+                      "abbreviation": "CIN"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "5",
+                      "uid": "s:1~l:10~t:5",
+                      "displayName": "Cleveland Guardians",
+                      "abbreviation": "CLE"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "27",
+                      "uid": "s:1~l:10~t:27",
+                      "displayName": "Colorado Rockies",
+                      "abbreviation": "COL"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "6",
+                      "uid": "s:1~l:10~t:6",
+                      "displayName": "Detroit Tigers",
+                      "abbreviation": "DET"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "18",
+                      "uid": "s:1~l:10~t:18",
+                      "displayName": "Houston Astros",
+                      "abbreviation": "HOU"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "7",
+                      "uid": "s:1~l:10~t:7",
+                      "displayName": "Kansas City Royals",
+                      "abbreviation": "KC"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "3",
+                      "uid": "s:1~l:10~t:3",
+                      "displayName": "Los Angeles Angels",
+                      "abbreviation": "LAA"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "19",
+                      "uid": "s:1~l:10~t:19",
+                      "displayName": "Los Angeles Dodgers",
+                      "abbreviation": "LAD"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "28",
+                      "uid": "s:1~l:10~t:28",
+                      "displayName": "Miami Marlins",
+                      "abbreviation": "MIA"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "8",
+                      "uid": "s:1~l:10~t:8",
+                      "displayName": "Milwaukee Brewers",
+                      "abbreviation": "MIL"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "9",
+                      "uid": "s:1~l:10~t:9",
+                      "displayName": "Minnesota Twins",
+                      "abbreviation": "MIN"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "21",
+                      "uid": "s:1~l:10~t:21",
+                      "displayName": "New York Mets",
+                      "abbreviation": "NYM"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "10",
+                      "uid": "s:1~l:10~t:10",
+                      "displayName": "New York Yankees",
+                      "abbreviation": "NYY"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "22",
+                      "uid": "s:1~l:10~t:22",
+                      "displayName": "Philadelphia Phillies",
+                      "abbreviation": "PHI"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "23",
+                      "uid": "s:1~l:10~t:23",
+                      "displayName": "Pittsburgh Pirates",
+                      "abbreviation": "PIT"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "25",
+                      "uid": "s:1~l:10~t:25",
+                      "displayName": "San Diego Padres",
+                      "abbreviation": "SD"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "26",
+                      "uid": "s:1~l:10~t:26",
+                      "displayName": "San Francisco Giants",
+                      "abbreviation": "SF"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "12",
+                      "uid": "s:1~l:10~t:12",
+                      "displayName": "Seattle Mariners",
+                      "abbreviation": "SEA"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "24",
+                      "uid": "s:1~l:10~t:24",
+                      "displayName": "St. Louis Cardinals",
+                      "abbreviation": "STL"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "30",
+                      "uid": "s:1~l:10~t:30",
+                      "displayName": "Tampa Bay Rays",
+                      "abbreviation": "TB"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "13",
+                      "uid": "s:1~l:10~t:13",
+                      "displayName": "Texas Rangers",
+                      "abbreviation": "TEX"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "14",
+                      "uid": "s:1~l:10~t:14",
+                      "displayName": "Toronto Blue Jays",
+                      "abbreviation": "TOR"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "20",
+                      "uid": "s:1~l:10~t:20",
+                      "displayName": "Washington Nationals",
+                      "abbreviation": "WSH"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "file": "nhl.json",
+      "route": "hockey/nhl",
+      "team_count": 32,
+      "raw_payload_sha256": "c374c6cf90526256ace9912fd16c82dc4d880047a07a80a4e162c6fe7012c473",
+      "payload": {
+        "sports": [
+          {
+            "uid": "s:70",
+            "leagues": [
+              {
+                "uid": "s:70~l:90",
+                "teams": [
+                  {
+                    "team": {
+                      "id": "25",
+                      "uid": "s:70~l:90~t:25",
+                      "displayName": "Anaheim Ducks",
+                      "abbreviation": "ANA"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "1",
+                      "uid": "s:70~l:90~t:1",
+                      "displayName": "Boston Bruins",
+                      "abbreviation": "BOS"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "2",
+                      "uid": "s:70~l:90~t:2",
+                      "displayName": "Buffalo Sabres",
+                      "abbreviation": "BUF"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "3",
+                      "uid": "s:70~l:90~t:3",
+                      "displayName": "Calgary Flames",
+                      "abbreviation": "CGY"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "7",
+                      "uid": "s:70~l:90~t:7",
+                      "displayName": "Carolina Hurricanes",
+                      "abbreviation": "CAR"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "4",
+                      "uid": "s:70~l:90~t:4",
+                      "displayName": "Chicago Blackhawks",
+                      "abbreviation": "CHI"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "17",
+                      "uid": "s:70~l:90~t:17",
+                      "displayName": "Colorado Avalanche",
+                      "abbreviation": "COL"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "29",
+                      "uid": "s:70~l:90~t:29",
+                      "displayName": "Columbus Blue Jackets",
+                      "abbreviation": "CBJ"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "9",
+                      "uid": "s:70~l:90~t:9",
+                      "displayName": "Dallas Stars",
+                      "abbreviation": "DAL"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "5",
+                      "uid": "s:70~l:90~t:5",
+                      "displayName": "Detroit Red Wings",
+                      "abbreviation": "DET"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "6",
+                      "uid": "s:70~l:90~t:6",
+                      "displayName": "Edmonton Oilers",
+                      "abbreviation": "EDM"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "26",
+                      "uid": "s:70~l:90~t:26",
+                      "displayName": "Florida Panthers",
+                      "abbreviation": "FLA"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "8",
+                      "uid": "s:70~l:90~t:8",
+                      "displayName": "Los Angeles Kings",
+                      "abbreviation": "LA"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "30",
+                      "uid": "s:70~l:90~t:30",
+                      "displayName": "Minnesota Wild",
+                      "abbreviation": "MIN"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "10",
+                      "uid": "s:70~l:90~t:10",
+                      "displayName": "Montreal Canadiens",
+                      "abbreviation": "MTL"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "27",
+                      "uid": "s:70~l:90~t:27",
+                      "displayName": "Nashville Predators",
+                      "abbreviation": "NSH"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "11",
+                      "uid": "s:70~l:90~t:11",
+                      "displayName": "New Jersey Devils",
+                      "abbreviation": "NJ"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "12",
+                      "uid": "s:70~l:90~t:12",
+                      "displayName": "New York Islanders",
+                      "abbreviation": "NYI"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "13",
+                      "uid": "s:70~l:90~t:13",
+                      "displayName": "New York Rangers",
+                      "abbreviation": "NYR"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "14",
+                      "uid": "s:70~l:90~t:14",
+                      "displayName": "Ottawa Senators",
+                      "abbreviation": "OTT"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "15",
+                      "uid": "s:70~l:90~t:15",
+                      "displayName": "Philadelphia Flyers",
+                      "abbreviation": "PHI"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "16",
+                      "uid": "s:70~l:90~t:16",
+                      "displayName": "Pittsburgh Penguins",
+                      "abbreviation": "PIT"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "18",
+                      "uid": "s:70~l:90~t:18",
+                      "displayName": "San Jose Sharks",
+                      "abbreviation": "SJ"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "124292",
+                      "uid": "s:70~l:90~t:124292",
+                      "displayName": "Seattle Kraken",
+                      "abbreviation": "SEA"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "19",
+                      "uid": "s:70~l:90~t:19",
+                      "displayName": "St. Louis Blues",
+                      "abbreviation": "STL"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "20",
+                      "uid": "s:70~l:90~t:20",
+                      "displayName": "Tampa Bay Lightning",
+                      "abbreviation": "TB"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "21",
+                      "uid": "s:70~l:90~t:21",
+                      "displayName": "Toronto Maple Leafs",
+                      "abbreviation": "TOR"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "129764",
+                      "uid": "s:70~l:90~t:129764",
+                      "displayName": "Utah Mammoth",
+                      "abbreviation": "UTAH"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "22",
+                      "uid": "s:70~l:90~t:22",
+                      "displayName": "Vancouver Canucks",
+                      "abbreviation": "VAN"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "37",
+                      "uid": "s:70~l:90~t:37",
+                      "displayName": "Vegas Golden Knights",
+                      "abbreviation": "VGK"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "23",
+                      "uid": "s:70~l:90~t:23",
+                      "displayName": "Washington Capitals",
+                      "abbreviation": "WSH"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "28",
+                      "uid": "s:70~l:90~t:28",
+                      "displayName": "Winnipeg Jets",
+                      "abbreviation": "WPG"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "file": "epl.json",
+      "route": "soccer/eng.1",
+      "team_count": 20,
+      "raw_payload_sha256": "3f2716fefd5ebcdaaff815a3fe814e5c0d728ef639095f67a2bd055bebecd6fd",
+      "payload": {
+        "sports": [
+          {
+            "uid": "s:600",
+            "leagues": [
+              {
+                "uid": "s:600~l:700",
+                "teams": [
+                  {
+                    "team": {
+                      "id": "349",
+                      "uid": "s:600~t:349",
+                      "displayName": "AFC Bournemouth",
+                      "abbreviation": "BOU"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "359",
+                      "uid": "s:600~t:359",
+                      "displayName": "Arsenal",
+                      "abbreviation": "ARS"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "362",
+                      "uid": "s:600~t:362",
+                      "displayName": "Aston Villa",
+                      "abbreviation": "AVL"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "337",
+                      "uid": "s:600~t:337",
+                      "displayName": "Brentford",
+                      "abbreviation": "BRE"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "331",
+                      "uid": "s:600~t:331",
+                      "displayName": "Brighton & Hove Albion",
+                      "abbreviation": "BHA"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "363",
+                      "uid": "s:600~t:363",
+                      "displayName": "Chelsea",
+                      "abbreviation": "CHE"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "388",
+                      "uid": "s:600~t:388",
+                      "displayName": "Coventry City",
+                      "abbreviation": "COV"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "384",
+                      "uid": "s:600~t:384",
+                      "displayName": "Crystal Palace",
+                      "abbreviation": "CRY"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "368",
+                      "uid": "s:600~t:368",
+                      "displayName": "Everton",
+                      "abbreviation": "EVE"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "370",
+                      "uid": "s:600~t:370",
+                      "displayName": "Fulham",
+                      "abbreviation": "FUL"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "306",
+                      "uid": "s:600~t:306",
+                      "displayName": "Hull City",
+                      "abbreviation": "HUL"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "373",
+                      "uid": "s:600~t:373",
+                      "displayName": "Ipswich Town",
+                      "abbreviation": "IPS"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "357",
+                      "uid": "s:600~t:357",
+                      "displayName": "Leeds United",
+                      "abbreviation": "LEE"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "364",
+                      "uid": "s:600~t:364",
+                      "displayName": "Liverpool",
+                      "abbreviation": "LIV"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "382",
+                      "uid": "s:600~t:382",
+                      "displayName": "Manchester City",
+                      "abbreviation": "MNC"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "360",
+                      "uid": "s:600~t:360",
+                      "displayName": "Manchester United",
+                      "abbreviation": "MAN"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "361",
+                      "uid": "s:600~t:361",
+                      "displayName": "Newcastle United",
+                      "abbreviation": "NEW"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "393",
+                      "uid": "s:600~t:393",
+                      "displayName": "Nottingham Forest",
+                      "abbreviation": "NFO"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "366",
+                      "uid": "s:600~t:366",
+                      "displayName": "Sunderland",
+                      "abbreviation": "SUN"
+                    }
+                  },
+                  {
+                    "team": {
+                      "id": "367",
+                      "uid": "s:600~t:367",
+                      "displayName": "Tottenham Hotspur",
+                      "abbreviation": "TOT"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "observed_at": "2026-10-16T02:56:25.521361+00:00"
+}
