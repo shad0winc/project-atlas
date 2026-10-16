@@ -1,0 +1,2473 @@
+{
+  "source_archive_sha256": "12f6d2e257041b41ec8596b5a9e17c717f3f1ba0f21fb2358b3ff2839a03ef4b",
+  "purpose": "Lossless projection of fields read by the ESPN parser; not current provider state",
+  "samples": [
+    {
+      "dates": "20261018",
+      "event_count": 12,
+      "file": "nfl.json",
+      "route": "football/nfl",
+      "raw_payload_sha256": "efbbf11578ae68d345e571333d87e091a19f1d1f3c172fbb4fdafa531bd30510",
+      "payload": {
+        "leagues": [
+          {
+            "uid": "s:20~l:28"
+          }
+        ],
+        "events": [
+          {
+            "id": "401872996",
+            "date": "2026-10-18T13:30Z",
+            "name": "Houston Texans at Jacksonville Jaguars",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0:00",
+              "period": 0,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Sun, October 18th at 9:30 AM EDT",
+                "shortDetail": "10/18 - 9:30 AM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401872996",
+                "date": "2026-10-18T13:30Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0:00",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sun, October 18th at 9:30 AM EDT",
+                    "shortDetail": "10/18 - 9:30 AM EDT"
+                  },
+                  "isTBDFlex": false
+                },
+                "competitors": [
+                  {
+                    "id": "30",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "30",
+                      "displayName": "Jacksonville Jaguars"
+                    }
+                  },
+                  {
+                    "id": "34",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "34",
+                      "displayName": "Houston Texans"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401872999",
+            "date": "2026-10-18T17:00Z",
+            "name": "Chicago Bears at Atlanta Falcons",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0:00",
+              "period": 0,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Sun, October 18th at 1:00 PM EDT",
+                "shortDetail": "10/18 - 1:00 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401872999",
+                "date": "2026-10-18T17:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0:00",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sun, October 18th at 1:00 PM EDT",
+                    "shortDetail": "10/18 - 1:00 PM EDT"
+                  },
+                  "isTBDFlex": false
+                },
+                "competitors": [
+                  {
+                    "id": "1",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "1",
+                      "displayName": "Atlanta Falcons"
+                    }
+                  },
+                  {
+                    "id": "3",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "3",
+                      "displayName": "Chicago Bears"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401872997",
+            "date": "2026-10-18T17:00Z",
+            "name": "Baltimore Ravens at Cleveland Browns",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0:00",
+              "period": 0,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Sun, October 18th at 1:00 PM EDT",
+                "shortDetail": "10/18 - 1:00 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401872997",
+                "date": "2026-10-18T17:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0:00",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sun, October 18th at 1:00 PM EDT",
+                    "shortDetail": "10/18 - 1:00 PM EDT"
+                  },
+                  "isTBDFlex": false
+                },
+                "competitors": [
+                  {
+                    "id": "5",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "5",
+                      "displayName": "Cleveland Browns"
+                    }
+                  },
+                  {
+                    "id": "33",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "33",
+                      "displayName": "Baltimore Ravens"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401873003",
+            "date": "2026-10-18T17:00Z",
+            "name": "Tennessee Titans at Indianapolis Colts",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0:00",
+              "period": 0,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Sun, October 18th at 1:00 PM EDT",
+                "shortDetail": "10/18 - 1:00 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401873003",
+                "date": "2026-10-18T17:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0:00",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sun, October 18th at 1:00 PM EDT",
+                    "shortDetail": "10/18 - 1:00 PM EDT"
+                  },
+                  "isTBDFlex": false
+                },
+                "competitors": [
+                  {
+                    "id": "11",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "11",
+                      "displayName": "Indianapolis Colts"
+                    }
+                  },
+                  {
+                    "id": "10",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "10",
+                      "displayName": "Tennessee Titans"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401873001",
+            "date": "2026-10-18T17:00Z",
+            "name": "New York Jets at New England Patriots",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0:00",
+              "period": 0,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Sun, October 18th at 1:00 PM EDT",
+                "shortDetail": "10/18 - 1:00 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401873001",
+                "date": "2026-10-18T17:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0:00",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sun, October 18th at 1:00 PM EDT",
+                    "shortDetail": "10/18 - 1:00 PM EDT"
+                  },
+                  "isTBDFlex": false
+                },
+                "competitors": [
+                  {
+                    "id": "17",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "17",
+                      "displayName": "New England Patriots"
+                    }
+                  },
+                  {
+                    "id": "20",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "20",
+                      "displayName": "New York Jets"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401873000",
+            "date": "2026-10-18T17:00Z",
+            "name": "New Orleans Saints at New York Giants",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0:00",
+              "period": 0,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Sun, October 18th at 1:00 PM EDT",
+                "shortDetail": "10/18 - 1:00 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401873000",
+                "date": "2026-10-18T17:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0:00",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sun, October 18th at 1:00 PM EDT",
+                    "shortDetail": "10/18 - 1:00 PM EDT"
+                  },
+                  "isTBDFlex": false
+                },
+                "competitors": [
+                  {
+                    "id": "19",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "19",
+                      "displayName": "New York Giants"
+                    }
+                  },
+                  {
+                    "id": "18",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "18",
+                      "displayName": "New Orleans Saints"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401872998",
+            "date": "2026-10-18T17:00Z",
+            "name": "Carolina Panthers at Philadelphia Eagles",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0:00",
+              "period": 0,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Sun, October 18th at 1:00 PM EDT",
+                "shortDetail": "10/18 - 1:00 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401872998",
+                "date": "2026-10-18T17:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0:00",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sun, October 18th at 1:00 PM EDT",
+                    "shortDetail": "10/18 - 1:00 PM EDT"
+                  },
+                  "isTBDFlex": false
+                },
+                "competitors": [
+                  {
+                    "id": "21",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "21",
+                      "displayName": "Philadelphia Eagles"
+                    }
+                  },
+                  {
+                    "id": "29",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "29",
+                      "displayName": "Carolina Panthers"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401873002",
+            "date": "2026-10-18T17:00Z",
+            "name": "Pittsburgh Steelers at Tampa Bay Buccaneers",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0:00",
+              "period": 0,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Sun, October 18th at 1:00 PM EDT",
+                "shortDetail": "10/18 - 1:00 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401873002",
+                "date": "2026-10-18T17:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0:00",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sun, October 18th at 1:00 PM EDT",
+                    "shortDetail": "10/18 - 1:00 PM EDT"
+                  },
+                  "isTBDFlex": false
+                },
+                "competitors": [
+                  {
+                    "id": "27",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "27",
+                      "displayName": "Tampa Bay Buccaneers"
+                    }
+                  },
+                  {
+                    "id": "23",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "23",
+                      "displayName": "Pittsburgh Steelers"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401873004",
+            "date": "2026-10-18T20:05Z",
+            "name": "Arizona Cardinals at Los Angeles Rams",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0:00",
+              "period": 0,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Sun, October 18th at 4:05 PM EDT",
+                "shortDetail": "10/18 - 4:05 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401873004",
+                "date": "2026-10-18T20:05Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0:00",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sun, October 18th at 4:05 PM EDT",
+                    "shortDetail": "10/18 - 4:05 PM EDT"
+                  },
+                  "isTBDFlex": false
+                },
+                "competitors": [
+                  {
+                    "id": "14",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "14",
+                      "displayName": "Los Angeles Rams"
+                    }
+                  },
+                  {
+                    "id": "22",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "22",
+                      "displayName": "Arizona Cardinals"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401873006",
+            "date": "2026-10-18T20:25Z",
+            "name": "Los Angeles Chargers at Kansas City Chiefs",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0:00",
+              "period": 0,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Sun, October 18th at 4:25 PM EDT",
+                "shortDetail": "10/18 - 4:25 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401873006",
+                "date": "2026-10-18T20:25Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0:00",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sun, October 18th at 4:25 PM EDT",
+                    "shortDetail": "10/18 - 4:25 PM EDT"
+                  },
+                  "isTBDFlex": false
+                },
+                "competitors": [
+                  {
+                    "id": "12",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "12",
+                      "displayName": "Kansas City Chiefs"
+                    }
+                  },
+                  {
+                    "id": "24",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "24",
+                      "displayName": "Los Angeles Chargers"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401873005",
+            "date": "2026-10-18T20:25Z",
+            "name": "Buffalo Bills at Las Vegas Raiders",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0:00",
+              "period": 0,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Sun, October 18th at 4:25 PM EDT",
+                "shortDetail": "10/18 - 4:25 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401873005",
+                "date": "2026-10-18T20:25Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0:00",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sun, October 18th at 4:25 PM EDT",
+                    "shortDetail": "10/18 - 4:25 PM EDT"
+                  },
+                  "isTBDFlex": false
+                },
+                "competitors": [
+                  {
+                    "id": "13",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "13",
+                      "displayName": "Las Vegas Raiders"
+                    }
+                  },
+                  {
+                    "id": "2",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "2",
+                      "displayName": "Buffalo Bills"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401873007",
+            "date": "2026-10-19T00:20Z",
+            "name": "Dallas Cowboys at Green Bay Packers",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0:00",
+              "period": 0,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Sun, October 18th at 8:20 PM EDT",
+                "shortDetail": "10/18 - 8:20 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401873007",
+                "date": "2026-10-19T00:20Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0:00",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sun, October 18th at 8:20 PM EDT",
+                    "shortDetail": "10/18 - 8:20 PM EDT"
+                  },
+                  "isTBDFlex": false
+                },
+                "competitors": [
+                  {
+                    "id": "9",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "9",
+                      "displayName": "Green Bay Packers"
+                    }
+                  },
+                  {
+                    "id": "6",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "6",
+                      "displayName": "Dallas Cowboys"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "projection_sha256": "90a8cc6421da5428e6ffd6971d6ebcd8229609e3ac56cab6dd4a0a2bb50e45fc"
+    },
+    {
+      "dates": "20261016",
+      "event_count": 12,
+      "file": "nba.json",
+      "route": "basketball/nba",
+      "raw_payload_sha256": "66e4b576babe9e905c8e36a25fbd0d6ba03cd7f15034bb8fc8791c5a5afe4249",
+      "payload": {
+        "leagues": [
+          {
+            "uid": "s:40~l:46"
+          }
+        ],
+        "events": [
+          {
+            "id": "401898406",
+            "date": "2026-10-16T23:00Z",
+            "name": "Miami Heat at Orlando Magic",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0.0",
+              "period": 0,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Fri, October 16th at 7:00 PM EDT",
+                "shortDetail": "10/16 - 7:00 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401898406",
+                "date": "2026-10-16T23:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0.0",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Fri, October 16th at 7:00 PM EDT",
+                    "shortDetail": "10/16 - 7:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "19",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "19",
+                      "displayName": "Orlando Magic"
+                    }
+                  },
+                  {
+                    "id": "14",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "14",
+                      "displayName": "Miami Heat"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401898407",
+            "date": "2026-10-16T23:00Z",
+            "name": "Boston Celtics at Philadelphia 76ers",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0.0",
+              "period": 0,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Fri, October 16th at 7:00 PM EDT",
+                "shortDetail": "10/16 - 7:00 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401898407",
+                "date": "2026-10-16T23:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0.0",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Fri, October 16th at 7:00 PM EDT",
+                    "shortDetail": "10/16 - 7:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "20",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "20",
+                      "displayName": "Philadelphia 76ers"
+                    }
+                  },
+                  {
+                    "id": "2",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "2",
+                      "displayName": "Boston Celtics"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401908946",
+            "date": "2026-10-16T23:00Z",
+            "name": "Toronto Raptors at Detroit Pistons",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0.0",
+              "period": 0,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Fri, October 16th at 7:00 PM EDT",
+                "shortDetail": "10/16 - 7:00 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401908946",
+                "date": "2026-10-16T23:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0.0",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Fri, October 16th at 7:00 PM EDT",
+                    "shortDetail": "10/16 - 7:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "8",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "8",
+                      "displayName": "Detroit Pistons"
+                    }
+                  },
+                  {
+                    "id": "28",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "28",
+                      "displayName": "Toronto Raptors"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401914126",
+            "date": "2026-10-16T23:00Z",
+            "name": "Milwaukee Bucks at Indiana Pacers",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0.0",
+              "period": 0,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Fri, October 16th at 7:00 PM EDT",
+                "shortDetail": "10/16 - 7:00 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401914126",
+                "date": "2026-10-16T23:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0.0",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Fri, October 16th at 7:00 PM EDT",
+                    "shortDetail": "10/16 - 7:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "11",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "11",
+                      "displayName": "Indiana Pacers"
+                    }
+                  },
+                  {
+                    "id": "15",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "15",
+                      "displayName": "Milwaukee Bucks"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401898408",
+            "date": "2026-10-17T00:00Z",
+            "name": "Atlanta Hawks at Dallas Mavericks",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0.0",
+              "period": 0,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Fri, October 16th at 8:00 PM EDT",
+                "shortDetail": "10/16 - 8:00 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401898408",
+                "date": "2026-10-17T00:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0.0",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Fri, October 16th at 8:00 PM EDT",
+                    "shortDetail": "10/16 - 8:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "6",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "6",
+                      "displayName": "Dallas Mavericks"
+                    }
+                  },
+                  {
+                    "id": "1",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "1",
+                      "displayName": "Atlanta Hawks"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401898843",
+            "date": "2026-10-17T00:00Z",
+            "name": "Sacramento Kings at San Antonio Spurs",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0.0",
+              "period": 0,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Fri, October 16th at 8:00 PM EDT",
+                "shortDetail": "10/16 - 8:00 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401898843",
+                "date": "2026-10-17T00:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0.0",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Fri, October 16th at 8:00 PM EDT",
+                    "shortDetail": "10/16 - 8:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "24",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "24",
+                      "displayName": "San Antonio Spurs"
+                    }
+                  },
+                  {
+                    "id": "23",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "23",
+                      "displayName": "Sacramento Kings"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401901822",
+            "date": "2026-10-17T00:00Z",
+            "name": "Charlotte Hornets at Memphis Grizzlies",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0.0",
+              "period": 0,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Fri, October 16th at 8:00 PM EDT",
+                "shortDetail": "10/16 - 8:00 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401901822",
+                "date": "2026-10-17T00:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0.0",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Fri, October 16th at 8:00 PM EDT",
+                    "shortDetail": "10/16 - 8:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "29",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "29",
+                      "displayName": "Memphis Grizzlies"
+                    }
+                  },
+                  {
+                    "id": "30",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "30",
+                      "displayName": "Charlotte Hornets"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401906509",
+            "date": "2026-10-17T00:00Z",
+            "name": "Washington Wizards at New Orleans Pelicans",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0.0",
+              "period": 0,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Fri, October 16th at 8:00 PM EDT",
+                "shortDetail": "10/16 - 8:00 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401906509",
+                "date": "2026-10-17T00:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0.0",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Fri, October 16th at 8:00 PM EDT",
+                    "shortDetail": "10/16 - 8:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "3",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "3",
+                      "displayName": "New Orleans Pelicans"
+                    }
+                  },
+                  {
+                    "id": "27",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "27",
+                      "displayName": "Washington Wizards"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401908943",
+            "date": "2026-10-17T00:00Z",
+            "name": "Minnesota Timberwolves at Chicago Bulls",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0.0",
+              "period": 0,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Fri, October 16th at 8:00 PM EDT",
+                "shortDetail": "10/16 - 8:00 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401908943",
+                "date": "2026-10-17T00:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0.0",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Fri, October 16th at 8:00 PM EDT",
+                    "shortDetail": "10/16 - 8:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "4",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "4",
+                      "displayName": "Chicago Bulls"
+                    }
+                  },
+                  {
+                    "id": "16",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "16",
+                      "displayName": "Minnesota Timberwolves"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401898409",
+            "date": "2026-10-17T02:00Z",
+            "name": "Portland Trail Blazers at Golden State Warriors",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0.0",
+              "period": 0,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Fri, October 16th at 10:00 PM EDT",
+                "shortDetail": "10/16 - 10:00 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401898409",
+                "date": "2026-10-17T02:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0.0",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Fri, October 16th at 10:00 PM EDT",
+                    "shortDetail": "10/16 - 10:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "9",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "9",
+                      "displayName": "Golden State Warriors"
+                    }
+                  },
+                  {
+                    "id": "22",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "22",
+                      "displayName": "Portland Trail Blazers"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401908948",
+            "date": "2026-10-17T02:00Z",
+            "name": "Utah Jazz at Phoenix Suns",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0.0",
+              "period": 0,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Fri, October 16th at 10:00 PM EDT",
+                "shortDetail": "10/16 - 10:00 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401908948",
+                "date": "2026-10-17T02:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0.0",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Fri, October 16th at 10:00 PM EDT",
+                    "shortDetail": "10/16 - 10:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "21",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "21",
+                      "displayName": "Phoenix Suns"
+                    }
+                  },
+                  {
+                    "id": "26",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "26",
+                      "displayName": "Utah Jazz"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401898719",
+            "date": "2026-10-17T02:30Z",
+            "name": "Denver Nuggets at Los Angeles Lakers",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0.0",
+              "period": 0,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Fri, October 16th at 10:30 PM EDT",
+                "shortDetail": "10/16 - 10:30 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401898719",
+                "date": "2026-10-17T02:30Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0.0",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Fri, October 16th at 10:30 PM EDT",
+                    "shortDetail": "10/16 - 10:30 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "13",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "13",
+                      "displayName": "Los Angeles Lakers"
+                    }
+                  },
+                  {
+                    "id": "7",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "7",
+                      "displayName": "Denver Nuggets"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "projection_sha256": "cf8875a99c8b3e216ebae652da8e551d1acd1a3a2988c1829b7f572aed7534bf"
+    },
+    {
+      "dates": "20261016",
+      "event_count": 2,
+      "file": "mlb.json",
+      "route": "baseball/mlb",
+      "raw_payload_sha256": "b61b6af7a0ce2dc8ac6c4e65890585b42497e01f5470af0860623a1d3fac71ac",
+      "payload": {
+        "leagues": [
+          {
+            "uid": "s:1~l:10"
+          }
+        ],
+        "events": [
+          {
+            "id": "401908026",
+            "date": "2026-10-16T22:00Z",
+            "name": "Tampa Bay Rays at Cleveland Guardians",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0:00",
+              "period": 1,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Scheduled",
+                "shortDetail": "10/16 - 6:00 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401908026",
+                "date": "2026-10-16T22:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0:00",
+                  "period": 1,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Scheduled",
+                    "shortDetail": "10/16 - 6:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "5",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "5",
+                      "displayName": "Cleveland Guardians"
+                    }
+                  },
+                  {
+                    "id": "30",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "30",
+                      "displayName": "Tampa Bay Rays"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401908034",
+            "date": "2026-10-17T01:00Z",
+            "name": "Milwaukee Brewers at Los Angeles Dodgers",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0:00",
+              "period": 1,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Scheduled",
+                "shortDetail": "10/16 - 9:00 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401908034",
+                "date": "2026-10-17T01:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0:00",
+                  "period": 1,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Scheduled",
+                    "shortDetail": "10/16 - 9:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "19",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "19",
+                      "displayName": "Los Angeles Dodgers"
+                    }
+                  },
+                  {
+                    "id": "8",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "8",
+                      "displayName": "Milwaukee Brewers"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "projection_sha256": "fb034e8a497bed2698541eaed3f878c5d763ff937d47474c3d6777d1b0cd33b9"
+    },
+    {
+      "dates": "20261016",
+      "event_count": 2,
+      "file": "nhl.json",
+      "route": "hockey/nhl",
+      "raw_payload_sha256": "d301577d583932de3729826942632e0d26a658c6259f76f189ceff06ffa4def6",
+      "payload": {
+        "leagues": [
+          {
+            "uid": "s:70~l:90"
+          }
+        ],
+        "events": [
+          {
+            "id": "401892517",
+            "date": "2026-10-17T01:00Z",
+            "name": "Pittsburgh Penguins at Colorado Avalanche",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0:00",
+              "period": 0,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Fri, October 16th at 9:00 PM EDT",
+                "shortDetail": "10/16 - 9:00 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401892517",
+                "date": "2026-10-17T01:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0:00",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Fri, October 16th at 9:00 PM EDT",
+                    "shortDetail": "10/16 - 9:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "17",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "17",
+                      "displayName": "Colorado Avalanche"
+                    }
+                  },
+                  {
+                    "id": "16",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "16",
+                      "displayName": "Pittsburgh Penguins"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401892518",
+            "date": "2026-10-17T02:00Z",
+            "name": "Boston Bruins at Anaheim Ducks",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0:00",
+              "period": 0,
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Fri, October 16th at 10:00 PM EDT",
+                "shortDetail": "10/16 - 10:00 PM EDT"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401892518",
+                "date": "2026-10-17T02:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0:00",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Fri, October 16th at 10:00 PM EDT",
+                    "shortDetail": "10/16 - 10:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "25",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "25",
+                      "displayName": "Anaheim Ducks"
+                    }
+                  },
+                  {
+                    "id": "1",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "1",
+                      "displayName": "Boston Bruins"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "projection_sha256": "c91f3d7d0a778390d1100f80dbe421c21aa866558e032d80816739322fcb9bbe"
+    },
+    {
+      "dates": "20261017",
+      "event_count": 5,
+      "file": "epl.json",
+      "route": "soccer/eng.1",
+      "raw_payload_sha256": "3af46d2560d3b4f0373b3bd935e4b7c89bf9ccf7968e68537c2527c526a3c99c",
+      "payload": {
+        "leagues": [
+          {
+            "uid": "s:600~l:700"
+          }
+        ],
+        "events": [
+          {
+            "id": "401878771",
+            "date": "2026-10-17T11:30Z",
+            "name": "Chelsea at Everton",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0'",
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Sat, October 17th at 7:30 AM EDT",
+                "shortDetail": "Scheduled"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401878771",
+                "date": "2026-10-17T11:30Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0'",
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sat, October 17th at 7:30 AM EDT",
+                    "shortDetail": "Scheduled"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "368",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "368",
+                      "displayName": "Everton"
+                    }
+                  },
+                  {
+                    "id": "363",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "363",
+                      "displayName": "Chelsea"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401879262",
+            "date": "2026-10-17T14:00Z",
+            "name": "Liverpool at Brentford",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0'",
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Sat, October 17th at 10:00 AM EDT",
+                "shortDetail": "Scheduled"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401879262",
+                "date": "2026-10-17T14:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0'",
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sat, October 17th at 10:00 AM EDT",
+                    "shortDetail": "Scheduled"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "337",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "337",
+                      "displayName": "Brentford"
+                    }
+                  },
+                  {
+                    "id": "364",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "364",
+                      "displayName": "Liverpool"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401878770",
+            "date": "2026-10-17T14:00Z",
+            "name": "Hull City at Fulham",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0'",
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Sat, October 17th at 10:00 AM EDT",
+                "shortDetail": "Scheduled"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401878770",
+                "date": "2026-10-17T14:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0'",
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sat, October 17th at 10:00 AM EDT",
+                    "shortDetail": "Scheduled"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "370",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "370",
+                      "displayName": "Fulham"
+                    }
+                  },
+                  {
+                    "id": "306",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "306",
+                      "displayName": "Hull City"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401879259",
+            "date": "2026-10-17T14:00Z",
+            "name": "Ipswich Town at Manchester City",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0'",
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Sat, October 17th at 10:00 AM EDT",
+                "shortDetail": "Scheduled"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401879259",
+                "date": "2026-10-17T14:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0'",
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sat, October 17th at 10:00 AM EDT",
+                    "shortDetail": "Scheduled"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "382",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "382",
+                      "displayName": "Manchester City"
+                    }
+                  },
+                  {
+                    "id": "373",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "373",
+                      "displayName": "Ipswich Town"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "401879258",
+            "date": "2026-10-17T16:30Z",
+            "name": "Aston Villa at Newcastle United",
+            "status": {
+              "clock": 0.0,
+              "displayClock": "0'",
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Sat, October 17th at 12:30 PM EDT",
+                "shortDetail": "Scheduled"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401879258",
+                "date": "2026-10-17T16:30Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "0'",
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sat, October 17th at 12:30 PM EDT",
+                    "shortDetail": "Scheduled"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "361",
+                    "homeAway": "home",
+                    "team": {
+                      "id": "361",
+                      "displayName": "Newcastle United"
+                    }
+                  },
+                  {
+                    "id": "362",
+                    "homeAway": "away",
+                    "team": {
+                      "id": "362",
+                      "displayName": "Aston Villa"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "projection_sha256": "793d8b9fd919b1686df0bcba597e18b63f1b684fe2e4fe72fc7463a8aa7a8a77"
+    },
+    {
+      "dates": "20261015-20261022",
+      "event_count": 1,
+      "file": "ufc.json",
+      "route": "mma/ufc",
+      "raw_payload_sha256": "24ebe961287a012ae068ab9d80a665a355afbef2d030e4e1b629ccf37938a085",
+      "payload": {
+        "leagues": [
+          {
+            "uid": "s:3301~l:3321"
+          }
+        ],
+        "events": [
+          {
+            "id": "600060773",
+            "date": "2026-10-17T21:00Z",
+            "name": "UFC Fight Night: Buckley vs. Malott",
+            "status": {
+              "type": {
+                "id": "1",
+                "name": "STATUS_SCHEDULED",
+                "state": "pre",
+                "completed": false,
+                "description": "Scheduled",
+                "detail": "Scheduled",
+                "shortDetail": "Scheduled"
+              }
+            },
+            "competitions": [
+              {
+                "id": "401919643",
+                "date": "2026-10-17T21:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "-",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sat, October 17th at 5:00 PM EDT",
+                    "shortDetail": "10/17 - 5:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "5044361",
+                    "athlete": {
+                      "displayName": "SuYoung You"
+                    }
+                  },
+                  {
+                    "id": "5282412",
+                    "athlete": {
+                      "displayName": "Cody Chovancek"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "401908373",
+                "date": "2026-10-17T21:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "-",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sat, October 17th at 5:00 PM EDT",
+                    "shortDetail": "10/17 - 5:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "4319785",
+                    "athlete": {
+                      "displayName": "Chelsea Chandler"
+                    }
+                  },
+                  {
+                    "id": "4947922",
+                    "athlete": {
+                      "displayName": "Melissa Croden"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "401914039",
+                "date": "2026-10-17T21:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "-",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sat, October 17th at 5:00 PM EDT",
+                    "shortDetail": "10/17 - 5:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "4816062",
+                    "athlete": {
+                      "displayName": "Chad Anheliger"
+                    }
+                  },
+                  {
+                    "id": "5119740",
+                    "athlete": {
+                      "displayName": "Steven Koslow"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "401929675",
+                "date": "2026-10-17T21:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "-",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sat, October 17th at 5:00 PM EDT",
+                    "shortDetail": "10/17 - 5:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "4026490",
+                    "athlete": {
+                      "displayName": "Katlyn Cerminara"
+                    }
+                  },
+                  {
+                    "id": "5130806",
+                    "athlete": {
+                      "displayName": "Mackenzie Stiller"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "401929676",
+                "date": "2026-10-17T21:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "-",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sat, October 17th at 5:00 PM EDT",
+                    "shortDetail": "10/17 - 5:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "5405986",
+                    "athlete": {
+                      "displayName": "Javad Mahjoub"
+                    }
+                  },
+                  {
+                    "id": "5454260",
+                    "athlete": {
+                      "displayName": "Joel Faglier"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "401911807",
+                "date": "2026-10-17T21:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "-",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sat, October 17th at 5:00 PM EDT",
+                    "shortDetail": "10/17 - 5:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "4807973",
+                    "athlete": {
+                      "displayName": "Julien LeBlanc"
+                    }
+                  },
+                  {
+                    "id": "5296770",
+                    "athlete": {
+                      "displayName": "Nick Galanti"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "401908371",
+                "date": "2026-10-17T21:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "-",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sat, October 17th at 5:00 PM EDT",
+                    "shortDetail": "10/17 - 5:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "4232775",
+                    "athlete": {
+                      "displayName": "Tanner Boser"
+                    }
+                  },
+                  {
+                    "id": "5145497",
+                    "athlete": {
+                      "displayName": "Jhonata Diniz"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "401905374",
+                "date": "2026-10-18T00:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "-",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sat, October 17th at 8:00 PM EDT",
+                    "shortDetail": "10/17 - 8:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "3821549",
+                    "athlete": {
+                      "displayName": "Nate Landwehr"
+                    }
+                  },
+                  {
+                    "id": "4063786",
+                    "athlete": {
+                      "displayName": "Mandel Nallo"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "401909783",
+                "date": "2026-10-18T00:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "-",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sat, October 17th at 8:00 PM EDT",
+                    "shortDetail": "10/17 - 8:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "4877916",
+                    "athlete": {
+                      "displayName": "Louis Jourdain"
+                    }
+                  },
+                  {
+                    "id": "5123311",
+                    "athlete": {
+                      "displayName": "Timmy Cuamba"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "401908372",
+                "date": "2026-10-18T00:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "-",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sat, October 17th at 8:00 PM EDT",
+                    "shortDetail": "10/17 - 8:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "4329444",
+                    "athlete": {
+                      "displayName": "Kyle Daukaus"
+                    }
+                  },
+                  {
+                    "id": "4415883",
+                    "athlete": {
+                      "displayName": "Marc-Andre Barriault"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "401923630",
+                "date": "2026-10-18T00:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "-",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sat, October 17th at 8:00 PM EDT",
+                    "shortDetail": "10/17 - 8:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "4408436",
+                    "athlete": {
+                      "displayName": "Kyle Nelson"
+                    }
+                  },
+                  {
+                    "id": "5180489",
+                    "athlete": {
+                      "displayName": "Cristian P\u00e9rez"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "401897729",
+                "date": "2026-10-18T00:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "-",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sat, October 17th at 8:00 PM EDT",
+                    "shortDetail": "10/17 - 8:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "4350796",
+                    "athlete": {
+                      "displayName": "Erin Blanchfield"
+                    }
+                  },
+                  {
+                    "id": "4835135",
+                    "athlete": {
+                      "displayName": "Jasmine Jasudavicius"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "401897388",
+                "date": "2026-10-18T00:00Z",
+                "timeValid": true,
+                "status": {
+                  "clock": 0.0,
+                  "displayClock": "-",
+                  "period": 0,
+                  "type": {
+                    "id": "1",
+                    "name": "STATUS_SCHEDULED",
+                    "state": "pre",
+                    "completed": false,
+                    "description": "Scheduled",
+                    "detail": "Sat, October 17th at 8:00 PM EDT",
+                    "shortDetail": "10/17 - 8:00 PM EDT"
+                  }
+                },
+                "competitors": [
+                  {
+                    "id": "3165120",
+                    "athlete": {
+                      "displayName": "Mike Malott"
+                    }
+                  },
+                  {
+                    "id": "4024714",
+                    "athlete": {
+                      "displayName": "Joaquin Buckley"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "projection_sha256": "9df21cd37d0a6696bb3814955d6f1ca87df080a3b8e745f1fb91ee181ca76497"
+    }
+  ],
+  "atlas_source_head": "6e02ee73169be80e50e629517b74d48abf10bc2e",
+  "observed_at": "2026-10-16T01:36:30.738426+00:00"
+}
