@@ -380,3 +380,18 @@ describe("SportsRequestView", () => {
     expect(markup).not.toContain("View upcoming");
   });
 });
+
+
+describe("Sports discovery source outcomes", () => {
+  it("keeps partial results visible with an availability notice", () => {
+    const markup = renderToStaticMarkup(<SportsRequestView {...baseProps} events={[]} discoveryState="partial" searchResults={[{ kind: "team", provider: "espn", id: "football-nfl-1", name: "Available Rams", sport: "Football", league: "NFL" }]} />);
+    expect(markup).toContain("Available Rams");
+    expect(markup).toContain("Showing results from available sources");
+    expect(markup).not.toContain("No matching");
+  });
+  it("distinguishes unavailable search from an empty result", () => {
+    const markup = renderToStaticMarkup(<SportsRequestView {...baseProps} events={[]} discoveryState="unavailable" />);
+    expect(markup).toContain("Sports search is unavailable");
+    expect(markup).not.toContain("No matching");
+  });
+});

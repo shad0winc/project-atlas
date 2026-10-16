@@ -6,8 +6,9 @@ The authenticated private writer can resolve an explicit `provider=espn` through
 `MetadataDiscoveryProvider`. The existing search/events, search/teams,
 search/leagues, filtered events and follow creation routes are reused. Existing
 public Sports API routes and the Portal client already accept an explicit
-provider. Portal default search still uses SportsDB; automatic aggregation and
-partial-provider result presentation are NOT implemented by this change.
+provider. Portal default search now consults authenticated source configuration,
+then searches enabled sources independently. Disabled ESPN discovery is skipped.
+Available results survive another source's failure with a partial-results notice.
 
 The factory first requires an explicitly enabled refresh policy, then uses only
 that policy's supported routes and shared metadata store. The packaged policy
@@ -61,7 +62,32 @@ Jellyfin binding, Dispatcharr connection or capacity entitlement.
 
 ## Remaining release work
 
-Automatic Portal discovery aggregation, provider/route coverage presentation,
-reviewed existing-follow identity mappings, effective capability health,
+Per-route coverage presentation, reviewed existing-follow identity mappings,
+effective capability health,
 enabled-policy persistence and recovery/rollback acceptance remain open.
 Production metadata activation and Sports UAT have not been performed.
+
+## Portal aggregation
+
+`/sports/discovery/providers` exposes configuration flags through Sports read
+authorization and the existing private writer credential. It opens no metadata
+store, checks no network, exposes no token/path and makes no effective-health
+claim. Invalid configuration remains unavailable.
+
+The Portal uses one capability request, then at most one concurrent search per
+enabled source, with no retries. Each phase/request has a ten-second browser
+deadline and abort signal. New searches/unmount cancel old work; obsolete results
+cannot replace the current query. Sources publish independently while pending.
+Actions remain disabled until the search transaction settles.
+
+Results deduplicate only an exact provider/kind/id identity. Identical names or
+native IDs across providers remain distinct; no aliases are inferred. Team and
+league cards label the schedule source so the saved identity is visible. A
+source identity mismatch or conflicting duplicate invalidates that source.
+A fresh empty response is available; all failed/disabled sources are unavailable.
+One successful empty source plus a failed source is partial, never proof that
+there are no matching events across all sources. Registered channels continue
+through their existing separate Events discovery component.
+
+The packaged policy remains disabled. This code does not activate ESPN, change
+existing follows, enroll aliases, enable recording or authorize playback.

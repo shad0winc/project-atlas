@@ -16,6 +16,7 @@ from fastapi import (
 
 from atlas_api.auth.models import AuthenticatedUser
 from atlas_api.schemas.sports import (
+    SportsDiscoveryProvidersResponse,
     SportsLiveChannelListResponse,
     SportsLiveChannelResponse,
     SportsEventListResponse,
@@ -73,6 +74,20 @@ def get_sports_api_service(
     """Return the process-wide Sports application service."""
 
     return build_default_sports_api_service()
+
+
+@router.get("/discovery/providers", response_model=SportsDiscoveryProvidersResponse,
+            summary="Read configured Sports discovery sources")
+def sports_discovery_providers(
+    current_user: Annotated[AuthenticatedUser, Depends(require_sports_read)],
+    service: Annotated[SportsAPIService, Depends(get_sports_api_service)],
+) -> SportsDiscoveryProvidersResponse:
+    try:
+        document = service.discovery_providers()
+    except SportsWriterTransportError as error:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                            detail="Sports discovery configuration is unavailable.") from error
+    return SportsDiscoveryProvidersResponse(**document)
 
 
 @router.get(

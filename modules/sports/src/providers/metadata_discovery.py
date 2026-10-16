@@ -186,3 +186,19 @@ def configured_discovery_provider():
     if policy is None:
         raise MetadataUnavailable('disabled')
     return MetadataDiscoveryProvider(configured_broker(policy), policy.routes)
+
+
+def discovery_capabilities(primary_enabled):
+    """Configuration only; no cache, transport or effective-health assertion."""
+    import os
+    from pathlib import Path
+    from providers.metadata_refresh import load_refresh_policy
+    if type(primary_enabled) is not bool:
+        raise ValueError('Invalid primary discovery configuration')
+    policy = load_refresh_policy()
+    directory = os.environ.get('ATLAS_SPORTS_METADATA_STATE_DIR', '')
+    independent_enabled = policy is not None and bool(directory) and Path(directory).is_absolute()
+    return {'version': 1, 'providers': [
+        {'provider': 'thesportsdb', 'enabled': primary_enabled},
+        {'provider': 'espn', 'enabled': independent_enabled},
+    ]}
