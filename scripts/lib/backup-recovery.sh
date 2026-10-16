@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/sports-backend-recovery.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/metadata-recovery.sh"
 
 # Canonical M-023.25 recovery-state registry.
 #
@@ -586,7 +587,8 @@ atlas_backup_recovery_validate_archive() {
   }
 
   [[ "$recovery_format" == '1' ||
-     "$recovery_format" == '2' ]] || {
+     "$recovery_format" == '2' ||
+     "$recovery_format" == '3' ]] || {
     echo 'ERROR: unsupported recovery archive format.' >&2
     return 1
   }
@@ -795,9 +797,15 @@ atlas_backup_recovery_validate_archive() {
       }
     fi
   done
-  if [[ "$recovery_format" == '2' ]]; then
+  if [[ "$recovery_format" == '2' || "$recovery_format" == '3' ]]; then
     atlas_sports_backend_recovery_validate_archive \
       "$archive" || return 1
+  fi
+  if [[ "$recovery_format" == '3' ]]; then
+    atlas_metadata_recovery_validate_archive "$archive" || return 1
+  elif atlas_backup_recovery_archive_member_present "$listing" 'metadata-recovery'; then
+    echo 'ERROR: metadata recovery requires archive format 3.' >&2
+    return 1
   fi
 
 }
@@ -867,6 +875,9 @@ with archive:
                 .strip()
             )
 
+    if recovery_format == "3":
+        allowed_roots.add("metadata-recovery")
+
     for member in archive.getmembers():
         name = member.name
         raw = name[:-1] if name.endswith("/") else name
@@ -888,7 +899,7 @@ with archive:
 
         if pieces[0] not in allowed_roots:
             if (
-                recovery_format == "2"
+                recovery_format in {"2", "3"}
                 and (
                     name == "backend-recovery"
                     or name.startswith("backend-recovery/")
@@ -961,7 +972,8 @@ atlas_backup_recovery_validate_staged_restore() {
   recovery_format="$(<"$root/RECOVERY_FORMAT")"
 
   [[ "$recovery_format" == '1' ||
-     "$recovery_format" == '2' ]] || {
+     "$recovery_format" == '2' ||
+     "$recovery_format" == '3' ]] || {
     echo 'ERROR: staged restore recovery format is unsupported.' >&2
     return 1
   }
@@ -1036,9 +1048,15 @@ atlas_backup_recovery_validate_staged_restore() {
     echo 'ERROR: staged recovery checksum verification failed.' >&2
     return 1
   }
-  if [[ "$recovery_format" == '2' ]]; then
+  if [[ "$recovery_format" == '2' || "$recovery_format" == '3' ]]; then
     atlas_sports_backend_recovery_validate_staged \
       "$root" || return 1
+  fi
+  if [[ "$recovery_format" == '3' ]]; then
+    atlas_metadata_recovery_validate_staged "$root" || return 1
+  elif [[ -e "$root/metadata-recovery" || -L "$root/metadata-recovery" ]]; then
+    echo 'ERROR: metadata recovery requires archive format 3.' >&2
+    return 1
   fi
 
 }
@@ -1200,6 +1218,10 @@ atlas_backup_recovery_restore_plan() {
 
   if [[ "$(<"$root/RECOVERY_FORMAT")" == '2' ]]; then
     echo 'ERROR: recovery format 2 contains native Sports backend state; live restore is not implemented.' >&2
+    return 1
+  fi
+  if [[ "$(<"$root/RECOVERY_FORMAT")" == '3' ]]; then
+    echo 'ERROR: recovery format 3 requires native Sports and metadata recovery; live restore is not implemented.' >&2
     return 1
   fi
 
