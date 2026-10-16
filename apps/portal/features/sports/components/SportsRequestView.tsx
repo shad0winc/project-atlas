@@ -25,9 +25,9 @@ export type SportsRequestViewProps = Readonly<{
   searchResults: readonly SportsSearchResult[];
   searchType: SportsSearchType;
   onSearch: (type: SportsSearchType, query: string) => Promise<void>;
-  onFollow: (type: "team" | "league", providerId: string) => Promise<void>;
+  onFollow: (type: "team" | "league", providerId: string, provider: string) => Promise<void>;
   onUnfollow: (subscriptionId: string) => Promise<void>;
-  onBrowse: (type: "team" | "league", providerId: string) => Promise<void>;
+  onBrowse: (type: "team" | "league", providerId: string, provider: string) => Promise<void>;
   onRequestEvent: (input: SportsRequestInput) => Promise<SportsSubscription>;
   liveAvailabilityByEvent?: Readonly<
     Record<
@@ -170,7 +170,8 @@ export function SportsRequestView({
           className="requests-grid"
         >
           {searchResults.map((result) => {
-            const identity = `${searchType}:${result.id}`;
+            const provider = result.provider ?? "thesportsdb";
+            const identity = `${searchType}:${provider}:${result.id}`;
 
             if (result.kind === "event") {
               const eventFollow = follows.find(
@@ -258,7 +259,7 @@ export function SportsRequestView({
 
             const existing = follows.find(
               (item) =>
-                item.type === searchType && item.providerId === result.id,
+                item.type === searchType && item.provider === provider && item.providerId === result.id,
             );
 
             return (
@@ -278,7 +279,7 @@ export function SportsRequestView({
                   disabled={pending === `browse:${identity}`}
                   onClick={() => {
                     void mutate(`browse:${identity}`, () =>
-                      onBrowse(result.kind, result.id),
+                      onBrowse(result.kind, result.id, provider),
                     );
                   }}
                   type="button"
@@ -308,7 +309,7 @@ export function SportsRequestView({
                         return;
                       }
 
-                      await onFollow(result.kind, result.id);
+                      await onFollow(result.kind, result.id, provider);
                       setQuery("");
                     });
                   }}
@@ -422,7 +423,7 @@ export function SportsRequestView({
                           follow.type === "team" ? "team" : "league";
 
                         void mutate(`browse:${follow.subscriptionId}`, () =>
-                          onBrowse(browseType, follow.providerId),
+                          onBrowse(browseType, follow.providerId, follow.provider),
                         );
                       }}
                       type="button"

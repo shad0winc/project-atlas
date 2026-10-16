@@ -9,7 +9,7 @@ describe("Sports page UX coordination", () => {
 
   it("removes a successfully followed result from Discover", () => {
     expect(source).toContain(
-      "current.filter((item) => item.id !== providerId)"
+      'item.kind !== type || item.id !== providerId || (item.provider ?? "thesportsdb") !== provider'
     );
   });
 
