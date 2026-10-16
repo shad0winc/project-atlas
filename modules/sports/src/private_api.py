@@ -353,7 +353,8 @@ class Handler(BaseHTTPRequestHandler):
         if not self._require_auth():
             return
 
-        if parsed.path in {"/internal/v1/metadata/day", "/internal/v1/metadata/teams"}:
+        if parsed.path in {"/internal/v1/metadata/day", "/internal/v1/metadata/teams",
+                           "/internal/v1/metadata/schedule"}:
             from providers.metadata_service import query_metadata
             from providers.metadata_broker import MetadataUnavailable
             try:
