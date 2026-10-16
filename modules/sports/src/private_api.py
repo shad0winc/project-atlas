@@ -819,6 +819,7 @@ class Handler(BaseHTTPRequestHandler):
                         event_ids=event_ids or None,
                         team_ids=team_ids or None,
                         league_ids=league_ids or None,
+                        days_ahead=7 if team_ids or league_ids else None,
                     )
                 ]
             else:

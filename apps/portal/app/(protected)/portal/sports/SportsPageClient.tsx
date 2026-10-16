@@ -30,6 +30,7 @@ import {
 } from "../../../../features/sports";
 import { startFollowedSportsRefresh } from "../../../../features/sports/services/followedSportsRefresh";
 import { reconcileFollowedEventMetadata } from "../../../../features/sports/services/followedEventMetadata";
+import { upcomingSportsEvents } from "../../../../features/sports/services/upcomingSports";
 import { startLiveAvailabilityRefresh } from "../../../../features/sports/services/liveAvailabilityRefresh";
 import { PORTAL_ROUTES } from "../../../../lib/navigation/portal";
 
@@ -49,6 +50,10 @@ export function SportsPageClient(): React.ReactElement {
     [],
   );
   const [follows, setFollows] = useState<readonly SportsFollow[]>([]);
+  const [browsedSports, setBrowsedSports] = useState<
+    Readonly<{ provider: string; type: "team" | "league"; providerId: string }>
+    | undefined
+  >(undefined);
   const [liveAvailabilityByEvent, setLiveAvailabilityByEvent] = useState<
     Readonly<Record<string, SportsLiveAvailability>>
   >({});
@@ -353,12 +358,8 @@ export function SportsPageClient(): React.ReactElement {
     setError(null);
 
     try {
-      const [loadedEvents, loadedFollows] = await Promise.all([
-        loadSportsEvents(),
-        loadSportsFollows(),
-      ]);
-
-      setEvents(loadedEvents);
+      const loadedFollows = await loadSportsFollows();
+      setEvents([]);
       setFollows(loadedFollows);
     } catch (loadError) {
       setError(
@@ -393,13 +394,9 @@ export function SportsPageClient(): React.ReactElement {
   useEffect(() => {
     const controller = new AbortController();
 
-    void Promise.all([
-      loadSportsEvents({ signal: controller.signal }),
-      loadSportsFollows({ signal: controller.signal }),
-    ])
-      .then(([loadedEvents, loadedFollows]) => {
+    void loadSportsFollows({ signal: controller.signal })
+      .then((loadedFollows) => {
         if (!controller.signal.aborted) {
-          setEvents(loadedEvents);
           setFollows(loadedFollows);
         }
       })
@@ -423,40 +420,39 @@ export function SportsPageClient(): React.ReactElement {
     };
   }, []);
 
-  useEffect(
-    () =>
-      startFollowedSportsRefresh({
-        follows,
-        load: loadSportsEvents,
-        publish: (providers, results) => {
-          if (results === null) {
-            setFreshFollowedEvents([]);
-            return;
-          }
-          setFreshFollowedEvents(
-            results.flatMap((result, index) =>
-              result.status === "fulfilled"
-                ? result.value.filter(
-                    (event) => event.provider === providers[index],
-                  )
-                : [],
-            ),
-          );
-          setLiveMetadataUnavailable(
-            results.some((result) => result.status === "rejected"),
-          );
-          setFollowedEvents((current) =>
-            reconcileFollowedEventMetadata(
-              current,
-              follows,
-              providers,
-              results,
-            ),
-          );
-        },
-      }),
-    [follows],
-  );
+  useEffect(() => {
+    return startFollowedSportsRefresh({
+      follows,
+      browse: browsedSports,
+      load: loadSportsEvents,
+      publish: (providers, results) => {
+        if (results === null) {
+          setFreshFollowedEvents([]);
+          return;
+        }
+        const refreshedEvents = results.flatMap((result, index) =>
+          result.status === "fulfilled"
+            ? result.value.filter(
+                (event) => event.provider === providers[index],
+              )
+            : [],
+        );
+        setFreshFollowedEvents(refreshedEvents);
+        setEvents(upcomingSportsEvents(refreshedEvents));
+        setLiveMetadataUnavailable(
+          results.some((result) => result.status === "rejected"),
+        );
+        setFollowedEvents((current) =>
+          reconcileFollowedEventMetadata(
+            current,
+            follows,
+            providers,
+            results,
+          ),
+        );
+      },
+    });
+  }, [follows, browsedSports]);
 
   useEffect(() => {
     return startLiveAvailabilityRefresh({
@@ -509,7 +505,8 @@ export function SportsPageClient(): React.ReactElement {
       type === "team" ? { teamIds: [providerId] } : { leagueIds: [providerId] },
     );
 
-    setEvents(loadedEvents);
+    setEvents(upcomingSportsEvents(loadedEvents));
+    setBrowsedSports({ provider: "thesportsdb", type, providerId });
 
     window.requestAnimationFrame(() => {
       document
@@ -685,6 +682,7 @@ export function SportsPageClient(): React.ReactElement {
       ) : (
         <SportsRequestView
           events={events}
+          scheduleUnavailable={liveMetadataUnavailable}
           followedEvents={followedEvents}
           follows={follows}
           eventChannels={
