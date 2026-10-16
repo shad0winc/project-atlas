@@ -511,7 +511,7 @@ export async function requestSportsEvent(
 export async function searchSports(
   type: SportsSearchType,
   query: string,
-  options: SportsRequestOptions = {}
+  options: SportsRequestOptions & Readonly<{ provider?: string }> = {}
 ): Promise<readonly SportsSearchResult[]> {
   const normalizedQuery = query.trim();
 
@@ -519,6 +519,8 @@ export async function searchSports(
     return [];
   }
 
+  const provider = options.provider === undefined ? "thesportsdb" : options.provider.trim();
+  if (!provider) throw new Error("sportsSearch.provider must not be empty.");
   const path = type === "team" ? "teams" : type === "league" ? "leagues" : "events";
 
   try {
@@ -536,7 +538,7 @@ export async function searchSports(
     if (type === "event") {
       const response =
         await authenticatedAtlasApiRequest<SportsEventCollectionTransport>(
-          `/sports/search/${path}?provider=thesportsdb&query=${encodeURIComponent(normalizedQuery)}`,
+          `/sports/search/${path}?provider=${encodeURIComponent(provider)}&query=${encodeURIComponent(normalizedQuery)}`,
           requestOptions
         );
       return createSportsEventSearchCollection(response);
@@ -544,11 +546,11 @@ export async function searchSports(
 
     const response =
       await authenticatedAtlasApiRequest<SportsSearchCollectionTransport>(
-        `/sports/search/${path}?provider=thesportsdb&query=${encodeURIComponent(normalizedQuery)}`,
+        `/sports/search/${path}?provider=${encodeURIComponent(provider)}&query=${encodeURIComponent(normalizedQuery)}`,
         requestOptions
       );
 
-    return createSportsSearchCollection(type, response);
+    return createSportsSearchCollection(type, response, provider);
   } catch (error) {
     if (
       error instanceof AtlasApiError &&
@@ -565,9 +567,11 @@ export async function searchSports(
 }
 
 export async function loadSportsFollows(options: SportsRequestOptions = {}): Promise<readonly SportsFollow[]> { return createSportsFollowCollection(await authenticatedAtlasApiRequest<SportsFollowCollectionTransport>("/sports/follows", { method: "GET", cache: "no-store", signal: options.signal })); }
-export async function followSports(type: "event" | "team" | "league" | "channel", providerId: string, options: SportsRequestOptions = {}): Promise<SportsFollow> {
+export async function followSports(type: "event" | "team" | "league" | "channel", providerId: string, options: SportsRequestOptions & Readonly<{ provider?: string }> = {}): Promise<SportsFollow> {
   const id=providerId.trim(); if (!id) throw new Error("sportsFollow.providerId must not be empty.");
-  return createSportsFollow(await authenticatedAtlasApiRequest<SportsFollowTransport>("/sports/follows", { method: "POST", cache: "no-store", signal: options.signal, body: { type, provider: type === "channel" ? "atlas" : "thesportsdb", provider_id: id }, retryPolicy: { maxRetries: 0, baseDelayMs: 250, maxDelayMs: 5000 } }));
+  const provider = type === "channel" ? "atlas" : options.provider === undefined ? "thesportsdb" : options.provider.trim();
+  if (!provider) throw new Error("sportsFollow.provider must not be empty.");
+  return createSportsFollow(await authenticatedAtlasApiRequest<SportsFollowTransport>("/sports/follows", { method: "POST", cache: "no-store", signal: options.signal, body: { type, provider, provider_id: id }, retryPolicy: { maxRetries: 0, baseDelayMs: 250, maxDelayMs: 5000 } }));
 }
 export async function unfollowSports(subscriptionId: string, options: SportsRequestOptions = {}): Promise<void> {
   const id=subscriptionId.trim(); if (!id) throw new Error("sportsFollow.subscriptionId must not be empty.");

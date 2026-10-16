@@ -53,7 +53,7 @@ export type SportsSubscriptionTransport = Readonly<{
 }>;
 
 export type SportsSearchType = "team" | "league" | "event";
-export type SportsEntitySearchResult = Readonly<{ kind: "team" | "league"; id: string; name: string; sport: string; league: string; }>;
+export type SportsEntitySearchResult = Readonly<{ kind: "team" | "league"; id: string; provider?: string; name: string; sport: string; league: string; }>;
 export type SportsEventSearchResult = Readonly<{ kind: "event"; id: string; provider: string; name: string; sport: string; league: string; startAt: string; status: string; requested: boolean; }>;
 export type SportsSearchResult = SportsEntitySearchResult | SportsEventSearchResult;
 export type SportsSearchCollectionTransport = Readonly<{ results: readonly Readonly<{ id: string; name: string; sport?: string; league?: string; }>[]; }>;
@@ -126,9 +126,10 @@ export function createSportsSubscription(input: SportsSubscriptionTransport): Sp
 
 export function createSportsSearchCollection(
   kind: "team" | "league",
-  input: SportsSearchCollectionTransport
+  input: SportsSearchCollectionTransport,
+  provider = "thesportsdb"
 ): readonly SportsEntitySearchResult[] {
-  return Object.freeze(input.results.map((item) => Object.freeze({ kind, id: requiredText(item.id, "sportsSearch.id"), name: requiredText(item.name, "sportsSearch.name"), sport: String(item.sport ?? "").trim(), league: String(item.league ?? "").trim() })));
+  return Object.freeze(input.results.map((item) => Object.freeze({ kind, provider: requiredText(provider, "sportsSearch.provider"), id: requiredText(item.id, "sportsSearch.id"), name: requiredText(item.name, "sportsSearch.name"), sport: String(item.sport ?? "").trim(), league: String(item.league ?? "").trim() })));
 }
 
 export function createSportsEventSearchCollection(
