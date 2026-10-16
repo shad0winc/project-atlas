@@ -30,7 +30,8 @@ class RecoveryBundleTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix='project-atlas-restore.', dir='/tmp')
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        self.identities = {'dispatcharr': [1000, 1000], 'teamarr': [1000, 1000], 'writer': [999, 999]}
+        self.identities = {'dispatcharr': [1000, 1000], 'dispatcharr_jwt': [0, 0],
+                           'teamarr': [0, 0], 'writer': [1000, 1000]}
         write(self.root / 'RECOVERY_FORMAT', b'3\n')
         original = self.root / 'source'; original.mkdir(mode=0o700)
         metadata = original / 'sports-metadata'; metadata.mkdir(mode=0o700)
@@ -87,7 +88,7 @@ class RecoveryBundleTests(unittest.TestCase):
             self.assertEqual(connection.execute('SELECT owner_event_id FROM metadata_aliases WHERE provider=?', ('espn',)).fetchone(), ('2475454',))
         records = {row['surface']: row for row in manifest['files']}
         self.assertEqual(records['dispatcharr-database']['state'], 'native-restore-required')
-        self.assertEqual(records['metadata-policy']['publish_owner'], [0, 999])
+        self.assertEqual(records['metadata-policy']['publish_owner'], [0, 1000])
         self.assertEqual(records['metadata-policy']['publish_mode'], '0640')
 
     def test_staged_files_remain_operator_private_and_no_ownership_is_applied(self):
@@ -98,6 +99,46 @@ class RecoveryBundleTests(unittest.TestCase):
             self.assertEqual(info.st_uid, os.geteuid())
             self.assertEqual(stat.S_IMODE(info.st_mode), 0o700 if path.is_dir() else 0o600)
         self.assertEqual((result / 'sports-metadata/metadata.sqlite.lock').read_bytes(), b'')
+
+    def test_v2_plan_keeps_postgres_jwt_teamarr_and_writer_identities_independent(self):
+        result = self.prepare()
+        manifest = bundle.validate_bundle(result)
+        self.assertEqual(manifest['version'], 2)
+        rows = {row['surface']: row for row in manifest['files']}
+        for surface, owner in (
+            ('dispatcharr-database', [1000, 1000]),
+            ('dispatcharr-jwt', [0, 0]),
+            ('teamarr-database', [0, 0]),
+            ('metadata-database', [1000, 1000]),
+            ('metadata-lock', [1000, 1000]),
+            ('metadata-policy', [0, 1000]),
+        ):
+            with self.subTest(surface=surface):
+                self.assertEqual(rows[surface]['publish_owner'], owner)
+        self.assertEqual(manifest['publish_directories']['sports-metadata-policy'],
+                         {'owner': [0, 1000], 'mode': '0750'})
+        self.assertTrue(all(path.stat().st_uid == os.geteuid()
+                            for path in result.rglob('*')))
+
+    def test_missing_jwt_identity_is_not_guessed_from_postgres(self):
+        identities = {key: value for key, value in self.identities.items() if key != 'dispatcharr_jwt'}
+        with patch.object(bundle.tempfile, 'mkdtemp') as create:
+            with self.assertRaises(bundle.BundleError): bundle.prepare(self.root, identities)
+            create.assert_not_called()
+
+    def test_prepared_v1_manifest_requires_regeneration(self):
+        result = self.prepare(); path = result / 'BUNDLE.json'
+        manifest = json.loads(path.read_bytes()); manifest['version'] = 1
+        write(path, json.dumps(manifest).encode())
+        with self.assertRaises(bundle.BundleError): bundle.validate_bundle(result)
+
+    def test_jwt_owner_cannot_be_substituted_with_postgres_owner(self):
+        result = self.prepare(); path = result / 'BUNDLE.json'
+        manifest = json.loads(path.read_bytes())
+        for row in manifest['files']:
+            if row['surface'] == 'dispatcharr-jwt': row['publish_owner'] = [1000, 1000]
+        write(path, json.dumps(manifest).encode())
+        with self.assertRaises(bundle.BundleError): bundle.validate_bundle(result)
 
     def test_absent_native_state_remains_an_explicit_unresolved_action(self):
         native = self.root / 'backend-recovery'
