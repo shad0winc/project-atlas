@@ -13,7 +13,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import yaml
+import re
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'modules/sports/src'))
@@ -270,19 +270,29 @@ class MetadataPolicyTests(unittest.TestCase):
                 recovery.validate_archive(archive_path)
 
     def test_compose_policy_is_writer_only_readonly_bind(self):
-        data = yaml.safe_load((ROOT / 'stack/ingress.yml').read_text())
-        writer = data['services']['sports-writer']
-        mounts = [v for v in writer['volumes'] if isinstance(v, dict) and v['target'] == '/srv/sports-metadata-policy']
-        self.assertEqual(len(mounts), 1)
-        self.assertEqual(mounts[0], {'type': 'bind',
-            'source': '${ATLAS_RUNTIME_CONFIG_DIR:-/mnt/storage/configs/atlas}/private/sports-metadata-policy',
-            'target': '/srv/sports-metadata-policy', 'read_only': True,
-            'bind': {'create_host_path': False}})
-        self.assertEqual(writer['environment']['ATLAS_SPORTS_METADATA_REFRESH_FILE'], '/srv/sports-metadata-policy/refresh.json')
-        self.assertEqual(writer['expose'], ['8003'])
-        for name, service in data['services'].items():
+        # Check this fixed Compose source contract without adding a YAML runtime
+        # dependency to Core CI. Scope the mount to volumes, not expose or env.
+        text = (ROOT / 'stack/ingress.yml').read_text()
+        parts = re.split(r'(?m)^  ([a-z][a-z0-9-]*):\n', text)
+        services = dict(zip(parts[1::2], parts[2::2]))
+        writer = services['sports-writer']
+        self.assertEqual(writer.count('    volumes:\n'), 1)
+        volumes = writer.split('    volumes:\n', 1)[1].split('    expose:\n', 1)[0]
+        mount = (
+            '      - type: bind\n'
+            '        source: ${ATLAS_RUNTIME_CONFIG_DIR:-/mnt/storage/configs/atlas}/private/sports-metadata-policy\n'
+            '        target: /srv/sports-metadata-policy\n'
+            '        read_only: true\n'
+            '        bind:\n'
+            '          create_host_path: false\n'
+        )
+        self.assertEqual(volumes.count(mount), 1)
+        self.assertEqual(writer.count('target: /srv/sports-metadata-policy'), 1)
+        self.assertIn('    expose:\n      - "8003"\n    environment:\n', writer)
+        self.assertIn('      ATLAS_SPORTS_METADATA_REFRESH_FILE: /srv/sports-metadata-policy/refresh.json\n', writer)
+        for name, service in services.items():
             if name != 'sports-writer':
-                self.assertNotIn('sports-metadata-policy', json.dumps(service.get('volumes', [])))
+                self.assertNotIn('sports-metadata-policy', service)
 
     @unittest.skipUnless(os.geteuid() == 0, 'nonroot permission check requires root')
     def test_nonroot_writer_reads_but_cannot_replace_policy(self):
