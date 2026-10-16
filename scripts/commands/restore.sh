@@ -369,6 +369,12 @@ atlas_restore_require_production_preflight() {
     echo 'ERROR: recovery format 2 contains native Sports backend state; live restore is not implemented.' >&2
     return 1
   fi
+  if [[ -f "$root/RECOVERY_FORMAT" &&
+        "$(<"$root/RECOVERY_FORMAT")" == '3' ]]
+  then
+    echo 'ERROR: recovery format 3 requires native Sports and metadata recovery; live restore is not implemented.' >&2
+    return 1
+  fi
 
   atlas_deployment_validate_source || return 1
   current_record="$(atlas_deployment_require_current_record)" || return 1

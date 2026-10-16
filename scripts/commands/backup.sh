@@ -172,6 +172,19 @@ EOF_MANIFEST
     return 1
   fi
 
+  local archive_format=2
+  local -a extra_recovery_roots=()
+  if ! atlas_metadata_recovery_capture "$snapshot_root"; then
+    echo 'ERROR: metadata recovery-state capture failed.' >&2
+    return 1
+  fi
+  if [[ -d "$snapshot_root/metadata-recovery" ]]; then
+    archive_format=3
+    printf '%s\n' '3' > "$recovery_format"
+    sed -i 's/^Recovery format: 2$/Recovery format: 3/' "$manifest" || return 1
+    extra_recovery_roots=('metadata-recovery')
+  fi
+
   atlas_backup_recovery_write_snapshot_checksums \
     "$snapshot_root" "$recovery_checksums" || {
       echo 'ERROR: recovery-state checksum generation failed.' >&2
@@ -220,7 +233,8 @@ EOF_MANIFEST
     .atlas-backup-recovery-checksums.tmp \
     -C "$snapshot_root" \
     state \
-    backend-recovery
+    backend-recovery \
+    "${extra_recovery_roots[@]}"
   then
     echo 'ERROR: backup archive creation failed; partial artifact removed.' >&2
     return 1
@@ -261,7 +275,7 @@ EOF_MANIFEST
   echo "  $(du -h "$backup_file" | awk '{print $1}')"
   echo
   echo 'Recovery:'
-  echo '  Format 2 (state-complete; restore-unverified)'
+  echo "  Format $archive_format (state-complete; restore-unverified)"
   echo
   echo 'Retention:'
   echo '  Keeping newest 10 backups'
