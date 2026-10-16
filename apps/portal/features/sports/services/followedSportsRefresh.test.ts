@@ -45,6 +45,25 @@ const flush = async () => {
   await Promise.resolve();
 };
 describe("followed Sports refresh", () => {
+  it("refreshes an explicitly browsed league without creating a follow", async () => {
+    const follows = [saved("team", "team")];
+    const load = vi.fn().mockResolvedValue([]);
+    stop = startFollowedSportsRefresh({
+      follows,
+      browse: { provider: "thesportsdb", type: "league", providerId: "nfl" },
+      load,
+      publish: vi.fn(),
+    });
+    await flush();
+    expect(load.mock.calls[0][1]).toEqual({
+      provider: "thesportsdb", eventIds: [], teamIds: ["team"], leagueIds: ["nfl"],
+    });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(follows).toHaveLength(1);
+    expect(follows[0].type).toBe("team");
+  });
+
   it("groups identity filters, excludes channels and disabled follows, and replaces live status with final", async () => {
     const load = vi
       .fn()

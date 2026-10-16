@@ -18,6 +18,7 @@ export type SportsRequestInput = Readonly<{
 
 export type SportsRequestViewProps = Readonly<{
   events: readonly SportsEvent[];
+  scheduleUnavailable?: boolean;
   eventChannels?: ReactNode;
   followedEvents?: readonly SportsEvent[];
   follows: readonly SportsFollow[];
@@ -46,6 +47,7 @@ export type SportsRequestViewProps = Readonly<{
 
 export function SportsRequestView({
   events,
+  scheduleUnavailable = false,
   eventChannels,
   followedEvents = [],
   follows,
@@ -465,18 +467,31 @@ export function SportsRequestView({
       >
         <div>
           <p className="portal-page-eyebrow">Upcoming events</p>
-          <h2>Sports</h2>
+          <h2>Next 7 days</h2>
           <p>
-            Request a supported event through Atlas. Following and recording
-            remain separate.
+            Upcoming events from your followed Sports and the team or league
+            you choose to browse. Times use your device timezone. Following and
+            recording remain separate. Channel schedules require a linked guide.
           </p>
         </div>
       </div>
 
-      {events.length === 0 ? (
+      {scheduleUnavailable ? (
+        <p role="status">
+          Some followed Sports schedules are temporarily unavailable. This list
+          may be incomplete.
+        </p>
+      ) : null}
+
+      {events.length === 0 && scheduleUnavailable ? (
+        <section className="requests-message-panel">
+          <h3>Upcoming schedules could not be fully loaded</h3>
+          <p>Check again when schedule information is available.</p>
+        </section>
+      ) : events.length === 0 ? (
         <section className="requests-message-panel">
           <p className="portal-page-eyebrow">No upcoming events</p>
-          <h3>Atlas has no supported Sports events to show right now</h3>
+          <h3>No upcoming Sports events to show in the next 7 days</h3>
           <p>
             Search for a team, league, or event above, or check again as new
             events are discovered.

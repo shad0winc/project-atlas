@@ -99,6 +99,7 @@ export function SportsLiveChannels({
     .replace(/\s+/g, "");
   const visible = combined.filter(
     (channel) =>
+      (searchQuery === undefined || normalizedQuery.length > 0) &&
       (!savedOnly || saved.has(channel.atlasChannelId)) &&
       channel.name
         .toLocaleLowerCase()
@@ -206,6 +207,8 @@ export function SportsLiveChannels({
         <p role="status">Loading live channels...</p>
       ) : error ? (
         <p role="alert">{error}</p>
+      ) : searchQuery !== undefined && !normalizedQuery ? (
+        <p>Search for an event or channel above to see matching channels.</p>
       ) : visible.length === 0 ? (
         <p>
           {normalizedQuery
