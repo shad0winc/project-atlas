@@ -140,3 +140,46 @@ the canonical deployment path, then install the collector/discovery caller. No
 mount, environment credential, alias, production cache or sharing policy is
 modified by this source candidate. End-user search/follow/Upcoming integration
 and effective capability health remain outstanding.
+
+
+## Cache-only seven-day schedule collection
+
+Authenticated GET `/internal/v1/metadata/schedule` takes exactly `route`,
+`start_at` and `end_at`. Both timestamps must carry a timezone, and the half-open
+window must be positive and at most seven days. The collector requests at most
+nine cached date buckets: the UTC window dates plus the preceding provider
+calendar bucket where the broker's yesterday-through-day-seven horizon permits.
+This handles provider calendar dates and Sunday-night games with Monday UTC
+kickoffs without inventing a programme or moving a kickoff to a different date.
+
+The broker reads the bucket set under one lock and SQLite read transaction.
+Collection never calls upstream, consumes request budget, renews timestamps or
+rewrites provider health. Missing and invalid buckets are explicit; stale
+snapshots preserve their observation/expiry time. Bucket retry delays reflect
+existing holds. A separate explicit `refresh_one_schedule_day` primitive admits
+at most one day request through the existing broker. It skips fresh and held
+buckets and returns/raises the original broker outcome. No loop, daemon, cold
+cache fan-out or production refresh policy is installed by this change.
+
+The versioned private response carries only the selected window and bucket
+snapshots/statuses, with a four-MB aggregate response budget. It fails rather
+than silently truncating. The client validates the full requested bucket set,
+recomputes the schedule and rechecks expiry at delivery. Missing dates cannot
+be interpreted as successful empty dates. A cold cache returns partial coverage.
+`all_buckets_fresh` describes cache observations at the evaluation time; it is
+not proof of all-league or upstream schedule completeness.
+
+Events reconcile by route and provider event ID before timestamp/status filtering.
+The most recently observed record wins, including a newer cancellation/final
+record or a reschedule outside the window. Equal-observation conflicts are
+withheld explicitly instead of choosing a date-bucket order. Identical overlaps
+collapse. Unknown times stay unknown and keep the result partial. Stale scheduled
+entries can be retained with explicit age; stale live status never qualifies for
+`fresh_live`, and this collector cannot grant playback availability.
+
+Production integration remains open: choose/sustain refresh cadence within the
+shared budget, provision and protect durable writer state, validate backup/restore,
+wire the collector into user discovery/Upcoming and background consumers, and
+install reviewed league/team/event identities for existing follows. The current
+SportsDB provider and all runtime health, ownership and sharing policies remain
+unchanged. The schedule collector is not automatically registered or enabled.
