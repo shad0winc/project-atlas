@@ -5,9 +5,11 @@ export function startFollowedSportsRefresh({
   follows,
   load,
   publish,
+  browse,
   intervalMs = 60_000,
 }: Readonly<{
   follows: readonly SportsFollow[];
+  browse?: Readonly<{ provider: string; type: "team" | "league"; providerId: string }>;
   load: (
     options: SportsRequestOptions,
     filter: SportsEventFilter,
@@ -37,6 +39,17 @@ export function startFollowedSportsRefresh({
           : group.leagueIds;
     if (!ids.includes(follow.providerId)) ids.push(follow.providerId);
     groups.set(follow.provider, group);
+  }
+  // A deliberate browse stays in the refreshed schedule without saving a follow.
+  if (browse) {
+    const group = groups.get(browse.provider) ?? {
+      eventIds: [],
+      teamIds: [],
+      leagueIds: [],
+    };
+    const ids = browse.type === "team" ? group.teamIds : group.leagueIds;
+    if (!ids.includes(browse.providerId)) ids.push(browse.providerId);
+    groups.set(browse.provider, group);
   }
   const providers = [...groups.keys()];
   let stopped = false;
