@@ -1,8 +1,9 @@
 # Sports metadata automatic refresh
 
-Status: optional source integration, disabled in production. No policy, Compose
-mount, environment credential, storage directory or provider registration is
-installed by this change. SportsDB remains independently degraded when it fails;
+Status: optional source integration, disabled in production. Canonical packaging
+now provisions a disabled persistent policy and mounts it read-only in the writer
+on a future approved update; this source integration itself installs no production
+policy, credential, state directory or provider registration. SportsDB remains independently degraded when it fails;
 this worker does not change doctor or provider-health.json.
 
 ## Explicit configuration
@@ -18,8 +19,11 @@ policy requires writer restart; an existing worker rereads its policy every tick
 The state environment `ATLAS_SPORTS_METADATA_STATE_DIR` must point to an already
 provisioned writer-owned private directory. The canonical host recovery path is
 `/mnt/storage/configs/atlas/private/sports-metadata`; eventual container mapping
-must select this exact supported host path. This candidate does not provision it.
-The current Compose deployment has no corresponding mount or policy configuration.
+must select this exact supported host path. The canonical update helper provisions it only after the existing pre-update
+doctor and artifact preparation succeed.
+Canonical source Compose defines the state mount and a separate read-only policy
+mount; the active production deployment is still unchanged. See
+`SPORTS_METADATA_POLICY.md` for policy provisioning and recovery.
 
 This is a policy example for review, not an installed canary:
 
