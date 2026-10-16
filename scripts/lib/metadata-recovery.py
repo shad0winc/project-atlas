@@ -2,6 +2,7 @@
 from contextlib import contextmanager
 import fcntl
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -111,11 +112,21 @@ def source_lock(path,uid,*,timeout=12):
         os.close(descriptor)
 
 
+def policy_helper():
+    spec = importlib.util.spec_from_file_location(
+        'atlas_metadata_policy', Path(__file__).with_name('sports-metadata-policy.py'))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def capture(source,destination):
     source=safe_path(source);destination=safe_path(destination)
     # An absent installation stays absent. A present but incomplete installation
     # fails; it must never silently downgrade a backup to the previous format.
+    policy = source.parent / 'sports-metadata-policy'
     if not source.exists():
+        require(not policy.exists() and not policy.is_symlink())
         return False
     info=source.lstat()
     require(stat.S_ISDIR(info.st_mode) and stat.S_IMODE(info.st_mode)==0o700)
@@ -126,6 +137,12 @@ def capture(source,destination):
     for extra in source.iterdir():
         require(extra.name in {'metadata.sqlite','metadata.sqlite.lock','metadata.sqlite-journal','metadata.sqlite-wal','metadata.sqlite-shm'})
         regular(extra,uid=info.st_uid)
+    # The policy is an independently captured configuration observation, not an
+    # assertion that an in-flight request used this generation. No worker is stopped.
+    policy_raw = None
+    if policy.exists() or policy.is_symlink():
+        policy_raw = policy_helper().read_directory(
+            policy, 0 if os.geteuid() == 0 else os.geteuid(), info.st_gid)
     with source_lock(source/'metadata.sqlite.lock',info.st_uid):
         work=Path(tempfile.mkdtemp(prefix='.metadata-recovery-',dir=destination.parent))
         try:
@@ -149,6 +166,11 @@ def capture(source,destination):
                 src.close()
             validate_database(target)
             manifest={'version':1,'database_schema':1,'database_sha256':digest(target)}
+            if policy_raw is not None:
+                descriptor=os.open(work/'refresh-policy.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+                with os.fdopen(descriptor,'wb') as handle:
+                    handle.write(policy_raw)
+                manifest.update(version=2,policy_sha256=digest(work/'refresh-policy.json'))
             descriptor=os.open(work/'MANIFEST.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
             with os.fdopen(descriptor,'w') as handle:
                 json.dump(manifest,handle,sort_keys=True)
@@ -163,7 +185,6 @@ def capture(source,destination):
 def validate_staged(root):
     root=safe_path(root)
     require(root.is_dir() and stat.S_IMODE(root.stat().st_mode)==0o700)
-    require({path.name for path in root.iterdir()}=={'MANIFEST.json','database.sqlite'})
     manifest_path=root/'MANIFEST.json';database=root/'database.sqlite'
     require(regular(manifest_path).st_size<=4096)
     regular(database)
@@ -173,8 +194,19 @@ def validate_staged(root):
             require(key not in result);result[key]=value
         return result
     data=json.loads(manifest_path.read_bytes(),object_pairs_hook=unique)
-    require(isinstance(data,dict) and set(data)=={'version','database_schema','database_sha256'})
-    require(type(data['version']) is int and data['version']==1)
+    require(isinstance(data,dict) and type(data.get('version')) is int)
+    require(data['version'] in {1,2})
+    fields={'version','database_schema','database_sha256'}
+    names={'MANIFEST.json','database.sqlite'}
+    if data['version']==2:
+        fields.add('policy_sha256');names.add('refresh-policy.json')
+    require(set(data)==fields)
+    require({path.name for path in root.iterdir()}==names)
+    if data['version']==2:
+        policy=root/'refresh-policy.json'
+        require(0<regular(policy).st_size<=16384)
+        require(data['policy_sha256']==digest(policy))
+        policy_helper().validate_bytes(policy.read_bytes())
     require(type(data['database_schema']) is int and data['database_schema']==1)
     require(data['database_sha256']==digest(database))
     validate_database(database)
@@ -193,9 +225,9 @@ def validate_archive(path):
             if name=='metadata-recovery':
                 require(member.isdir() and member.mode==0o700)
                 continue
-            require(name in {'metadata-recovery/MANIFEST.json','metadata-recovery/database.sqlite'})
+            require(name in {'metadata-recovery/MANIFEST.json','metadata-recovery/database.sqlite','metadata-recovery/refresh-policy.json'})
             require(member.isfile() and member.mode==0o600)
-            limit=4096 if name.endswith('MANIFEST.json') else MAX_DATABASE_BYTES
+            limit=4096 if name.endswith('MANIFEST.json') else 16384 if name.endswith('refresh-policy.json') else MAX_DATABASE_BYTES
             require(0<member.size<=limit)
             target=root/Path(name).name
             descriptor=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)

@@ -256,3 +256,13 @@ policy stays disabled; existing SportsDB follow mappings remain outstanding.
 Portal search now aggregates explicitly configured sources through an authenticated
 configuration-only capability boundary, preserving partial results and source
 identities. Effective capability health and production activation remain open.
+
+### Persistent refresh-policy packaging
+
+Canonical packaging now provisions a disabled policy in a distinct server-owned
+`private/sports-metadata-policy` directory and mounts it read-only in the writer.
+Updates preserve existing valid bytes, ownership and modes. Metadata recovery
+manifest version 2 captures and validates this policy alongside the database,
+while version 1 database-only snapshots remain readable. This is source-only
+integration: no production policy activation, live restore, doctor change or
+existing-follow alias enrollment. See `../operations/SPORTS_METADATA_POLICY.md`.
