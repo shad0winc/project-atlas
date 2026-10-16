@@ -287,6 +287,20 @@ class SportsWriterBackedAPIService:
         self._token = normalized_token
         self._timeout_seconds = timeout_seconds
 
+    def discovery_providers(self) -> dict[str, Any]:
+        payload = self._request("GET", "/internal/v1/discovery/providers")
+        if not isinstance(payload, dict) or set(payload) != {"version", "providers"} or type(payload.get("version")) is not int or payload["version"] != 1:
+            raise SportsWriterTransportError("Private Sports discovery configuration is unavailable.")
+        rows = payload["providers"]
+        if (not isinstance(rows, list) or len(rows) != 2
+            or any(not isinstance(row, dict) or set(row) != {"provider", "enabled"}
+                   or not isinstance(row["provider"], str)
+                   or row["provider"] not in {"thesportsdb", "espn"}
+                   or type(row["enabled"]) is not bool for row in rows)
+            or {row["provider"] for row in rows} != {"thesportsdb", "espn"}):
+            raise SportsWriterTransportError("Private Sports discovery configuration is unavailable.")
+        return {"version": 1, "providers": [dict(row) for row in rows]}
+
     def list_events_for_user(
         self,
         *,

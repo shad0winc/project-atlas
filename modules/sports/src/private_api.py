@@ -359,6 +359,18 @@ class Handler(BaseHTTPRequestHandler):
         if not self._require_auth():
             return
 
+        if parsed.path == "/internal/v1/discovery/providers":
+            if parsed.query:
+                self._json(HTTPStatus.BAD_REQUEST, {"error": "Unexpected discovery query."})
+                return
+            try:
+                from providers.metadata_discovery import discovery_capabilities
+                primary_enabled = any(provider.name == "thesportsdb" for provider in enabled_providers())
+                self._json(HTTPStatus.OK, discovery_capabilities(primary_enabled))
+            except Exception:
+                self._backend_unavailable()
+            return
+
         if parsed.path == "/internal/v1/metadata/refresh-status":
             if parsed.query:
                 self._json(HTTPStatus.BAD_REQUEST, {"error": "Invalid refresh status query."})

@@ -1,3 +1,4 @@
+import { parseDiscoveryProviders, type SportsDiscoveryProvider } from "./federatedDiscovery";
 import { atlasApiRequest } from "../../../lib/api/client";
 import { AtlasApiError } from "../../../lib/api/errors";
 import {
@@ -592,4 +593,13 @@ export async function updateSportsRecordingIntent(
         retryPolicy: { maxRetries: 0, baseDelayMs: 250, maxDelayMs: 5_000 } }
     )
   );
+}
+
+
+export async function loadSportsDiscoveryProviders(options: SportsRequestOptions = {}): Promise<readonly SportsDiscoveryProvider[]> {
+  const document = await authenticatedAtlasApiRequest<unknown>("/sports/discovery/providers", {
+    method: "GET", cache: "no-store", signal: options.signal,
+    retryPolicy: { maxRetries: 0, baseDelayMs: 250, maxDelayMs: 5_000 },
+  });
+  return parseDiscoveryProviders(document);
 }
