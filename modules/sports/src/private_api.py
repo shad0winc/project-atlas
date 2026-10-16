@@ -42,6 +42,7 @@ from subscriptions import (
 )
 
 MAX_BODY_BYTES = 16 * 1024
+_metadata_refresher = None
 
 
 def _provider(name: str):
@@ -351,6 +352,16 @@ class Handler(BaseHTTPRequestHandler):
             self._json(HTTPStatus.OK, {"status": "ok"})
             return
         if not self._require_auth():
+            return
+
+        if parsed.path == "/internal/v1/metadata/refresh-status":
+            if parsed.query:
+                self._json(HTTPStatus.BAD_REQUEST, {"error": "Invalid refresh status query."})
+                return
+            refresher = _metadata_refresher
+            status = (refresher.status() if refresher is not None else
+                      {"version": 1, "state": "disabled", "running": False})
+            self._json(HTTPStatus.OK, status)
             return
 
         if parsed.path in {"/internal/v1/metadata/day", "/internal/v1/metadata/teams",
@@ -2685,6 +2696,53 @@ class Handler(BaseHTTPRequestHandler):
         self._json(HTTPStatus.OK, {"removed": True})
 
 
+
+def _serve_with_metadata(server, refresh_factory=None, *, install_signals=True):
+    """Own refresh lifetime in the writer; shutdown starts no new admissions."""
+    import signal
+    from providers.metadata_refresh import start_configured_refresh
+    global _metadata_refresher
+    refresher = None
+    previous = {}
+    stopping = False
+    serving = False
+
+    class StopWriter(BaseException):
+        pass
+
+    def stop_writer(signum, frame):
+        nonlocal stopping
+        if not stopping:
+            stopping = True
+            if serving:
+                raise StopWriter()
+
+    try:
+        if install_signals:
+            for signum in (signal.SIGTERM, signal.SIGINT):
+                previous[signum] = signal.getsignal(signum)
+                signal.signal(signum, stop_writer)
+        refresher = (refresh_factory or start_configured_refresh)()
+        _metadata_refresher = refresher
+        if stopping:
+            return 0
+        serving = True
+        server.serve_forever()
+        return 0
+    except (StopWriter, KeyboardInterrupt):
+        return 0
+    finally:
+        stopping = True
+        try:
+            if refresher is not None and not refresher.close(timeout=25):
+                raise RuntimeError("Metadata refresh did not stop within its shutdown budget")
+        finally:
+            _metadata_refresher = None
+            server.server_close()
+            for signum, handler in previous.items():
+                signal.signal(signum, handler)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="127.0.0.1")
@@ -2708,8 +2766,7 @@ def main() -> int:
         (args.host, args.port),
         Handler,
     )
-    server.serve_forever()
-    return 0
+    return _serve_with_metadata(server)
 
 
 if __name__ == "__main__":
