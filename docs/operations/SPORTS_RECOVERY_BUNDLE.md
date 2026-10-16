@@ -36,8 +36,10 @@ Source contracts are rechecked before publication. A failed operation removes on
 its own new workspace, retaining original staged and live state.
 
 All actual output directories/files remain operator-owned 0700/0600. No chmod or
-chown is performed on existing/live objects. Numeric dispatcharr/teamarr/writer
-identities are explicit preparation inputs. BUNDLE.json records publish_owner,
+chown is performed on existing/live objects. Numeric dispatcharr (PostgreSQL),
+dispatcharr_jwt, teamarr and writer identities are explicit preparation inputs.
+The JWT identity must be supplied independently; it is not inferred from the
+PostgreSQL process owner. BUNDLE.json version 2 records publish_owner,
 publish_mode and directory ownership intentions separately from current staging
 permissions. These identities are not certified against deployed consumers here;
 a future transaction must derive and recheck them from canonical configuration.
