@@ -183,3 +183,22 @@ wire the collector into user discovery/Upcoming and background consumers, and
 install reviewed league/team/event identities for existing follows. The current
 SportsDB provider and all runtime health, ownership and sharing policies remain
 unchanged. The schedule collector is not automatically registered or enabled.
+
+
+## Metadata backup integration
+
+The canonical future host state directory is
+`${ATLAS_RUNTIME_CONFIG_DIR}/private/sports-metadata`, normally
+`/mnt/storage/configs/atlas/private/sports-metadata`. No directory, mount or
+configuration is provisioned by this change. `atlas backup` checks that path:
+an absent installation keeps recovery format 2; a present installation must be
+complete and successfully captured or backup publication fails.
+
+Metadata is captured as a separate application-consistent `metadata-recovery`
+artifact using the shared writer file lock and SQLite online backup, then detached
+from WAL into one private database. Recovery format 3 requires this artifact and
+its integrity/schema/identity validation in addition to existing format-2 state.
+Formats 1 and 2 remain readable. The 16 filesystem replacement surfaces are
+unchanged. Older readers reject format 3 rather than silently omitting metadata.
+Live native-backend/metadata restore remains unsupported; format 3 is explicitly
+blocked before live mutation. See `docs/operations/SPORTS_METADATA_RECOVERY.md`.
