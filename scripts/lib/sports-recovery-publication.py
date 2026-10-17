@@ -144,6 +144,8 @@ def locked(root):
     try:
         private(root / 'publication.lock')
         fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        # Consumer exposure transfers recovery authority to the consumption journal.
+        require(not (root / 'consumption').exists() and not (root / 'consumption').is_symlink())
         private(root / 'current', True)
         # A crash can leave a surface in old/ while current/ lacks that entry.
         # The journal's position validator decides whether that absence is valid.
