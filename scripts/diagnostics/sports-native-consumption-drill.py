@@ -49,7 +49,8 @@ def team_code(change=False, consumed=False):
         " assert c.execute('SELECT marker FROM atlas_teamarr_probe ORDER BY id').fetchall()==[("+repr(marker)+",)]\nfinally:c.close()\nprint('native-team-marker-valid')\n"
 
 
-def run(*, expected_head=None, prepare_baseline=None, pg_baseline_marker='after-dump', metadata_hooks=None, recover_journal=None, orchestrate_recovery=None):
+def run(*, expected_head=None, prepare_baseline=None, pg_baseline_marker='after-dump', metadata_hooks=None, recover_journal=None, orchestrate_recovery=None, capture_boundary=None):
+    require(capture_boundary is None or (callable(capture_boundary) and orchestrate_recovery is not None))
     require(orchestrate_recovery is None or (callable(orchestrate_recovery) and metadata_hooks is not None and recover_journal is None))
     require(recover_journal is None or (callable(recover_journal) and metadata_hooks is not None))
     require(metadata_hooks is None or (prepare_baseline is not None and isinstance(metadata_hooks, dict)
@@ -121,14 +122,31 @@ def run(*, expected_head=None, prepare_baseline=None, pg_baseline_marker='after-
             app, _ = fence.names(identifier, 'teamarr')
             require(team_base.docker('exec', app, 'python3', '-B', '-c', team_code(change, consumed), timeout=30) == 'native-team-marker-valid')
         try:
-            phase = 'baseline-native-start'; old_id = volumes(); apps(old_id, seed=True); markers(old_id, baseline='after-dump')
-            journal(first); fence.arm(first, old_id); fence.detach(first)
-            phase = 'baseline-native-capture'; native.capture(first, work/'baseline', 'after-dump')
-            print('NATIVE_STOPPED_BASELINE_CAPTURE=PASS', flush=True)
-            if prepare_baseline is not None:
-                phase = 'strict-dump-preparation'
-                prepare_baseline(native, first, work/'baseline', cold, dispatch)
-                print('STRICT_DUMP_BASELINE_PREPARATION=PASS', flush=True)
+            phase = 'baseline-native-start'; old_id = volumes(); apps(old_id, seed=capture_boundary is None)
+            if capture_boundary is None: markers(old_id, baseline='after-dump')
+            captured_baseline = []
+            def capture_baseline():
+                nonlocal phase
+                require(not captured_baseline)
+                captured_baseline.append(False)
+                if capture_boundary is not None:
+                    # Native dump/SQLite seed capture must occur after the four-writer stop proof.
+                    app, _ = fence.names(old_id, 'dispatcharr')
+                    require(cold.docker('exec', '--user', '1000:1000', app, 'python3', '-B', '-c', cold.SNAPSHOT, timeout=60) == 'snapshot-captured')
+                    app, _ = fence.names(old_id, 'teamarr')
+                    require(team_base.docker('exec', app, 'python3', '-B', '-c', team.SEED, timeout=30) == 'snapshot-captured')
+                    markers(old_id, baseline='after-dump')
+                journal(first); fence.arm(first, old_id); fence.detach(first)
+                phase = 'baseline-native-capture'; native.capture(first, work/'baseline', 'after-dump')
+                print('NATIVE_STOPPED_BASELINE_CAPTURE=PASS', flush=True)
+                if prepare_baseline is not None:
+                    phase = 'strict-dump-preparation'
+                    prepare_baseline(native, first, work/'baseline', cold, dispatch)
+                    print('STRICT_DUMP_BASELINE_PREPARATION=PASS', flush=True)
+                captured_baseline[0] = True
+            if capture_boundary is None: capture_baseline()
+            else: capture_boundary(native, work/'baseline', capture_baseline)
+            require(captured_baseline == [True])
             fixture.fixture(current); native.install_baseline(current, work/'baseline')
             if metadata_hooks is not None: metadata_hooks['initialize'](native, current)
             consumer.arm(current)
@@ -192,14 +210,14 @@ def run(*, expected_head=None, prepare_baseline=None, pg_baseline_marker='after-
                     and git('/opt/project-atlas', 'rev-parse', 'HEAD') == checkpoint_head
                     and not git('/opt/project-atlas', 'status', '--porcelain=v1'))
             require(failures == 0)
-    print(json.dumps({'version': 1, 'scope': ('synthetic-maintenance-native-recovery' if orchestrate_recovery is not None else 'synthetic-combined-consumption-interruptions' if recover_journal is not None else 'synthetic-atlas-metadata-consumption' if metadata_hooks is not None else 'synthetic-strict-dump-consumption' if prepare_baseline is not None else 'synthetic-native-cold-checkpoint-consumption'),
+    print(json.dumps({'version': 1, 'scope': ('synthetic-four-writer-native-backup-fence' if capture_boundary is not None else 'synthetic-maintenance-native-recovery' if orchestrate_recovery is not None else 'synthetic-combined-consumption-interruptions' if recover_journal is not None else 'synthetic-atlas-metadata-consumption' if metadata_hooks is not None else 'synthetic-strict-dump-consumption' if prepare_baseline is not None else 'synthetic-native-cold-checkpoint-consumption'),
         'native_database_commits': True, 'detached_capture_import': True, 'teamarr_copied_wal': copied_wal,
         'modified_native_state_quarantined': True, 'baseline_native_restart': True,
         'restored_persistence_restart': True, 'jwt_preserved': True,
-        'maintenance_abort_orchestration': orchestrate_recovery is not None, 'combined_recovery_interruptions': recover_journal is not None, 'atlas_metadata_and_policy': metadata_hooks is not None, 'direct_native_writes_to_journal': False, 'strict_dump_prepare_in_this_drill': prepare_baseline is not None,
+        'four_writer_capture_fence': capture_boundary is not None, 'maintenance_abort_orchestration': orchestrate_recovery is not None, 'combined_recovery_interruptions': recover_journal is not None, 'atlas_metadata_and_policy': metadata_hooks is not None, 'direct_native_writes_to_journal': False, 'strict_dump_prepare_in_this_drill': prepare_baseline is not None,
         'production_state_access': False, 'live_restore_enabled': False}, sort_keys=True))
-    print('SYNTHETIC_MAINTENANCE_RECOVERY_DRILL=PASS' if orchestrate_recovery is not None else 'SYNTHETIC_CONSUMPTION_INTERRUPTION_DRILL=PASS' if recover_journal is not None else 'SYNTHETIC_METADATA_CONSUMPTION_DRILL=PASS' if metadata_hooks is not None else 'SYNTHETIC_STRICT_CONSUMPTION_DRILL=PASS' if prepare_baseline is not None else 'SYNTHETIC_NATIVE_CONSUMPTION_DRILL=PASS')
-    print('STATE=isolated-maintenance-native-recovery-not-deployed' if orchestrate_recovery is not None else 'STATE=isolated-combined-consumption-interruptions-not-deployed' if recover_journal is not None else 'STATE=isolated-Atlas-metadata-consumption-not-deployed' if metadata_hooks is not None else 'STATE=isolated-strict-dump-consumption-not-deployed' if prepare_baseline is not None else 'STATE=isolated-native-cold-checkpoint-recovery-not-deployed')
+    print('SYNTHETIC_BACKUP_FENCE_DRILL=PASS' if capture_boundary is not None else 'SYNTHETIC_MAINTENANCE_RECOVERY_DRILL=PASS' if orchestrate_recovery is not None else 'SYNTHETIC_CONSUMPTION_INTERRUPTION_DRILL=PASS' if recover_journal is not None else 'SYNTHETIC_METADATA_CONSUMPTION_DRILL=PASS' if metadata_hooks is not None else 'SYNTHETIC_STRICT_CONSUMPTION_DRILL=PASS' if prepare_baseline is not None else 'SYNTHETIC_NATIVE_CONSUMPTION_DRILL=PASS')
+    print('STATE=isolated-four-writer-native-backup-fence-not-deployed' if capture_boundary is not None else 'STATE=isolated-maintenance-native-recovery-not-deployed' if orchestrate_recovery is not None else 'STATE=isolated-combined-consumption-interruptions-not-deployed' if recover_journal is not None else 'STATE=isolated-Atlas-metadata-consumption-not-deployed' if metadata_hooks is not None else 'STATE=isolated-strict-dump-consumption-not-deployed' if prepare_baseline is not None else 'STATE=isolated-native-cold-checkpoint-recovery-not-deployed')
 
 
 def main():
