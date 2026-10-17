@@ -49,7 +49,10 @@ def team_code(change=False, consumed=False):
         " assert c.execute('SELECT marker FROM atlas_teamarr_probe ORDER BY id').fetchall()==[("+repr(marker)+",)]\nfinally:c.close()\nprint('native-team-marker-valid')\n"
 
 
-def run(*, expected_head=None, prepare_baseline=None, pg_baseline_marker='after-dump'):
+def run(*, expected_head=None, prepare_baseline=None, pg_baseline_marker='after-dump', metadata_hooks=None):
+    require(metadata_hooks is None or (prepare_baseline is not None and isinstance(metadata_hooks, dict)
+        and set(metadata_hooks) == {'initialize', 'mutate', 'verify'}
+        and all(callable(value) for value in metadata_hooks.values())))
     require((expected_head is None and prepare_baseline is None and pg_baseline_marker == 'after-dump')
         or (isinstance(expected_head, str) and len(expected_head) == 40
             and all(c in '0123456789abcdef' for c in expected_head)
@@ -124,11 +127,14 @@ def run(*, expected_head=None, prepare_baseline=None, pg_baseline_marker='after-
                 phase = 'strict-dump-preparation'
                 prepare_baseline(native, first, work/'baseline', cold, dispatch)
                 print('STRICT_DUMP_BASELINE_PREPARATION=PASS', flush=True)
-            fixture.fixture(current); native.install_baseline(current, work/'baseline'); consumer.arm(current)
+            fixture.fixture(current); native.install_baseline(current, work/'baseline')
+            if metadata_hooks is not None: metadata_hooks['initialize'](native, current)
+            consumer.arm(current)
             original = pub.read_json(current/'transaction/PLAN.json')['surfaces']
             phase = 'consumer-native-start'; changed_id = volumes(); native.materialize(work/'baseline', changed_id); apps(changed_id)
             fence.arm(current, changed_id)
             markers(changed_id, consumed=True, change=True)
+            if metadata_hooks is not None: metadata_hooks['mutate'](native, current)
             print('NATIVE_DATABASE_COMMITS=PASS', flush=True)
             phase = 'detach-and-capture-writes'; fence.detach(current)
             native.capture(current, work/'captured', 'native-consumer-committed')
@@ -137,6 +143,7 @@ def run(*, expected_head=None, prepare_baseline=None, pg_baseline_marker='after-
             phase = 'import-and-recover'; native.import_writes(current, work/'captured')
             # WAL snapshot import is complete before any recovery operation.
             native.recover(current); native.recover(current); fixture.verify(current, original)
+            if metadata_hooks is not None: metadata_hooks['verify'](native, current)
             require(pub.digest(current/'current/dispatcharr-jwt') == old_jwt)
             print('NATIVE_WRITES_QUARANTINED_AND_BASELINE_RESTORED=PASS', flush=True)
             phase = 'restored-native-start'; restored_id = volumes(); native.materialize(current/'current', restored_id)
@@ -152,6 +159,7 @@ def run(*, expected_head=None, prepare_baseline=None, pg_baseline_marker='after-
                 if role == 'dispatcharr': dispatch.wait_ready(base, app, data, restored_id)
                 else: team.wait_ready(base, app, restored_id, data)
             markers(restored_id)
+            if metadata_hooks is not None: metadata_hooks['verify'](native, current)
             journal(final); fence.arm(final, restored_id); fence.detach(final)
             print('NATIVE_RESTORED_APPLICATION_AND_PERSISTENCE_RESTART=PASS', flush=True)
             copied_wal = pub.read_json(work/'captured/CAPTURE.json')['copied_wal']
@@ -169,14 +177,14 @@ def run(*, expected_head=None, prepare_baseline=None, pg_baseline_marker='after-
                     and git('/opt/project-atlas', 'rev-parse', 'HEAD') == checkpoint_head
                     and not git('/opt/project-atlas', 'status', '--porcelain=v1'))
             require(failures == 0)
-    print(json.dumps({'version': 1, 'scope': ('synthetic-strict-dump-consumption' if prepare_baseline is not None else 'synthetic-native-cold-checkpoint-consumption'),
+    print(json.dumps({'version': 1, 'scope': ('synthetic-atlas-metadata-consumption' if metadata_hooks is not None else 'synthetic-strict-dump-consumption' if prepare_baseline is not None else 'synthetic-native-cold-checkpoint-consumption'),
         'native_database_commits': True, 'detached_capture_import': True, 'teamarr_copied_wal': copied_wal,
         'modified_native_state_quarantined': True, 'baseline_native_restart': True,
         'restored_persistence_restart': True, 'jwt_preserved': True,
-        'direct_native_writes_to_journal': False, 'strict_dump_prepare_in_this_drill': prepare_baseline is not None,
+        'atlas_metadata_and_policy': metadata_hooks is not None, 'direct_native_writes_to_journal': False, 'strict_dump_prepare_in_this_drill': prepare_baseline is not None,
         'production_state_access': False, 'live_restore_enabled': False}, sort_keys=True))
-    print('SYNTHETIC_STRICT_CONSUMPTION_DRILL=PASS' if prepare_baseline is not None else 'SYNTHETIC_NATIVE_CONSUMPTION_DRILL=PASS')
-    print('STATE=isolated-strict-dump-consumption-not-deployed' if prepare_baseline is not None else 'STATE=isolated-native-cold-checkpoint-recovery-not-deployed')
+    print('SYNTHETIC_METADATA_CONSUMPTION_DRILL=PASS' if metadata_hooks is not None else 'SYNTHETIC_STRICT_CONSUMPTION_DRILL=PASS' if prepare_baseline is not None else 'SYNTHETIC_NATIVE_CONSUMPTION_DRILL=PASS')
+    print('STATE=isolated-Atlas-metadata-consumption-not-deployed' if metadata_hooks is not None else 'STATE=isolated-strict-dump-consumption-not-deployed' if prepare_baseline is not None else 'STATE=isolated-native-cold-checkpoint-recovery-not-deployed')
 
 
 def main():
