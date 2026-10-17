@@ -1,13 +1,13 @@
 # Sports recovery implementation and acceptance ledger
 
-Checkpoint: 2026-10-17. This ledger is a documentation draft for the next reviewed
-candidate; it is not yet committed to canonical main. User-run CT100 outputs are
+Checkpoint: 2026-10-17. This ledger was introduced through RC PR356/main PR357. Subsequent candidate
+sections distinguish accepted evidence from pending verification. User-run CT100 outputs are
 the evidence for the completed checkpoints below.
 
 ## Current accepted source and production boundary
 
-- Clean canonical main: `6a46f68885b6196e8b1f16671f2bf0f9539066bb`.
-- RC1: `3b2a574e890b67975cb43cfb75d11d0bbec3aab3`.
+- Clean canonical main: `8955da81021ea9290b52215e29008578e1a86cf2`.
+- RC1: `06bab88a37e08b84e55f4326e24f4d84adefd6fd`.
 - Version: `1.0.0-rc.1`; no final v1.0.0 release has been performed here.
 - Deployment pointer: `update-20261015T211211Z-632971`, unchanged.
 - Production refresh and live restore remain disabled. Source synchronization is
@@ -28,6 +28,7 @@ the evidence for the completed checkpoints below.
 | Archived writer startup | 350 / 351 | a450e39f / 88b7d63a | Actual writer startup, authentication, disabled policy and persistent registry restart on archived metadata |
 | Archived broker accounting | 352 / 353 | 132a00b4 / 7d2467ff | Reservation visible before one synthetic fetch; persistent cache and quota across restart |
 | Refresh shutdown | 354 / 355 | 3b2a574e / 6a46f688 | Real refresh worker and bounded child completion/deadline during SIGTERM; child reaped before writer exit; no post-stop admissions |
+| Actual four-service lifecycle | 356 / 357 | 06bab88a / 8955da81 | Actual default-command application fixtures quiesced around native capture, clean restart and notification cursor persistence |
 
 Each gate has its own SPORTS_* operation document, diagnostic, helper and core
 tests. Read those files for algorithms, receipt schemas and fixture boundaries;
@@ -86,9 +87,9 @@ hash, identity, ownership, failure and receipt requirements.
 
 ## Outstanding operational work
 
-- Exercise the actual API, Sports controller, notifications worker and Sports
-  writer applications in private fixtures through quiescence and restart. Existing
-  four-counter proxies do not prove actual service lifecycle behavior.
+- Extend the completed actual four-application fixture lifecycle acceptance to
+  enabled provider work, remote delivery and full production deployment contracts.
+  The existing private default-command stop/capture/restart gate passed.
 - Integrate full sixteen-surface operational restore and partial setup/import
   failure handling; a synthetic sixteen-surface archive does not prove all real
   applications recover successfully.
@@ -116,7 +117,7 @@ and remaining limitations. The eventual system guide should explain normal
 operation, data ownership, backup/recovery ordering, failure handling and operator
 runbooks using this evidence and the individual operation documents.
 
-## Four-service lifecycle candidate (not yet accepted)
+## Four-service lifecycle acceptance
 
 Read-only runtime inventory at main6a46f688 reported all four actual services
 running and Docker-healthy, with before/after identity/configuration/mount stability.
@@ -125,7 +126,7 @@ Source ZIP at that checkpoint: 567 committed files, SHA256
 The candidate adds explicit controller TERM/INT stop and notifications idle-stop
 handling, and replaces the counter fence with actual default-command application
 fixtures. CT100 mapped-identity tests and the combined diagnostic passed on 2026-10-17.
-The RC1 and main PR CI/merge steps remain pending at this evidence checkpoint. See SPORTS_FOUR_SERVICE_LIFECYCLE.md for exact scope and limits.
+The RC1 and main PR CI/merge steps were pending at the original CT evidence checkpoint; both subsequently passed six checks and merged. See SPORTS_FOUR_SERVICE_LIFECYCLE.md for exact scope and limits.
 
 
 ### CT100 four-service acceptance evidence (2026-10-17)
@@ -149,3 +150,52 @@ The RC1 and main PR CI/merge steps remain pending at this evidence checkpoint. S
   `update-20261015T211211Z-632971`. Candidate source was uncommitted at test time.
 - This closes the private actual-application capture-fence acceptance, not enabled
   provider/remote delivery workflows or full sixteen-surface operational restore.
+
+
+### Four-service merge and synchronization evidence
+
+Source `1fba0013f3e9444157e679386eb2fcf89bb66e11`; RC head
+`9869acd4209671df1cba4b8d752f02125c070b39`. RC PR356 squash
+`06bab88a37e08b84e55f4326e24f4d84adefd6fd`; main PR357 squash
+`8955da81021ea9290b52215e29008578e1a86cf2`. Each PR passed six release
+checks. Seven file objects/modes matched source/RC/main; canonical main was
+fast-forwarded cleanly. Deployment remained update-20261015T211211Z-632971.
+The controller/notifications shutdown code is source-synced; this was not an
+image build or production restart. Source-mounted running services may read
+canonical files on subsequent starts, so source synchronization is not a claim
+that all running processes execute a new version.
+
+## Sixteen-registry restore candidate (CT100 accepted; CI pending)
+
+See SPORTS_REGISTRY_RESTORE.md. This candidate replaces generic archive registry
+placeholder payloads with valid empty consumer schemas plus one event/subscriber,
+stages the same real format3 archive and exercises all sixteen private registry
+row replacements, consumer readback, held setup/row/copy failures and validation
+refusal. Existing production format3 planning stays blocked. This is not a single
+crash-safe production transaction spanning native, metadata and registry state;
+full operational activation and populated-data migration remain separate gates.
+CT100 numeric-identity tests, the full core suite and the combined native
+diagnostic passed on 2026-10-17. RC1 and main CI/merge remain pending at this
+evidence checkpoint.
+
+
+### CT100 sixteen-registry acceptance evidence (2026-10-17)
+
+- Core Python: 5,458 tests and 874 subtests passed.
+- UID/GID1000 registry/four-service tests, with supplementary groups cleared:
+  24 tests and 49 subtests passed.
+- All seventeen setup/completed-row boundaries0 through16 passed held rollback
+  acceptance. Prepared-copy failure reverted; consumer refusal retained held
+  maintenance and rollback; successful replacement validated fifteen consumer
+  groups covering sixteen surfaces and finalized only after acceptance.
+- Both optional surfaces were captured in the combined format3 archive. Its SHA256:
+  `b679a4000e9ec1244ae496fecea4d74119f0c4a0a7cbb29e6a04d5e1a89de890`.
+- SAME_ARCHIVE_SIXTEEN_REGISTRY_NATIVE_METADATA_BINDING passed. Actual four-service
+  stop/capture/restart, notification cursor, native quarantine/rollback/persistence,
+  writer authentication, broker accounting, both refresh shutdown cases in both
+  verification phases, and maintenance acceptance/release passed.
+- Production format3 planning remained blocked. Full production operational restore
+  and power-loss recovery were explicitly false in the diagnostic receipt.
+- Canonical main stayed clean at8955da81; active deployment remained
+  `update-20261015T211211Z-632971`. Source was uncommitted at test time. Only this
+  documentation evidence update follows those tests; executable code is unchanged.
