@@ -49,7 +49,8 @@ def team_code(change=False, consumed=False):
         " assert c.execute('SELECT marker FROM atlas_teamarr_probe ORDER BY id').fetchall()==[("+repr(marker)+",)]\nfinally:c.close()\nprint('native-team-marker-valid')\n"
 
 
-def run(*, expected_head=None, prepare_baseline=None, pg_baseline_marker='after-dump', metadata_hooks=None):
+def run(*, expected_head=None, prepare_baseline=None, pg_baseline_marker='after-dump', metadata_hooks=None, recover_journal=None):
+    require(recover_journal is None or (callable(recover_journal) and metadata_hooks is not None))
     require(metadata_hooks is None or (prepare_baseline is not None and isinstance(metadata_hooks, dict)
         and set(metadata_hooks) == {'initialize', 'mutate', 'verify'}
         and all(callable(value) for value in metadata_hooks.values())))
@@ -142,7 +143,9 @@ def run(*, expected_head=None, prepare_baseline=None, pg_baseline_marker='after-
             require(pub.digest(work/'captured/dispatcharr-jwt') == old_jwt)
             phase = 'import-and-recover'; native.import_writes(current, work/'captured')
             # WAL snapshot import is complete before any recovery operation.
-            native.recover(current); native.recover(current); fixture.verify(current, original)
+            if recover_journal is None: native.recover(current); native.recover(current)
+            else: recover_journal(native, current)
+            fixture.verify(current, original)
             if metadata_hooks is not None: metadata_hooks['verify'](native, current)
             require(pub.digest(current/'current/dispatcharr-jwt') == old_jwt)
             print('NATIVE_WRITES_QUARANTINED_AND_BASELINE_RESTORED=PASS', flush=True)
@@ -177,14 +180,14 @@ def run(*, expected_head=None, prepare_baseline=None, pg_baseline_marker='after-
                     and git('/opt/project-atlas', 'rev-parse', 'HEAD') == checkpoint_head
                     and not git('/opt/project-atlas', 'status', '--porcelain=v1'))
             require(failures == 0)
-    print(json.dumps({'version': 1, 'scope': ('synthetic-atlas-metadata-consumption' if metadata_hooks is not None else 'synthetic-strict-dump-consumption' if prepare_baseline is not None else 'synthetic-native-cold-checkpoint-consumption'),
+    print(json.dumps({'version': 1, 'scope': ('synthetic-combined-consumption-interruptions' if recover_journal is not None else 'synthetic-atlas-metadata-consumption' if metadata_hooks is not None else 'synthetic-strict-dump-consumption' if prepare_baseline is not None else 'synthetic-native-cold-checkpoint-consumption'),
         'native_database_commits': True, 'detached_capture_import': True, 'teamarr_copied_wal': copied_wal,
         'modified_native_state_quarantined': True, 'baseline_native_restart': True,
         'restored_persistence_restart': True, 'jwt_preserved': True,
-        'atlas_metadata_and_policy': metadata_hooks is not None, 'direct_native_writes_to_journal': False, 'strict_dump_prepare_in_this_drill': prepare_baseline is not None,
+        'combined_recovery_interruptions': recover_journal is not None, 'atlas_metadata_and_policy': metadata_hooks is not None, 'direct_native_writes_to_journal': False, 'strict_dump_prepare_in_this_drill': prepare_baseline is not None,
         'production_state_access': False, 'live_restore_enabled': False}, sort_keys=True))
-    print('SYNTHETIC_METADATA_CONSUMPTION_DRILL=PASS' if metadata_hooks is not None else 'SYNTHETIC_STRICT_CONSUMPTION_DRILL=PASS' if prepare_baseline is not None else 'SYNTHETIC_NATIVE_CONSUMPTION_DRILL=PASS')
-    print('STATE=isolated-Atlas-metadata-consumption-not-deployed' if metadata_hooks is not None else 'STATE=isolated-strict-dump-consumption-not-deployed' if prepare_baseline is not None else 'STATE=isolated-native-cold-checkpoint-recovery-not-deployed')
+    print('SYNTHETIC_CONSUMPTION_INTERRUPTION_DRILL=PASS' if recover_journal is not None else 'SYNTHETIC_METADATA_CONSUMPTION_DRILL=PASS' if metadata_hooks is not None else 'SYNTHETIC_STRICT_CONSUMPTION_DRILL=PASS' if prepare_baseline is not None else 'SYNTHETIC_NATIVE_CONSUMPTION_DRILL=PASS')
+    print('STATE=isolated-combined-consumption-interruptions-not-deployed' if recover_journal is not None else 'STATE=isolated-Atlas-metadata-consumption-not-deployed' if metadata_hooks is not None else 'STATE=isolated-strict-dump-consumption-not-deployed' if prepare_baseline is not None else 'STATE=isolated-native-cold-checkpoint-recovery-not-deployed')
 
 
 def main():
