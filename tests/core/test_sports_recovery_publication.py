@@ -230,4 +230,18 @@ class RecoveryPublicationTests(unittest.TestCase):
         path.write_bytes(raw)
 
 
+
+
+class ConsumptionMarkerGuardTests(unittest.TestCase):
+    def test_generic_context_refuses_directory_or_link_consumer_marker(self):
+        with tempfile.TemporaryDirectory(prefix='project-atlas-sports-publication.',dir='/tmp') as temporary:
+            root=Path(temporary);(root/'current').mkdir(mode=0o700)
+            marker=root/'consumption';marker.mkdir(mode=0o700)
+            with self.assertRaises(publication.PublicationError):
+                with publication.locked(root):self.fail('consumer marker accepted')
+            marker.rmdir();marker.symlink_to(root/'missing')
+            with self.assertRaises(publication.PublicationError):
+                with publication.locked(root):self.fail('consumer marker link accepted')
+
+
 if __name__ == '__main__': unittest.main()
