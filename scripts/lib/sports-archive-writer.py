@@ -90,7 +90,8 @@ def stage_source(native, target):
     require(sorted(copies) == sorted(expected))
     target.mkdir(mode=0o755)
     for name, source in source_inputs().items():
-        out = target/name; native.copy_tree(source, out, source.is_dir())
+        out = target/name
+        native.copy_tree(source, out, source.is_dir(), target_owner=(os.geteuid(), os.getegid()))
         for path in [out, *out.rglob('*')] if out.is_dir() else [out]:
             path.chmod(0o755 if path.is_dir() else 0o644)
     native.pub.sync(target)

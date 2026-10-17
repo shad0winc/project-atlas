@@ -25,6 +25,10 @@ point. This tests current application code in the installed writer runtime; it d
 not claim the deployed image already embeds that code or prove a new production
 image build. No package installation or Internet access is required.
 
+Source staging retains the invoking operator's UID/GID, so the same checked copy
+works on unprivileged CI runners without requesting root ownership. Numeric
+UID/GID1000 mapping remains specific to CT100 container data, not source staging.
+
 The source copy is private to this fixture. Inside the container it is readable by
 UID1000 and read-only. The four normal startup registries use a new UID1000-owned
 /state directory. No production state, canary, provider credentials or configuration

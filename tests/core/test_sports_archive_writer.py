@@ -105,6 +105,8 @@ class RealApplicationStartup(unittest.TestCase):
             self.assertEqual({p.name for p in source.iterdir()},set(support.source_inputs()))
             for name, original in support.source_inputs().items():
                 self.assertEqual(native.shape(source/name,original.is_dir()),native.shape(original,original.is_dir()))
+                for entry in [source/name, *(source/name).rglob('*')] if (source/name).is_dir() else [source/name]:
+                    self.assertEqual((entry.stat().st_uid,entry.stat().st_gid),(os.geteuid(),os.getegid()))
             state=root/'state';state.mkdir(mode=0o700)
             policy=root/'refresh.json';policy.write_text('{"version":1,"enabled":false}\n');policy.chmod(0o600)
             with socket.socket() as sock:sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]
