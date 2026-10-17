@@ -24,14 +24,38 @@ echo "Subscriber: $SUBSCRIBER"
 echo "Interval:   ${PROCESS_INTERVAL}s"
 echo
 
-while true; do
+# Finish the current subscriber batch before exiting. Do not advance its cursor
+# independently of the existing successful processing path.
+stopping=0
+sleep_pid=""
+request_stop() {
+  stopping=1
+  if [[ -n "$sleep_pid" ]]; then
+    kill -TERM "$sleep_pid" 2>/dev/null || true
+  fi
+}
+trap request_stop TERM INT
+
+while [[ "$stopping" == 0 ]]; do
   if ! atlas_event_subscriber_process \
       "$SUBSCRIBER" \
       "$PROCESSOR" >/dev/null; then
     echo "WARN Notifications processing failed; events remain pending." >&2
   fi
 
+  [[ "$stopping" == 0 ]] || break
   touch "$WORKER_HEARTBEAT"
 
-  sleep "$PROCESS_INTERVAL"
+  sleep "$PROCESS_INTERVAL" &
+  sleep_pid=$!
+  if [[ "$stopping" == 1 ]]; then
+    kill -TERM "$sleep_pid" 2>/dev/null || true
+  fi
+  if ! wait "$sleep_pid"; then
+    [[ "$stopping" == 1 ]] || exit 1
+  fi
+  # Reap an interrupted sleep before the worker exits.
+  wait "$sleep_pid" 2>/dev/null || true
+  sleep_pid=""
 done
+exit 0

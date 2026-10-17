@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+import signal
+import threading
 import sys
 import time
 from datetime import datetime, timezone
@@ -977,36 +979,45 @@ def run_cycle() -> int:
 
 def main() -> int:
     once = "--once" in sys.argv[1:]
+    stopping = threading.Event()
 
-    while True:
-        try:
-            result = run_cycle()
+    def request_stop(signum: int, frame: Any) -> None:
+        stopping.set()
 
-        except Exception as exc:
-            print(
-                f"Sports worker cycle failed: {exc}",
-                file=sys.stderr,
-            )
-
-            write_heartbeat()
-
+    previous_handlers = {
+        signum: signal.signal(signum, request_stop)
+        for signum in (signal.SIGTERM, signal.SIGINT)
+    }
+    try:
+        while not stopping.is_set():
             try:
-                write_health_report()
-            except Exception as health_exc:
+                result = run_cycle()
+
+            except Exception as exc:
                 print(
-                    "Unable to write Sports "
-                    f"health report: {health_exc}",
+                    f"Sports worker cycle failed: {exc}",
                     file=sys.stderr,
                 )
+                write_heartbeat()
+                try:
+                    write_health_report()
+                except Exception as health_exc:
+                    print(
+                        "Unable to write Sports "
+                        f"health report: {health_exc}",
+                        file=sys.stderr,
+                    )
+                result = 1
 
-            result = 1
-
-        if once:
-            return result
-
-        time.sleep(
-            CONTROLLER_INTERVAL_SECONDS
-        )
+            if once:
+                return result
+            # Finish an admitted cycle, then refuse another cycle after stop.
+            # Event.wait also interrupts a long idle polling interval promptly.
+            stopping.wait(CONTROLLER_INTERVAL_SECONDS)
+        return 0
+    finally:
+        for signum, handler in previous_handlers.items():
+            signal.signal(signum, handler)
 
 
 if __name__ == "__main__":
