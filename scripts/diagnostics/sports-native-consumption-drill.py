@@ -23,9 +23,10 @@ def load(name, relative):
     module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module); return module
 
 
-def pg_code(change=False, consumed=False):
-    marker = 'native-consumer-committed' if consumed else 'after-dump'
-    return r'''
+def pg_code(change=False, consumed=False, baseline='after-dump'):
+    require(baseline in {'after-dump', 'snapshot'})
+    marker = 'native-consumer-committed' if consumed else baseline
+    code = r'''
 import subprocess
 base=['/usr/lib/postgresql/17/bin/psql','-XAt','-h','/var/run/postgresql',
     '-U','dispatch','-d','atlas_cold_drill','-v','ON_ERROR_STOP=1']
@@ -38,6 +39,8 @@ assert sql("SELECT marker FROM atlas_cold_copy_probe WHERE id=1")=='after-dump'
 sql("BEGIN; UPDATE atlas_cold_copy_probe SET marker='native-consumer-committed' WHERE id=1; CREATE TABLE atlas_after_native_cutover(id integer); INSERT INTO atlas_after_native_cutover VALUES(1); COMMIT")
 ''' if change else '') + "\nassert sql(\"SELECT marker FROM atlas_cold_copy_probe WHERE id=1\")=="+repr(marker)+"\nassert sql(\"SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tablename='atlas_after_native_cutover'\")=="+repr('1' if consumed else '0')+"\nprint('native-pg-marker-valid')\n"
 
+    return code.replace("=='after-dump'", "=="+repr(baseline))
+
 
 def team_code(change=False, consumed=False):
     marker = 'native-consumer-committed' if consumed else 'after-dump'
@@ -46,7 +49,12 @@ def team_code(change=False, consumed=False):
         " assert c.execute('SELECT marker FROM atlas_teamarr_probe ORDER BY id').fetchall()==[("+repr(marker)+",)]\nfinally:c.close()\nprint('native-team-marker-valid')\n"
 
 
-def run():
+def run(*, expected_head=None, prepare_baseline=None, pg_baseline_marker='after-dump'):
+    require((expected_head is None and prepare_baseline is None and pg_baseline_marker == 'after-dump')
+        or (isinstance(expected_head, str) and len(expected_head) == 40
+            and all(c in '0123456789abcdef' for c in expected_head)
+            and callable(prepare_baseline) and pg_baseline_marker == 'snapshot'))
+    checkpoint_head = HEAD if expected_head is None else expected_head
     for name, digest in PINS.items():
         path = ROOT/name
         require(path.is_file() and not path.is_symlink() and hashlib.sha256(path.read_bytes()).hexdigest() == digest)
@@ -60,8 +68,8 @@ def run():
     cold.LABEL = fence.LABEL; team_base = team.utilities(ROOT); team_base.LABEL = fence.LABEL
     bases = {'dispatcharr': cold, 'teamarr': team_base}
     def git(path, *args): return cold.invoke('git', '-C', str(path), *args).stdout.decode().strip()
-    require(git(ROOT, 'rev-parse', 'HEAD') == HEAD
-        and git('/opt/project-atlas', 'rev-parse', 'HEAD') == HEAD
+    require(git(ROOT, 'rev-parse', 'HEAD') == checkpoint_head
+        and git('/opt/project-atlas', 'rev-parse', 'HEAD') == checkpoint_head
         and git('/opt/project-atlas', 'branch', '--show-current') == 'main'
         and not git('/opt/project-atlas', 'status', '--porcelain=v1'))
     pointer = Path('/mnt/storage/configs/atlas/deployments/current')
@@ -102,16 +110,20 @@ def run():
                 else:
                     team.wait_ready(base, app, identifier, data)
                     if seed: require(base.docker('exec', app, 'python3', '-B', '-c', team.SEED, timeout=30) == 'snapshot-captured')
-        def markers(identifier, consumed=False, change=False):
+        def markers(identifier, consumed=False, change=False, baseline=pg_baseline_marker):
             app, _ = fence.names(identifier, 'dispatcharr')
-            require(cold.docker('exec', '--user', '1000:1000', app, 'python3', '-B', '-c', pg_code(change, consumed), timeout=30) == 'native-pg-marker-valid')
+            require(cold.docker('exec', '--user', '1000:1000', app, 'python3', '-B', '-c', pg_code(change, consumed, baseline), timeout=30) == 'native-pg-marker-valid')
             app, _ = fence.names(identifier, 'teamarr')
             require(team_base.docker('exec', app, 'python3', '-B', '-c', team_code(change, consumed), timeout=30) == 'native-team-marker-valid')
         try:
-            phase = 'baseline-native-start'; old_id = volumes(); apps(old_id, seed=True); markers(old_id)
+            phase = 'baseline-native-start'; old_id = volumes(); apps(old_id, seed=True); markers(old_id, baseline='after-dump')
             journal(first); fence.arm(first, old_id); fence.detach(first)
             phase = 'baseline-native-capture'; native.capture(first, work/'baseline', 'after-dump')
             print('NATIVE_STOPPED_BASELINE_CAPTURE=PASS', flush=True)
+            if prepare_baseline is not None:
+                phase = 'strict-dump-preparation'
+                prepare_baseline(native, first, work/'baseline', cold, dispatch)
+                print('STRICT_DUMP_BASELINE_PREPARATION=PASS', flush=True)
             fixture.fixture(current); native.install_baseline(current, work/'baseline'); consumer.arm(current)
             original = pub.read_json(current/'transaction/PLAN.json')['surfaces']
             phase = 'consumer-native-start'; changed_id = volumes(); native.materialize(work/'baseline', changed_id); apps(changed_id)
@@ -154,17 +166,17 @@ def run():
             try: shutil.rmtree(work)
             finally:
                 require(pointer.read_bytes() == before_pointer and observe() == before
-                    and git('/opt/project-atlas', 'rev-parse', 'HEAD') == HEAD
+                    and git('/opt/project-atlas', 'rev-parse', 'HEAD') == checkpoint_head
                     and not git('/opt/project-atlas', 'status', '--porcelain=v1'))
             require(failures == 0)
-    print(json.dumps({'version': 1, 'scope': 'synthetic-native-cold-checkpoint-consumption',
+    print(json.dumps({'version': 1, 'scope': ('synthetic-strict-dump-consumption' if prepare_baseline is not None else 'synthetic-native-cold-checkpoint-consumption'),
         'native_database_commits': True, 'detached_capture_import': True, 'teamarr_copied_wal': copied_wal,
         'modified_native_state_quarantined': True, 'baseline_native_restart': True,
         'restored_persistence_restart': True, 'jwt_preserved': True,
-        'direct_native_writes_to_journal': False, 'strict_dump_prepare_in_this_drill': False,
+        'direct_native_writes_to_journal': False, 'strict_dump_prepare_in_this_drill': prepare_baseline is not None,
         'production_state_access': False, 'live_restore_enabled': False}, sort_keys=True))
-    print('SYNTHETIC_NATIVE_CONSUMPTION_DRILL=PASS')
-    print('STATE=isolated-native-cold-checkpoint-recovery-not-deployed')
+    print('SYNTHETIC_STRICT_CONSUMPTION_DRILL=PASS' if prepare_baseline is not None else 'SYNTHETIC_NATIVE_CONSUMPTION_DRILL=PASS')
+    print('STATE=isolated-strict-dump-consumption-not-deployed' if prepare_baseline is not None else 'STATE=isolated-native-cold-checkpoint-recovery-not-deployed')
 
 
 def main():
