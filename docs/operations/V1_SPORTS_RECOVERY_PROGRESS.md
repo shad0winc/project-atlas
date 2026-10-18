@@ -647,3 +647,57 @@ CT100/full-core verification and promotion remain pending. See
 - This records isolated candidate acceptance. Protected RC/main CI, staged
   image acceptance, managed activation, sustained provider health and accurate
   private/public deployment reconciliation remain required.
+
+## 2026-10-18: tracked-plan transition regression and candidate
+
+Rolling renewal merged through RC PR372 (`4ba8b306...`) and main PR373
+(`a552eb4d...`), passed 66 controller/18 writer image tests, and was activated
+as `repairs/rolling-refresh-jf2op8lu`. Only controller/writer changed; canonical
+remains `f8696d95...`, historical `79cf7374...`, baseline and original failed
+transaction/maintenance/lock remain held.
+
+The sustained watch retained bounded availability for roughly 22 minutes after
+its first completion, observed two full completion markers, then correctly
+rejected acceptance with Provider Health critical. Receipt is
+`sustained-health-789732d152a8.json`. Last usable oldest-response age was
+795.664 seconds; subsequent read-only diagnosis found rate-limit messages and
+a 41-request plan. Logs showed 20 tracked events during 33 usable cycles,
+followed by deferrals, a completion using 19 tracked events, then more deferrals.
+Explicit subscription counts remained 4 event / 1 team / 1 league, but exact
+identifiers must still be checked by the candidate.
+
+An isolated candidate allows per-request observation handoff across tracked-ID
+changes only within identical credentials/day/horizon/explicit-target scope.
+A smaller plan can normalize its entire exact request set from still-fresh
+observations without a cold replay. New missing requests remain incomplete
+until obtained through existing shared admission; no previous plan is claimed
+as complete coverage of a new required request. Original response times,
+900-second freshness, normal cache TTLs, shared budget, upstream cooldown,
+worker publication and health gates are unchanged.
+
+Fourteen new regressions and the preceding 66 focused tests passed locally.
+A deterministic 4,040-second comparison produced five full completion markers
+and 220 HTTP invocations for both variants; unavailable samples following the
+first completion fell from 17 to zero with a tracked-ID contraction. This does
+not certify production continuity or provider capacity. CT100/full-core tests
+and promotion remain pending. See `SPORTS_PROVIDER_PLAN_HANDOFF.md`. Media
+browse remains queued after Sports acceptance and deployment reconciliation.
+
+## CT100 acceptance: 2026-10-18 UTC
+
+- Four frozen candidate postimages and Git/permission modes verified before and
+  after isolated testing; installer applied without correction.
+- UID/GID 1000 with cleared supplementary groups: 80 targeted tests and 30
+  subtests passed in 2.40 seconds.
+- Full core: 5593 tests and 1756 subtests passed in 453.39 seconds.
+- Running rolling-refresh repair, original failed transaction, backup and source
+  archives, active baseline, maintenance and original lock remained unchanged.
+- Candidate installation receipt:
+  /var/tmp/atlas-plan-handoff-candidate-jsm7p82_/receipt.json.
+- The test command reported plan-handoff-tested-uncommitted-not-activated;
+  installation receipt state remains applied-uncommitted-not-activated because
+  that command did not update it. These observed test results are recorded here
+  and in the separate promotion receipt without rewriting installation evidence.
+- Protected RC/main CI, staged image acceptance, managed activation, sustained
+  live acceptance and accurate private/public deployment reconciliation remain
+  separate gates. Media browse remains queued after Sports.
