@@ -5,10 +5,14 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 import time
 from pathlib import Path
 from urllib.error import URLError
 from urllib.request import urlopen
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from atlas.sports_provider_snapshot_health import provider_snapshot_usable
 
 
 def check(name: str, healthy: bool, success: str, failure: str, **details):
@@ -75,7 +79,7 @@ def main() -> int:
         providers = json.loads(provider_file.read_text(encoding="utf-8"))
         provider_count = len(providers)
         providers_healthy = provider_count > 0 and all(
-            item.get("status") == "healthy" for item in providers.values()
+            provider_snapshot_usable(item) for item in providers.values()
         )
     except (OSError, TypeError, ValueError, json.JSONDecodeError):
         pass
