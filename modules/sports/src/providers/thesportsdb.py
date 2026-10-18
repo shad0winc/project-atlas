@@ -672,6 +672,109 @@ class TheSportsDBProvider(SportsProvider):
 
         return leagues[0]
 
+    @staticmethod
+    def _complete_storage_bytes(games, responses, observations) -> int:
+        # Include retained provider payloads as well as normalized games in the
+        # existing total serialized-payload bound. No response may hide here.
+        value = [games, [[key, payload, observations[key]]
+                         for key, payload in responses.items()]]
+        return len(json.dumps(value, separators=(",", ":"), allow_nan=False).encode())
+
+    def _renew_complete_snapshot(self, complete, arguments):
+        """Renew the oldest observations first, retaining full plan coverage.
+
+        A cooldown can interrupt renewal, but never normalization: reconstruct
+        all planned requests from retained responses without additional HTTP.
+        The completion timestamp advances only after every response has a new
+        observation since the preceding full renewal.
+        """
+        responses = copy.deepcopy(complete["responses"])
+        observations = dict(complete["observations"])
+        changed = False
+        deferred = None
+        for key in sorted(responses, key=lambda item: (observations[item], item)):
+            endpoint, parameters = key
+            before = time.monotonic()
+            age = before - observations[key]
+            if not math.isfinite(age) or age < 0:
+                raise RuntimeError("Sports rolling refresh clock is invalid")
+            if age < _cache_ttl_seconds(endpoint):
+                continue
+            try:
+                payload = self.request_json(endpoint, dict(parameters))
+            except SportsProviderRateLimitError as error:
+                deferred = error
+                break
+            if not isinstance(payload, dict):
+                raise RuntimeError("Sports refresh response must be an object")
+            observed = before
+            with _CACHE_LOCK:
+                cached = _RESPONSE_CACHE.get(key)
+                if cached is not None:
+                    cached_observed = cached[0] - _cache_ttl_seconds(endpoint)
+                    if not math.isfinite(cached_observed) or cached_observed > time.monotonic():
+                        raise RuntimeError("Sports refresh cache clock is invalid")
+                    observed = min(observed, cached_observed)
+            if observed < observations[key]:
+                raise RuntimeError("Sports rolling refresh observation regressed")
+            if observed > observations[key]:
+                responses[key] = copy.deepcopy(payload)
+                observations[key] = observed
+                changed = True
+            if self._complete_storage_bytes(complete["games"], responses, observations) > _REFRESH_COMPLETE_MAX_BYTES:
+                raise RuntimeError("Sports rolling refresh memory bound exceeded")
+
+        current = time.monotonic()
+        oldest = min(observations.values(), default=complete["oldest"])
+        epoch = time.time()
+        if (not math.isfinite(current) or not 0 <= current - oldest <= _REFRESH_MAX_AGE_SECONDS
+                or current < complete["completed_monotonic"]
+                or not math.isfinite(epoch) or epoch < complete["completed_epoch"]):
+            raise RuntimeError("Sports rolling refresh observations expired or clock invalid")
+        if changed:
+            used = set()
+            def retained(endpoint, parameters):
+                key = _cache_key(endpoint, parameters)
+                if key not in responses:
+                    raise RuntimeError("Sports rolling refresh plan coverage changed")
+                used.add(key)
+                return copy.deepcopy(responses[key])
+            clone = copy.copy(self)
+            clone.request_json = retained
+            games = clone.fetch_games(**arguments)
+            if used != set(responses):
+                raise RuntimeError("Sports rolling refresh plan coverage changed")
+            size = self._complete_storage_bytes(games, responses, observations)
+            if size > _REFRESH_COMPLETE_MAX_BYTES:
+                raise RuntimeError("Sports rolling refresh memory bound exceeded")
+            current, epoch = time.monotonic(), time.time()
+            if (not math.isfinite(current) or not 0 <= current - oldest <= _REFRESH_MAX_AGE_SECONDS
+                    or current < complete["completed_monotonic"]
+                    or not math.isfinite(epoch) or epoch < complete["completed_epoch"]):
+                raise RuntimeError("Sports rolling refresh observations expired or clock invalid")
+            renewed = bool(observations) and all(
+                observed > complete["completed_monotonic"] for observed in observations.values())
+            if renewed:
+                complete["completed_monotonic"] = current
+                complete["completed_epoch"] = epoch
+                complete["completed_at"] = datetime.fromtimestamp(epoch, timezone.utc).isoformat()
+            # Until full renewal, at least one original observation remains at
+            # or before the unchanged completion time. Age changes reflect real
+            # replaced responses, never a renewed timestamp on a cache hit.
+            age_at_completion = complete["completed_monotonic"] - oldest
+            if age_at_completion < 0:
+                raise RuntimeError("Sports rolling refresh completion age is invalid")
+            complete.update(games=copy.deepcopy(games), responses=responses,
+                observations=observations, oldest=oldest, bytes=size)
+            complete["metadata"]["oldest_response_age_seconds"] = round(age_at_completion, 3)
+        self.last_refresh_snapshot = copy.deepcopy(complete["metadata"])
+        self.last_refresh_completed_at = complete["completed_at"]
+        if deferred is not None:
+            self.last_refresh_deferred = {
+                "reason": "rate-limit", "retry_after_seconds": deferred.retry_after_seconds,
+            }
+        return copy.deepcopy(complete["games"])
+
     def fetch_games_resumable(
         self,
         tracked_event_ids: list[str] | None = None,
@@ -727,9 +830,23 @@ class TheSportsDBProvider(SportsProvider):
             for key, entry in list(_REFRESH_PROGRESS.items()):
                 if not 0 <= now - entry["oldest"] <= _REFRESH_MAX_AGE_SECONDS:
                     del _REFRESH_PROGRESS[key]
+            while sum(item["bytes"] for item in _REFRESH_COMPLETE.values()) > _REFRESH_COMPLETE_MAX_BYTES:
+                _REFRESH_COMPLETE.popitem(last=False)
+            complete = _REFRESH_COMPLETE.get(identity)
+            if complete is not None and "responses" in complete:
+                try:
+                    result = self._renew_complete_snapshot(complete, arguments)
+                    _REFRESH_COMPLETE.move_to_end(identity)
+                    while sum(item["bytes"] for item in _REFRESH_COMPLETE.values()) > _REFRESH_COMPLETE_MAX_BYTES:
+                        _REFRESH_COMPLETE.popitem(last=False)
+                    return result
+                except BaseException:
+                    _REFRESH_PROGRESS.pop(identity, None)
+                    _REFRESH_COMPLETE.pop(identity, None)
+                    raise
             if identity not in _REFRESH_PROGRESS:
                 _REFRESH_PROGRESS[identity] = {
-                    "oldest": now, "responses": {}, "bytes": 0,
+                    "oldest": now, "responses": {}, "observations": {}, "bytes": 0,
                 }
             _REFRESH_PROGRESS.move_to_end(identity)
             while len(_REFRESH_PROGRESS) > _REFRESH_MAX_PLANS:
@@ -768,6 +885,7 @@ class TheSportsDBProvider(SportsProvider):
                 if entry["bytes"] + size > _REFRESH_MAX_BYTES:
                     raise RuntimeError("Sports refresh memory bound exceeded")
                 entry["responses"][key] = copy.deepcopy(payload)
+                entry["observations"][key] = observed
                 entry["bytes"] += size
                 return payload
 
@@ -821,7 +939,7 @@ class TheSportsDBProvider(SportsProvider):
                 self.last_refresh_completed_at = datetime.fromtimestamp(
                     completed_epoch, timezone.utc,
                 ).isoformat()
-                size = len(json.dumps(result, separators=(",", ":"), allow_nan=False).encode())
+                size = self._complete_storage_bytes(result, entry["responses"], entry["observations"])
                 if size <= _REFRESH_COMPLETE_MAX_BYTES:
                     _REFRESH_COMPLETE[identity] = {
                         "oldest": entry["oldest"], "completed_monotonic": time.monotonic(),
@@ -829,6 +947,8 @@ class TheSportsDBProvider(SportsProvider):
                         "completed_at": self.last_refresh_completed_at,
                         "metadata": copy.deepcopy(self.last_refresh_snapshot),
                         "games": copy.deepcopy(result), "bytes": size,
+                        "responses": copy.deepcopy(entry["responses"]),
+                        "observations": dict(entry["observations"]),
                     }
                     while (len(_REFRESH_COMPLETE) > _REFRESH_MAX_PLANS
                            or sum(item["bytes"] for item in _REFRESH_COMPLETE.values()) > _REFRESH_COMPLETE_MAX_BYTES):
