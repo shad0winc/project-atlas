@@ -6,8 +6,8 @@ the evidence for the completed checkpoints below.
 
 ## Current accepted source and production boundary
 
-- Clean canonical main: `8955da81021ea9290b52215e29008578e1a86cf2`.
-- RC1: `06bab88a37e08b84e55f4326e24f4d84adefd6fd`.
+- Clean canonical main: `9f090d75b3cdb3d69f537aa1fe7e2b3b02c3cf02`.
+- RC1: `ac3e69c486b261cc86847877421653692daa4d50`.
 - Version: `1.0.0-rc.1`; no final v1.0.0 release has been performed here.
 - Deployment pointer: `update-20261015T211211Z-632971`, unchanged.
 - Production refresh and live restore remain disabled. Source synchronization is
@@ -29,6 +29,8 @@ the evidence for the completed checkpoints below.
 | Archived broker accounting | 352 / 353 | 132a00b4 / 7d2467ff | Reservation visible before one synthetic fetch; persistent cache and quota across restart |
 | Refresh shutdown | 354 / 355 | 3b2a574e / 6a46f688 | Real refresh worker and bounded child completion/deadline during SIGTERM; child reaped before writer exit; no post-stop admissions |
 | Actual four-service lifecycle | 356 / 357 | 06bab88a / 8955da81 | Actual default-command application fixtures quiesced around native capture, clean restart and notification cursor persistence |
+
+| Sixteen-registry restore | 358 / 359 | ac3e69c4 / 9f090d75 | All sixteen replacements, consumer readback, handled setup/row/copy failure and held validation refusal |
 
 Each gate has its own SPORTS_* operation document, diagnostic, helper and core
 tests. Read those files for algorithms, receipt schemas and fixture boundaries;
@@ -165,7 +167,7 @@ image build or production restart. Source-mounted running services may read
 canonical files on subsequent starts, so source synchronization is not a claim
 that all running processes execute a new version.
 
-## Sixteen-registry restore candidate (CT100 accepted; CI pending)
+## Sixteen-registry restore (merged and source-synced)
 
 See SPORTS_REGISTRY_RESTORE.md. This candidate replaces generic archive registry
 placeholder payloads with valid empty consumer schemas plus one event/subscriber,
@@ -175,8 +177,7 @@ refusal. Existing production format3 planning stays blocked. This is not a singl
 crash-safe production transaction spanning native, metadata and registry state;
 full operational activation and populated-data migration remain separate gates.
 CT100 numeric-identity tests, the full core suite and the combined native
-diagnostic passed on 2026-10-17. RC1 and main CI/merge remain pending at this
-evidence checkpoint.
+diagnostic passed on 2026-10-17. RC1 and main subsequently passed six checks each, merged and synced as recorded below.
 
 
 ### CT100 sixteen-registry acceptance evidence (2026-10-17)
@@ -199,3 +200,59 @@ evidence checkpoint.
 - Canonical main stayed clean at8955da81; active deployment remained
   `update-20261015T211211Z-632971`. Source was uncommitted at test time. Only this
   documentation evidence update follows those tests; executable code is unchanged.
+
+
+### Registry merge and synchronization evidence
+
+Source `6d0b2583daa14407afd7952444a462b9ef38dce8`; RC head
+`b45bcb25c3125a7c9ef820466e8d92f542657f3e`. PR358 RC squash
+`ac3e69c486b261cc86847877421653692daa4d50`; PR359 main squash
+`9f090d75b3cdb3d69f537aa1fe7e2b3b02c3cf02`. Both PRs passed all six
+release checks. Five file objects/modes matched across source and both merges;
+canonical main fast-forwarded cleanly. Deployment remained
+`update-20261015T211211Z-632971`. These are user-reported CT/GitHub results;
+no production deployment or final version/tag was performed.
+
+## Coordinated recovery candidate (CT100 accepted; CI pending)
+
+See SPORTS_COORDINATED_RECOVERY.md for the complete layout/state/receipt protocol.
+The candidate adds a separate private all-captured21-unit journal with durable
+prepare/publish/resume/abort direction, location/hash reconstruction, shared
+reader exclusion and validation-before-release. It composes five representative
+fresh-process deaths on same-archive artifacts with the accepted combined gate.
+The full small-unit matrix covers every publication/undo rename and parent-sync
+boundary. Existing publication5 and production restore code remain unchanged.
+
+This closes no production recovery gate until CT evidence is obtained. Native
+acceptance inside the new private journal is a strict-baseline hash comparison;
+the parent boots matching bytes through its existing separate journal. It does
+not establish direct native volume admission or post-consumer21-unit rollback.
+Optional-absent actions and incomplete offline initialization recovery remain
+outside this journal version. Process-death testing is not power-loss testing.
+Record CT command/results, cleanup, source/RC/main commits and merges here after
+they occur. Do not pre-populate those results from local unit tests.
+
+
+### CT100 coordinated recovery acceptance evidence (2026-10-18 UTC)
+
+- Explicit UID/GID1000 tests with supplementary groups cleared: 14 tests and
+  448 subtests passed in 165.34 seconds. Pytest could not write its optional cache
+  in the root-owned worktree; the warning did not affect test execution/results.
+- Full Core Python: 5,472 tests and 1,322 subtests passed in 334.28 seconds.
+- All five representative same-archive process deaths passed fresh-process
+  resume/abort, repeated invocation, validation and admission acceptance across
+  21 units. Registry, native-baseline and metadata bindings used archive SHA256
+  `4598a898991abc6fb698d98e7cb060ccd68f58a766b730a8f9f38846ed53e3f8`.
+- Actual four-service capture/restart and notification cursor, sixteen-registry
+  handled failures/readback, strict dump preparation, native quarantine/rollback/
+  persistence restart, UID1000 metadata reader, writer authentication, broker
+  accounting, refresh completion/deadline child reaping in both verification
+  phases, and maintenance acceptance/release passed.
+- SYNTHETIC_COORDINATED_RECOVERY_DRILL passed. Canonical checkout remained clean;
+  candidate status was exactly the six intended files, uncommitted at test time.
+- Production live restore and refresh were not enabled. Deployment remained
+  `update-20261015T211211Z-632971`. This proves private process-death acceptance;
+  power loss, direct native mounts of the21-unit journal, post-exposure writes,
+  coherent production snapshots and full operational restore remain unproven.
+- This ledger-only evidence update follows the frozen executable verification.
+  Source commit, RC/main CI/merge and canonical synchronization remain pending.
