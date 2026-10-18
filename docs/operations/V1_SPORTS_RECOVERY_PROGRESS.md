@@ -7,10 +7,11 @@ the evidence for the completed checkpoints below.
 ## Current accepted source and production boundary
 
 - Clean canonical main: `/opt/project-atlas-v1-main`,
-  `79cf73747f9a979ea02fb77446f2fa61df8e3451`.
-- Historical live-mounted source: `/opt/project-atlas`, clean and detached at
-  the same commit; keep frozen and perform development in isolated worktrees.
-- RC1: `604be89938f807530da136281d8fa8d010fdbfca`.
+  `f8696d95bbf4488d95c2243e54c305010ae5b22c`.
+- Historical Notifications source: `/opt/project-atlas`, clean and detached at
+  `79cf73747f9a979ea02fb77446f2fa61df8e3451`; keep frozen. Controller now mounts
+  canonical main read-only. Perform development in isolated worktrees.
+- RC1: `5be6f4bf92fcca0834e4103266cd8a8aec61bc17`.
 - Version: `1.0.0-rc.1`; no final v1.0.0 release has been performed here.
 - Active recovery baseline: `baseline-20261018T035020Z-2649543`, after
   Notifications adoption. Previous baseline `update-20261015T211211Z-632971`
@@ -484,3 +485,83 @@ These observations accept the source/test candidate on CT100; RC/main CI and
 protected merges, activation preflight, production rollout, live provider recovery
 and sustained-use verification are separate pending gates. No update, service
 restart, live restore or final tag was performed by these test commands.
+
+
+## Production provider recovery attempt and free-key progress candidate
+
+RC PR366 merged `5be6f4bf92fcca0834e4103266cd8a8aec61bc17` at
+2026-10-18T04:45:21Z; main PR367 merged
+`f8696d95bbf4488d95c2243e54c305010ae5b22c` at04:53:05Z. Source
+`15d2bc4895616c8ffde9b580748559e5162c626e` and RC head
+`98990c1dbfb9636858a34020577addee7a3e08dd` had identical six-file postimages
+and modes; each PR passed six CI checks. Canonical was fast-forwarded, historical
+source stayed frozen, and production runtime stayed unchanged during that sync.
+
+A merged-code admission rehearsal accepted exactly the known TheSportsDB
+rate-limit-only fault among37 required checks. All26 baseline rollback aliases
+resolved, baseline/source/runtime stayed unchanged. The actual all-scope update
+`update-20261018T045650Z-2853292` then passed admission/acquisition/backup and
+applied Core, ingress and managed Sports. The recorded backup reported format3,
+state-complete but restore-unverified. Post-update Doctor exhausted its bounded
+provider-health grace, and the transaction became failed with maintenance and its
+owned deployment lock retained. The verified pointer remained
+`baseline-20261018T035020Z-2649543`. No successful deployment was claimed.
+
+Read-only failure and morning checks matched all26 applied images to running
+containers. Controller image was
+`sha256:628a071f8bdeb56fee1bc479ad6b476991540fb173e230791bde9e368bc8dc17`;
+writer image was
+`sha256:a80d03aa2df0af78374fc83c2d0a5bf20ce41e3a6e6d190e286fe2cc5c2880a8`.
+Both had provider SHA256
+`f0857e3b89eff1928680f6eed750ef53931f099cb38650269d249afda5a9d55c` and
+expected shared budget path. Controller source was mounted read-only from the
+canonical root. Both callers used current free key123, not legacy3. The last
+success age exceeded63hours. An active cooldown with zero admissions during the
+preceding minute did not mean that the provider had recovered.
+
+Budgeted probes respected shared cooldown: one daily-event query returned3events;
+one first-controller-endpoint eventslast query returned1event. A full-plan trace
+made ten successful calls followed by upstream HTTP429 on call11 (eventsday.php)
+with Retry-After120. None of the probes saved games or provider-health data,
+changed configuration, restarted services or released maintenance/lock.
+
+The read-only plan inspection found38 unique cold requests, 14-day horizon,
+17tracked and4explicit event targets, one team and one league. A synthetic model
+of repeated eleventh-dispatch429/120-second cooldown reproduced30minutes of
+noncompletion with the actual old provider cache. The user selected fixing
+free-key recovery rather than switching to a dedicated key. The new isolated
+candidate stages bounded background snapshot progress across rate-limit deferrals,
+preserves ordinary interactive cache TTLs, and exposes completed snapshot age.
+See SPORTS_PROVIDER_REFRESH_PROGRESS.md for the deliberate15-minute snapshot
+bound, local tests and pending CT100/activation gates. No claim is made that this
+candidate is installed in the failed production target or that live health has
+recovered. The original failed record, baseline, maintenance and lock must remain
+intact pending a separately reviewed repair/recovery step.
+
+
+## Controller refresh progress: observed CT100 acceptance
+
+User-run CT100 verification on 2026-10-18 confirmed packet SHA256
+`53658a81c5758b03dca2eae7d9df0c77501df36fce3a36fc84f9b0901704a9e5`
+(27318 bytes), all184 support pins, five intended postimages/modes and installer
+runtime-stability checks PASS. The isolated worktree was
+`/opt/project-atlas-sports-provider-refresh-progress`, based on canonical
+`f8696d95bbf4488d95c2243e54c305010ae5b22c`.
+
+Explicit UID/GID1000 with supplementary groups cleared and a private pytest
+basetemp passed37 tests and20 subtests in1.05s. Full core passed5550 tests and1746
+subtests in448.35s. The nineteen new offline progress tests include the old
+30-minute starvation reproduction, new-instance completion at360 simulated
+seconds, complete normalized event publication, worker degraded-to-healthy
+transition only on completion, snapshot-age reporting, unchanged interactive
+cache expiry, identity isolation, clock/expiry refusal, resource bounds and
+concurrent-caller serialization. Synthetic requests did not contact a provider.
+
+Final assertions preserved canonical main atf8696d95, historical Notifications
+source at79cf7374, the active baseline baseline-20261018T035020Z-2649543, failed
+transaction update-20261018T045650Z-2853292, its lock ownership and enabled
+maintenance. Exactly five candidate files remained uncommitted. No production
+source, image, game state, provider-health state or public maintenance change was
+performed by the installer/test command. RC/main CI and protected merges remain
+pending. Activation needs its own reviewed recovery transaction; do not advance
+the live-mounted canonical checkout or relabel the original failed target.
