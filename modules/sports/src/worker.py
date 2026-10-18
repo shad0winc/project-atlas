@@ -385,7 +385,12 @@ def run_provider_pipeline() -> dict[str, Any] | None:
         )
 
         try:
-            games = provider.fetch_games(
+            # Providers can opt into bounded, resumable background snapshots.
+            # Interactive provider calls keep their immediate fetch semantics.
+            fetch_games = getattr(
+                provider, "fetch_games_resumable", provider.fetch_games,
+            )
+            games = fetch_games(
                 tracked_event_ids=tracked_ids,
                 event_ids=discovery_targets[
                     "events"
@@ -431,6 +436,15 @@ def run_provider_pipeline() -> dict[str, Any] | None:
                 len(games),
             )
         )
+
+        snapshot = getattr(provider, "last_refresh_snapshot", None)
+        if isinstance(snapshot, dict) and snapshot.get("version") == 1:
+            provider_health[provider.name]["refresh_snapshot"] = {
+                key: snapshot[key] for key in (
+                    "version", "oldest_response_age_seconds",
+                    "maximum_age_seconds", "completed_request_count",
+                )
+            }
 
         if provider_health_event is not None:
             provider_health_events.append(
