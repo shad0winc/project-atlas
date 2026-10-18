@@ -6,8 +6,8 @@ the evidence for the completed checkpoints below.
 
 ## Current accepted source and production boundary
 
-- Clean canonical main: `448b556b3f184c0b5e5697a4e9742ef369acb27f`.
-- RC1: `186a4bcddba60f35629683b032c232927d053cdd`.
+- Clean canonical main: `3e4c0f9e6edf622434710400fd49190c326726af`.
+- RC1: `6b20c39ba07597bb6bb6da60bd688dafa0356193`.
 - Version: `1.0.0-rc.1`; no final v1.0.0 release has been performed here.
 - Deployment pointer: `update-20261015T211211Z-632971`, unchanged.
 - Production refresh and live restore remain disabled. Source synchronization is
@@ -321,3 +321,67 @@ power-loss/global-Docker-admission/full operational restore remain unproven.
   operational restore remain unproven.
 - This ledger-only evidence update follows frozen executable verification.
   Source commit, RC/main CI/merge and canonical synchronization remain pending.
+
+## Coordinated native consumption merges and production health reconciliation
+
+User output confirmed RC PR362 squash
+`6b20c39ba07597bb6bb6da60bd688dafa0356193` and main PR363 squash
+`3e4c0f9e6edf622434710400fd49190c326726af`, with six successful checks on
+each PR. Source head was `b4859ae5bdfcf3666da7f9666a6f4923841e123b`; RC
+head was `f774317592410dc0f1abeb1e1e825c4ffded420d`. All nine file objects
+and modes matched. Canonical source synchronization was fast-forward only;
+the deployment pointer remained unchanged. CT100 core evidence was 5493 tests
+and 1548 subtests; explicit UID/GID1000 focused evidence was 21 tests and 226
+subtests. The combined coordinated-consumption diagnostic passed, including
+owned cleanup and production identity/pointer checks.
+
+Subsequent read-only production inventory and provider diagnostics identified
+TheSportsDB degradation with an active cooldown and the same documented public
+key in controller/writer. No key or raw error was exposed. Source, deployment
+and checked runtime identities stayed stable. See SPORTS_PROVIDER_REQUEST_BUDGET.md
+for exact observations, health/liveness distinctions, storage mounts, published
+provider context, request-admission algorithm, persistence and rollout contracts.
+The inventory did not certify doctor/preflight or open database connections.
+
+The provider-budget candidate passed CT100 verification; both PR gates remain
+pending. Local evidence: 18 new offline cases plus 17 existing related contracts/
+capability cases passed (35 total). The candidate preserves 14-day discovery and
+adds 20 shared rolling-minute admissions, full persisted Retry-After, cache-hit
+reuse and charged failure/process-death behavior. It does not claim that the
+public provider has recovered or that a new image was deployed. Controlled
+rollout must cover all callers; mixed old/new processes do not establish the
+new admission guarantee. No production mutation, live restore or final tag.
+
+## Provider request budget: observed CT100 acceptance
+
+User-run CT100 output on 2026-10-18 UTC confirmed candidate ZIP SHA256
+`0da44eb6788e9a9fdaea81f087eefbd0016bb1909debf6e841997fae6e5c2ea9`
+(58,311 bytes), five intended files and installer pre/postconditions PASS.
+The isolated branch is `feat/sports-provider-budget`, based on canonical
+`3e4c0f9e6edf622434710400fd49190c326726af`.
+
+Explicit UID/GID 1000, supplementary groups cleared, cache plugin disabled:
+18 tests and 15 subtests passed in 0.74 seconds. Full core: 5511 tests and 1563
+subtests passed in 446.90 seconds. The combined diagnostic reached
+`SYNTHETIC_PROVIDER_BUDGET_RECOVERY_REGRESSION=PASS` and returned successfully.
+The final canonical-clean assertion completed, and only the five expected
+feature-worktree paths were reported as modified/new. No commit or deployment
+was performed by that test command.
+
+Combined acceptance retained all ten held maintenance-abort failures, all 17
+sixteen-registry held boundaries, same-archive native/metadata/registry binding,
+five representative coordinated preparation/publication deaths, actual four-
+application stop/capture/restart and notification cursor, running-native recovery
+refusal, detached capture/import resumption, three post-write recovery deaths,
+metadata UID 1000 readback, authenticated writer restart, broker accounting and
+both refresh shutdown cases at both restored verification phases. Restored native
+applications and persistence restart reached PASS. Archive SHA256 was
+`387ff0b65bd40f284f7999c2a07ca6777d328ee43f48f995a6ab447abef9a5ef`.
+
+This is offline provider behavior plus private recovery/runtime compatibility
+acceptance. The diagnostics explicitly reported no external provider access,
+production state access, live restore or production service control. It does not
+establish recovery of the live TheSportsDB provider, freshness of production games,
+full production operational restore or power-loss recovery. Build/rollout,
+effective caller version/mount checks and sustained provider verification remain
+separate. Media browse improvements remain queued after Sports.
