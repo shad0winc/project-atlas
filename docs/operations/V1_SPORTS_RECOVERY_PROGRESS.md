@@ -6,8 +6,8 @@ the evidence for the completed checkpoints below.
 
 ## Current accepted source and production boundary
 
-- Clean canonical main: `9f090d75b3cdb3d69f537aa1fe7e2b3b02c3cf02`.
-- RC1: `ac3e69c486b261cc86847877421653692daa4d50`.
+- Clean canonical main: `448b556b3f184c0b5e5697a4e9742ef369acb27f`.
+- RC1: `186a4bcddba60f35629683b032c232927d053cdd`.
 - Version: `1.0.0-rc.1`; no final v1.0.0 release has been performed here.
 - Deployment pointer: `update-20261015T211211Z-632971`, unchanged.
 - Production refresh and live restore remain disabled. Source synchronization is
@@ -31,6 +31,8 @@ the evidence for the completed checkpoints below.
 | Actual four-service lifecycle | 356 / 357 | 06bab88a / 8955da81 | Actual default-command application fixtures quiesced around native capture, clean restart and notification cursor persistence |
 
 | Sixteen-registry restore | 358 / 359 | ac3e69c4 / 9f090d75 | All sixteen replacements, consumer readback, handled setup/row/copy failure and held validation refusal |
+
+| Coordinated pre-exposure recovery | 360 / 361 | 186a4bcd / 448b556b | Durable21-unit prepare/resume/abort and held acceptance, fresh-process deaths and same-archive bindings |
 
 Each gate has its own SPORTS_* operation document, diagnostic, helper and core
 tests. Read those files for algorithms, receipt schemas and fixture boundaries;
@@ -213,7 +215,7 @@ canonical main fast-forwarded cleanly. Deployment remained
 `update-20261015T211211Z-632971`. These are user-reported CT/GitHub results;
 no production deployment or final version/tag was performed.
 
-## Coordinated recovery candidate (CT100 accepted; CI pending)
+## Coordinated recovery (merged and source-synced)
 
 See SPORTS_COORDINATED_RECOVERY.md for the complete layout/state/receipt protocol.
 The candidate adds a separate private all-captured21-unit journal with durable
@@ -255,4 +257,67 @@ they occur. Do not pre-populate those results from local unit tests.
   power loss, direct native mounts of the21-unit journal, post-exposure writes,
   coherent production snapshots and full operational restore remain unproven.
 - This ledger-only evidence update follows the frozen executable verification.
+  Source commit, RC/main CI/merge and canonical synchronization remain pending.
+
+
+### Coordinated recovery merge and synchronization evidence
+
+Source `a6dd83ad3c35a4fb85458745d49261369536a728`; RC head
+`434ef8fbaaae260cba13ce9d879010f39940f8d4`. PR360 RC squash
+`186a4bcddba60f35629683b032c232927d053cdd`; PR361 main squash
+`448b556b3f184c0b5e5697a4e9742ef369acb27f`. Both PRs passed all six
+release checks. Six file objects/modes matched source/RC/main; canonical main
+fast-forwarded cleanly. The operation guide and CT evidence ledger were committed.
+Active deployment stayed update-20261015T211211Z-632971. No final tag/deployment.
+These results are from the user's CT100 command outputs, not local simulation.
+
+## Coordinated native consumption candidate (CT100 accepted; CI pending)
+
+See SPORTS_COORDINATED_CONSUMPTION.md. The candidate extends the private journal
+with shared writer leases, exact owned native volume/application epoch bindings,
+a detached capture barrier, durable resumable native import, all21-unit sealing
+and quarantine/restore after application writes. Native restored fixture volumes
+are copied from the actual coordinated rollback destinations and pass the
+parent's real native boot/persistence restart before reader admission releases.
+
+The original publication APIs refuse any consumption marker. Native ownership
+remapping stays in guarded owned Docker volume copies; the journal is not mounted
+writable into native applications. Metadata uses actual consumers; registry
+mutations are valid synthetic fixture bytes/event/cursor, not real API workflows.
+Unit Docker/ownership contracts are simulated. CT100 mapped-identity, complete
+core, actual native refusal/capture/import/interruption/restart and cleanup proof
+must be observed before commit/RC/main promotion. Record those results and later
+commit/merge/sync evidence here. Production format3 restore remains blocked;
+power-loss/global-Docker-admission/full operational restore remain unproven.
+
+
+### CT100 coordinated native consumption evidence (2026-10-18 UTC)
+
+- UID/GID1000 tests with supplementary groups cleared: 21 tests and 226 subtests
+  passed in 112.41 seconds. Optional pytest caching was disabled for this run.
+- Full Core Python: 5,493 tests and 1,548 subtests passed in 447.97 seconds.
+- Combined diagnostic passed coordinated21-unit baseline admission, refusal while
+  actual owned native applications ran, real native DB and metadata commits,
+  valid synthetic registry/event/cursor writes, and interrupted detached capture
+  import resumed by fresh processes.
+- Three independent post-write recovery deaths passed: seal-written,
+  renamed:quarantine:dispatcharr-db, and source-synced:restore:registry-users.
+  The source journal remained preserved through those independent cases.
+- Restored native applications booted from copies of coordinated rollback state,
+  passed normal persistence restart, then detached for fixture teardown before
+  coordinated reader admission and maintenance release passed.
+- Same-archive binding SHA256:
+  `dc80f8fccd0c0e213274b6a3db12b95c60c0c1e83e58998bfa319eebedc9232a`.
+  Actual four-service capture/restart and notification cursor, sixteen-registry
+  handled failures/readback, strict dump, metadata numeric readers, writer auth,
+  broker accounting and both refresh shutdown cases in both phases also passed.
+- SYNTHETIC_COORDINATED_CONSUMPTION_DRILL passed. Canonical checkout remained
+  clean at448b556b; candidate status contained exactly nine intended files and
+  was uncommitted at verification time. Deployment stayed
+  `update-20261015T211211Z-632971`; production live restore/refresh were not enabled.
+- Scope remains private copy-mediated native admission. Direct native mounts of
+  the journal, real mutations through every registry API, coherent populated
+  production snapshots, power loss, global Docker admission and full production
+  operational restore remain unproven.
+- This ledger-only evidence update follows frozen executable verification.
   Source commit, RC/main CI/merge and canonical synchronization remain pending.
