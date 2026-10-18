@@ -598,3 +598,52 @@ CT100 and protected RC/main promotion remain pending.
   maintenance and original deployment lock remained unchanged.
 - This records candidate acceptance only; protected RC/main CI and a separate
   managed activation plus sustained live acceptance are still required.
+
+## 2026-10-18: rolling response renewal candidate
+
+Snapshot availability was merged via RC PR370 (`8f82c6c3...`) and main PR371
+(`959dc2a9...`), staged with 54 controller/18 writer offline tests and activated
+as `repairs/snapshot-availability-dr7jfnlf`. Only controller/writer changed;
+canonical remains pinned at `f8696d95...`, historical at `79cf7374...`.
+Original failed transaction, baseline, maintenance, lock and both repair
+journals remain held.
+
+The 20-minute sustained watch recorded two completions 611.773 seconds apart,
+healthy deferrals and a real freshness gap. Its receipt
+`sustained-health-498b6a8fea5e.json` correctly has `accepted=false`, despite 37
+healthy native checks at the final instant. The next read-only diagnosis again
+reported degraded health and a 92.7-second shared cooldown. This is not private
+sustained acceptance or deployment reconciliation.
+
+A new isolated candidate retains complete request-plan responses with their
+original observation times and renews the oldest due response first. It
+reassembles only fully covered bounded snapshots; the completion timestamp
+advances only after all observations have renewed since the preceding full
+completion. The 900-second freshness gate, normal cache TTLs, shared admission
+budget, Retry-After exclusion, worker publication and both health gates are
+unchanged. Complete-cache memory accounting now charges response payloads too.
+
+A deterministic 4,040-second offline comparison produced five full completions
+and 220 HTTP invocations for both versions. Previous behavior had 76 unusable
+samples after the first completion; the candidate had zero. This synthetic
+fixture is not a provider quota guarantee. Twelve additional regressions cover
+cadence, full coverage, real ages, timestamps, failure closure and bounds.
+CT100/full-core verification and promotion remain pending. See
+`SPORTS_PROVIDER_ROLLING_REFRESH.md`. Media browse remains queued after Sports.
+
+## CT100 acceptance: 2026-10-18 UTC
+
+- Five candidate postimage hashes and permission modes verified.
+- The initial installer stopped after applying the patch because it compared
+  permission bits 0644 with the full Git mode 100644. A guarded continuation
+  verified every file and corrected only the permission comparison; candidate
+  source was unchanged. The candidate receipt records this correction.
+- UID/GID 1000 with cleared supplementary groups: 66 targeted tests and 25
+  subtests passed in 1.80 seconds.
+- Full core: 5579 tests and 1751 subtests passed in 453.13 seconds.
+- Running snapshot-availability repair, original failed transaction, backup,
+  source archives, active baseline, maintenance and original lock were preserved.
+- Candidate receipt: /var/tmp/atlas-rolling-refresh-candidate-92_drqgx/receipt.json.
+- This records isolated candidate acceptance. Protected RC/main CI, staged
+  image acceptance, managed activation, sustained provider health and accurate
+  private/public deployment reconciliation remain required.
