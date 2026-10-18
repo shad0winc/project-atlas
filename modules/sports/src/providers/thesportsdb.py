@@ -5,6 +5,10 @@ from __future__ import annotations
 import copy
 import fcntl
 import json
+import math
+import stat
+import tempfile
+from contextlib import contextmanager
 import os
 import threading
 import time
@@ -42,7 +46,9 @@ _CACHE_MAX_ENTRIES = 512
 _SEARCH_CACHE_TTL_SECONDS = 60
 _DISCOVERY_CACHE_TTL_SECONDS = 300
 _RATE_LIMIT_FALLBACK_SECONDS = 60
-_RATE_LIMIT_MAX_SECONDS = 300
+_RATE_LIMIT_MAX_SECONDS = 300  # Maximum retry hint, not the persisted deadline.
+_SHARED_REQUEST_LIMIT = 20
+_SHARED_REQUEST_WINDOW_SECONDS = 60
 _PROVIDER_BUDGET_FILE = Path(
     os.getenv(
         "SPORTS_PROVIDER_REQUEST_BUDGET_FILE",
@@ -91,7 +97,7 @@ def _retry_after_seconds(error: urllib.error.HTTPError) -> int:
                 parsed = parsedate_to_datetime(raw)
                 if parsed.tzinfo is None:
                     parsed = parsed.replace(tzinfo=timezone.utc)
-                seconds = int(
+                seconds = math.ceil(
                     max(
                         1,
                         (
@@ -106,81 +112,147 @@ def _retry_after_seconds(error: urllib.error.HTTPError) -> int:
     if seconds is None:
         seconds = _RATE_LIMIT_FALLBACK_SECONDS
 
-    return max(
-        1,
-        min(seconds, _RATE_LIMIT_MAX_SECONDS),
-    )
+    # Preserve the provider's full Retry-After. Client retry hints may be
+    # shorter, but they must never shorten the shared upstream exclusion.
+    return max(1, seconds)
+
+
+def _load_shared_budget() -> dict[str, Any]:
+    try:
+        descriptor = os.open(
+            _PROVIDER_BUDGET_FILE, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
+        )
+    except FileNotFoundError:
+        return {"provider": "thesportsdb", "retry_until_epoch": 0.0,
+                "request_epochs": []}
+    try:
+        details = os.fstat(descriptor)
+        if not stat.S_ISREG(details.st_mode) or details.st_nlink != 1:
+            raise RuntimeError("Sports provider budget is not a regular file")
+        if details.st_size > 16384:
+            raise RuntimeError("Sports provider budget is too large")
+        with os.fdopen(descriptor, "rb", closefd=False) as handle:
+            raw = handle.read(16385)
+        if len(raw) > 16384:
+            raise RuntimeError("Sports provider budget is too large")
+    finally:
+        os.close(descriptor)
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("Duplicate budget field")
+            result[key] = value
+        return result
+
+    try:
+        payload = json.loads(raw, object_pairs_hook=unique_object)
+    except (ValueError, UnicodeError):
+        raise RuntimeError("Sports provider budget is invalid") from None
+    if not isinstance(payload, dict) or payload.get("provider") != "thesportsdb":
+        raise RuntimeError("Sports provider budget is invalid")
+    deadline = payload.get("retry_until_epoch")
+    epochs = payload.get("request_epochs", [])
+    if (type(deadline) not in (int, float) or not math.isfinite(deadline)
+            or deadline < 0 or not isinstance(epochs, list)
+            or len(epochs) > _SHARED_REQUEST_LIMIT
+            or any(type(stamp) not in (int, float) or not math.isfinite(stamp)
+                   or stamp < 0 for stamp in epochs)):
+        raise RuntimeError("Sports provider budget is invalid")
+    # Legacy cooldown-only documents retain their deadline and start with no
+    # recorded admissions. Every new upstream request is charged durably.
+    return {"provider": "thesportsdb", "retry_until_epoch": deadline,
+            "request_epochs": epochs}
 
 
 def _load_shared_rate_limit_until() -> float:
-    try:
-        with _PROVIDER_BUDGET_FILE.open("r", encoding="utf-8") as handle:
-            payload = json.load(handle)
-    except (OSError, json.JSONDecodeError):
-        return 0.0
-
-    if not isinstance(payload, dict):
-        return 0.0
-
-    try:
-        retry_until = float(payload.get("retry_until_epoch", 0.0))
-    except (TypeError, ValueError):
-        return 0.0
-
-    return max(0.0, retry_until)
+    return float(_load_shared_budget()["retry_until_epoch"])
 
 
-def _write_shared_rate_limit_until(retry_until_epoch: float) -> None:
+@contextmanager
+def _shared_budget_lock():
     _PROVIDER_BUDGET_FILE.parent.mkdir(parents=True, exist_ok=True)
-
     lock_file = _PROVIDER_BUDGET_FILE.with_name(
         f"{_PROVIDER_BUDGET_FILE.name}.lock"
     )
+    descriptor = os.open(
+        lock_file, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o644
+    )
+    try:
+        details = os.fstat(descriptor)
+        if not stat.S_ISREG(details.st_mode) or details.st_nlink != 1:
+            raise RuntimeError("Sports provider budget lock is invalid")
+        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        linked = lock_file.lstat()
+        if (linked.st_dev, linked.st_ino) != (details.st_dev, details.st_ino):
+            raise RuntimeError("Sports provider budget lock changed")
+        yield
+    finally:
+        os.close(descriptor)
 
-    with lock_file.open("a+", encoding="utf-8") as lock_handle:
-        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
 
-        current = _load_shared_rate_limit_until()
-        retry_until = max(current, float(retry_until_epoch))
-
-        temporary = _PROVIDER_BUDGET_FILE.with_name(
-            f"{_PROVIDER_BUDGET_FILE.name}.tmp.{os.getpid()}"
-        )
+def _save_shared_budget(payload: dict[str, Any]) -> None:
+    descriptor, name = tempfile.mkstemp(
+        prefix=_PROVIDER_BUDGET_FILE.name + ".tmp.",
+        dir=_PROVIDER_BUDGET_FILE.parent,
+    )
+    temporary = Path(name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, separators=(",", ":"), sort_keys=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        temporary.replace(_PROVIDER_BUDGET_FILE)
+        parent = os.open(_PROVIDER_BUDGET_FILE.parent, os.O_RDONLY | os.O_DIRECTORY)
         try:
-            with temporary.open("w", encoding="utf-8") as handle:
-                json.dump(
-                    {
-                        "provider": "thesportsdb",
-                        "retry_until_epoch": retry_until,
-                    },
-                    handle,
-                    separators=(",", ":"),
-                    sort_keys=True,
-                )
-                handle.write("\n")
-            temporary.replace(_PROVIDER_BUDGET_FILE)
+            os.fsync(parent)
         finally:
-            try:
-                temporary.unlink()
-            except FileNotFoundError:
-                pass
-            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
+            os.close(parent)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _write_shared_rate_limit_until(retry_until_epoch: float) -> None:
+    deadline = float(retry_until_epoch)
+    if not math.isfinite(deadline) or deadline < 0:
+        raise RuntimeError("Sports provider cooldown is invalid")
+    with _shared_budget_lock():
+        payload = _load_shared_budget()
+        payload["retry_until_epoch"] = max(payload["retry_until_epoch"], deadline)
+        _save_shared_budget(payload)
+
+
+def _reserve_shared_request() -> None:
+    # The reservation commits before HTTP. Failed requests and a process death
+    # after reservation remain charged; no quota is refunded on uncertainty.
+    with _shared_budget_lock():
+        payload = _load_shared_budget()
+        now = time.time()
+        if not math.isfinite(now) or now < 0:
+            raise RuntimeError("Sports provider clock is invalid")
+        deadline = payload["retry_until_epoch"]
+        if deadline > now:
+            raise SportsProviderRateLimitError(
+                min(_RATE_LIMIT_MAX_SECONDS, max(1, math.ceil(deadline - now)))
+            )
+        epochs = [stamp for stamp in payload["request_epochs"]
+                  if stamp > now - _SHARED_REQUEST_WINDOW_SECONDS]
+        if len(epochs) >= _SHARED_REQUEST_LIMIT:
+            wait = min(epochs) + _SHARED_REQUEST_WINDOW_SECONDS - now
+            raise SportsProviderRateLimitError(
+                min(_RATE_LIMIT_MAX_SECONDS, max(1, math.ceil(wait)))
+            )
+        payload["request_epochs"] = epochs + [now]
+        _save_shared_budget(payload)
 
 
 def _shared_retry_after_seconds(now_epoch: float | None = None) -> int:
     now = time.time() if now_epoch is None else float(now_epoch)
     retry_until = _load_shared_rate_limit_until()
-
     if retry_until <= now:
         return 0
-
-    return max(
-        1,
-        min(
-            int(retry_until - now),
-            _RATE_LIMIT_MAX_SECONDS,
-        ),
-    )
+    return max(1, min(math.ceil(retry_until - now), _RATE_LIMIT_MAX_SECONDS))
 
 
 def _reset_request_budget_for_tests() -> None:
@@ -237,16 +309,7 @@ class TheSportsDBProvider(SportsProvider):
         key = _cache_key(endpoint, parameters)
         now = time.monotonic()
 
-        shared_retry_after = _shared_retry_after_seconds()
-        if shared_retry_after > 0:
-            raise SportsProviderRateLimitError(shared_retry_after)
-
         with _CACHE_LOCK:
-            if _RATE_LIMIT_UNTIL > now:
-                raise SportsProviderRateLimitError(
-                    max(1, int(_RATE_LIMIT_UNTIL - now))
-                )
-
             cached = _RESPONSE_CACHE.get(key)
             if cached is not None:
                 expires_at, payload = cached
@@ -254,7 +317,16 @@ class TheSportsDBProvider(SportsProvider):
                     _RESPONSE_CACHE.move_to_end(key)
                     return copy.deepcopy(payload)
                 del _RESPONSE_CACHE[key]
+            if _RATE_LIMIT_UNTIL > now:
+                raise SportsProviderRateLimitError(
+                    max(1, math.ceil(_RATE_LIMIT_UNTIL - now))
+                )
 
+        shared_retry_after = _shared_retry_after_seconds()
+        if shared_retry_after > 0:
+            raise SportsProviderRateLimitError(shared_retry_after)
+
+        _reserve_shared_request()
         query = urllib.parse.urlencode(parameters)
         url = (
             "https://www.thesportsdb.com/"
