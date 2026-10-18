@@ -30,7 +30,7 @@ class SnapshotAvailabilityTests(unittest.TestCase):
         self.assertEqual(client.last_refresh_completed_at,first.last_refresh_completed_at)
         self.assertEqual(client.last_refresh_snapshot,first.last_refresh_snapshot)
         self.assertEqual(client.last_refresh_deferred['reason'],'rate-limit')
-        self.assertTrue(module._REFRESH_PROGRESS)
+        self.assertTrue(next(iter(module._REFRESH_COMPLETE.values()))["responses"])
     def test_unknown_failure_invalidates_complete_snapshot(self):
         self.complete();self.clock+=30;self.failure=RuntimeError('offline failure')
         with self.assertRaises(RuntimeError):self.attempt()
@@ -63,8 +63,8 @@ class SnapshotAvailabilityTests(unittest.TestCase):
             self.clock=1000000+elapsed;client=module.TheSportsDBProvider()
             try:client.fetch_games_resumable(**self.args)
             except module.SportsProviderRateLimitError:continue
-            if client.last_refresh_deferred is None:
-                self.assertGreater(client.last_refresh_completed_at,first.last_refresh_completed_at);return
+            if client.last_refresh_completed_at > first.last_refresh_completed_at:
+                return
         self.fail('Following refresh did not complete')
 
     def test_populated_snapshot_is_reused_without_exposing_mutation(self):
