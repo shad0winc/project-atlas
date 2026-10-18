@@ -20,6 +20,62 @@ atlas_update_validate_migration() {
   }
 }
 
+# Recovery is explicit, restricted to the scope that applies both provider callers,
+# and affects only the pre-update gate. Post-apply/public gates remain unchanged.
+atlas_update_validate_arguments() {
+  [[ "$#" -eq 3 || "$#" -eq 4 ]] || {
+    echo 'Usage: atlas update <core|ingress|all> --migration none [--recover-sports-provider]' >&2
+    return 2
+  }
+  atlas_update_validate_scope "$1" || return $?
+  atlas_update_validate_migration "$2" "$3" || return $?
+  if [[ "$#" -eq 4 ]]; then
+    [[ "$1" == 'all' && "$4" == '--recover-sports-provider' ]] || {
+      echo 'ERROR: --recover-sports-provider requires all --migration none.' >&2
+      return 2
+    }
+  fi
+}
+
+atlas_update_preflight() {
+  local recovery="${1:-}"
+  local record="$2"
+  local health_json
+  local health_rc=0
+
+  if [[ -z "$recovery" ]]; then
+    atlas_command_doctor
+    return $?
+  fi
+  [[ "$recovery" == '--recover-sports-provider' ]] || return 2
+  atlas_update_sports_managed || {
+    echo 'ERROR: provider recovery requires an adopted Sports baseline.' >&2
+    return 1
+  }
+
+  # Take one structured observation; do not reinterpret a separate failed Doctor
+  # result using a report from another moment. Never print raw provider errors.
+  if health_json="$(atlas_health_python --format json)"; then
+    health_rc=0
+  else
+    health_rc=$?
+  fi
+  [[ "$health_rc" -eq 0 || "$health_rc" -eq 1 ]] || return 1
+
+  # An exclusive, sanitized receipt binds the accepted observation to this
+  # deployment. A refusal leaves an aborted record; it never reaches acquisition.
+  (
+    set -o noclobber
+    python3 "$ATLAS_PROJECT_DIR/scripts/lib/sports-provider-recovery-preflight.py" \
+      --health-exit-code "$health_rc" <<< "$health_json" \
+      > "$record/provider-recovery-preflight.json"
+  ) || {
+    echo 'ERROR: provider recovery preflight refused; all other checks must be healthy.' >&2
+    return 1
+  }
+  echo 'Provider recovery preflight accepted; full post-update health is still required.'
+}
+
 atlas_update_validate_build_context_permissions() {
   local path
   local absolute
@@ -835,8 +891,7 @@ atlas_update_execute_locked() {
     return 2
   }
 
-  atlas_update_validate_scope "$scope" || return $?
-  atlas_update_validate_migration "${2:-}" "${3:-}" || return $?
+  atlas_update_validate_arguments "$@" || return $?
 
   atlas_deployment_validate_source || return 1
 
@@ -866,7 +921,7 @@ atlas_update_execute_locked() {
   echo "Atlas deployment scope: $scope"
   echo 'Migration declaration: none'
 
-  if ! atlas_command_doctor; then
+  if ! atlas_update_preflight "${4:-}" "$(atlas_deployment_record_dir "$identifier")"; then
     atlas_deployment_set_status \
       "$(atlas_deployment_record_dir "$identifier")" \
       aborted
