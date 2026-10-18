@@ -15,6 +15,7 @@ from recorder import (
     SPORTS_MEDIA_DIR,
 )
 from recordings import load_recordings
+from atlas.sports_provider_snapshot_health import provider_snapshot_usable
 
 
 HEALTH_FILE = Path(
@@ -150,23 +151,9 @@ def provider_health() -> dict[str, Any]:
         PROVIDER_HEALTH_FILE
     )
 
-    provider_statuses = [
-        str(
-            provider.get(
-                "status",
-                "unknown",
-            )
-        ).lower()
-        for provider in providers.values()
-        if isinstance(provider, dict)
-    ]
-
-    if not provider_statuses:
+    if not providers:
         status = "unknown"
-    elif all(
-        item == "healthy"
-        for item in provider_statuses
-    ):
+    elif all(provider_snapshot_usable(provider) for provider in providers.values()):
         status = "healthy"
     else:
         status = "degraded"

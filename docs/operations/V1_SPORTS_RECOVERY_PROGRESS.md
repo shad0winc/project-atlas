@@ -565,3 +565,36 @@ source, image, game state, provider-health state or public maintenance change wa
 performed by the installer/test command. RC/main CI and protected merges remain
 pending. Activation needs its own reviewed recovery transaction; do not advance
 the live-mounted canonical checkout or relabel the original failed target.
+
+## 2026-10-18: first live refresh, following-cycle health flap
+
+Refresh progress merged through RC #368 (`9f7db2da`) and main #369 (`5db0f488`).
+The guarded two-service repair retained the original failed update and baseline.
+At 17:02:28Z it completed 38 requests with oldest observation age 479.092 seconds.
+The following refresh returned to rate-limited/degraded at last-success ages
+231–292 seconds; normal Atlas health still had one Provider Health critical.
+This is live proof of progress across cooldowns, not stable deployment acceptance.
+
+A separate bounded-complete-snapshot candidate preserves usable complete data
+and its actual completion timestamp during cooperative deferral. Both health
+consumers validate the original 900-second bound at read time. No production
+source, cooldown or health record is patched manually. See
+`SPORTS_PROVIDER_SNAPSHOT_AVAILABILITY.md` for identities, receipts, cache bounds,
+configuration-copy and graceful-stop details, test coverage and remaining gates.
+Candidate local validation: 17 availability + 19 progress + 18 budget tests pass;
+CT100 and protected RC/main promotion remain pending.
+
+## CT100 acceptance: 2026-10-18
+
+- Eight candidate file hashes and modes matched the frozen packet.
+- Corrected test-launch PATH so child `python` resolves to the existing shared
+  `/opt/project-atlas/.venv/bin/python`; the first core attempt had nine missing-
+  executable failures, with 5558 tests passing. No source correction was needed.
+- Restore-state validation rerun: 10 passed in 0.91 seconds.
+- UID/GID 1000 with cleared supplementary groups: 54 focused tests and 25
+  subtests passed in 1.29 seconds.
+- Full core: 5567 tests and 1751 subtests passed in 448.52 seconds.
+- Running repair, original failed transaction, backup, source archives, baseline,
+  maintenance and original deployment lock remained unchanged.
+- This records candidate acceptance only; protected RC/main CI and a separate
+  managed activation plus sustained live acceptance are still required.

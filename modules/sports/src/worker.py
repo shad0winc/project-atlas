@@ -445,6 +445,19 @@ def run_provider_pipeline() -> dict[str, Any] | None:
                     "maximum_age_seconds", "completed_request_count",
                 )
             }
+            completed_at = getattr(provider, "last_refresh_completed_at", None)
+            if isinstance(completed_at, str):
+                provider_health[provider.name]["last_success_at"] = completed_at
+            deferral = getattr(provider, "last_refresh_deferred", None)
+            provider_health[provider.name]["refresh_state"] = (
+                "deferred" if isinstance(deferral, dict) else "complete"
+            )
+            if isinstance(deferral, dict):
+                provider_health[provider.name]["refresh_deferral"] = {
+                    "reason": deferral["reason"],
+                    "retry_after_seconds": deferral["retry_after_seconds"],
+                    "observed_at": utc_now(),
+                }
 
         if provider_health_event is not None:
             provider_health_events.append(
