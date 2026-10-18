@@ -81,8 +81,9 @@ def initialize(root,old_sources,new_sources,archive_sha):
  checkpoint('initialized')
 
 
-def journal(root):
- require({p.name for p in root.iterdir()} <= {'current','source','transaction','CONTROL.json',
+def journal(root, *, consuming=False):
+ require(consuming or not (root/'consumption').exists() and not (root/'consumption').is_symlink())
+ require({p.name for p in root.iterdir()} <= ({'consumption'} if consuming else set())|{'current','source','transaction','CONTROL.json',
   '.CONTROL.json.writing','ACCEPTANCE.json','.ACCEPTANCE.json.writing','admission.lock','journal.lock'})
  tx=root/'transaction';pub.private(tx,True)
  require({p.name for p in tx.iterdir()} <= {'incoming','old','PLAN.json','STATUS.json','.STATUS.json.writing'})
