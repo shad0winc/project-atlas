@@ -618,14 +618,14 @@ def test_update_prepares_and_verifies_target_artifacts_before_maintenance() -> N
     content = UPDATE.read_text(encoding="utf-8")
     section = content.split("atlas_update_execute_locked() {", 1)[1]
 
-    doctor = section.index("atlas_command_doctor")
+    preflight = section.index('atlas_update_preflight "${4:-}"')
     prepare = section.index('atlas_update_prepare_scope "$scope"')
     verify = section.index('atlas_update_verify_target_images "$scope"')
     maintenance = section.index("atlas_command_maintenance enable")
     backup = section.index("atlas_command_backup")
     apply = section.index('atlas_update_apply_scope "$scope"')
 
-    assert doctor < prepare < verify < maintenance < backup < apply
+    assert preflight < prepare < verify < maintenance < backup < apply
 
 
 def test_update_publishes_dashboard_runtime_before_reopening_traffic() -> None:
