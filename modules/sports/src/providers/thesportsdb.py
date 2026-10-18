@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import fcntl
 import json
 import math
@@ -49,6 +50,14 @@ _RATE_LIMIT_FALLBACK_SECONDS = 60
 _RATE_LIMIT_MAX_SECONDS = 300  # Maximum retry hint, not the persisted deadline.
 _SHARED_REQUEST_LIMIT = 20
 _SHARED_REQUEST_WINDOW_SECONDS = 60
+# Controller-only partial refreshes are private process memory, separate from
+# the normal response cache. No incomplete snapshot is returned to consumers.
+_REFRESH_LOCK = threading.Lock()
+_REFRESH_PROGRESS: OrderedDict[tuple, dict[str, Any]] = OrderedDict()
+_REFRESH_MAX_AGE_SECONDS = 900
+_REFRESH_MAX_PLANS = 8
+_REFRESH_MAX_REQUESTS = 128
+_REFRESH_MAX_BYTES = 4 * 1024 * 1024
 _PROVIDER_BUDGET_FILE = Path(
     os.getenv(
         "SPORTS_PROVIDER_REQUEST_BUDGET_FILE",
@@ -260,6 +269,8 @@ def _reset_request_budget_for_tests() -> None:
     with _CACHE_LOCK:
         _RESPONSE_CACHE.clear()
         _RATE_LIMIT_UNTIL = 0.0
+    with _REFRESH_LOCK:
+        _REFRESH_PROGRESS.clear()
 
 
 class TheSportsDBProvider(SportsProvider):
@@ -656,6 +667,121 @@ class TheSportsDBProvider(SportsProvider):
             return None
 
         return leagues[0]
+
+    def fetch_games_resumable(
+        self,
+        tracked_event_ids: list[str] | None = None,
+        event_ids: list[str] | None = None,
+        team_ids: list[str] | None = None,
+        league_ids: list[str] | None = None,
+        date_value: str | None = None,
+        days_ahead: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Complete a bounded controller snapshot across rate-limit deferrals.
+
+        Checkpoints survive new provider instances in this process, not process
+        death. Interactive fetch_games and response-cache TTLs are unchanged.
+        """
+        self.last_refresh_snapshot = None
+        date_value = (
+            datetime.now(timezone.utc).date().isoformat()
+            if date_value is None
+            else datetime.fromisoformat(date_value).date().isoformat()
+        )
+        arguments = {
+            "tracked_event_ids": sorted(set(tracked_event_ids or [])),
+            "event_ids": sorted(set(event_ids or [])),
+            "team_ids": sorted(set(team_ids or [])),
+            "league_ids": sorted(set(league_ids or [])),
+            "date_value": date_value,
+            "days_ahead": days_ahead,
+        }
+        identity = (
+            hashlib.sha256(self.api_key.encode()).digest(),
+            date_value,
+            self.discovery_days_ahead if days_ahead is None else days_ahead,
+            *(tuple(arguments[name]) for name in (
+                "tracked_event_ids", "event_ids", "team_ids", "league_ids"
+            )),
+        )
+        # Serializing this opt-in path prevents concurrent callers from mutating
+        # a shared checkpoint. Ordinary interactive requests do not take this lock.
+        with _REFRESH_LOCK:
+            now = time.monotonic()
+            if not math.isfinite(now):
+                raise RuntimeError("Sports refresh clock is invalid")
+            for key, entry in list(_REFRESH_PROGRESS.items()):
+                if not 0 <= now - entry["oldest"] <= _REFRESH_MAX_AGE_SECONDS:
+                    del _REFRESH_PROGRESS[key]
+            if identity not in _REFRESH_PROGRESS:
+                _REFRESH_PROGRESS[identity] = {
+                    "oldest": now, "responses": {}, "bytes": 0,
+                }
+            _REFRESH_PROGRESS.move_to_end(identity)
+            while len(_REFRESH_PROGRESS) > _REFRESH_MAX_PLANS:
+                _REFRESH_PROGRESS.popitem(last=False)
+            entry = _REFRESH_PROGRESS[identity]
+
+            def require_current() -> None:
+                age = time.monotonic() - entry["oldest"]
+                if not math.isfinite(age) or not 0 <= age <= _REFRESH_MAX_AGE_SECONDS:
+                    raise RuntimeError("Sports refresh checkpoint expired")
+
+            def request(endpoint: str, parameters: dict[str, str]) -> dict[str, Any]:
+                require_current()
+                key = _cache_key(endpoint, parameters)
+                if key in entry["responses"]:
+                    return copy.deepcopy(entry["responses"][key])
+                if len(entry["responses"]) >= _REFRESH_MAX_REQUESTS:
+                    raise RuntimeError("Sports refresh request bound exceeded")
+                before = time.monotonic()
+                payload = self.request_json(endpoint, parameters)
+                if not isinstance(payload, dict):
+                    raise RuntimeError("Sports refresh response must be an object")
+                # Normal cache reuse can predate checkpoint creation. Charge its
+                # original observation age, so retries cannot refresh its timestamp.
+                observed = before
+                with _CACHE_LOCK:
+                    cached = _RESPONSE_CACHE.get(key)
+                    if cached is not None:
+                        cached_observed = cached[0] - _cache_ttl_seconds(endpoint)
+                        if not math.isfinite(cached_observed) or cached_observed > time.monotonic():
+                            raise RuntimeError("Sports refresh cache clock is invalid")
+                        observed = min(observed, cached_observed)
+                entry["oldest"] = min(entry["oldest"], observed)
+                require_current()
+                size = len(json.dumps(payload, separators=(",", ":")).encode())
+                if entry["bytes"] + size > _REFRESH_MAX_BYTES:
+                    raise RuntimeError("Sports refresh memory bound exceeded")
+                entry["responses"][key] = copy.deepcopy(payload)
+                entry["bytes"] += size
+                return payload
+
+            # A private clone routes just this snapshot through checkpointed
+            # requests. Never replace the original instance's request method.
+            clone = copy.copy(self)
+            clone.request_json = request
+            try:
+                result = clone.fetch_games(**arguments)
+                require_current()
+            except SportsProviderRateLimitError:
+                # Health stays degraded; the existing shared budget/cooldown is
+                # authoritative. Preserve completed work for the next worker cycle.
+                raise
+            except BaseException:
+                _REFRESH_PROGRESS.pop(identity, None)
+                raise
+            else:
+                self.last_refresh_snapshot = {
+                    "version": 1,
+                    "oldest_response_age_seconds": round(
+                        max(0.0, time.monotonic() - entry["oldest"]), 3,
+                    ),
+                    "maximum_age_seconds": _REFRESH_MAX_AGE_SECONDS,
+                    "completed_request_count": len(entry["responses"]),
+                }
+                _REFRESH_PROGRESS.pop(identity, None)
+                return result
 
     def fetch_games(
         self,
