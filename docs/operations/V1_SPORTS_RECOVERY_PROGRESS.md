@@ -1,15 +1,20 @@
 # Sports recovery implementation and acceptance ledger
 
-Checkpoint: 2026-10-17. This ledger was introduced through RC PR356/main PR357. Subsequent candidate
+Checkpoint: 2026-10-18 UTC. This ledger was introduced through RC PR356/main PR357. Subsequent candidate
 sections distinguish accepted evidence from pending verification. User-run CT100 outputs are
 the evidence for the completed checkpoints below.
 
 ## Current accepted source and production boundary
 
-- Clean canonical main: `3e4c0f9e6edf622434710400fd49190c326726af`.
-- RC1: `6b20c39ba07597bb6bb6da60bd688dafa0356193`.
+- Clean canonical main: `/opt/project-atlas-v1-main`,
+  `79cf73747f9a979ea02fb77446f2fa61df8e3451`.
+- Historical live-mounted source: `/opt/project-atlas`, clean and detached at
+  the same commit; keep frozen and perform development in isolated worktrees.
+- RC1: `604be89938f807530da136281d8fa8d010fdbfca`.
 - Version: `1.0.0-rc.1`; no final v1.0.0 release has been performed here.
-- Deployment pointer: `update-20261015T211211Z-632971`, unchanged.
+- Active recovery baseline: `baseline-20261018T035020Z-2649543`, after
+  Notifications adoption. Previous baseline `update-20261015T211211Z-632971`
+  and its recovery assets were preserved. Adoption was not a service upgrade.
 - Production refresh and live restore remain disabled. Source synchronization is
   distinct from building images, deploying services, or performing live recovery.
 
@@ -385,3 +390,97 @@ establish recovery of the live TheSportsDB provider, freshness of production gam
 full production operational restore or power-loss recovery. Build/rollout,
 effective caller version/mount checks and sustained provider verification remain
 separate. Media browse improvements remain queued after Sports.
+
+
+## Provider budget merged, image staged, canonical root transferred
+
+User-run protected merges passed six checks each: RC PR364 squash
+`604be89938f807530da136281d8fa8d010fdbfca` at 2026-10-18T02:52:39Z;
+main PR365 squash `79cf73747f9a979ea02fb77446f2fa61df8e3451` at 03:09:18Z.
+Source commit `589b0d93dab6514157fdf5a8c7732b497d6af879` and RC head
+`abfaf71ffa84b27740de0ac6b3745351d474072d` had identical five-file postimages
+and modes. Canonical synchronization was fast-forward only.
+
+The image staging command built a unique writer tag
+`atlas-sports-writer:provider-budget-79cf7374-4979d2b1cb13`, Docker image identity
+`sha256:a9b2651d6188eeb236a9c8220d55b94c132c98638e9885b335d7c2d87d0e5f11`.
+All 25 copied source files were verified. Eighteen offline tests passed inside the
+actual image as UID/GID1000, network disabled, read-only root and no production
+mounts. Base digest was
+`sha256:7ce4b6dfe35e55397b7cda544f8a13f191b7ae28dc5aad71fe664dbc9bc2623f`.
+Receipt: `/var/tmp/atlas-provider-budget-image-c2vxhoon/receipt.json`.
+Production runtime and existing baseline remained unchanged; image not deployed.
+
+Canonical transfer restored main to `/opt/project-atlas-v1-main` and detached
+`/opt/project-atlas` at the same source commit. The host CLI now resolves to
+`/opt/project-atlas-v1-main/scripts/atlas`. Canonical root .env was aligned with
+the staging environment; the two prior environments and other configuration
+backups remain private. Other module/configuration bytes already matched.
+Bootstrap data/storage roots stayed aligned, no live bind targeted the canonical
+destination, and all production runtime identities stayed unchanged.
+Receipt: `/var/tmp/atlas-canonical-transfer-pyoq_l5i/receipt.json`.
+Do not upload that private backup directory: it contains environment secrets.
+Do not rerun the one-time transfer script or advance the frozen historical root.
+
+## Notifications adoption and actual health preflight
+
+User-run guarded adoption captured Notifications source provenance
+`79cf73747f9a979ea02fb77446f2fa61df8e3451`, added exactly one Notifications
+manifest row and rollback image aliases, and published verified baseline
+`baseline-20261018T035020Z-2649543`. Previous Core/ingress/Sports source identities
+and archives were retained; the old record's regular-file hashes stayed unchanged.
+Every observed production container's runtime fingerprint stayed unchanged.
+Adoption records historical restart source and image recovery evidence; it does
+not prove that an already-running process loaded the new source or upgrade it.
+
+The subsequent real health preflight returned exit 1: 36 healthy, one critical
+`module:sports / Provider Health`. Core/runtime/configuration, ten services, all
+five storage write probes, project documents, Sports feed/controller running and
+Docker health, controller heartbeat and Sports liveness endpoint were healthy.
+The baseline pointer and clean canonical source remained unchanged. This health
+command did not perform an update. Liveness does not imply provider recovery.
+
+## Provider recovery preflight candidate (not yet accepted on CT100)
+
+See SPORTS_PROVIDER_RECOVERY_PREFLIGHT.md. The explicit candidate flag permits
+only `all --migration none --recover-sports-provider`, a managed Sports baseline,
+and a fresh complete report whose sole fault matches fresh TheSportsDB rate-limit
+evidence. Ordinary updates and every post-update health gate retain their
+existing behavior. This is a full all-scope transaction, not a two-service-only
+patch or authorization to deploy. Local new gate tests and existing update
+transaction regression passed; CT100/full-core/CI and actual rollout remain
+pending. No live provider recovery, fresh-game result, live operational restore,
+sustained-use acceptance or final release has been established by this candidate.
+
+
+## Provider recovery preflight: observed CT100 acceptance
+
+User-run CT100 verification on 2026-10-18 UTC confirmed all original five packet
+postimages and modes. The initial explicit UID1000 run passed the new tests but
+54 existing tmp_path cases stopped during fixture setup: pytest inherited the
+root login name and selected root-owned /tmp/pytest-of-root. No assertion failure
+was reported in that run. The corrected harness creates a private UID1000-owned
+TemporaryDirectory and passes its child explicitly as --basetemp; it does not
+chown, remove or reuse the global pytest directory. The corrected explicit
+UID/GID1000/no-supplementary-groups run passed 76 tests and 178 subtests in 8.90s.
+
+Full core then found one stale source-order assertion in test_deployment_recovery:
+it still searched for a direct Doctor call after that call moved into the
+preflight helper. The two-line correction checks the actual preflight boundary
+before artifact preparation, target verification, maintenance, backup and apply.
+No application behavior changed in this correction. Corrected test SHA256:
+`a82c9a3504f67b73167d4f4dd0f217aac02e35a7209a01bc47fecb4e71f91a64`.
+
+The corrected three-file regression passed 131 tests and 178 subtests in 9.46s.
+Full core passed 5531 tests and 1741 subtests in 448.10s. Final checks confirmed
+canonical main and frozen historical HEAD both remained
+`79cf73747f9a979ea02fb77446f2fa61df8e3451`, both checkouts were clean, host CLI
+resolved to the canonical root, and the active pointer remained
+`baseline-20261018T035020Z-2649543`. Exactly six intended candidate paths were
+reported, uncommitted. The original packet SHA256 was
+`fddc002dfa14a6fdba2903d4a86daf35f26bd11da52812abc660d5b9976b9360`.
+
+These observations accept the source/test candidate on CT100; RC/main CI and
+protected merges, activation preflight, production rollout, live provider recovery
+and sustained-use verification are separate pending gates. No update, service
+restart, live restore or final tag was performed by these test commands.
