@@ -54,10 +54,13 @@ _SHARED_REQUEST_WINDOW_SECONDS = 60
 # the normal response cache. No incomplete snapshot is returned to consumers.
 _REFRESH_LOCK = threading.Lock()
 _REFRESH_PROGRESS: OrderedDict[tuple, dict[str, Any]] = OrderedDict()
+# Complete normalized snapshots are separate from partial work and normal cache.
+_REFRESH_COMPLETE: OrderedDict[tuple, dict[str, Any]] = OrderedDict()
 _REFRESH_MAX_AGE_SECONDS = 900
 _REFRESH_MAX_PLANS = 8
 _REFRESH_MAX_REQUESTS = 128
 _REFRESH_MAX_BYTES = 4 * 1024 * 1024
+_REFRESH_COMPLETE_MAX_BYTES = 4 * 1024 * 1024
 _PROVIDER_BUDGET_FILE = Path(
     os.getenv(
         "SPORTS_PROVIDER_REQUEST_BUDGET_FILE",
@@ -271,6 +274,7 @@ def _reset_request_budget_for_tests() -> None:
         _RATE_LIMIT_UNTIL = 0.0
     with _REFRESH_LOCK:
         _REFRESH_PROGRESS.clear()
+        _REFRESH_COMPLETE.clear()
 
 
 class TheSportsDBProvider(SportsProvider):
@@ -683,6 +687,8 @@ class TheSportsDBProvider(SportsProvider):
         death. Interactive fetch_games and response-cache TTLs are unchanged.
         """
         self.last_refresh_snapshot = None
+        self.last_refresh_completed_at = None
+        self.last_refresh_deferred = None
         date_value = (
             datetime.now(timezone.utc).date().isoformat()
             if date_value is None
@@ -709,7 +715,15 @@ class TheSportsDBProvider(SportsProvider):
         with _REFRESH_LOCK:
             now = time.monotonic()
             if not math.isfinite(now):
+                _REFRESH_PROGRESS.clear()
+                _REFRESH_COMPLETE.clear()
                 raise RuntimeError("Sports refresh clock is invalid")
+            for key, complete in list(_REFRESH_COMPLETE.items()):
+                if (not 0 <= now - complete["oldest"] <= _REFRESH_MAX_AGE_SECONDS
+                        or now < complete["completed_monotonic"]
+                        or not math.isfinite(time.time())
+                        or time.time() < complete["completed_epoch"]):
+                    del _REFRESH_COMPLETE[key]
             for key, entry in list(_REFRESH_PROGRESS.items()):
                 if not 0 <= now - entry["oldest"] <= _REFRESH_MAX_AGE_SECONDS:
                     del _REFRESH_PROGRESS[key]
@@ -764,12 +778,31 @@ class TheSportsDBProvider(SportsProvider):
             try:
                 result = clone.fetch_games(**arguments)
                 require_current()
-            except SportsProviderRateLimitError:
-                # Health stays degraded; the existing shared budget/cooldown is
-                # authoritative. Preserve completed work for the next worker cycle.
+            except SportsProviderRateLimitError as error:
+                # Only a complete, same-identity snapshot can cover a deferral.
+                # Keep collecting the next snapshot; never publish partial work.
+                complete = _REFRESH_COMPLETE.get(identity)
+                current = time.monotonic()
+                if complete is not None and (
+                    math.isfinite(current)
+                    and 0 <= current - complete["oldest"] <= _REFRESH_MAX_AGE_SECONDS
+                    and current >= complete["completed_monotonic"]
+                    and math.isfinite(time.time())
+                    and time.time() >= complete["completed_epoch"]
+                ):
+                    self.last_refresh_snapshot = copy.deepcopy(complete["metadata"])
+                    self.last_refresh_completed_at = complete["completed_at"]
+                    self.last_refresh_deferred = {
+                        "reason": "rate-limit",
+                        "retry_after_seconds": error.retry_after_seconds,
+                    }
+                    _REFRESH_COMPLETE.move_to_end(identity)
+                    return copy.deepcopy(complete["games"])
+                _REFRESH_COMPLETE.pop(identity, None)
                 raise
             except BaseException:
                 _REFRESH_PROGRESS.pop(identity, None)
+                _REFRESH_COMPLETE.pop(identity, None)
                 raise
             else:
                 self.last_refresh_snapshot = {
@@ -781,6 +814,25 @@ class TheSportsDBProvider(SportsProvider):
                     "completed_request_count": len(entry["responses"]),
                 }
                 _REFRESH_PROGRESS.pop(identity, None)
+                _REFRESH_COMPLETE.pop(identity, None)
+                completed_epoch = time.time()
+                if not math.isfinite(completed_epoch):
+                    raise RuntimeError("Sports refresh completion clock is invalid")
+                self.last_refresh_completed_at = datetime.fromtimestamp(
+                    completed_epoch, timezone.utc,
+                ).isoformat()
+                size = len(json.dumps(result, separators=(",", ":"), allow_nan=False).encode())
+                if size <= _REFRESH_COMPLETE_MAX_BYTES:
+                    _REFRESH_COMPLETE[identity] = {
+                        "oldest": entry["oldest"], "completed_monotonic": time.monotonic(),
+                        "completed_epoch": completed_epoch,
+                        "completed_at": self.last_refresh_completed_at,
+                        "metadata": copy.deepcopy(self.last_refresh_snapshot),
+                        "games": copy.deepcopy(result), "bytes": size,
+                    }
+                    while (len(_REFRESH_COMPLETE) > _REFRESH_MAX_PLANS
+                           or sum(item["bytes"] for item in _REFRESH_COMPLETE.values()) > _REFRESH_COMPLETE_MAX_BYTES):
+                        _REFRESH_COMPLETE.popitem(last=False)
                 return result
 
     def fetch_games(
