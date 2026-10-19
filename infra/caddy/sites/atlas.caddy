@@ -1,158 +1,80 @@
 atlas.shadowinc.co {
         import atlas_security_headers
         import atlas_access_log
-
         encode zstd gzip
 
         route {
-                # This endpoint proves ingress liveness even when Atlas is in
-                # intentional maintenance mode. It must not depend on Portal
-                # or API availability.
                 handle /_atlas/ingress-health {
                         respond "ok" 200
                 }
-
+                # Forward authorization is an internal proxy operation only.
+                handle /_atlas/maintenance/* {
+                        respond "Not Found" 404
+                }
                 @atlas_maintenance {
                         file {
                                 root /etc/atlas-maintenance
-                                try_files /enabled
+                                try_files /enabled /control-pending
                         }
                 }
-
-                # Maintenance artwork remains available while Portal/API requests
-                # stay isolated behind the HTTP 503 maintenance boundary.
+                @admin_console path /maintenance/admin.html /maintenance/admin.js /maintenance/admin.css
+                handle @admin_console {
+                        header Cache-Control "no-store"
+                        header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+                        root * /srv
+                        file_server
+                }
                 handle /maintenance/* {
                         root * /srv
                         file_server
                 }
-
-                handle @atlas_maintenance {
-                        header Retry-After "300"
-                        header Content-Type "text/html; charset=utf-8"
-                        respond <<HTML
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark">
-  <title>Project Atlas Maintenance</title>
-  <style>
-    :root {
-      color-scheme: dark;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #07111f;
-      color: #f8fafc;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    html,
-    body {
-      min-height: 100%;
-      margin: 0;
-    }
-
-    body {
-      display: grid;
-      min-height: 100vh;
-      min-height: 100dvh;
-      place-items: center;
-      padding: clamp(1rem, 3vw, 2.5rem);
-      background:
-        radial-gradient(circle at top, rgba(30, 64, 175, 0.2), transparent 42rem),
-        #07111f;
-    }
-
-    main {
-      width: min(100%, 72rem);
-    }
-
-    .maintenance-frame {
-      overflow: hidden;
-      border: 1px solid rgba(148, 163, 184, 0.28);
-      border-radius: 1.25rem;
-      background: rgba(15, 23, 42, 0.88);
-      box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, 0.35);
-    }
-
-    picture,
-    img {
-      display: block;
-      width: 100%;
-    }
-
-    img {
-      max-height: min(72vh, 48rem);
-      object-fit: contain;
-      background: #07111f;
-    }
-
-    .maintenance-copy {
-      padding: clamp(1.25rem, 3vw, 2rem);
-      text-align: center;
-    }
-
-    h1 {
-      margin: 0;
-      color: #f8fafc;
-      font-size: clamp(1.5rem, 3vw, 2.35rem);
-      line-height: 1.15;
-    }
-
-    p {
-      max-width: 48rem;
-      margin: 0.85rem auto 0;
-      color: #cbd5e1;
-      font-size: clamp(1rem, 2vw, 1.1rem);
-      line-height: 1.65;
-    }
-  </style>
-</head>
-<body>
-  <main>
-    <section class="maintenance-frame" aria-labelledby="maintenance-title">
-      <picture aria-hidden="true">
-        <source
-          media="(max-width: 640px) and (orientation: portrait)"
-          srcset="/maintenance/Maintenance_Phone_Image.png">
-        <source
-          media="(max-width: 1024px)"
-          srcset="/maintenance/Maintenance_Tablet_Image.png">
-        <img
-          src="/maintenance/Maintenance_Desktop_Image.png"
-          alt=""
-          decoding="async">
-      </picture>
-      <div class="maintenance-copy">
-        <h1 id="maintenance-title">Project Atlas is currently under maintenance.</h1>
-        <p>We are working to get it back up and running as soon as possible.</p>
-      </div>
-    </section>
-  </main>
-</body>
-</html>
-HTML 503
-                }
-
-                # API documentation and schema metadata are intentionally
-                # unavailable at public ingress. FastAPI also disables these
-                # routes so this boundary remains fail-closed if proxy routing
-                # changes later.
                 @atlas_api_metadata path /api/docs /api/docs/* /api/openapi.json /api/redoc /api/redoc/*
                 handle @atlas_api_metadata {
                         respond "Not Found" 404
                 }
-
-                handle /api/* {
+                # These exact credential entry points still enforce API admission.
+                @atlas_auth_entry {
+                        method POST
+                        path /api/v1/auth/login /api/v1/auth/refresh /api/v1/auth/logout /api/v1/auth/browser/login /api/v1/auth/browser/refresh /api/v1/auth/browser/logout
+                }
+                handle @atlas_auth_entry {
                         reverse_proxy atlas-api:8000
                 }
-
-                handle {
-                        reverse_proxy atlas-portal:3000
+                # Drain only a viewer's signed, scoped cleanup capability.
+                # API validation still checks owner, session, target and lease.
+                @atlas_live_release {
+                        method DELETE
+                        path_regexp maintenance_release ^/api/v1/sports/live/sessions/[A-Za-z0-9_-]{1,256}/release-capability$
                 }
+                handle @atlas_live_release {
+                        reverse_proxy atlas-api:8000
+                }
+                handle @atlas_maintenance {
+                        route {
+                                import atlas_required_admin_auth
+                                handle /api/* {
+                                        reverse_proxy atlas-api:8000
+                                }
+                                handle {
+                                        reverse_proxy atlas-portal:3000
+                                }
+                        }
+                }
+                handle {
+                        route {
+                                # Consult the authority even if the local marker is absent.
+                                import atlas_maintenance_auth
+                                handle /api/* {
+                                        reverse_proxy atlas-api:8000
+                                }
+                                handle {
+                                        reverse_proxy atlas-portal:3000
+                                }
+                        }
+                }
+        }
+        handle_errors {
+                import atlas_maintenance_page
         }
 }
 
@@ -202,39 +124,52 @@ playback.shadowinc.co {
                 path /_atlas/playback/bootstrap
         }
 
-        handle @playback_bootstrap_options {
-                header Access-Control-Allow-Headers "Authorization, Content-Type"
-                header Access-Control-Allow-Methods "POST, OPTIONS"
-                respond "" 204
-        }
-
-        handle /_atlas/playback/bootstrap {
-                reverse_proxy atlas-api:8000
-        }
-
-        @playback_media path /videos/*
-
-        handle @playback_media {
-                forward_auth atlas-api:8000 {
-                        uri /_atlas/playback/authorize
-                        copy_headers X-Atlas-Jellyfin-Authorization
-                }
-
-                reverse_proxy jellyfin:8096 {
-                        header_up Authorization {http.request.header.X-Atlas-Jellyfin-Authorization}
-                        header_up -X-Atlas-Jellyfin-Authorization
-
-                        # Atlas owns browser CORS on the dedicated playback
-                        # origin. Do not expose Jellyfin's wildcard CORS
-                        # response alongside Atlas's credentialed origin.
-                        header_down -Access-Control-Allow-Origin
-                        header_down -Access-Control-Allow-Credentials
+        @playback_held {
+                file {
+                        root /etc/atlas-maintenance
+                        try_files /enabled /control-pending
                 }
         }
 
-        handle {
-                respond "Not Found" 404
+        route {
+                # Browser headers cannot turn off or fabricate a local hold.
+                request_header -X-Atlas-Maintenance-Required
+                request_header @playback_held X-Atlas-Maintenance-Required "1"
+                handle @playback_bootstrap_options {
+                        header Access-Control-Allow-Headers "Authorization, Content-Type"
+                        header Access-Control-Allow-Methods "POST, OPTIONS"
+                        respond "" 204
+                }
+
+                handle /_atlas/playback/bootstrap {
+                        reverse_proxy atlas-api:8000
+                }
+
+                @playback_media path /videos/*
+
+                handle @playback_media {
+                        forward_auth atlas-api:8000 {
+                                uri /_atlas/playback/authorize
+                                copy_headers X-Atlas-Jellyfin-Authorization
+                        }
+
+                        reverse_proxy jellyfin:8096 {
+                                header_up Authorization {http.request.header.X-Atlas-Jellyfin-Authorization}
+                                header_up -X-Atlas-Jellyfin-Authorization
+
+                                # Atlas owns browser CORS on the dedicated playback
+                                # origin. Do not expose Jellyfin's wildcard CORS
+                                # response alongside Atlas's credentialed origin.
+                                header_down -Access-Control-Allow-Origin
+                                header_down -Access-Control-Allow-Credentials
+                        }
+                }
+
+                handle {
+                        respond "Not Found" 404
+                }
         }
+
 }
 
 # Jellyfin is the playback/transcoding backend behind Atlas Theater.
@@ -245,5 +180,28 @@ jellyfin.shadowinc.co {
 
         encode zstd gzip
 
-        reverse_proxy jellyfin:8096
+        @jellyfin_held {
+                file {
+                        root /etc/atlas-maintenance
+                        try_files /enabled /control-pending
+                }
+        }
+        route {
+                handle @jellyfin_held {
+                        header Cache-Control "no-store"
+                        header Retry-After "300"
+                        respond "Atlas is under maintenance." 503
+                }
+                handle {
+                        route {
+                                import atlas_closed_media_origin_auth
+                                reverse_proxy jellyfin:8096
+                        }
+                }
+        }
+        handle_errors {
+                header Cache-Control "no-store"
+                header Retry-After "300"
+                respond "Atlas media is unavailable." 503
+        }
 }

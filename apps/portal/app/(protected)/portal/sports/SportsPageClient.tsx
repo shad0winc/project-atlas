@@ -378,6 +378,9 @@ export function SportsPageClient(): React.ReactElement {
   }, []);
 
   useEffect(() => {
+    // Capture the stable tracker method, while reading its latest owned session
+    // when cleanup runs. This is a closure accessor, not a React ref snapshot.
+    const currentTerminalRelease = terminalRelease.current;
     return () => {
       discoveryAbort.current?.abort();
       liveRequestVersionRef.current += 1;
@@ -387,7 +390,7 @@ export function SportsPageClient(): React.ReactElement {
 
       activeLiveSessionRef.current = null;
 
-      if (terminalRelease.current() !== null) {
+      if (currentTerminalRelease() !== null) {
         void terminalRelease.release((owned) => releaseSportsLiveSession(
           owned.liveSessionId, { releaseCapability: owned.releaseCapability },
         ));

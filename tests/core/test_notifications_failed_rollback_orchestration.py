@@ -110,11 +110,15 @@ atlas_deployment_verify_runtime() {
   fi
 }
 
+atlas_maintenance_transaction_enable() { atlas_command_maintenance enable; }
+
+atlas_maintenance_transaction_hold() { atlas_command_maintenance retain; }
+
 atlas_command_maintenance() {
   printf 'maintenance:%s\n' "$1" >> "$EVENT_LOG"
   case "$1" in
-    disable)
-      rm -f -- "$MAINTENANCE_FLAG"
+    retain)
+      test -f "$MAINTENANCE_FLAG"
       ;;
     enable)
       printf 'enabled\n' > "$MAINTENANCE_FLAG"
@@ -224,7 +228,7 @@ def test_public_notifications_attestation_restores_maintenance(
         "doctor",
         "atlas-verify",
         "notifications-attest:1",
-        "maintenance:disable",
+        "maintenance:retain",
         "doctor",
         "atlas-verify",
         "notifications-attest:2",
@@ -240,7 +244,7 @@ def test_invalid_adopted_identity_blocks_private_reopen(
     )
     assert_failure_preserves_state(result)
     assert "notifications-attest:" not in result.events
-    assert "maintenance:disable" not in result.events
+    assert "maintenance:retain" not in result.events
 
 
 def test_historical_baseline_bypasses_notifications_attestation(
@@ -256,7 +260,7 @@ def test_historical_baseline_bypasses_notifications_attestation(
     assert result.events.splitlines() == [
         "doctor",
         "atlas-verify",
-        "maintenance:disable",
+        "maintenance:retain",
         "doctor",
         "atlas-verify",
         "publish",

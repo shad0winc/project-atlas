@@ -97,6 +97,12 @@ class RefreshSessionRegistry:
 
         return len(token_ids)
 
+    def active_session(self, subject: str, token_id: str, expires_at: int) -> bool:
+        """Inspect refresh-session liveness without consuming a rotation token."""
+        with self._lock:
+            self._prune_expired(self._clock())
+            return self._sessions.get(token_id) == (subject, expires_at)
+
     @property
     def active_count(self) -> int:
         """Return the number of unexpired active refresh sessions."""

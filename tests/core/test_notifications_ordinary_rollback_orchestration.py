@@ -145,6 +145,10 @@ atlas_deployment_verify_runtime() {
   [[ "$ATTEST_COUNT" -ne "$FAIL_ON" ]]
 }
 
+atlas_maintenance_transaction_enable() { atlas_command_maintenance enable; }
+
+atlas_maintenance_transaction_hold() { atlas_command_maintenance retain; }
+
 atlas_command_maintenance() {
   printf 'maintenance:%s\n' "$1" >> "$EVENT_LOG"
 
@@ -152,8 +156,8 @@ atlas_command_maintenance() {
     enable)
       printf 'enabled\n' > "$MAINTENANCE_FLAG"
       ;;
-    disable)
-      rm -f -- "$MAINTENANCE_FLAG"
+    retain)
+      test -f "$MAINTENANCE_FLAG"
       ;;
     *)
       return 2
@@ -269,7 +273,7 @@ def test_public_attestation_failure_restores_maintenance(
         "doctor",
         "atlas-verify",
         "notifications-attest:1",
-        "maintenance:disable",
+        "maintenance:retain",
         "doctor",
         "atlas-verify",
         "notifications-attest:2",
@@ -286,7 +290,7 @@ def test_invalid_adopted_identity_prevents_public_reopen(
 
     assert_attestation_failure_preserves_state(result)
     assert "notifications-attest:" not in result.events
-    assert "maintenance:disable" not in result.events
+    assert "maintenance:retain" not in result.events
 
 
 @pytest.mark.parametrize("adopted", (False, True))
@@ -305,11 +309,11 @@ def test_matching_or_historical_baseline_finalizes_in_order(
     assert result.transaction_status == "rolled_back"
     assert result.baseline_status == "verified"
     assert result.lock_exists is False
-    assert result.maintenance_exists is False
+    assert result.maintenance_exists is True
 
     events = result.events.splitlines()
 
-    assert events.count("maintenance:disable") == 1
+    assert events.count("maintenance:retain") == 1
     assert events.count("set-current:baseline-test") == 1
     assert events.count("release:update-test") == 1
 

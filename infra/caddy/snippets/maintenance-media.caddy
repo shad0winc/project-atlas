@@ -1,0 +1,14 @@
+# Raw Jellyfin has no shared admin cookie bypass. Atlas Theater uses the
+# separately scoped transport. Consult authority even without a local marker.
+(atlas_closed_media_origin_auth) {
+        forward_auth atlas-api:8000 {
+                uri /_atlas/maintenance/closed-origin
+                header_up -X-Atlas-Maintenance-Required
+                @media_origin_denied status 401 403 503
+                handle_response @media_origin_denied {
+                        header Cache-Control "no-store"
+                        header Retry-After "300"
+                        respond "Atlas is under maintenance." 503
+                }
+        }
+}

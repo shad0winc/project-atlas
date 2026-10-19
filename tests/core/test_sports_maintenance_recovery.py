@@ -24,7 +24,7 @@ class ControllerTests(unittest.TestCase):
     def test_all_ten_failures_retain_private_maintenance_and_owner(self):
         with contextlib.redirect_stdout(io.StringIO()): support.failure_cases()
 
-    def test_success_releases_only_after_checks_and_kernel_exclusion_is_owned(self):
+    def test_success_keeps_maintenance_after_checks_and_private_owner_release(self):
         with tempfile.TemporaryDirectory(prefix='atlas-maint-rehearsal.', dir='/tmp') as temporary:
             root = Path(temporary); calls = []
             def stop():
@@ -37,6 +37,9 @@ class ControllerTests(unittest.TestCase):
             actions['stop'] = stop
             result = support.execute(root, actions)
             self.assertTrue(result['success'])
+            self.assertTrue(result['maintenance_retained'])
+            self.assertFalse(result['lock_retained'])
+            self.assertNotIn('disable',result['events'])
             self.assertEqual(calls, ['stop', 'revert', 'validate', 'start', 'ready', 'runtime', 'runtime'])
             with (root/'deployment-scheduler.lock').open('rb') as handle:
                 fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)

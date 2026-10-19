@@ -219,7 +219,7 @@ class MetadataRecoveryTests(unittest.TestCase):
 
     def test_format_three_live_preflight_stops_before_deployment_actions(self):
         marker=self.root/'unexpected'
-        with tempfile.TemporaryDirectory(prefix='project-atlas-restore.') as directory:
+        with tempfile.TemporaryDirectory(prefix='project-atlas-restore.', dir='/tmp') as directory:
             stage=Path(directory);(stage/'RECOVERY_FORMAT').write_text('3\n')
             script='source "$RESTORE"; atlas_deployment_validate_source() { touch "$MARKER"; return 1; }; atlas_restore_require_production_preflight "$STAGE"'
             result=self.shell(script,{'RESTORE':str(ROOT/'scripts/commands/restore.sh'),
