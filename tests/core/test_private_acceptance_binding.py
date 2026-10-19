@@ -35,7 +35,8 @@ class PrivateAcceptanceBindingTests(unittest.TestCase):
         def git(*args):
             subprocess.run(['git','-C',str(self.source),*args],check=True,capture_output=True)
         shutil.copytree(ROOT/'scripts',self.source/'scripts',ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
-        git('init','-b','main');git('add','atlas','scripts')
+        shutil.copyfile(ROOT/'.gitignore',self.source/'.gitignore')
+        git('init','-b','main');git('add','.gitignore','atlas','scripts')
         git('-c','user.name=Atlas fixture','-c','user.email=fixture@example.invalid','commit','-m','Fixture canonical acceptance source')
         self.providers=self.root/'provider.json'
         self.providers.write_text(json.dumps({'fixture':{'status':'healthy','refresh_state':'deferred',
@@ -63,6 +64,18 @@ class PrivateAcceptanceBindingTests(unittest.TestCase):
             (attempt/(stage+'.log')).write_text(text);(attempt/(stage+'.exit')).write_text('0\n')
 
     def finish(self,attempt):return self.acceptance.finish('reconciliation-new',attempt.name)
+
+    def test_generated_bytecode_is_ignored_but_untracked_source_is_refused(self):
+        import py_compile
+        target=self.source/'atlas/deployment_private_acceptance.py'
+        bytecode=Path(py_compile.compile(str(target),doraise=True))
+        self.assertTrue(bytecode.is_file())
+        status=subprocess.run(['git','-C',str(self.source),'status','--porcelain','--untracked-files=all'],
+                              check=True,capture_output=True).stdout
+        self.assertEqual(status,b'')
+        self.acceptance._source(self.source)
+        (self.source/'untracked-acceptance-source.py').write_text('unreviewed = True\n')
+        with self.assertRaises(MaintenanceControlError):self.acceptance._source(self.source)
 
     def test_native_capture_writes_bound_logs_through_real_collector_cli(self):
         bin_dir=self.root/'bin';bin_dir.mkdir();runtime=self.root/'docker-inspect.json';runtime.write_text(json.dumps(self.rows))
