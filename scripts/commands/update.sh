@@ -897,6 +897,10 @@ atlas_update_execute_locked() {
 
   previous_record="$(atlas_deployment_require_current_record)" || return 1
 
+  if [[ "$scope" != all ]]; then
+    atlas_deployment_validate_update_inheritance "$previous_record" "$scope" || return 1
+  fi
+
   atlas_deployment_verify_runtime "$previous_record" || {
     echo 'ERROR: production runtime differs from the verified baseline.' >&2
     return 1

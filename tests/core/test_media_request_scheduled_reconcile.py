@@ -301,6 +301,7 @@ def test_default_service_uses_requests_directory_override(
 
 def test_default_service_uses_canonical_requests_root(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     monkeypatch.delenv(
         "ATLAS_REQUESTS_DIR",
@@ -313,11 +314,19 @@ def test_default_service_uses_canonical_requests_root(
         FactoryProvider,
     )
 
+    # Check configuration selection without inspecting a host's real registry.
+    selected_roots = []
+    def private_repository(root):
+        selected_roots.append(Path(root))
+        return JsonMediaRequestRepository(tmp_path / "requests")
+    monkeypatch.setattr(
+        "atlas.media_requests.scheduled_reconcile.open_request_repository",
+        private_repository,
+    )
     service = build_default_service()
 
-    assert service.repository.root == (
-        DEFAULT_REQUESTS_ROOT
-    )
+    assert selected_roots == [DEFAULT_REQUESTS_ROOT]
+    assert service.repository.root == tmp_path / "requests"
 
 
 def test_default_service_rejects_empty_requests_directory(
