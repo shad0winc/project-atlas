@@ -390,7 +390,7 @@ def _require_browser_origin(request: Request) -> None:
         raise HTTPException(403, "Browser session request origin is not permitted.")
 
 
-def _browser_response(tokens: TokenResponse, jwt_service: JWTService) -> Response:
+def _browser_response(tokens: TokenResponse, jwt_service: JWTService, *, authentication=None, profiles=None) -> Response:
     claims = jwt_service.decode_token(tokens.refresh_token, expected_type=TokenType.REFRESH)
     response = JSONResponse(
         {"access_token": tokens.access_token, "token_type": tokens.token_type},
@@ -401,6 +401,8 @@ def _browser_response(tokens: TokenResponse, jwt_service: JWTService) -> Respons
         max_age=max(0, claims.expires_at - int(time.time())),
         path=_BROWSER_PATH, secure=True, httponly=True, samesite="strict",
     )
+    from atlas_api.services.maintenance_access import attach_browser_cookie
+    attach_browser_cookie(response, tokens, jwt_service, authentication, profiles)
     return response
 
 
@@ -415,6 +417,7 @@ def _clear_browser_response(status_code: int = 204) -> Response:
         _BROWSER_COOKIE, path=_BROWSER_PATH,
         secure=True, httponly=True, samesite="strict",
     )
+    response.delete_cookie("__Host-atlas_maintenance", path="/", secure=True, httponly=True, samesite="strict")
     return response
 
 
@@ -424,10 +427,11 @@ def browser_login(
     credentials: LoginRequest,
     authentication: AuthenticationService = Depends(get_authentication_service),
     jwt_service: JWTService = Depends(get_jwt_service),
+    profiles=Depends(get_user_profile_store),
 ) -> Response:
     _require_browser_origin(request)
     tokens = login(credentials, authentication)
-    return _browser_response(tokens, jwt_service)
+    return _browser_response(tokens, jwt_service, authentication=authentication, profiles=profiles)
 
 
 @router.post("/browser/refresh")
@@ -451,7 +455,7 @@ def browser_refresh(
         if error.status_code != 401:
             raise
         return _clear_browser_response(401)
-    return _browser_response(tokens, jwt_service)
+    return _browser_response(tokens, jwt_service, authentication=authentication, profiles=profiles)
 
 
 @router.post("/browser/logout", status_code=204)

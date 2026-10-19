@@ -1,0 +1,21 @@
+(atlas_maintenance_auth) {
+        forward_auth atlas-api:8000 {
+                uri /_atlas/maintenance/authorize
+                header_up -X-Atlas-Maintenance-Required
+                @maintenance_denied status 401 403 503
+                handle_response @maintenance_denied {
+                        import atlas_maintenance_page
+                }
+        }
+}
+
+(atlas_required_admin_auth) {
+        forward_auth atlas-api:8000 {
+                uri /_atlas/maintenance/authorize
+                header_up X-Atlas-Maintenance-Required "1"
+                @maintenance_denied status 401 403 503
+                handle_response @maintenance_denied {
+                        import atlas_maintenance_page
+                }
+        }
+}

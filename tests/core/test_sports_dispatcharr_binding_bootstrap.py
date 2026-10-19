@@ -225,7 +225,7 @@ def test_binding_bootstrap_precedes_maintenance_and_backup_statically() -> None:
         "atlas_sports_dispatcharr_binding_bootstrap_provision"
     )
     maintenance = source.index(
-        "atlas_command_maintenance enable",
+        'atlas_maintenance_transaction_enable "$identifier"',
         bootstrap,
     )
     backup = source.index(

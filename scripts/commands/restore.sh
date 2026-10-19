@@ -417,12 +417,17 @@ atlas_restore_require_production_preflight() {
   current_record="$(atlas_deployment_require_current_record)" || return 1
   [[ -d "$current_record" ]] || return 1
 
-  [[ ! -f "$(atlas_maintenance_flag)" ]] || {
-    echo 'ERROR: live restore requires maintenance mode to be disabled at preflight.' >&2
+  # A repair may begin inside an existing maintenance window. Malformed state
+  # is never interpreted as an absent flag; the authority validates all parents
+  # and pending/audit state before writers are stopped or backup/application.
+  local maintenance_flag
+  maintenance_flag="$(atlas_maintenance_flag)"
+  [[ ! -L "$maintenance_flag" && ( ! -e "$maintenance_flag" || -f "$maintenance_flag" ) ]] || {
+    echo 'ERROR: live restore maintenance state is uncertain.' >&2
     return 1
   }
 
-  [[ ! -e "$(atlas_deployment_lock_dir)" ]] || {
+  [[ ! -e "$(atlas_deployment_lock_dir)" && ! -L "$(atlas_deployment_lock_dir)" ]] || {
     echo 'ERROR: live restore requires the shared deployment lock to be free.' >&2
     return 1
   }
@@ -624,8 +629,8 @@ atlas_restore_cleanup_before_mutation() {
     echo 'CRITICAL: restore pre-mutation cleanup writers are not ready.' >&2
     return 1
   }
-  atlas_maintenance_disable || {
-    echo 'CRITICAL: restore pre-mutation cleanup could not reopen maintenance.' >&2
+  atlas_maintenance_transaction_hold "$identifier" "${exclusion_fd:-}" || {
+    echo 'CRITICAL: restore pre-mutation cleanup could not prove the maintenance hold.' >&2
     return 1
   }
   atlas_deployment_release_lock "$identifier" || return 1
@@ -666,16 +671,16 @@ atlas_restore_complete_applied_transaction() {
     return 1
   }
 
-  atlas_maintenance_disable || {
+  atlas_maintenance_transaction_hold "$identifier" "${exclusion_fd:-}" || {
     atlas_restore_report_held_failure \
-      "$identifier" 'unable to reopen public ingress after restore.'
+      "$identifier" 'unable to prove maintenance hold after restore.'
     return 1
   }
 
   if ! atlas_restore_verify_runtime_boundary; then
     atlas_maintenance_enable >/dev/null 2>&1 || true
     atlas_restore_report_held_failure \
-      "$identifier" 'public post-restore verification failed.'
+      "$identifier" 'held post-restore verification failed.'
     return 1
   fi
 
@@ -731,15 +736,14 @@ atlas_restore_apply_live_locked() {
 
   atlas_deployment_acquire_lock "$identifier" || return 1
 
-  if ! atlas_maintenance_enable; then
+  if ! atlas_maintenance_transaction_enable "$identifier" "${exclusion_fd:-}"; then
     atlas_deployment_release_lock "$identifier" || true
     return 1
   fi
 
   if ! atlas_restore_verify_maintenance_isolation; then
-    atlas_maintenance_disable || true
-    atlas_deployment_release_lock "$identifier" || true
-    echo 'ERROR: maintenance isolation verification failed before restore.' >&2
+    atlas_restore_report_held_failure \
+      "$identifier" 'maintenance isolation verification failed before restore.'
     return 1
   fi
 
@@ -850,6 +854,22 @@ atlas_restore_require_held_transaction() {
 }
 
 atlas_restore_resume_live() {
+  local exclusion_fd
+  local status
+  atlas_execution_exclusion_acquire exclusion_fd || return 1
+  if atlas_restore_resume_live_locked "$@"; then
+    status=0
+  else
+    status=$?
+  fi
+  if ! atlas_execution_exclusion_release "$exclusion_fd"; then
+    echo 'CRITICAL: unable to release restore execution exclusion.' >&2
+    status=1
+  fi
+  return "$status"
+}
+
+atlas_restore_resume_live_locked() {
   local identifier="$1"
   local transaction status
 
@@ -875,6 +895,22 @@ atlas_restore_resume_live() {
 }
 
 atlas_restore_abort_live() {
+  local exclusion_fd
+  local status
+  atlas_execution_exclusion_acquire exclusion_fd || return 1
+  if atlas_restore_abort_live_locked "$@"; then
+    status=0
+  else
+    status=$?
+  fi
+  if ! atlas_execution_exclusion_release "$exclusion_fd"; then
+    echo 'CRITICAL: unable to release restore execution exclusion.' >&2
+    status=1
+  fi
+  return "$status"
+}
+
+atlas_restore_abort_live_locked() {
   local identifier="$1"
   local transaction status
 
@@ -917,15 +953,15 @@ atlas_restore_abort_live() {
     return 1
   }
 
-  atlas_maintenance_disable || {
+  atlas_maintenance_transaction_hold "$identifier" "${exclusion_fd:-}" || {
     atlas_restore_report_held_failure \
-      "$identifier" 'unable to reopen public ingress after restore abort.'
+      "$identifier" 'unable to prove maintenance hold after restore abort.'
     return 1
   }
   if ! atlas_restore_verify_runtime_boundary; then
     atlas_maintenance_enable >/dev/null 2>&1 || true
     atlas_restore_report_held_failure \
-      "$identifier" 'public verification failed after restore abort.'
+      "$identifier" 'held verification failed after restore abort.'
     return 1
   fi
 

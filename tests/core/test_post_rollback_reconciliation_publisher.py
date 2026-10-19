@@ -283,13 +283,17 @@ atlas_deployment_verify_rollback_runtime() {
   fi
 }
 
+atlas_maintenance_transaction_enable() { atlas_command_maintenance enable; }
+
+atlas_maintenance_transaction_hold() { atlas_command_maintenance retain; }
+
 atlas_command_maintenance() {
   local action="$1"
   printf 'maintenance:%s\n' "$action" >> "$EVENT_LOG"
 
   case "$action" in
-    disable)
-      rm -f -- "$MAINTENANCE_FLAG"
+    retain)
+      test -f "$MAINTENANCE_FLAG"
       ;;
     enable)
       printf 'enabled\n' > "$MAINTENANCE_FLAG"
@@ -387,14 +391,14 @@ def test_failed_rollback_recovery_success_orders_finalization_before_release(
 
     assert result.events.splitlines() == [
         "verify:1",
-        "maintenance:disable",
+        "maintenance:retain",
         "verify:2",
         "publish",
         "set-current:baseline-reconciliation-test",
         "release:update-test",
     ]
 
-    assert result.maintenance_exists is False
+    assert result.maintenance_exists is True
     assert "Failed-rollback recovery complete" in result.stdout
 
 
@@ -410,7 +414,7 @@ def test_failed_rollback_public_verify_failure_reenables_and_retains_lock(
 
     assert result.events.splitlines() == [
         "verify:1",
-        "maintenance:disable",
+        "maintenance:retain",
         "verify:2",
         "maintenance:enable",
     ]
@@ -433,7 +437,7 @@ def test_failed_rollback_publish_failure_reenables_and_retains_lock(
 
     assert result.events.splitlines() == [
         "verify:1",
-        "maintenance:disable",
+        "maintenance:retain",
         "verify:2",
         "publish",
         "maintenance:enable",

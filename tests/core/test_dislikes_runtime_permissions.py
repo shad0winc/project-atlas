@@ -129,7 +129,7 @@ def test_ingress_update_bootstraps_dislikes_before_maintenance_and_backup() -> N
         "echo 'Target artifact preflight: PASS'"
     )
     maintenance = source.index(
-        "if ! atlas_command_maintenance enable",
+        'if ! atlas_maintenance_transaction_enable "$identifier"',
         transaction_start,
     )
     backup = source.index(

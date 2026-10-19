@@ -1,4 +1,4 @@
-"""Private adapters for the unchanged shell restore-abort controller.
+"""Private adapters for the held-completion shell restore-abort controller.
 
 This module is a rehearsal adapter, never a production restore API.
 """
@@ -15,7 +15,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 ORDER = ('held', 'stop', 'revert', 'validate', 'start', 'ready',
-         'runtime-held', 'disable', 'runtime-public', 'release')
+         'runtime-held', 'retain', 'runtime-held-again', 'release')
 CLIENT = """import os,sys,select
 os.write(int(sys.argv[1]),(sys.argv[3]+'\\n').encode())
 assert select.select([int(sys.argv[2])],[],[],900)[0]
@@ -40,19 +40,25 @@ atlas_backup_recovery_revert_applied_state() {
 atlas_restore_validate_live_consumers() { rpc validate; }
 atlas_restore_start_writers() { rpc start; }
 atlas_restore_wait_for_writers() { rpc ready; }
+runtime_checks=0
 atlas_restore_verify_runtime_boundary() {
-  if [[ -f "$PRIVATE_ROOT/maintenance" ]]; then rpc runtime-held
-  else rpc runtime-public; fi
+  [[ -f "$PRIVATE_ROOT/maintenance" ]] || return 1
+  runtime_checks=$((runtime_checks+1))
+  if [[ "$runtime_checks" == 1 ]]; then rpc runtime-held
+  else rpc runtime-held-again; fi
 }
-atlas_maintenance_disable() { rpc disable; }
+atlas_maintenance_transaction_hold() {
+  [[ "$1" == restore-rehearsal && "$2" =~ ^[0-9]+$ ]] || return 1
+  rpc retain
+}
+atlas_maintenance_disable() { echo FORBIDDEN_REOPEN >&2; return 99; }
 atlas_maintenance_enable() { : > "$PRIVATE_ROOT/maintenance"; }
 atlas_deployment_release_lock() {
   [[ "$1" == restore-rehearsal ]] || return 1
   rpc release
 }
-atlas_execution_exclusion_acquire rehearsal_fd || exit 1
+# The real wrapper acquires exclusion once and owns it through every callback.
 if atlas_restore_abort_live restore-rehearsal; then result=0; else result=$?; fi
-atlas_execution_exclusion_release "$rehearsal_fd" || exit 1
 exit "$result"
 '''
 
@@ -101,7 +107,7 @@ def execute(root, actions, *, fail_at=None):
                 op = request.decode('ascii').removesuffix('\n')
                 require(not failed and len(events) < len(ORDER) and op == ORDER[len(events)])
                 require(lock.read_text() == 'restore-rehearsal\n')
-                require(maintenance.exists() == (op not in {'runtime-public', 'release'}))
+                require(maintenance.is_file())
                 events.append(op)
                 require(op != fail_at)
                 if op in {'stop', 'revert', 'validate', 'start', 'ready'}:
@@ -109,7 +115,7 @@ def execute(root, actions, *, fail_at=None):
                 elif op.startswith('runtime-'): actions['runtime']()
                 if op == 'held': require((tx/'status').read_text().strip() == 'applied-awaiting-verification')
                 elif op == 'revert': (tx/'status').write_text('reverted\n')
-                elif op == 'disable': maintenance.unlink()
+                elif op == 'retain': require(maintenance.is_file())
                 elif op == 'release':
                     require((tx/'status').read_text().strip() == 'aborted')
                     lock.unlink()
@@ -128,7 +134,7 @@ def execute(root, actions, *, fail_at=None):
               'maintenance_retained': maintenance.exists(), 'lock_retained': lock.exists(),
               'status': (tx/'status').read_text().strip()}
     if result['success']:
-        require(events == list(ORDER) and not maintenance.exists() and not lock.exists()
+        require(events == list(ORDER) and maintenance.is_file() and not lock.exists()
                 and result['status'] == 'aborted')
     else:
         require(maintenance.is_file() and lock.is_file())

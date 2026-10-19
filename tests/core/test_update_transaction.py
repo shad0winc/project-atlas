@@ -358,12 +358,14 @@ def run_update(
     atlas_command_verify() {
       echo verify >> "$ATLAS_TEST_EVENTS"
       if [[ "${ATLAS_TEST_VERIFY_FAIL_AFTER_DISABLE:-0}" == "1" ]] &&
-        grep -Fxq 'maintenance:disable' "$ATLAS_TEST_EVENTS"
+        grep -Fxq 'maintenance:retain' "$ATLAS_TEST_EVENTS"
       then
         return 1
       fi
       return "${ATLAS_TEST_VERIFY_STATUS:-0}"
     }
+    atlas_maintenance_transaction_enable() { atlas_command_maintenance enable; }
+    atlas_maintenance_transaction_hold() { atlas_command_maintenance retain; }
     atlas_command_maintenance() {
       echo "maintenance:$1" >> "$ATLAS_TEST_EVENTS"
       return "${ATLAS_TEST_MAINTENANCE_STATUS:-0}"
@@ -565,7 +567,7 @@ def test_ingress_untraversable_tracked_directory_fails_before_network_or_mainten
     )
 
 
-def test_core_update_preflights_artifacts_before_maintenance_and_reopens_on_success(
+def test_core_update_preflights_artifacts_before_maintenance_and_retains_maintenance_on_success(
     tmp_path: Path,
 ) -> None:
     environment = prepare_runtime(tmp_path)
@@ -608,7 +610,7 @@ def test_core_update_preflights_artifacts_before_maintenance_and_reopens_on_succ
     assert all(render < inspection < maintenance for inspection in inspections)
     assert maintenance < backup < apply
 
-    assert events[-3:] == ["maintenance:disable", "doctor", "verify"]
+    assert events[-3:] == ["maintenance:retain", "doctor", "verify"]
     assert not lock_path(environment).exists()
     assert not any("image prune" in event for event in events)
 
@@ -647,7 +649,7 @@ def test_post_verify_failure_keeps_maintenance_and_lock(tmp_path: Path) -> None:
     assert result.returncode != 0
     events = event_lines(environment)
     assert "maintenance:enable" in events
-    assert "maintenance:disable" not in events
+    assert "maintenance:retain" not in events
     assert lock_path(environment).is_dir()
 
 
@@ -684,7 +686,7 @@ def test_ingress_scope_prepares_builds_and_applies_without_network_in_maintenanc
 
     assert events.count("ingress-verify") == 2
 
-    disable = events.index("maintenance:disable")
+    disable = events.index("maintenance:retain")
 
     assert events.index("ingress-verify") < disable
     assert events.index("ingress-verify", disable + 1) > disable
@@ -717,11 +719,11 @@ def test_dashboard_runtime_publication_failure_keeps_maintenance_and_lock(
 
     assert "dashboard-runtime:publish-all" in events
     assert "maintenance:enable" in events
-    assert "maintenance:disable" not in events
+    assert "maintenance:retain" not in events
     assert "Dashboard runtime publication failed." in result.stderr
 
 
-def test_failed_public_reopen_reenables_maintenance_and_keeps_lock(tmp_path: Path) -> None:
+def test_failed_held_completion_reenables_maintenance_and_keeps_lock(tmp_path: Path) -> None:
     environment = prepare_runtime(tmp_path)
     environment["ATLAS_TEST_VERIFY_STATUS"] = "0"
     environment["ATLAS_TEST_VERIFY_FAIL_AFTER_DISABLE"] = "1"
@@ -730,7 +732,7 @@ def test_failed_public_reopen_reenables_maintenance_and_keeps_lock(tmp_path: Pat
 
     assert result.returncode != 0
     events = event_lines(environment)
-    disable = events.index("maintenance:disable")
+    disable = events.index("maintenance:retain")
     assert "verify" in events[disable + 1 :]
     assert "maintenance:enable" in events[disable + 1 :]
     assert lock_path(environment).is_dir()
@@ -738,7 +740,7 @@ def test_failed_public_reopen_reenables_maintenance_and_keeps_lock(tmp_path: Pat
         Path(environment["ATLAS_RUNTIME_CONFIG_DIR"]) / "deployments" / "current"
     ).read_text(encoding="utf-8")
     assert current == "baseline-test\n"
-    assert "public post-maintenance verification failed" in result.stderr
+    assert "held completion verification failed" in result.stderr
 
 
 def test_unknown_scope_is_rejected_before_runtime_mutation(tmp_path: Path) -> None:
@@ -938,7 +940,7 @@ def test_private_post_apply_failure_preserves_target_image_attestation(
     failed_doctor = events.index("doctor", apply + 1)
 
     assert apply < capture < failed_doctor
-    assert "maintenance:disable" not in events
+    assert "maintenance:retain" not in events
     assert lock_path(environment).is_dir()
 
 
@@ -1041,7 +1043,7 @@ def test_readiness_unhealthy_fails_immediately(
     )
 
     assert "maintenance:enable" in event_lines(environment)
-    assert "maintenance:disable" not in event_lines(environment)
+    assert "maintenance:retain" not in event_lines(environment)
     assert lock_path(environment).is_dir()
 
     assert "ingress readiness failed" in result.stderr.lower()
@@ -1067,7 +1069,7 @@ def test_readiness_non_running_container_fails_immediately(
         in readiness_events(environment)
     )
 
-    assert "maintenance:disable" not in event_lines(environment)
+    assert "maintenance:retain" not in event_lines(environment)
     assert lock_path(environment).is_dir()
 
 
@@ -1090,7 +1092,7 @@ def test_readiness_missing_health_contract_fails_immediately(
         in readiness_events(environment)
     )
 
-    assert "maintenance:disable" not in event_lines(environment)
+    assert "maintenance:retain" not in event_lines(environment)
     assert lock_path(environment).is_dir()
 
 
@@ -1118,7 +1120,7 @@ def test_readiness_starting_timeout_fails_closed(
     ]
 
     assert len(caddy_starting) == 3
-    assert "maintenance:disable" not in event_lines(environment)
+    assert "maintenance:retain" not in event_lines(environment)
     assert lock_path(environment).is_dir()
 
     assert "readiness timed out" in result.stderr.lower()
@@ -1187,7 +1189,7 @@ def test_readiness_failure_preserves_maintenance_and_lock(
     events = event_lines(environment)
 
     assert "maintenance:enable" in events
-    assert "maintenance:disable" not in events
+    assert "maintenance:retain" not in events
     assert lock_path(environment).is_dir()
     assert "Recovery command: atlas deployment rollback" in result.stderr
 
@@ -1252,7 +1254,7 @@ def test_identity_writer_runtime_provisioning_failure_aborts_before_ingress_appl
     ]
 
     assert compose_up_events == []
-    assert "maintenance:disable" not in events
+    assert "maintenance:retain" not in events
 
     audit_provision = events.index("audit-runtime:provision")
     assert audit_provision < identity_provision
@@ -1281,7 +1283,7 @@ def test_sports_writer_unhealthy_blocks_ingress_verification(
         "readiness-probe:atlas-sports-writer:running:unhealthy"
         in events
     )
-    assert "maintenance:disable" not in event_lines(environment)
+    assert "maintenance:retain" not in event_lines(environment)
     assert lock_path(environment).is_dir()
 
 
@@ -1307,7 +1309,7 @@ def test_sports_writer_not_running_blocks_ingress_verification(
         "readiness-probe:atlas-sports-writer:exited:healthy"
         in events
     )
-    assert "maintenance:disable" not in event_lines(environment)
+    assert "maintenance:retain" not in event_lines(environment)
     assert lock_path(environment).is_dir()
 
 
@@ -1360,7 +1362,7 @@ def test_sports_runtime_provisioning_failure_aborts_before_ingress_apply(
     ]
 
     assert compose_up_events == []
-    assert "maintenance:disable" not in events
+    assert "maintenance:retain" not in events
 
 
 
@@ -1603,7 +1605,7 @@ def test_post_apply_transient_sports_docker_starting_recovers_within_grace(
 
     enable = events.index("maintenance:enable")
     health_json = events.index("health-json")
-    disable = events.index("maintenance:disable")
+    disable = events.index("maintenance:retain")
 
     assert enable < health_json < disable
     assert not lock_path(environment).exists()
@@ -1649,9 +1651,9 @@ def test_post_apply_critical_health_json_is_classified_despite_nonzero_health_ex
     assert events.count("doctor") >= 4
     assert events.count("health-json") >= 1
     assert "maintenance:enable" in events
-    assert "maintenance:disable" in events
+    assert "maintenance:retain" in events
     assert events.index("health-json") < events.index(
-        "maintenance:disable"
+        "maintenance:retain"
     )
     assert not lock_path(environment).exists()
 
@@ -1687,7 +1689,7 @@ def test_post_apply_unexpected_health_command_failure_remains_fail_closed(
     assert events.count("doctor") == 2
     assert events.count("health-json") == 1
     assert "maintenance:enable" in events
-    assert "maintenance:disable" not in events
+    assert "maintenance:retain" not in events
     assert lock_path(environment).is_dir()
 
 
@@ -1724,8 +1726,8 @@ def test_post_apply_failed_doctor_with_recovered_health_snapshot_retries(
     assert events.count("doctor") >= 4
     assert events.count("health-json") >= 1
     assert "maintenance:enable" in events
-    assert "maintenance:disable" in events
-    assert events.index("health-json") < events.index("maintenance:disable")
+    assert "maintenance:retain" in events
+    assert events.index("health-json") < events.index("maintenance:retain")
     assert not lock_path(environment).exists()
 
 
@@ -1758,7 +1760,7 @@ def test_post_apply_sports_docker_starting_grace_exhausts_fail_closed(
     assert "health-json" in events
 
     assert "maintenance:enable" in events
-    assert "maintenance:disable" not in events
+    assert "maintenance:retain" not in events
     assert lock_path(environment).is_dir()
 
 
@@ -1787,7 +1789,7 @@ def test_post_apply_sports_docker_unhealthy_does_not_receive_startup_grace(
     # An actual unhealthy state must retain existing fail-fast behavior.
     assert events.count("doctor") == 2
     assert events.count("health-json") == 1
-    assert "maintenance:disable" not in events
+    assert "maintenance:retain" not in events
     assert lock_path(environment).is_dir()
 
 
@@ -1835,10 +1837,10 @@ def test_post_apply_transient_sports_provider_health_recovers_within_grace(
     assert "health-json" in events
 
     enable = events.index("maintenance:enable")
-    disable = events.index("maintenance:disable")
+    disable = events.index("maintenance:retain")
 
     assert enable < events.index("health-json") < disable
-    assert events[-3:] == ["maintenance:disable", "doctor", "verify"]
+    assert events[-3:] == ["maintenance:retain", "doctor", "verify"]
     assert not lock_path(environment).exists()
 
 
@@ -1870,7 +1872,7 @@ def test_post_apply_transient_sports_provider_health_grace_exhausts_fail_closed(
 
     # Persistent degradation must never reopen public traffic.
     assert "maintenance:enable" in events
-    assert "maintenance:disable" not in events
+    assert "maintenance:retain" not in events
     assert lock_path(environment).is_dir()
 
     assert "Recovery command: atlas deployment rollback" in result.stderr
@@ -1907,7 +1909,7 @@ def test_post_apply_unrelated_health_failure_does_not_receive_sports_grace(
     assert events.count("doctor") == 2
     assert events.count("health-json") == 1
     assert "maintenance:enable" in events
-    assert "maintenance:disable" not in events
+    assert "maintenance:retain" not in events
     assert lock_path(environment).is_dir()
 
     assert "Recovery command: atlas deployment rollback" in result.stderr
@@ -1952,7 +1954,7 @@ def test_post_apply_mixed_health_failure_does_not_receive_sports_grace(
     assert events.count("doctor") == 2
     assert events.count("health-json") == 1
     assert "maintenance:enable" in events
-    assert "maintenance:disable" not in events
+    assert "maintenance:retain" not in events
     assert lock_path(environment).is_dir()
 
     assert "Recovery command: atlas deployment rollback" in result.stderr
@@ -2024,7 +2026,7 @@ def test_post_apply_realistic_sports_startup_bundle_receives_grace(
 
     enable = events.index("maintenance:enable")
     health_json = events.index("health-json")
-    disable = events.index("maintenance:disable")
+    disable = events.index("maintenance:retain")
 
     assert enable < health_json < disable
     assert not lock_path(environment).exists()

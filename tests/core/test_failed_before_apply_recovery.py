@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -10,11 +11,12 @@ HELP = PROJECT_ROOT / "scripts" / "commands" / "help.sh"
 
 def recovery_section() -> str:
     content = DEPLOYMENT.read_text(encoding="utf-8")
-    return content.split(
+    body = content.split(
         "atlas_deployment_recover_failed_before_apply() {", 1
-    )[1].split(
-        "atlas_command_deployment() {", 1
-    )[0]
+    )[1]
+    # Stop at the next shell function; later publication helpers have their own
+    # verification contract and are not part of failed-before-apply recovery.
+    return re.split(r"(?m)^atlas_[A-Za-z0-9_]+\(\) \{", body, maxsplit=1)[0]
 
 
 def test_deployment_cli_exposes_failed_before_apply_recovery() -> None:
@@ -57,16 +59,16 @@ def test_recovery_requires_matching_lock_owner() -> None:
     assert "another deployment owns the active lock" in section
 
 
-def test_recovery_verifies_runtime_before_disabling_maintenance() -> None:
+def test_recovery_verifies_runtime_before_held_completion() -> None:
     section = recovery_section()
 
     verify_index = section.index("atlas_deployment_verify_runtime")
-    disable_index = section.index("atlas_command_maintenance disable")
+    disable_index = section.index("atlas_maintenance_transaction_hold")
 
     assert verify_index < disable_index
 
 
-def test_recovery_reverifies_baseline_after_public_reopen() -> None:
+def test_recovery_reverifies_baseline_after_held_checkpoint() -> None:
     section = recovery_section()
 
     assert section.count("atlas_deployment_verify_runtime") >= 2
@@ -79,10 +81,10 @@ def test_recovery_reverifies_baseline_after_public_reopen() -> None:
     assert "verify-ingress.sh" not in section
 
 
-def test_recovery_reenables_maintenance_if_public_verification_fails() -> None:
+def test_recovery_reenables_maintenance_if_held_verification_fails() -> None:
     section = recovery_section()
 
-    disable_index = section.index("atlas_command_maintenance disable")
+    disable_index = section.index("atlas_maintenance_transaction_hold")
     tail = section[disable_index:]
 
     assert "atlas_command_maintenance enable" in tail
@@ -290,14 +292,18 @@ exit 97
       return 96
     }
 
+    atlas_maintenance_transaction_enable() { atlas_command_maintenance enable; }
+
+    atlas_maintenance_transaction_hold() { atlas_command_maintenance retain; }
+
     atlas_command_maintenance() {
       local action="$1"
 
       printf 'maintenance:%s\n' "$action" >> "$ATLAS_TEST_EVENTS"
 
       case "$action" in
-        disable)
-          rm -f -- "$ATLAS_TEST_MAINTENANCE"
+        retain)
+          test -f "$ATLAS_TEST_MAINTENANCE"
           ;;
         enable)
           printf '%s\n' enabled > "$ATLAS_TEST_MAINTENANCE"
@@ -465,14 +471,14 @@ def test_recovery_behavior_ignores_current_release_readiness(
     assert "CURRENT_RELEASE_INGRESS_VERIFIER_CALLED" not in events
 
     assert not (root / "update.lock").exists()
-    assert not (tmp_path / "maintenance.flag").exists()
+    assert (tmp_path / "maintenance.flag").exists()
 
     assert (
         root / "records" / "update-test" / "status"
     ).read_text(encoding="utf-8").strip() == "recovered_pre_apply"
 
 
-def test_recovery_behavior_success_orders_reopen_finalize_and_release(
+def test_recovery_behavior_success_orders_hold_finalize_and_release(
     tmp_path: Path,
 ) -> None:
     result, events, root = _run_recovery_behavior(tmp_path)
@@ -482,7 +488,7 @@ def test_recovery_behavior_success_orders_reopen_finalize_and_release(
     assert events == [
         "runtime:1",
         "doctor",
-        "maintenance:disable",
+        "maintenance:retain",
         "doctor",
         "runtime:2",
         "status:recovered_pre_apply",
@@ -490,7 +496,7 @@ def test_recovery_behavior_success_orders_reopen_finalize_and_release(
     ]
 
     assert not (root / "update.lock").exists()
-    assert not (tmp_path / "maintenance.flag").exists()
+    assert (tmp_path / "maintenance.flag").exists()
 
     assert (
         root / "records" / "update-test" / "status"

@@ -53,6 +53,8 @@ def create_app() -> FastAPI:
         lifespan=_lifespan,
     )
 
+    from atlas_api.services.maintenance_access import install_maintenance_middleware
+    install_maintenance_middleware(application)
     application.include_router(v1_router)
     application.include_router(playback_gateway_router)
 

@@ -19,6 +19,7 @@ from atlas_api.auth.models import (
 )
 from atlas_api.auth.provider import AuthenticationProvider
 from atlas_api.auth.sessions import RefreshSessionRegistry
+from atlas_api.auth.maintenance_sessions import MaintenanceSessions
 from atlas_api.auth.throttling import LoginAttemptLimiter
 
 
@@ -35,6 +36,7 @@ class AuthenticationService:
         refresh_sessions: RefreshSessionRegistry | None = None,
         login_attempts: LoginAttemptLimiter | None = None,
         audit_publisher: SecurityAuditPublisher | None = None,
+        admission: Callable[[AuthenticatedUser], None] | None = None,
     ) -> None:
         self._provider = provider
         self._jwt_service = jwt_service
@@ -49,6 +51,10 @@ class AuthenticationService:
             else LoginAttemptLimiter()
         )
         self._audit_publisher = audit_publisher
+        self._admission = admission
+        self._maintenance_sessions = MaintenanceSessions(
+            lambda subject, token_id, expires: self._refresh_sessions.active_session(subject, token_id, expires)
+        )
 
     def login(self, username: str, password: str) -> TokenPair:
         """Authenticate credentials and issue an Atlas token pair."""
@@ -110,6 +116,8 @@ class AuthenticationService:
                 "Username or password is incorrect."
             )
 
+        if self._admission is not None:
+            self._admission(user)
         self._login_attempts.reset(normalized_username)
         tokens = self._issue_token_pair(user)
         self._audit(
@@ -152,6 +160,8 @@ class AuthenticationService:
                 "Refresh token does not belong to this user."
             )
 
+        if self._admission is not None:
+            self._admission(user)
         if not self._refresh_sessions.consume(claims):
             self._audit(
                 "security.session.refresh_rejected",
@@ -229,6 +239,22 @@ class AuthenticationService:
             "provider": user.provider,
         }
 
+    def maintenance_cookie(self, refresh_token: str) -> tuple[str, int]:
+        claims = self._jwt_service.decode_token(refresh_token, expected_type=TokenType.REFRESH)
+        return self._maintenance_sessions.issue_browser(claims.subject, claims.token_id, claims.expires_at)
+
+    def maintenance_cookie_subject(self, value: str) -> str | None:
+        return self._maintenance_sessions.browser_subject(value)
+
+    def maintenance_access_active(self, claims) -> bool:
+        return self._maintenance_sessions.access_active(claims.token_id, claims.subject)
+
+    def maintenance_media_binding(self, claims) -> str:
+        return self._maintenance_sessions.issue_media(claims.token_id, claims.subject)
+
+    def maintenance_media_subject(self, reference: str) -> str | None:
+        return self._maintenance_sessions.media_subject(reference)
+
     def _issue_token_pair(
         self,
         user: AuthenticatedUser,
@@ -241,6 +267,9 @@ class AuthenticationService:
         )
 
         self._refresh_sessions.register(refresh_claims)
+        access_claims = self._jwt_service.decode_token(access_token, expected_type=TokenType.ACCESS)
+        self._maintenance_sessions.bind_access(access_claims.token_id, access_claims.subject,
+            access_claims.expires_at, refresh_claims.token_id, refresh_claims.expires_at)
 
         return TokenPair(
             access_token=access_token,

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Atlas maintenance administration</title>
+  <link rel="stylesheet" href="/maintenance/admin.css">
+  <script src="/maintenance/admin.js" defer></script>
+</head>
+<body>
+  <main>
+    <h1>Maintenance administration</h1>
+    <p>Administrator access for maintenance, repairs, and patching.</p>
+    <p id="notice" role="status" aria-live="polite">Checking administrator session…</p>
+    <form id="login" hidden>
+      <label for="username">Username</label>
+      <input id="username" name="username" autocomplete="username" required maxlength="128">
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
+      <button id="sign-in" type="submit">Sign in as administrator</button>
+    </form>
+    <section id="controls" aria-label="Maintenance controls" hidden>
+      <p id="maintenance-status"></p>
+      <p id="recovery-status"></p>
+      <div class="actions">
+        <button id="enable" type="button">Turn maintenance on</button>
+        <button id="disable" type="button">Turn maintenance off</button>
+        <button id="refresh" type="button">Refresh status</button>
+      </div>
+      <p><a href="/portal">Open Atlas</a></p>
+      <button id="sign-out" type="button">Sign out</button>
+    </section>
+    <p><a href="/">Return to Atlas</a></p>
+  </main>
+</body>
+</html>

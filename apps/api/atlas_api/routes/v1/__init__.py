@@ -10,6 +10,7 @@ from .admin_live_sessions import router as admin_live_sessions_router
 from .admin_sports_providers import router as admin_sports_providers_router
 from .admin_users import router as admin_users_router
 from .auth import router as auth_router
+from .admin_maintenance import router as admin_maintenance_router
 from .dashboard import router as dashboard_router
 from .dashboard_media import router as dashboard_media_router
 from .downloads import router as downloads_router
@@ -36,6 +37,7 @@ router = APIRouter(
 router.include_router(health_router)
 router.include_router(admin_automation_health_router)
 router.include_router(auth_router)
+router.include_router(admin_maintenance_router)
 router.include_router(admin_live_sessions_router)
 router.include_router(admin_sports_providers_router)
 router.include_router(admin_users_router)

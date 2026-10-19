@@ -42,6 +42,7 @@ class PlaybackCapabilityService:
         user_id: str,
         playable_target_id: str,
         stream_path: str,
+        maintenance_binding: str | None = None,
     ) -> str:
         normalized_user = self._required(user_id, "user_id")
         normalized_item = self._required(playable_target_id, "playable_target_id")
@@ -55,6 +56,7 @@ class PlaybackCapabilityService:
                 "item": normalized_item,
                 "stream": normalized_stream,
                 "scope": path_prefix,
+                **self._maintenance_claim(maintenance_binding),
             },
         )
 
@@ -82,12 +84,24 @@ class PlaybackCapabilityService:
             raise PlaybackCapabilityError("Live release capability is out of scope.")
         return payload
 
+    @staticmethod
+    def _maintenance_claim(reference: str | None) -> dict[str, str]:
+        if reference is None:
+            return {}
+        if not isinstance(reference, str) or len(reference) != 64 or any(c not in '0123456789abcdef' for c in reference):
+            raise PlaybackCapabilityError('Maintenance media binding is invalid.')
+        return {'maintenance_binding': reference}
+
+    def inspect_bootstrap(self, token: str) -> dict[str, Any]:
+        payload = self._decode(token, audience=self.bootstrap_audience, expected_kind='playback_bootstrap')
+        _, scope = self._stream_scope(str(payload.get('stream') or ''))
+        if payload.get('scope') != scope:
+            raise PlaybackCapabilityError('Playback capability scope is invalid.')
+        self._maintenance_claim(payload.get('maintenance_binding'))
+        return payload
+
     def exchange_bootstrap(self, token: str) -> PlaybackGatewaySession:
-        payload = self._decode(
-            token,
-            audience=self.bootstrap_audience,
-            expected_kind="playback_bootstrap",
-        )
+        payload = self.inspect_bootstrap(token)
         user_id = self._required(str(payload["sub"]), "sub")
         playable_target_id = self._required(str(payload["item"]), "item")
         stream_path, path_prefix = self._stream_scope(str(payload["stream"]))
@@ -104,6 +118,7 @@ class PlaybackCapabilityService:
                 "scope": path_prefix,
                 "live_identity": self._live_identity(stream_path),
                 "entry_path": urlsplit(stream_path).path,
+                **self._maintenance_claim(payload.get("maintenance_binding")),
             },
         )
         return PlaybackGatewaySession(

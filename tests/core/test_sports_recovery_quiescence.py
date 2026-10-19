@@ -87,7 +87,7 @@ atlas_restore_require_writers_quiesced() { echo writers:changed >> "$EVENTS"; re
         self.assertIn('backup:create', events)
         self.assertIn('writers:changed', events)
         self.assertNotIn('state:apply', events)
-        self.assertEqual(events[-4:], ['writers:start', 'writers:ready', 'maintenance:disable', 'lock:release'])
+        self.assertEqual(events[-4:], ['writers:start', 'writers:ready', 'maintenance:retain', 'lock:release'])
 
     def test_incomplete_application_revert_does_not_restart_consumers(self):
         result, events = self.apply_failure('''
@@ -100,7 +100,7 @@ atlas_backup_recovery_apply_staged_state() {
 ''')
         self.assertIn('state:partial', events)
         self.assertNotIn('writers:start', events)
-        self.assertNotIn('maintenance:disable', events)
+        self.assertNotIn('maintenance:retain', events)
         self.assertNotIn('lock:release', events)
         self.assertIn('Maintenance: retained', result.stderr)
 
@@ -122,7 +122,7 @@ atlas_backup_recovery_apply_staged_state() {
 }
 ''')
         self.assertLess(events.index('consumers:live'), events.index('writers:start'))
-        self.assertNotIn('maintenance:disable', events)
+        self.assertNotIn('maintenance:retain', events)
         self.assertNotIn('lock:release', events)
 
     def test_failed_revert_keeps_writers_stopped(self):

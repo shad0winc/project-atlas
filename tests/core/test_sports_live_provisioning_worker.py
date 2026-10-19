@@ -195,6 +195,7 @@ def test_surfaced_game_resolves_plans_and_reconciles_once(
 
 def test_no_content_resolution_means_no_channel_reconciliation(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     worker = _worker()
 
@@ -234,6 +235,7 @@ def test_no_content_resolution_means_no_channel_reconciliation(
         dispatcharr=object(),
         sources=(object(),),
         bindings=object(),
+        live_sources=worker.LiveSourceRegistry(tmp_path / "live-sources.json"),
     )
 
     assert result == 0
@@ -284,6 +286,7 @@ def test_empty_source_lifecycle_does_not_construct_dispatcharr(
 
 def test_reconciliation_failure_propagates_fail_closed(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     worker = _worker()
 
@@ -326,6 +329,7 @@ def test_reconciliation_failure_propagates_fail_closed(
             dispatcharr=object(),
             sources=(object(),),
             bindings=object(),
+            live_sources=worker.LiveSourceRegistry(tmp_path / "live-sources.json"),
         )
 
 
