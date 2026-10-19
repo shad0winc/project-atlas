@@ -2,6 +2,49 @@
 
 source "$(dirname "${BASH_SOURCE[0]}")/../lib/execution-exclusion.sh"
 
+
+atlas_deployment_is_mixed() {
+  local record="$1"
+  local name
+  for name in service-sources.json repair-tracked-source.json recovery-chain.json \
+    sports-writer-source.tar.gz repair-activation.json original-lock-owner \
+    accepted-private-sustained.json; do
+    [[ ! -e "$record/$name" && ! -L "$record/$name" ]] || return 0
+  done
+  if [[ -f "$record/MANIFEST.sha256" ]] &&
+    grep -Eq '  (service-sources|repair-tracked-source|recovery-chain)\.json$' "$record/MANIFEST.sha256"; then
+    return 0
+  fi
+  grep -Eq '^(requires_mixed_runtime_contract|runtime_provenance_schema|ingress_source_mode)=' \
+    "$record/metadata"
+}
+
+atlas_deployment_mixed_contract() {
+  local action="$1"
+  local record="$2"
+  shift 2
+  atlas_deployment_is_mixed "$record" || return 0
+  python3 "$ATLAS_PROJECT_DIR/scripts/lib/deployment-mixed-runtime.py" \
+    "$action" "$record" "$@"
+}
+
+atlas_deployment_validate_update_inheritance() {
+  local record="$1"
+  local scope="$2"
+  if atlas_deployment_is_mixed "$record" && [[ "$scope" != all ]]; then
+    echo 'ERROR: partial updates from a mixed-runtime baseline require explicit provenance inheritance; runtime was not mutated.' >&2
+    return 1
+  fi
+}
+
+atlas_deployment_refuse_mixed_adoption() {
+  local record="$1"
+  if atlas_deployment_is_mixed "$record"; then
+    echo 'ERROR: component adoption cannot discard mixed-runtime service provenance.' >&2
+    return 1
+  fi
+}
+
 atlas_deployment_root() {
   printf '%s\n' "${ATLAS_DEPLOYMENT_DIR:-$ATLAS_RUNTIME_CONFIG_DIR/deployments}"
 }
@@ -384,6 +427,7 @@ atlas_deployment_set_current() {
   # scheduler/runtime source generation is present and provenance-verified.
   # The deployment current file remains the single authoritative pointer;
   # systemd derives the executable generation from this deployment identity.
+  atlas_deployment_mixed_contract live "$(atlas_deployment_record_dir "$identifier")" || return 1
   atlas_deployment_publish_runtime_source "$identifier" || return 1
 
   root="$(atlas_deployment_root)"
@@ -834,6 +878,8 @@ atlas_deployment_verify_runtime() {
       return 1
     }
   fi
+  atlas_deployment_mixed_contract live "$record" "$excluded_surface" || return 1
+
 }
 
 # Attest the worker currently executing a specific clean source checkout.
@@ -1302,6 +1348,7 @@ atlas_deployment_require_current_record() {
     }
   fi
 
+  atlas_deployment_mixed_contract record "$record" || return 1
   printf '%s\n' "$record"
 }
 
@@ -1318,6 +1365,15 @@ atlas_deployment_baseline() {
   local sports_commit=''
 
   atlas_deployment_validate_source || return 1
+
+  if [[ -d "$(atlas_deployment_lock_dir)" ]]; then
+    echo 'ERROR: baseline creation cannot replace a held deployment recovery.' >&2
+    return 1
+  fi
+  local existing_id
+  if existing_id="$(atlas_deployment_current_id)"; then
+    atlas_deployment_refuse_mixed_adoption "$(atlas_deployment_record_dir "$existing_id")" || return 1
+  fi
 
   echo 'Baseline doctor:'
   atlas_command_doctor || return 1
@@ -1478,6 +1534,11 @@ atlas_deployment_adopt_notifications() {
   atlas_deployment_acquire_lock "$identifier" || return 1
 
   previous_record="$(atlas_deployment_require_current_record)" || {
+    atlas_deployment_release_lock "$identifier" || return 1
+    return 1
+  }
+
+  atlas_deployment_refuse_mixed_adoption "$previous_record" || {
     atlas_deployment_release_lock "$identifier" || return 1
     return 1
   }
@@ -1748,6 +1809,8 @@ atlas_deployment_adopt_sports() {
   previous_record="$(
     atlas_deployment_require_current_record
   )" || return 1
+
+  atlas_deployment_refuse_mixed_adoption "$previous_record" || return 1
 
   previous_id="$(basename -- "$previous_record")"
 
@@ -2048,6 +2111,8 @@ atlas_deployment_prepare_update() {
   record="$(
     atlas_deployment_record_dir "$identifier"
   )" || return 1
+
+  atlas_deployment_validate_update_inheritance "$previous_record" "$scope" || return 1
 
   mkdir -p "$record"
 
@@ -2528,6 +2593,11 @@ EOF
     return 1
   }
 
+  atlas_deployment_mixed_contract inherit "$baseline" "$temporary" --recovery-transaction "$transaction" || {
+    rm -rf -- "$temporary"
+    return 1
+  }
+
   atlas_deployment_verify_runtime "$temporary" || {
     rm -rf -- "$temporary"
     return 1
@@ -2571,6 +2641,12 @@ EOF
       MANIFEST.sha256 \
       >&2
   ) || {
+    rm -rf -- "$temporary"
+    return 1
+  }
+
+  atlas_deployment_mixed_contract seal "$temporary" || {
+    atlas_command_maintenance enable || true
     rm -rf -- "$temporary"
     return 1
   }
@@ -2771,6 +2847,8 @@ atlas_deployment_restore_surface() {
   local recovery_tag
   local restored=0
 
+  atlas_deployment_mixed_contract record "$baseline" || return 1
+
   [[ -s "$archive" ]] || return 1
   [[ -s "$rollback_images" ]] || {
     echo 'ERROR: rollback image alias evidence is missing.' >&2
@@ -2782,6 +2860,10 @@ atlas_deployment_restore_surface() {
   )" || return 1
 
   tar -xzf "$archive" -C "$recovery" || return 1
+
+  if [[ "$surface" == sports ]]; then
+    atlas_deployment_mixed_contract prepare-restore "$baseline" "$recovery" || return 1
+  fi
 
   if [[ -f "$ATLAS_PROJECT_DIR/.env" && ! -e "$recovery/.env" ]]; then
     ln -s -- "$ATLAS_PROJECT_DIR/.env" "$recovery/.env"
@@ -3299,6 +3381,10 @@ atlas_deployment_rollback_locked() {
     atlas_command_maintenance enable || true
     return 1
   }
+  atlas_deployment_mixed_contract seal "$transaction" || {
+    atlas_command_maintenance enable || true
+    return 1
+  }
   atlas_deployment_release_lock "$identifier" || return 1
 
   printf 'Rollback complete: %s -> %s\n' "$identifier" "$previous_id"
@@ -3702,6 +3788,11 @@ EOF
 
   echo 'Private applied-target runtime verification:'
 
+  atlas_deployment_mixed_contract inherit "$transaction" "$temporary" || {
+    rm -rf -- "$temporary"
+    return 1
+  }
+
   atlas_deployment_verify_runtime "$temporary" || {
     rm -rf -- "$temporary"
     echo \
@@ -3802,6 +3893,12 @@ EOF
       MANIFEST.sha256 \
       >&2
   ) || {
+    atlas_command_maintenance enable || true
+    rm -rf -- "$temporary"
+    return 1
+  }
+
+  atlas_deployment_mixed_contract seal "$temporary" || {
     atlas_command_maintenance enable || true
     rm -rf -- "$temporary"
     return 1

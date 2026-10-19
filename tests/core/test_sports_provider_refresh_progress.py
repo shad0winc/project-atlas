@@ -1,5 +1,6 @@
 """Offline progress tests: private files, synthetic HTTP, no production access."""
 from contextlib import ExitStack
+from datetime import datetime, timezone
 import copy
 import io
 import os
@@ -22,6 +23,14 @@ class RefreshProgressTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.stack = ExitStack()
         self.addCleanup(self.stack.close)
+        # The worker omits date_value; keep its default aligned with this fixture's
+        # explicit discovery date, independently of the calendar on the test host.
+        class FixtureDatetime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                value = datetime(2026, 10, 18, 12, tzinfo=timezone.utc)
+                return value.replace(tzinfo=None) if tz is None else value.astimezone(tz)
+        self.stack.enter_context(patch.object(module, 'datetime', FixtureDatetime))
         self.clock = 1000000.
         self.calls = []
         self.limit_every = 11

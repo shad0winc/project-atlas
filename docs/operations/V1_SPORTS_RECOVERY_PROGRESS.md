@@ -701,3 +701,58 @@ browse remains queued after Sports acceptance and deployment reconciliation.
 - Protected RC/main CI, staged image acceptance, managed activation, sustained
   live acceptance and accurate private/public deployment reconciliation remain
   separate gates. Media browse remains queued after Sports.
+
+
+## 2026-10-19 mixed-runtime candidate prepared; native integration pending
+
+The read-only reconciliation audit passed at 01:01:06 UTC. Original and previous
+baseline source archives matched their exact tracked Git objects. The repaired
+writer's 25 COPY inputs matched d90c3ead, and all four repair pairs' rollback
+aliases matched. Backup archive listing succeeded; operational restore remains
+unproven. Maintenance, original lock ownership and recovery evidence remained
+unchanged.
+
+Candidate `baseline-reconciliation-20261019T012409Z-e98c967e0b` was prepared at
+01:24:16 UTC under `reconciliation-prepared-bhdbe6on/candidate`. It contains 21
+files, remains `prepared`, and passed the native read-only image/Notifications
+verification. Manifest SHA256:
+`ebf18fbaabf7bd120baed0710cb5d2c22a8cb0e0f554c352db38ab04d17f2d2c`.
+No source checkout, running service, current pointer, maintenance or lock owner
+was changed. The scheduler unit reported failed; source-level lock refusal is
+consistent with the held state, but its actual failure cause was not diagnosed.
+
+See `MIXED_RUNTIME_PROVENANCE.md` for the bounded native integration. Its local
+29 new unittest cases and 93 directly exercised existing test functions passed.
+The CT100 integration validation below supersedes the test-pending status of
+this preparation entry. RC1/main CI, finalization, canonical advancement and
+fresh private/public acceptance remain pending. Do not rerun activation or
+ordinary update, republish the original failed transaction, or remove the held
+deployment lock.
+
+## 2026-10-19 mixed-runtime native integration: CT100 checks passed
+
+Focused installation passed 129 tests and 2 subtests. After guarded test-harness
+and fixture corrections, 94 targeted tests / 194 subtests passed, followed by
+148 affected-module tests / 2 subtests and full Core with 5610 passed,
+12 skipped and 1758 subtests. API passed 884 tests / 27 subtests with 14 warnings;
+all 5 Sports integration programs passed; Portal passed lint, type-check,
+118 test files / 661 tests and production build. Release Contracts passed for
+35 shell files and deployment safety checks. Python compilation covered
+624 Core files plus 243 additional API/Sports test files without bytecode.
+
+The successful full Core receipt is under
+`atlas-mixed-runtime-core-isolated-uurrxzjr`; remaining surfaces are under
+`atlas-mixed-runtime-remaining-named-fggqqg9u`, both in `/var/tmp`.
+Earlier failed attempts remain retained. Production runtime, protected evidence,
+original recovery ownership and candidate manifest remained unchanged.
+See `MIXED_RUNTIME_PROVENANCE.md` for environment and evidence details.
+
+At this validation checkpoint the source was tested, uncommitted and unactivated;
+it was not an accepted deployment.
+Protected source promotion, canonical compatibility, finalizer failure handling,
+fresh private Doctor/Verify and controlled public acceptance remain pending.
+Admin-only authenticated maintenance access/control and the queued media-browse
+acceptance requirements remain in the 1.0 scope and are not implemented or
+accepted by this provenance patch. Backup listing does not prove operational
+restore. The earlier private sustained Sports gate is retained without claiming
+it establishes current or public acceptance.
