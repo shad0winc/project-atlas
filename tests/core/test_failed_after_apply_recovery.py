@@ -107,11 +107,11 @@ def test_recovery_requires_original_lock_owner_and_maintenance() -> None:
     assert "atlas_command_maintenance enable" not in prefix
 
 
-def test_recovery_verifies_applied_target_before_public_reopen() -> None:
+def test_recovery_verifies_applied_target_before_held_checkpoint() -> None:
     section = recovery_section()
 
     first_verify = section.index("atlas_deployment_verify_runtime")
-    disable = section.index("atlas_command_maintenance disable")
+    disable = section.index("atlas_maintenance_transaction_hold")
 
     assert first_verify < disable
 
@@ -119,7 +119,7 @@ def test_recovery_verifies_applied_target_before_public_reopen() -> None:
 def test_recovery_reverifies_public_runtime_after_reopen() -> None:
     section = recovery_section()
 
-    disable = section.index("atlas_command_maintenance disable")
+    disable = section.index("atlas_maintenance_transaction_hold")
 
     assert section.count("atlas_deployment_verify_runtime") >= 2
 
@@ -140,7 +140,7 @@ def test_recovery_reverifies_public_runtime_after_reopen() -> None:
 def test_public_verification_failure_restores_maintenance() -> None:
     section = recovery_section()
 
-    disable = section.index("atlas_command_maintenance disable")
+    disable = section.index("atlas_maintenance_transaction_hold")
     tail = section[disable:]
 
     assert "atlas_command_maintenance enable" in tail
@@ -221,7 +221,7 @@ def test_recovery_verifies_live_runtime_against_failed_transaction_images() -> N
         copy_target,
     )
     disable = section.index(
-        "atlas_command_maintenance disable",
+        "atlas_maintenance_transaction_hold",
         private_verify,
     )
     public_verify = section.index(
@@ -582,6 +582,10 @@ atlas_command_verify() {
   fi
 }
 
+atlas_maintenance_transaction_enable() { atlas_command_maintenance enable; }
+
+atlas_maintenance_transaction_hold() { atlas_command_maintenance retain; }
+
 atlas_command_maintenance() {
   local action="$1"
 
@@ -591,8 +595,8 @@ atlas_command_maintenance() {
     >> "$EVENT_LOG"
 
   case "$action" in
-    disable)
-      rm -f -- "$MAINTENANCE_FLAG"
+    retain)
+      test -f "$MAINTENANCE_FLAG"
       ;;
     enable)
       printf 'enabled\n' > "$MAINTENANCE_FLAG"
@@ -1012,7 +1016,7 @@ def test_behavior_private_atlas_verify_failure_never_reopens(
     assert result.lock_exists is True
 
 
-def test_behavior_public_runtime_failure_restores_maintenance(
+def test_behavior_held_runtime_failure_restores_maintenance(
     tmp_path: Path,
 ) -> None:
     result = _run_failed_after_apply_recovery(
@@ -1026,7 +1030,7 @@ def test_behavior_public_runtime_failure_restores_maintenance(
         "runtime-verify:1",
         "doctor:1",
         "atlas-verify:1",
-        "maintenance:disable",
+        "maintenance:retain",
         "runtime-verify:2",
         "maintenance:enable",
     ]
@@ -1038,7 +1042,7 @@ def test_behavior_public_runtime_failure_restores_maintenance(
     assert result.reconciliation.exists() is False
 
 
-def test_behavior_public_doctor_failure_restores_maintenance(
+def test_behavior_held_doctor_failure_restores_maintenance(
     tmp_path: Path,
 ) -> None:
     result = _run_failed_after_apply_recovery(
@@ -1052,7 +1056,7 @@ def test_behavior_public_doctor_failure_restores_maintenance(
         "runtime-verify:1",
         "doctor:1",
         "atlas-verify:1",
-        "maintenance:disable",
+        "maintenance:retain",
         "runtime-verify:2",
         "doctor:2",
         "maintenance:enable",
@@ -1065,7 +1069,7 @@ def test_behavior_public_doctor_failure_restores_maintenance(
     assert result.reconciliation.exists() is False
 
 
-def test_behavior_public_atlas_verify_failure_restores_maintenance(
+def test_behavior_held_atlas_verify_failure_restores_maintenance(
     tmp_path: Path,
 ) -> None:
     result = _run_failed_after_apply_recovery(
@@ -1079,7 +1083,7 @@ def test_behavior_public_atlas_verify_failure_restores_maintenance(
         "runtime-verify:1",
         "doctor:1",
         "atlas-verify:1",
-        "maintenance:disable",
+        "maintenance:retain",
         "runtime-verify:2",
         "doctor:2",
         "atlas-verify:2",
@@ -1110,7 +1114,7 @@ def test_behavior_success_publishes_verified_target_reconciliation(
         "runtime-verify:1",
         "doctor:1",
         "atlas-verify:1",
-        "maintenance:disable",
+        "maintenance:retain",
         "runtime-verify:2",
         "doctor:2",
         "atlas-verify:2",
@@ -1120,7 +1124,7 @@ def test_behavior_success_publishes_verified_target_reconciliation(
     ]
 
     assert result.current_id == "baseline-reconciliation-test"
-    assert result.maintenance_exists is False
+    assert result.maintenance_exists is True
     assert result.lock_exists is False
 
     # The original failed deployment is immutable evidence.

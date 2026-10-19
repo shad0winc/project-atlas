@@ -21,6 +21,7 @@ from atlas_api.dependencies import (
     get_sports_session_registry,
     get_user_profile_store,
 )
+from atlas_api.services.maintenance_playback import issue_maintenance_media_binding
 from atlas_api.playback_capabilities import PlaybackCapabilityError, PlaybackCapabilityService
 from atlas.sports_resource_pool import (
     SportsResourceLeaseNotFound,
@@ -408,6 +409,7 @@ def read_sports_live_session(
         Query(max_length=16),
     ] = None,
     option: Annotated[str | None, Query(pattern="^(primary|backup-1|backup-2)$")] = None,
+    maintenance_binding: Annotated[str | None, Depends(issue_maintenance_media_binding)] = None,
 ) -> PlaybackSessionResponse:
     try:
         profile = profiles.get_user(current_user.user_id)
@@ -684,6 +686,7 @@ def read_sports_live_session(
             user_id=current_user.user_id,
             playable_target_id=session.playable_target_id,
             stream_path=session.stream_path,
+            **({"maintenance_binding": maintenance_binding} if maintenance_binding is not None else {}),
         )
     except Exception:
         playback.release_live_stream(

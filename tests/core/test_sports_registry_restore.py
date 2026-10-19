@@ -31,21 +31,21 @@ def stage_fixture(root,optional=True):
 
 class RowEngine(unittest.TestCase):
  def test_all_sixteen_captured_restore_through_real_consumer_contracts(self):
-  with tempfile.TemporaryDirectory() as tmp:
+  with tempfile.TemporaryDirectory(dir='/tmp') as tmp:
    stage=stage_fixture(Path(tmp));before=native.shape(stage,True)
    result=support.trial(native,stage)
    self.assertEqual(result['surfaces'],16);self.assertFalse(result['held'])
    self.assertEqual(native.shape(stage,True),before)
 
  def test_optional_absent_rows_remove_existing_old_values_and_validate(self):
-  with tempfile.TemporaryDirectory() as tmp:
+  with tempfile.TemporaryDirectory(dir='/tmp') as tmp:
    stage=stage_fixture(Path(tmp),False)
    rows=support.consumer(stage)
    self.assertEqual(sum(row[0]=='SKIP' for row in rows),2)
    self.assertFalse(support.trial(native,stage)['held'])
 
  def test_partial_setup_and_each_completed_row_revert_without_releasing_maintenance(self):
-  with tempfile.TemporaryDirectory() as tmp:
+  with tempfile.TemporaryDirectory(dir='/tmp') as tmp:
    stage=stage_fixture(Path(tmp));before=native.shape(stage,True)
    for boundary in range(17):
     with self.subTest(boundary=boundary):
@@ -54,20 +54,20 @@ class RowEngine(unittest.TestCase):
    self.assertEqual(native.shape(stage,True),before)
 
  def test_failure_after_preparing_incoming_copy_reverts_prior_rows_and_stays_held(self):
-  with tempfile.TemporaryDirectory() as tmp:
+  with tempfile.TemporaryDirectory(dir='/tmp') as tmp:
    stage=stage_fixture(Path(tmp));before=native.shape(stage,True)
    result=support.trial(native,stage,fail_copy=True)
    self.assertTrue(result['partial_copy'] and result['held'])
    self.assertEqual(native.shape(stage,True),before)
 
  def test_malformed_consumer_state_is_rejected_before_row_engine(self):
-  with tempfile.TemporaryDirectory() as tmp:
+  with tempfile.TemporaryDirectory(dir='/tmp') as tmp:
    stage=stage_fixture(Path(tmp))
    (stage/'state/users/users.json').write_text('{"schema_version":1,"users":[]}\n')
    with self.assertRaises(ValueError):support.trial(native,stage)
 
  def test_cursor_beyond_captured_event_journal_is_rejected(self):
-  with tempfile.TemporaryDirectory() as tmp:
+  with tempfile.TemporaryDirectory(dir='/tmp') as tmp:
    stage=stage_fixture(Path(tmp))
    (stage/'state/runtime/subscribers/module-notifications.cursor').write_text('2\n')
    with self.assertRaises(ValueError):support.consumer(stage)
@@ -100,7 +100,7 @@ class RowEngine(unittest.TestCase):
    with self.subTest(value=value),self.assertRaises(ValueError):support.trial(native,Path('/tmp/missing'),fail_after=value)
 
  def test_consumer_refusal_after_application_retains_rollback_and_held_maintenance(self):
-  with tempfile.TemporaryDirectory() as tmp:
+  with tempfile.TemporaryDirectory(dir='/tmp') as tmp:
    stage=stage_fixture(Path(tmp));before=native.shape(stage,True)
    result=support.trial(native,stage,reject_validation=True)
    self.assertTrue(result['validation_rejected'] and result['held'])

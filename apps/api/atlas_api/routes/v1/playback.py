@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from atlas.user_profiles import UserProfileError, UserProfileStore
 from atlas_api.auth.models import AuthenticatedUser
 from atlas_api.dependencies import get_settings, get_user_profile_store
+from atlas_api.services.maintenance_playback import issue_maintenance_media_binding
 from atlas_api.playback_capabilities import PlaybackCapabilityService
 from atlas_api.schemas.playback import (
     PlaybackActionResponse,
@@ -169,6 +170,7 @@ def read_playback_session(
         str | None,
         Query(max_length=16),
     ] = None,
+    maintenance_binding: Annotated[str | None, Depends(issue_maintenance_media_binding)] = None,
 ) -> PlaybackSessionResponse:
     try:
         profile = profiles.get_user(current_user.user_id)
@@ -210,6 +212,7 @@ def read_playback_session(
         user_id=current_user.user_id,
         playable_target_id=session.playable_target_id,
         stream_path=session.stream_path,
+        **({"maintenance_binding": maintenance_binding} if maintenance_binding is not None else {}),
     )
 
     return PlaybackSessionResponse.from_domain(
