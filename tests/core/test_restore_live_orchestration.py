@@ -172,7 +172,7 @@ atlas_restore_require_production_preflight "$STAGE"
     assert "shared deployment lock to be free" in result.stderr
 
 
-def test_preflight_rejects_existing_maintenance(tmp_path: Path) -> None:
+def test_preflight_accepts_existing_regular_maintenance(tmp_path: Path) -> None:
     stage = Path("/tmp") / f"project-atlas-restore.maintenance-{os.getpid()}-{tmp_path.name}"
     stage.mkdir(mode=0o700)
     record = tmp_path / "baseline"
@@ -187,6 +187,11 @@ atlas_deployment_validate_source() { :; }
 atlas_deployment_require_current_record() { printf '%s\n' "$RECORD"; }
 atlas_maintenance_flag() { printf '%s\n' "$MAINTENANCE_FLAG"; }
 atlas_deployment_lock_dir() { printf '%s\n' "$LOCK_DIR"; }
+atlas_restore_load_recovery_library() { :; }
+atlas_backup_recovery_validate_staged_restore() { :; }
+atlas_backup_recovery_staged_state_digest() { echo stable-digest; }
+atlas_backup_recovery_validate_staged_consumers() { :; }
+atlas_restore_require_writers_running() { :; }
 atlas_restore_require_production_preflight "$STAGE"
 ''',
             {
@@ -199,8 +204,9 @@ atlas_restore_require_production_preflight "$STAGE"
     finally:
         stage.rmdir()
 
-    assert result.returncode != 0
-    assert "maintenance mode to be disabled" in result.stderr
+    assert result.returncode == 0, result.stderr
+    assert maintenance.is_file()
+    assert result.stdout.strip() == str(record)
 
 
 def test_recovery_point_must_be_published_and_validated(tmp_path: Path) -> None:

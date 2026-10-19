@@ -294,6 +294,16 @@ def get_security_audit_writer():
     return SecurityAuditWriter.from_environment()
 
 
+def get_maintenance_control_client():
+    from atlas_api.services.maintenance_access import configured_client
+    return configured_client()
+
+
+def _maintenance_admission(user):
+    from atlas_api.services.maintenance_access import admit_authentication
+    admit_authentication(user, get_maintenance_control_client())
+
+
 @lru_cache(maxsize=1)
 def get_authentication_service() -> AuthenticationService:
     """Return the fully composed Atlas authentication service."""
@@ -309,6 +319,7 @@ def get_authentication_service() -> AuthenticationService:
         refresh_sessions=get_refresh_session_registry(),
         login_attempts=get_login_attempt_limiter(),
         audit_publisher=get_security_audit_writer().publish,
+        admission=_maintenance_admission,
     )
 
 

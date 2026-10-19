@@ -1013,7 +1013,7 @@ atlas_update_execute_locked() {
     fi
   fi
 
-  if ! atlas_command_maintenance enable; then
+  if ! atlas_maintenance_transaction_enable "$identifier" "${exclusion_fd:-}"; then
     atlas_deployment_set_status \
       "$(atlas_deployment_record_dir "$identifier")" \
       aborted
@@ -1088,8 +1088,8 @@ atlas_update_execute_locked() {
     return 1
   fi
 
-  if ! atlas_command_maintenance disable; then
-    echo 'ERROR: deployment verified, but maintenance could not be disabled.' >&2
+  if ! atlas_maintenance_transaction_hold "$identifier" "${exclusion_fd:-}"; then
+    echo 'ERROR: deployment verified, but the maintenance hold could not be proven.' >&2
     echo 'Deployment lock remains held for operator recovery.' >&2
 
     return 1
@@ -1100,7 +1100,7 @@ atlas_update_execute_locked() {
 
     atlas_update_fail_after_maintenance \
       "$identifier" \
-      'public post-maintenance verification failed.'
+      'held completion verification failed.'
 
     return 1
   fi
@@ -1115,8 +1115,9 @@ atlas_update_execute_locked() {
     return 1
   fi
 
-  atlas_deployment_release_lock "$identifier"
+  atlas_deployment_release_lock "$identifier" || return 1
 
+  echo 'Maintenance remains enabled; controlled acceptance and explicit administrator reopening are separate.'
   echo "Atlas update complete: $identifier"
   echo 'Rollback assets were not pruned.'
 }

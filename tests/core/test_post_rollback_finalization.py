@@ -105,13 +105,13 @@ def test_recovery_requires_existing_historical_rollback_source() -> None:
     assert "atlas_deployment_rollback_recovery_source" in section
 
 
-def test_recovery_uses_rollback_aware_verification_before_and_after_reopen() -> None:
+def test_recovery_uses_rollback_aware_verification_before_and_after_held_checkpoint() -> None:
     section = recovery_section()
 
     assert section.count("atlas_deployment_verify_rollback_runtime") >= 2
 
     first_verify = section.index("atlas_deployment_verify_rollback_runtime")
-    disable = section.index("atlas_command_maintenance disable")
+    disable = section.index("atlas_maintenance_transaction_hold")
     second_verify = section.index(
         "atlas_deployment_verify_rollback_runtime",
         first_verify + 1,
@@ -120,12 +120,12 @@ def test_recovery_uses_rollback_aware_verification_before_and_after_reopen() -> 
     assert first_verify < disable < second_verify
 
 
-def test_recovery_reenables_maintenance_if_public_verification_fails() -> None:
+def test_recovery_reenables_maintenance_if_held_verification_fails() -> None:
     section = recovery_section()
 
     first_verify = section.index("atlas_deployment_verify_rollback_runtime")
     disable = section.index(
-        "atlas_command_maintenance disable",
+        "atlas_maintenance_transaction_hold",
         first_verify,
     )
     second_verify = section.index(

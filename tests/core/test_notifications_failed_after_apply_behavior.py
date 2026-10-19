@@ -142,7 +142,7 @@ def test_adopted_failed_after_apply_preserves_recorded_evidence(
     assert result.current_id == "baseline-reconciliation-test"
     assert result.failed_status == "failed"
     assert result.lock_exists is False
-    assert result.maintenance_exists is False
+    assert result.maintenance_exists is True
 
     record = result.reconciliation
     assert record.is_dir()
@@ -199,7 +199,7 @@ def test_adopted_failed_after_apply_preserves_recorded_evidence(
     assert result.events.count("runtime-verify:") == 2
     assert result.events.index(
         "runtime-verify:1"
-    ) < result.events.index("maintenance:disable")
+    ) < result.events.index("maintenance:retain")
 
     assert result.events.index(
         "runtime-verify:2"
@@ -234,7 +234,7 @@ def test_inconsistent_adopted_evidence_blocks_publication(
         mode=mode,
     )
     assert_preserved_failure(result)
-    assert "maintenance:disable" not in result.events
+    assert "maintenance:retain" not in result.events
     assert "runtime-verify:" not in result.events
 
 
@@ -251,10 +251,10 @@ def test_private_runtime_failure_preserves_failed_transaction(
     )
     assert_preserved_failure(result)
     assert "runtime-verify:1" in result.events
-    assert "maintenance:disable" not in result.events
+    assert "maintenance:retain" not in result.events
 
 
-def test_public_runtime_failure_restores_maintenance_and_lock(
+def test_held_runtime_failure_restores_maintenance_and_lock(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     recovery_fixture_module,
@@ -266,6 +266,6 @@ def test_public_runtime_failure_restores_maintenance_and_lock(
         public_runtime_fails=True,
     )
     assert_preserved_failure(result)
-    assert "maintenance:disable" in result.events
+    assert "maintenance:retain" in result.events
     assert "runtime-verify:2" in result.events
     assert "maintenance:enable" in result.events

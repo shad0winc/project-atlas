@@ -1,0 +1,33 @@
+[Unit]
+Description=Atlas narrow host maintenance authority
+After=local-fs.target
+ConditionPathIsDirectory=/mnt/storage/configs/atlas/maintenance
+ConditionPathIsDirectory=/mnt/storage/configs/atlas/deployments
+ConditionPathExists=/mnt/storage/configs/atlas/deployment-scheduler.lock
+
+[Service]
+Type=simple
+User=root
+Group=20000
+WorkingDirectory=/opt/project-atlas-v1-main
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONPATH=/opt/project-atlas-v1-main
+RuntimeDirectory=atlas-maintenance-control
+RuntimeDirectoryMode=0750
+UMask=0077
+ExecStart=/usr/bin/python3 -B -m atlas.maintenance_control_server --runtime-root /mnt/storage/configs/atlas --socket /run/atlas-maintenance-control/control.sock --allowed-uid 999 --socket-gid 20000
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+RestrictAddressFamilies=AF_UNIX
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths=/mnt/storage/configs/atlas/maintenance /mnt/storage/configs/atlas/deployment-scheduler.lock /run/atlas-maintenance-control
+ReadOnlyPaths=/mnt/storage/configs/atlas/deployments
+
+[Install]
+WantedBy=multi-user.target

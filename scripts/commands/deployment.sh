@@ -136,13 +136,12 @@ atlas_deployment_record_value() {
     "$record/metadata"
 }
 
+atlas_deployment_durable_io() {
+  python3 "$(dirname "${BASH_SOURCE[0]}")/../lib/deployment-durable-io.py" "$@"
+}
+
 atlas_deployment_set_status() {
-  local record="$1"
-  local status="$2"
-  local temporary
-  temporary="$(mktemp "$record/.status.XXXXXX")"
-  printf '%s\n' "$status" > "$temporary"
-  mv -f -- "$temporary" "$record/status"
+  atlas_deployment_durable_io write "$1/status" "$2"
 }
 
 atlas_deployment_runtime_source_root() {
@@ -262,6 +261,9 @@ atlas_deployment_publish_runtime_source() {
       return 1
     }
 
+    atlas_deployment_durable_io generation "$generation" "$ATLAS_PROJECT_DIR/.env" || return 1
+    atlas_deployment_durable_io directory "$root" || return 1
+    atlas_deployment_durable_io directory "$(dirname "$root")" || return 1
     return 0
   fi
 
@@ -393,7 +395,13 @@ PYEXTRACT
   printf '%s\n' "$archive_sha" \
     > "$temporary/.atlas-source-sha256"
 
-  chmod -R a-w "$temporary"
+  chmod -R a-w "$temporary" || return 1
+
+  if ! atlas_deployment_durable_io generation "$temporary" "$env_source"; then
+    chmod -R u+w "$temporary" 2>/dev/null || true
+    rm -rf -- "$temporary"
+    return 1
+  fi
 
   if ! mv -- "$temporary" "$generation"; then
     chmod -R u+w "$temporary" 2>/dev/null || true
@@ -401,25 +409,14 @@ PYEXTRACT
     return 1
   fi
 
-  python3 - "$generations" <<'PYFSYNC'
-import os
-import sys
-
-directory = sys.argv[1]
-flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
-descriptor = os.open(directory, flags)
-
-try:
-    os.fsync(descriptor)
-finally:
-    os.close(descriptor)
-PYFSYNC
+  atlas_deployment_durable_io directory "$generations" || return 1
+  atlas_deployment_durable_io directory "$root" || return 1
+  atlas_deployment_durable_io directory "$(dirname "$root")" || return 1
 }
 
 atlas_deployment_set_current() {
   local identifier="$1"
   local root
-  local temporary
 
   atlas_deployment_valid_id "$identifier" || return 1
 
@@ -432,9 +429,7 @@ atlas_deployment_set_current() {
 
   root="$(atlas_deployment_root)"
   mkdir -p "$root"
-  temporary="$(mktemp "$root/.current.XXXXXX")"
-  printf '%s\n' "$identifier" > "$temporary"
-  mv -f -- "$temporary" "$(atlas_deployment_current_file)"
+  atlas_deployment_durable_io write "$(atlas_deployment_current_file)" "$identifier"
 }
 
 atlas_deployment_current_id() {
@@ -2783,18 +2778,18 @@ atlas_deployment_recover_failed_rollback() {
       return 1
     }
 
-  if ! atlas_command_maintenance disable; then
-    echo 'ERROR: unable to reopen public traffic during failed-rollback recovery.' >&2
+  if ! atlas_maintenance_transaction_hold "$identifier" "${exclusion_fd:-}"; then
+    echo 'ERROR: unable to prove maintenance hold during failed-rollback recovery.' >&2
     return 1
   fi
 
-  echo 'Public restored-runtime verification:'
+  echo 'Held restored-runtime verification:'
 
   atlas_deployment_verify_rollback_runtime \
     "$transaction" \
     "$scope" || {
       atlas_command_maintenance enable || true
-      echo 'ERROR: public rollback verification failed; maintenance restored.' >&2
+      echo 'ERROR: held rollback verification failed; maintenance retained.' >&2
       return 1
     }
 
@@ -3321,7 +3316,7 @@ atlas_deployment_rollback_locked() {
     acquired=true
   fi
 
-  if ! atlas_command_maintenance enable; then
+  if ! atlas_maintenance_transaction_enable "$identifier" "${exclusion_fd:-}"; then
     [[ "$acquired" == true ]] && atlas_deployment_release_lock "$identifier"
     return 1
   fi
@@ -3366,7 +3361,7 @@ atlas_deployment_rollback_locked() {
 
   atlas_deployment_verify_rollback_runtime     "$transaction"     "$scope" || return 1
 
-  atlas_command_maintenance disable || return 1
+  atlas_maintenance_transaction_hold "$identifier" "${exclusion_fd:-}" || return 1
 
   atlas_deployment_verify_rollback_runtime     "$transaction"     "$scope" || {
       atlas_command_maintenance enable || true
@@ -3817,21 +3812,21 @@ EOF
     return 1
   }
 
-  if ! atlas_command_maintenance disable; then
+  if ! atlas_maintenance_transaction_hold "$identifier" "${exclusion_fd:-}"; then
     rm -rf -- "$temporary"
     echo \
-      'ERROR: unable to reopen public traffic during failed-after-apply recovery.' \
+      'ERROR: unable to prove maintenance hold during failed-after-apply recovery.' \
       >&2
     return 1
   fi
 
-  echo 'Public applied-target runtime verification:'
+  echo 'Held applied-target runtime verification:'
 
   atlas_deployment_verify_runtime "$temporary" || {
     atlas_command_maintenance enable || true
     rm -rf -- "$temporary"
     echo \
-      'ERROR: public applied-target runtime verification failed; maintenance restored.' \
+      'ERROR: held applied-target runtime verification failed; maintenance retained.' \
       >&2
     return 1
   }
@@ -3840,7 +3835,7 @@ EOF
     atlas_command_maintenance enable || true
     rm -rf -- "$temporary"
     echo \
-      'ERROR: public failed-after-apply doctor verification failed; maintenance restored.' \
+      'ERROR: held failed-after-apply doctor verification failed; maintenance retained.' \
       >&2
     return 1
   }
@@ -3849,7 +3844,7 @@ EOF
     atlas_command_maintenance enable || true
     rm -rf -- "$temporary"
     echo \
-      'ERROR: public failed-after-apply Atlas verification failed; maintenance restored.' \
+      'ERROR: held failed-after-apply Atlas verification failed; maintenance retained.' \
       >&2
     return 1
   }
@@ -4031,7 +4026,7 @@ atlas_deployment_recover_failed_before_apply() {
   }
 
   # The unchanged verified baseline must still describe the live runtime
-  # before public traffic is reopened.
+  # before held completion is finalized.
   atlas_deployment_verify_runtime "$baseline" || {
     echo 'ERROR: production runtime differs from the verified previous baseline.' >&2
     return 1
@@ -4042,20 +4037,20 @@ atlas_deployment_recover_failed_before_apply() {
     return 1
   }
 
-  if ! atlas_command_maintenance disable; then
-    echo 'ERROR: unable to reopen public traffic during failed-before-apply recovery.' >&2
+  if ! atlas_maintenance_transaction_hold "$identifier" "${exclusion_fd:-}"; then
+    echo 'ERROR: unable to prove maintenance hold during failed-before-apply recovery.' >&2
     return 1
   fi
 
   atlas_command_doctor || {
     atlas_command_maintenance enable || true
-    echo 'ERROR: public post-recovery doctor verification failed; maintenance restored.' >&2
+    echo 'ERROR: held post-recovery doctor verification failed; maintenance retained.' >&2
     return 1
   }
 
   atlas_deployment_verify_runtime "$baseline" || {
     atlas_command_maintenance enable || true
-    echo 'ERROR: runtime drift detected after reopening public traffic; maintenance restored.' >&2
+    echo 'ERROR: runtime drift detected during held completion; maintenance retained.' >&2
     return 1
   }
 
@@ -4079,6 +4074,102 @@ atlas_deployment_recover_failed_before_apply() {
     "$previous_id"
 }
 
+
+# Held publication is callable only with an already prepared immutable intent.
+# This is deliberately not wired into the public deployment command dispatcher.
+# It never releases or archives the original recovery owner or clears the marker.
+atlas_deployment_publication_journal() {
+  local owner="$1"
+  local publication="$2"
+  local inherited_fd="$3"
+  local action="$4"
+  local source_root
+  source_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)" || return 1
+  [[ "$(cd "$ATLAS_PROJECT_DIR" && pwd -P)" == "$source_root" ]] || {
+    echo 'ERROR: held publication must use the canonical source checkout.' >&2
+    return 1
+  }
+  PYTHONPATH="$source_root" python3 -P -B \
+    -m atlas.deployment_held_publication \
+    --runtime-root "$ATLAS_RUNTIME_CONFIG_DIR" \
+    --owner "$owner" --publication "$publication" --fd "$inherited_fd" "$action"
+}
+
+atlas_deployment_private_acceptance_command() {
+  local owner="$1" publication="$2" inherited_fd="$3" action="$4" attempt="${5:-}"
+  local source_root
+  source_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)" || return 1
+  [[ "$(cd "$ATLAS_PROJECT_DIR" && pwd -P)" == "$source_root" ]] || return 1
+  local -a arguments=(--runtime-root "$ATLAS_RUNTIME_CONFIG_DIR" --owner "$owner" --publication "$publication" --fd "$inherited_fd")
+  if [[ "$action" == start ]]; then
+    arguments+=(--source "$source_root" --provider-path "${SPORTS_PROVIDER_HEALTH_FILE:-/mnt/storage/configs/sportyfin/state/provider-health.json}")
+  else
+    arguments+=(--attempt "$attempt")
+  fi
+  PYTHONPATH="$source_root" python3 -P -B -m atlas.deployment_private_acceptance "${arguments[@]}" "$action"
+}
+
+atlas_deployment_capture_private_held_acceptance() {
+  local owner="$1" publication="$2" inherited_fd="$3" record="$4"
+  local attempt stage result saved_umask
+  attempt="$(atlas_deployment_private_acceptance_command "$owner" "$publication" "$inherited_fd" start)" || return 1
+  saved_umask="$(umask)";umask 077
+  for stage in runtime doctor verify; do
+    # Noclobber applies only to the disposable attempt log/exit creation.
+    # Gate failures preserve the before snapshot and all completed logs.
+    if (
+      set -C
+      case "$stage" in
+        runtime) atlas_deployment_verify_runtime "$record" ;;
+        doctor) atlas_command_doctor ;;
+        verify) atlas_command_verify ;;
+      esac > "$attempt/$stage.log" 2>&1
+    ); then result=0;else result=$?;fi
+    (set -C;printf '%s\n' "$result" > "$attempt/$stage.exit") || { umask "$saved_umask";return 1; }
+    [[ "$result" == 0 ]] || { umask "$saved_umask";return 1; }
+  done
+  umask "$saved_umask"
+  atlas_deployment_private_acceptance_command "$owner" "$publication" "$inherited_fd" finish "${attempt##*/}"
+}
+
+atlas_deployment_publish_candidate_held() {
+  local owner="$1"
+  local publication="$2"
+  local inherited_fd="$3"
+  local phase
+  local candidate
+  local record
+  local private_receipt
+  atlas_deployment_valid_id "$owner" || return 1
+  atlas_deployment_valid_id "$publication" || return 1
+  [[ "$inherited_fd" =~ ^[0-9]+$ ]] || return 1
+  [[ "$(atlas_deployment_root)" == "$ATLAS_RUNTIME_CONFIG_DIR/deployments" ]] || {
+    echo 'ERROR: held publication refuses a redirected deployment namespace.' >&2
+    return 1
+  }
+  atlas_deployment_validate_source || return 1
+  phase="$(atlas_deployment_publication_journal "$owner" "$publication" "$inherited_fd" state)" || return 1
+  candidate="$(atlas_deployment_publication_journal "$owner" "$publication" "$inherited_fd" candidate)" || return 1
+  record="$(atlas_deployment_record_dir "$publication")" || return 1
+  if [[ "$phase" == before-current ]]; then
+    # Fresh gates are required on every explicit start/resume; no runtime apply.
+    atlas_deployment_verify_runtime "$candidate" || return 1
+    atlas_command_doctor || return 1
+    atlas_command_verify || return 1
+    atlas_deployment_publication_journal "$owner" "$publication" "$inherited_fd" record || return 1
+    atlas_deployment_verify_runtime "$record" || return 1
+    atlas_deployment_set_current "$publication" || return 1
+  elif [[ "$phase" != current-published ]]; then
+    echo 'ERROR: unexpected held publication phase; original owner retained.' >&2
+    return 1
+  fi
+  # Check actual post-pointer runtime and scheduler context before observing a
+  # held boundary. This observation is not a public acceptance certificate.
+  private_receipt="$(atlas_deployment_capture_private_held_acceptance "$owner" "$publication" "$inherited_fd" "$record")" || return 1
+  atlas_deployment_publication_journal "$owner" "$publication" "$inherited_fd" held-boundary || return 1
+  printf 'PRIVATE_HELD_ACCEPTANCE_RECEIPT=%s\n' "$private_receipt"
+  printf 'Held publication observed: %s; original owner and maintenance marker retained.\n' "$publication"
+}
 
 atlas_command_deployment() {
   local action="${1:-status}"

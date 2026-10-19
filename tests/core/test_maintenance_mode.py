@@ -23,6 +23,12 @@ def run_maintenance(tmp_path: Path, action: str) -> subprocess.CompletedProcess[
         atlas_command_maintenance {action}
         """
     )
+    # Standalone authority requires explicit, fixture-owned state and exclusion.
+    (tmp_path / "maintenance").mkdir(mode=0o700, exist_ok=True)
+    (tmp_path / "deployments").mkdir(mode=0o700, exist_ok=True)
+    lock = tmp_path / "deployment-scheduler.lock"
+    if not lock.exists():
+        lock.touch(mode=0o600)
     environment = os.environ.copy()
     environment.pop("ATLAS_MAINTENANCE_DIR", None)
     return subprocess.run(
@@ -82,24 +88,23 @@ def test_help_exposes_maintenance_commands() -> None:
     assert "atlas maintenance disable" in content
 
 
-def test_caddy_maintenance_precedes_public_upstreams() -> None:
+def test_caddy_maintenance_precedes_protected_public_upstreams() -> None:
     content = CADDY.read_text(encoding="utf-8")
-
     liveness = content.index("handle /_atlas/ingress-health")
-    maintenance = content.index("handle @atlas_maintenance")
-    api = content.index("reverse_proxy atlas-api:8000")
-    portal = content.index("reverse_proxy atlas-portal:3000")
-
     static_assets = content.index("handle /maintenance/*")
-
-    assert liveness < static_assets < maintenance < api < portal
-    assert "try_files /enabled" in content
-    assert "root * /srv" in content
-    assert "file_server" in content
-    assert 'header Retry-After "300"' in content
-    assert 'header Content-Type "text/html; charset=utf-8"' in content
-    assert "respond <<HTML" in content
-    assert "HTML 503" in content
+    auth = content.index("handle @atlas_auth_entry")
+    maintenance = content.index("handle @atlas_maintenance")
+    guard = content.index("import atlas_required_admin_auth", maintenance)
+    api = content.index("reverse_proxy atlas-api:8000", maintenance)
+    portal = content.index("reverse_proxy atlas-portal:3000", maintenance)
+    assert liveness < static_assets < auth < maintenance < guard < api < portal
+    assert "try_files /enabled /control-pending" in content
+    assert "method POST" in content
+    assert "handle /_atlas/maintenance/*" in content
+    assert "import atlas_maintenance_auth" in content
+    page = (CADDY.parents[1] / "snippets/maintenance-00-page.caddy").read_text()
+    assert 'header Retry-After "300"' in page
+    assert "HTML 503" in page
 
 
 def test_ingress_health_bypasses_upstream_health() -> None:
@@ -119,7 +124,7 @@ def test_ingress_mounts_runtime_maintenance_state_read_only() -> None:
 
 
 def test_caddy_maintenance_page_uses_responsive_tracked_artwork() -> None:
-    content = CADDY.read_text(encoding="utf-8")
+    content = (CADDY.parents[1] / "snippets/maintenance-00-page.caddy").read_text(encoding="utf-8")
 
     assert "/maintenance/Maintenance_Desktop_Image.png" in content
     assert "/maintenance/Maintenance_Tablet_Image.png" in content

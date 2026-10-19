@@ -188,7 +188,7 @@ def test_update_runs_bootstrap_before_maintenance_and_backup() -> None:
         "atlas_sports_live_source_bootstrap_provision"
     )
     maintenance = body.index(
-        "atlas_command_maintenance enable"
+        'atlas_maintenance_transaction_enable "$identifier"'
     )
     backup = body.index(
         "atlas_command_backup --notes"

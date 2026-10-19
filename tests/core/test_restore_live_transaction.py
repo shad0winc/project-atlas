@@ -41,8 +41,9 @@ atlas_deployment_new_id() { echo restore-test; }
 atlas_deployment_valid_id() { :; }
 atlas_deployment_acquire_lock() { echo lock:acquire >> "$EVENTS"; }
 atlas_deployment_release_lock() { echo lock:release >> "$EVENTS"; }
+atlas_maintenance_transaction_enable() { echo maintenance:enable >> "$EVENTS"; }
 atlas_maintenance_enable() { echo maintenance:enable >> "$EVENTS"; }
-atlas_maintenance_disable() { echo maintenance:disable >> "$EVENTS"; }
+atlas_maintenance_transaction_hold() { echo maintenance:retain >> "$EVENTS"; }
 atlas_restore_stop_writers() { echo writers:stop >> "$EVENTS"; }
 atlas_restore_require_writers_quiesced() { echo writers:quiesced >> "$EVENTS"; }
 atlas_restore_start_writers() { echo writers:start >> "$EVENTS"; }
@@ -113,7 +114,7 @@ atlas_restore_apply_live "$STAGE"
         "writers:start",
         "writers:ready",
         "runtime:verify",
-        "maintenance:disable",
+        "maintenance:retain",
         "runtime:verify",
         "state:finalize",
         "lock:release",
@@ -124,7 +125,7 @@ atlas_restore_apply_live "$STAGE"
     assert (transaction / "restore-metadata").is_file()
 
 
-def test_backup_failure_restores_normal_operation_before_mutation(tmp_path: Path) -> None:
+def test_backup_failure_restarts_writers_under_held_maintenance(tmp_path: Path) -> None:
     override = r'''
 atlas_restore_create_pre_restore_recovery_point() {
   echo backup:fail >> "$EVENTS"
@@ -144,7 +145,7 @@ atlas_restore_create_pre_restore_recovery_point() {
     assert events[-4:] == [
         "writers:start",
         "writers:ready",
-        "maintenance:disable",
+        "maintenance:retain",
         "lock:release",
     ]
 
@@ -169,7 +170,7 @@ atlas_backup_recovery_apply_staged_state() {
     events = Path(env["EVENTS"]).read_text(encoding="utf-8").splitlines()
     assert "state:apply-fail" in events
     assert "lock:release" not in events
-    assert "maintenance:disable" not in events
+    assert "maintenance:retain" not in events
     assert "Maintenance: retained" in result.stderr
 
 
@@ -193,10 +194,10 @@ atlas_restore_validate_live_consumers() {
     assert events.index("consumers:fail") < events.index("state:revert")
     assert "writers:start" not in events
     assert "lock:release" not in events
-    assert "maintenance:disable" not in events
+    assert "maintenance:retain" not in events
 
 
-def test_public_verification_failure_reenables_maintenance_and_keeps_lock(tmp_path: Path) -> None:
+def test_held_verification_failure_retains_maintenance_and_lock(tmp_path: Path) -> None:
     override = r'''
 VERIFY_COUNT=0
 atlas_restore_verify_runtime_boundary() {
@@ -214,7 +215,7 @@ atlas_restore_verify_runtime_boundary() {
 
     assert result.returncode != 0
     events = Path(env["EVENTS"]).read_text(encoding="utf-8").splitlines()
-    disable = events.index("maintenance:disable")
+    disable = events.index("maintenance:retain")
     assert "maintenance:enable" in events[disable + 1 :]
     assert "lock:release" not in events
     assert "state:finalize" not in events
@@ -244,7 +245,8 @@ atlas_restore_start_writers() { echo writers:start >> "$EVENTS"; }
 atlas_restore_wait_for_writers() { echo writers:ready >> "$EVENTS"; }
 atlas_restore_validate_live_consumers() { echo consumers:live >> "$EVENTS"; }
 atlas_restore_verify_runtime_boundary() { echo runtime:verify >> "$EVENTS"; }
-atlas_maintenance_disable() { echo maintenance:disable >> "$EVENTS"; }
+atlas_maintenance_transaction_hold() { echo maintenance:retain >> "$EVENTS"; }
+atlas_maintenance_transaction_enable() { echo maintenance:enable >> "$EVENTS"; }
 atlas_maintenance_enable() { echo maintenance:enable >> "$EVENTS"; }
 atlas_deployment_release_lock() { echo lock:release >> "$EVENTS"; }
 atlas_backup_recovery_revert_applied_state() {
@@ -266,7 +268,7 @@ atlas_backup_recovery_finalize_applied_state() {
     return script, environment, transaction
 
 
-def test_abort_reverts_applied_state_before_reopening(tmp_path: Path) -> None:
+def test_abort_reverts_applied_state_under_maintenance(tmp_path: Path) -> None:
     script, env, transaction = _held_environment(
         tmp_path, "applied-awaiting-verification"
     )

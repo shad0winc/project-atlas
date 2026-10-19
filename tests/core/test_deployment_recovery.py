@@ -572,7 +572,7 @@ def test_recovery_directory_rejects_transaction_outside_records_namespace(
     )
 
 
-def test_rollback_reopens_traffic_only_after_verification() -> None:
+def test_rollback_retains_hold_through_verification() -> None:
     content = DEPLOYMENT.read_text(encoding="utf-8")
 
     helper_start = content.index(
@@ -595,7 +595,7 @@ def test_rollback_reopens_traffic_only_after_verification() -> None:
     private_verify = section.index(
         "atlas_deployment_verify_rollback_runtime"
     )
-    disable = section.index("atlas_command_maintenance disable")
+    disable = section.index("atlas_maintenance_transaction_hold")
     public_verify = section.index(
         "atlas_deployment_verify_rollback_runtime",
         private_verify + 1,
@@ -621,14 +621,14 @@ def test_update_prepares_and_verifies_target_artifacts_before_maintenance() -> N
     preflight = section.index('atlas_update_preflight "${4:-}"')
     prepare = section.index('atlas_update_prepare_scope "$scope"')
     verify = section.index('atlas_update_verify_target_images "$scope"')
-    maintenance = section.index("atlas_command_maintenance enable")
+    maintenance = section.index("atlas_maintenance_transaction_enable")
     backup = section.index("atlas_command_backup")
     apply = section.index('atlas_update_apply_scope "$scope"')
 
     assert preflight < prepare < verify < maintenance < backup < apply
 
 
-def test_update_publishes_dashboard_runtime_before_reopening_traffic() -> None:
+def test_update_publishes_dashboard_runtime_before_held_completion() -> None:
     content = UPDATE.read_text(encoding="utf-8")
     section = content.split("atlas_update_execute_locked() {", 1)[1]
 
@@ -639,7 +639,7 @@ def test_update_publishes_dashboard_runtime_before_reopening_traffic() -> None:
         'atlas_update_publish_dashboard_runtime "$scope"'
     )
     disable = section.index(
-        "atlas_command_maintenance disable"
+        "atlas_maintenance_transaction_hold"
     )
     public_verify = section.index(
         'atlas_update_post_verify "$scope"',
@@ -677,7 +677,7 @@ def test_dashboard_runtime_publication_failure_uses_maintenance_failure_path() -
         'if ! atlas_update_publish_dashboard_runtime "$scope"; then'
     )
     disable = section.index(
-        "atlas_command_maintenance disable"
+        "atlas_maintenance_transaction_hold"
     )
 
     failure_window = section[publish:disable]
@@ -859,7 +859,7 @@ def test_rollback_readiness_failure_precedes_state_finalization() -> None:
         "atlas_deployment_wait_for_ingress_readiness"
     )
     maintenance_disable = section.index(
-        "atlas_command_maintenance disable"
+        "atlas_maintenance_transaction_hold"
     )
     set_current = section.index(
         'atlas_deployment_set_current "$previous_id"'
@@ -1182,7 +1182,7 @@ def test_rollback_recovery_source_fails_closed_when_ambiguous() -> None:
     assert "rollback recovery source is ambiguous" in helper
 
 
-def test_rollback_uses_recovery_aware_verification_before_and_after_reopen() -> None:
+def test_rollback_uses_recovery_aware_verification_before_and_after_held_checkpoint() -> None:
     content = Path("scripts/commands/deployment.sh").read_text(
         encoding="utf-8"
     )
@@ -1202,7 +1202,7 @@ def test_rollback_uses_recovery_aware_verification_before_and_after_reopen() -> 
         "atlas_deployment_verify_rollback_runtime"
     )
     disable = section.index(
-        "atlas_command_maintenance disable"
+        "atlas_maintenance_transaction_hold"
     )
     second_verify = section.index(
         "atlas_deployment_verify_rollback_runtime",
