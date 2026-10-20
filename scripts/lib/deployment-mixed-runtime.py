@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -62,11 +63,27 @@ def metadata(record):
     return result
 
 
+EXTENSION_NAMES = (
+    'ingress-runtime-extension.json', 'ingress-application-source.tar.gz',
+    'ingress-application-tracked.json', 'ingress-api-build.Dockerfile',
+    'ingress-portal-build.Dockerfile', 'maintenance-authority.service',
+    'ingress-release-gate.json',
+)
+
+
+def extension_module():
+    spec = importlib.util.spec_from_file_location(
+        'atlas_ingress_provenance', Path(__file__).with_name('deployment-ingress-provenance.py'))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def mixed(record):
     values = metadata(record)
     return (any(k in values for k in MARKERS)
             or any((record / name).exists() or (record / name).is_symlink()
-                   for name in SUPPLEMENTS[:3]))
+                   for name in SUPPLEMENTS[:3] + EXTENSION_NAMES))
 
 
 def safe_name(name):
@@ -149,12 +166,26 @@ def expected_copies(files):
 
 
 def check_record(record):
+    values = metadata(record)
+    extended = values.get('runtime_provenance_schema') == '2'
+    if extended:
+        ext = extension_module()
+        result = _check_base_record(record, ext.MARKERS, ext.SOURCE_CLAIM)
+        ext.check_record(__import__('types').SimpleNamespace(need=need, read=read, archive_files=archive_files, safe_name=safe_name),
+                         record, verify_manifest(record), values)
+        return result
+    need(not any((record / name).exists() or (record / name).is_symlink() for name in EXTENSION_NAMES),
+         'Schema-2 supplements cannot be interpreted as schema 1')
+    return _check_base_record(record, MARKERS, SOURCE_CLAIM)
+
+
+def _check_base_record(record, markers, source_claim):
     need(record.is_dir() and not record.is_symlink(), 'Invalid mixed-runtime record directory')
     entries = verify_manifest(record)
     need(set(SUPPLEMENTS) <= set(entries), 'Mixed-runtime supplements missing')
     m = metadata(record)
-    need(all(m.get(k) == v for k, v in MARKERS.items()), 'Mixed-runtime metadata markers differ')
-    need(m.get('source_claim') == SOURCE_CLAIM, 'Mixed-runtime source claim differs')
+    need(all(m.get(k) == v for k, v in markers.items()), 'Mixed-runtime metadata markers differ')
+    need(m.get('source_claim') == source_claim, 'Mixed-runtime source claim differs')
     ledger = json.loads(read(record / 'service-sources.json'))
     tracked = json.loads(read(record / 'repair-tracked-source.json'))
     activation = json.loads(read(record / 'repair-activation.json'))
@@ -234,6 +265,9 @@ def inspect(name):
 
 def check_live(record, excluded=''):
     ledger, files, activation = check_record(record)
+    if metadata(record).get('runtime_provenance_schema') == '2':
+        extension_module().check_live(__import__('types').SimpleNamespace(
+            read=read, archive_files=archive_files, inspect=inspect), record)
     writer = ledger['ingress']['overrides']['sports-writer']
     row = inspect('atlas-sports-writer')
     need(row['Image'] == writer['image'] and row['State']['Running'], 'Writer runtime identity differs')
@@ -312,6 +346,8 @@ def inherit(source, destination, recovery_transaction=None):
     if not mixed(source):
         return
     check_record(source)
+    need(metadata(source).get('runtime_provenance_schema') != '2',
+         'Schema-2 inheritance requires the pending recovery coordinator')
     need(destination.is_dir() and not destination.is_symlink(), 'Invalid inheritance destination')
     for name in SUPPLEMENTS:
         need(not (destination / name).exists() and not (destination / name).is_symlink(),
@@ -334,6 +370,8 @@ def inherit(source, destination, recovery_transaction=None):
 
 def prepare_restore(record, destination):
     ledger, _, activation = check_record(record)
+    need(metadata(record).get('runtime_provenance_schema') != '2',
+         'Schema-2 restore requires the pending recovery coordinator')
     need(destination.is_absolute() and destination.is_dir() and not destination.is_symlink(),
          'Invalid private restore destination')
     # Only the native records/<transaction>/recovery-sports.* namespace is writable here.
