@@ -8,11 +8,14 @@ atlas_deployment_is_mixed() {
   local name
   for name in service-sources.json repair-tracked-source.json recovery-chain.json \
     sports-writer-source.tar.gz repair-activation.json original-lock-owner \
-    accepted-private-sustained.json; do
+    accepted-private-sustained.json ingress-runtime-extension.json \
+    ingress-application-source.tar.gz ingress-application-tracked.json \
+    ingress-api-build.Dockerfile ingress-portal-build.Dockerfile \
+    maintenance-authority.service ingress-release-gate.json; do
     [[ ! -e "$record/$name" && ! -L "$record/$name" ]] || return 0
   done
   if [[ -f "$record/MANIFEST.sha256" ]] &&
-    grep -Eq '  (service-sources|repair-tracked-source|recovery-chain)\.json$' "$record/MANIFEST.sha256"; then
+    grep -Eq '  (service-sources|repair-tracked-source|recovery-chain|ingress-runtime-extension|ingress-application-tracked|ingress-release-gate)\.json$' "$record/MANIFEST.sha256"; then
     return 0
   fi
   grep -Eq '^(requires_mixed_runtime_contract|runtime_provenance_schema|ingress_source_mode)=' \
@@ -31,6 +34,10 @@ atlas_deployment_mixed_contract() {
 atlas_deployment_validate_update_inheritance() {
   local record="$1"
   local scope="$2"
+  if grep -Eq '^(runtime_provenance_schema|requires_mixed_runtime_contract)=2$' "$record/metadata"; then
+    echo 'ERROR: schema-2 updates require the pending component/recovery coordinator; runtime was not mutated.' >&2
+    return 1
+  fi
   if atlas_deployment_is_mixed "$record" && [[ "$scope" != all ]]; then
     echo 'ERROR: partial updates from a mixed-runtime baseline require explicit provenance inheritance; runtime was not mutated.' >&2
     return 1
