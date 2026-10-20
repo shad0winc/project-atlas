@@ -245,7 +245,10 @@ def state_identity(row):
     need(state.get('Running') is True and not any(state.get(key) for key in ('Paused', 'Restarting', 'Dead', 'OOMKilled'))
          and state.get('Health', {}).get('Status') == 'healthy', 'Ingress component is not healthy and running')
     need(type(state.get('Pid')) is int and state['Pid'] > 0, 'Ingress component process identity missing')
-    return {key: row[key] for key in ('Id', 'Image', 'Name', 'Config', 'HostConfig', 'Mounts', 'RestartCount')} | {
+    # Inspection order is not mount identity; retain every mount field.
+    mounts(row)
+    return {key: row[key] for key in ('Id', 'Image', 'Name', 'Config', 'HostConfig', 'RestartCount')} | {
+        'Mounts': sorted(row['Mounts'], key=lambda item: json.dumps(item, sort_keys=True)),
         'State': {key: state[key] for key in ('Pid', 'StartedAt')}}
 
 
@@ -360,7 +363,14 @@ def image_checks(m, role, row, ext, record):
         values = json.loads(query(['docker', 'image', 'inspect', image_id]))
         need(len(values) == 1 and values[0]['Id'] == image_id, 'Caddy image identity unavailable')
         for key in ('Cmd', 'Entrypoint', 'WorkingDir', 'User'):
-            need(row['Config'].get(key) == values[0]['Config'].get(key), 'Caddy default startup is overridden')
+            actual, expected = row['Config'].get(key), values[0]['Config'].get(key)
+            # Docker may represent an unset image User as null and its
+            # effective container User as an empty string. No explicit user
+            # or other startup field is normalized by this comparison.
+            if key == 'User':
+                actual = '' if actual is None else actual
+                expected = '' if expected is None else expected
+            need(actual == expected, 'Caddy default startup is overridden')
     check_mount_boundaries(role, row, ext)
 
 
