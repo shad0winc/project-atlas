@@ -89,7 +89,7 @@ class PrivateHeldAcceptance(HeldPublication):
             result[name] = {'id':row['Id'],'image':row['Image'],'restarts':row['RestartCount'],
                 'state':{key:state.get(key) for key in ('Running','Paused','Restarting','OOMKilled','Pid','StartedAt')},
                 'config_sha256':digest(row['Config']),'host_config_sha256':digest(row['HostConfig']),
-                'mounts_sha256':digest(row['Mounts'])}
+                'mounts_sha256':digest(sorted(row['Mounts'], key=encoded))}
         if set(result)!=set(expected):raise MaintenanceControlError('acceptance_runtime_inventory_changed')
         return result
 
