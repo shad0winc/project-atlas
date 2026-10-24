@@ -270,6 +270,7 @@ def _payload():
     return {
         "source_id": "xc4-account",
         "provider_id": "xc4",
+        "credential_realm": "xc4-license",
         "provider_display_name": "XC4",
         "account_display_name": (
             "XC4 Main"
@@ -311,6 +312,7 @@ def test_private_create_is_compensated_and_secret_safe(
         "xc4-account"
     )
     assert source.provider_id == "xc4"
+    assert source.credential_realm == "xc4-license"
     assert source.enabled is False
     assert source.max_connections == 4
     assert source.backend_reference == (
@@ -344,6 +346,25 @@ def test_private_create_is_compensated_and_secret_safe(
         "password",
     ):
         assert forbidden not in rendered
+
+
+@pytest.mark.parametrize("realm", (None, "UpperCase", "has space"))
+def test_private_create_rejects_missing_or_invalid_realm_before_backend(
+    monkeypatch, realm,
+) -> None:
+    module = _load_private_api(monkeypatch)
+    store = FakeStore()
+    client = FakeClient()
+    payload = _payload()
+    if realm is None:
+        payload.pop("credential_realm")
+    else:
+        payload["credential_realm"] = realm
+    status, _body = _request(module, monkeypatch, store=store,
+                             client=client, payload=payload)
+    assert status == 422
+    assert client.creates == []
+    assert store.writes == []
 
 
 def test_private_create_compensates_state_write_failure(

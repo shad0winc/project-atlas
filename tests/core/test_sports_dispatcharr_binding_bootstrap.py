@@ -14,8 +14,9 @@ UPDATE = ROOT / "scripts/commands/update.sh"
 UPDATE_TEST = ROOT / "tests/core/test_update_transaction.py"
 
 EMPTY_DOCUMENT = {
-    "version": 1,
+    "version": 2,
     "bindings": {},
+    "managed_uuids": [],
 }
 
 
@@ -147,10 +148,8 @@ def test_symbolic_registry_path_fails_closed(
     tmp_path: Path,
 ) -> None:
     real = tmp_path / "real.json"
-    real.write_text(
-        '{"version":1,"bindings":{}}\n',
-        encoding="utf-8",
-    )
+    original = b'{"version":1,"bindings":{}}\n'
+    real.write_bytes(original)
 
     path = tmp_path / "state/dispatcharr-channel-bindings.json"
     path.parent.mkdir(parents=True)
@@ -164,7 +163,7 @@ def test_symbolic_registry_path_fails_closed(
 
     assert result.returncode != 0
     assert path.is_symlink()
-    assert json.loads(real.read_text(encoding="utf-8")) == EMPTY_DOCUMENT
+    assert real.read_bytes() == original
 
 
 def test_bootstrap_requires_absolute_path(
