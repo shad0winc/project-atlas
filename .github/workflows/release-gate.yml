@@ -58,19 +58,20 @@ jobs:
   sports:
     name: Sports
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: '3.13'
       - name: Install Sports runtime dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ffmpeg
+        timeout-minutes: 35
+        run: bash scripts/ci/prepare-sports-runtime.sh
       - name: Compile Sports
+        timeout-minutes: 2
         run: python -m compileall -q modules/sports/src modules/sports/tests
       - name: Run Sports integration suite
+        timeout-minutes: 15
         env:
           SPORTS_MEDIA_DIR: ${{ runner.temp }}/atlas-sports/media
           SPORTS_RECORDING_LOG_DIR: ${{ runner.temp }}/atlas-sports/logs
