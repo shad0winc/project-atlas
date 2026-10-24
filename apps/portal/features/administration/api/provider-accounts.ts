@@ -57,6 +57,7 @@ export interface AdminSportsConnectionTest {
 
 export interface CreateAdminSportsProviderAccountInput {
   readonly sourceId: string;
+  readonly credentialRealm: string;
   readonly providerDisplayName: string;
   readonly accountDisplayName: string;
   readonly serverUrl: string;
@@ -512,6 +513,7 @@ export async function createAdminSportsProviderAccount(
       cache: "no-store",
       body: {
         source_id: requiredString(input.sourceId, "source id"),
+        credential_realm: requiredString(input.credentialRealm, "credential realm"),
         provider_display_name: requiredString(input.providerDisplayName, "provider display name"),
         account_display_name: requiredString(input.accountDisplayName, "account display name"),
         server_url: requiredString(input.serverUrl, "provider server URL"),
