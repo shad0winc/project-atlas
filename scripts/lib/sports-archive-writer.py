@@ -15,7 +15,7 @@ LABEL = 'io.project-atlas.archive-writer-drill'
 TOKEN = 'atlas-isolated-writer-drill-only'
 # Exact source packaging declared by the actual writer Dockerfile. Mount it RO
 # over the installed image's code; no image build, pull or production bind mount.
-FILES = ('private_api.py', 'shared_admission.py', 'games_state.py', 'dispatcharr_admin.py',
+FILES = ('private_api.py', 'atlas_live_policy_claim.py', 'shared_admission.py', 'games_state.py', 'dispatcharr_admin.py',
          'dispatcharr_channel_bindings.py', 'live_tv_bindings.py', 'live_sources.py',
          'subscriptions.py', 'source_lifecycle.py')
 REGISTRIES = {'SPORTS_LIVE_SOURCE_CATALOG_PATH': 'live-sources.json',

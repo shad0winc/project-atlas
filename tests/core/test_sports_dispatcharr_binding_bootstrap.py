@@ -14,8 +14,9 @@ UPDATE = ROOT / "scripts/commands/update.sh"
 UPDATE_TEST = ROOT / "tests/core/test_update_transaction.py"
 
 EMPTY_DOCUMENT = {
-    "version": 1,
+    "version": 2,
     "bindings": {},
+    "managed_uuids": [],
 }
 
 
