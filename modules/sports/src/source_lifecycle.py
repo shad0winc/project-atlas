@@ -13,6 +13,7 @@ from enum import StrEnum
 import json
 import os
 from pathlib import Path
+import re
 import tempfile
 from typing import Any, Iterable
 from urllib.parse import urlsplit
@@ -28,6 +29,7 @@ _ALLOWED_SOURCE_FIELDS = frozenset(
         "source_id",
         "display_name",
         "provider_id",
+        "credential_realm",
         "provider_display_name",
         "account_display_name",
         "kind",
@@ -233,6 +235,7 @@ class SportsSource:
     priority: int
     max_connections: int
     provider_id: str | None = None
+    credential_realm: str | None = None
     provider_display_name: str | None = None
     account_display_name: str | None = None
     backend_reference: str | None = None
@@ -282,6 +285,14 @@ class SportsSource:
             "provider_id",
             max_length=64,
         )
+        raw_realm = raw.get("credential_realm")
+        if raw_realm is None:
+            credential_realm = None  # Legacy source: valid metadata, no verified admission.
+        elif (not isinstance(raw_realm, str)
+              or not re.fullmatch(r"[a-z0-9][a-z0-9.-]{0,127}", raw_realm)):
+            raise SourceLifecycleError("credential_realm is invalid")
+        else:
+            credential_realm = raw_realm
         provider_display_name = _required_text(
             raw.get(
                 "provider_display_name",
@@ -375,6 +386,7 @@ class SportsSource:
             priority=priority,
             max_connections=max_connections,
             provider_id=provider_id,
+            credential_realm=credential_realm,
             provider_display_name=provider_display_name,
             account_display_name=account_display_name,
             backend_reference=_optional_text(
@@ -402,6 +414,7 @@ class SportsSource:
             "priority": self.priority,
             "max_connections": self.max_connections,
             "provider_id": self.provider_id,
+            "credential_realm": self.credential_realm,
             "provider_display_name": self.provider_display_name,
             "account_display_name": self.account_display_name,
             "backend_reference": self.backend_reference,
