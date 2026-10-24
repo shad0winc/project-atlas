@@ -29,6 +29,7 @@ def _created_payload():
             "source_id": "source one",
             "display_name": "Primary",
             "provider_id": "provider-a",
+            "credential_realm": "provider-a-license",
             "provider_display_name": (
                 "Provider A"
             ),
@@ -97,6 +98,7 @@ def test_create_provider_account_uses_exact_private_transaction(
     result = service.create_provider_account(
         source_id=" source one ",
         provider_id=" provider-a ",
+        credential_realm=" provider-a-license ",
         provider_display_name=" Provider A ",
         account_display_name=" Primary ",
         server_url=(
@@ -120,6 +122,7 @@ def test_create_provider_account_uses_exact_private_transaction(
             {
                 "source_id": "source one",
                 "provider_id": "provider-a",
+                "credential_realm": "provider-a-license",
                 "provider_display_name": (
                     "Provider A"
                 ),
@@ -165,6 +168,7 @@ def test_create_provider_account_rejects_secret_bearing_source(
         service.create_provider_account(
             source_id="source-one",
             provider_id="provider-a",
+            credential_realm="provider-a-license",
             provider_display_name=(
                 "Provider A"
             ),
@@ -175,6 +179,21 @@ def test_create_provider_account_rejects_secret_bearing_source(
             username="account-user",
             password="account-secret",
             max_connections=4,
+        )
+
+
+def test_create_provider_account_rejects_changed_realm_response(monkeypatch) -> None:
+    service = _service()
+    payload = _created_payload()
+    payload["source"]["credential_realm"] = "other-license"
+    monkeypatch.setattr(service, "_request", lambda *_args, **_kwargs: payload)
+    with pytest.raises(SportsWriterTransportError):
+        service.create_provider_account(
+            source_id="source one", provider_id="provider-a",
+            credential_realm="provider-a-license",
+            provider_display_name="Provider A", account_display_name="Primary",
+            server_url="https://provider.example", username="account-user",
+            password="account-secret", max_connections=4,
         )
 
 
@@ -200,6 +219,7 @@ def test_create_provider_account_rejects_unsafe_account_shape(
         service.create_provider_account(
             source_id="source-one",
             provider_id="provider-a",
+            credential_realm="provider-a-license",
             provider_display_name=(
                 "Provider A"
             ),
@@ -236,6 +256,7 @@ def test_create_provider_account_rejects_invalid_capacity_before_transport(
         service.create_provider_account(
             source_id="source-one",
             provider_id="provider-a",
+            credential_realm="provider-a-license",
             provider_display_name=(
                 "Provider A"
             ),

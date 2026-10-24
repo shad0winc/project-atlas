@@ -222,6 +222,7 @@ describe("Sports provider administration API", () => {
 
     await createAdminSportsProviderAccount("xc4", {
       sourceId: "xc4-primary",
+      credentialRealm: "xc4-primary",
       providerDisplayName: "XC4",
       accountDisplayName: "XC4 Primary",
       serverUrl: "https://provider.invalid",
@@ -238,6 +239,7 @@ describe("Sports provider administration API", () => {
         cache: "no-store",
         body: {
           source_id: "xc4-primary",
+          credential_realm: "xc4-primary",
           provider_display_name: "XC4",
           account_display_name: "XC4 Primary",
           server_url: "https://provider.invalid",

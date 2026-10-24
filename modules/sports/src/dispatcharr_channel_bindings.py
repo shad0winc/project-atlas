@@ -7,9 +7,11 @@ import os
 from pathlib import Path
 import tempfile
 from typing import Any
+from uuid import UUID
 
 
-STATE_VERSION = 1
+STATE_VERSION = 2
+LEGACY_STATE_VERSION = 1
 
 
 class DispatcharrChannelBindingError(
@@ -88,6 +90,17 @@ def _positive_identifier(
     return value
 
 
+def _canonical_channel_uuid(value: object) -> str:
+    candidate = _required_identifier(value, "dispatcharr_channel_uuid")
+    try:
+        if str(UUID(candidate)) != candidate:
+            raise ValueError("noncanonical")
+    except (TypeError, ValueError, AttributeError):
+        raise DispatcharrChannelBindingError(
+            "Dispatcharr channel UUID must be canonical") from None
+    return candidate
+
+
 def _reject_duplicate_keys(
     pairs: list[
         tuple[str, Any]
@@ -124,6 +137,7 @@ class DispatcharrChannelBindingRegistry:
         return {
             "version": STATE_VERSION,
             "bindings": {},
+            "managed_uuids": [],
         }
 
     def _validate_paths(
@@ -175,16 +189,18 @@ class DispatcharrChannelBindingRegistry:
                 "root must be an object"
             )
 
-        if set(raw) != {
-            "version",
-            "bindings",
-        }:
+        version = raw.get("version")
+        expected = ({"version", "bindings", "managed_uuids"}
+                    if version == STATE_VERSION else {"version", "bindings"})
+        if set(raw) != expected:
             raise DispatcharrChannelBindingError(
                 "Dispatcharr channel binding state "
                 "contains unsupported fields"
             )
 
-        if raw.get("version") != STATE_VERSION:
+        if type(version) is not int or version not in (
+            STATE_VERSION, LEGACY_STATE_VERSION
+        ):
             raise DispatcharrChannelBindingError(
                 "unsupported Dispatcharr channel "
                 "binding state version"
@@ -243,14 +259,12 @@ class DispatcharrChannelBindingRegistry:
                 )
             )
 
-            dispatcharr_channel_uuid = (
-                _required_identifier(
-                    entry.get(
-                        "dispatcharr_channel_uuid"
-                    ),
-                    "dispatcharr_channel_uuid",
-                )
-            )
+            uuid_value = entry.get("dispatcharr_channel_uuid")
+            if version == STATE_VERSION:
+                dispatcharr_channel_uuid = _canonical_channel_uuid(uuid_value)
+            else:
+                dispatcharr_channel_uuid = _required_identifier(
+                    uuid_value, "dispatcharr_channel_uuid")
 
             if (
                 dispatcharr_channel_id
@@ -288,10 +302,66 @@ class DispatcharrChannelBindingRegistry:
                 ),
             }
 
+        managed = raw.get("managed_uuids") if version == STATE_VERSION else None
+        if version == STATE_VERSION:
+            if (not isinstance(managed, list) or len(managed) != len(set(
+                    item for item in managed if isinstance(item, str)))
+                or any(not isinstance(item, str) or not item.strip()
+                       or len(item) > 256 for item in managed)
+                or not seen_channel_uuids.issubset(set(managed))):
+                raise DispatcharrChannelBindingError(
+                    "Managed channel history is invalid")
+            for item in managed:
+                _canonical_channel_uuid(item)
         return {
-            "version": STATE_VERSION,
+            "version": version,
             "bindings": normalized,
+            **({"managed_uuids": sorted(managed)} if managed is not None else {}),
         }
+
+    def classify_channel_uuid(self, channel_uuid: str) -> bool:
+        """Classify from one atomic document snapshot or fail closed."""
+        channel_uuid = _required_identifier(channel_uuid, "channel_uuid")
+        document = self._load()
+        if document["version"] != STATE_VERSION:
+            raise DispatcharrChannelBindingError(
+                "Managed channel history requires migration")
+        matches = sum(
+            entry["dispatcharr_channel_uuid"] == channel_uuid
+            for entry in document["bindings"].values())
+        in_history = channel_uuid in document["managed_uuids"]
+        if matches > 1 or in_history != (matches == 1):
+            raise DispatcharrChannelBindingError(
+                "Managed channel identity needs reconciliation")
+        return matches == 1
+
+    def managed_history_contains(self, channel_uuid: str) -> bool:
+        """Read history for maintenance without authorizing playback."""
+        channel_uuid = _required_identifier(channel_uuid, "channel_uuid")
+        document = self._load()
+        if document["version"] != STATE_VERSION:
+            raise DispatcharrChannelBindingError(
+                "Managed channel history requires migration")
+        return channel_uuid in document["managed_uuids"]
+
+    def migrate_managed_history(self) -> None:
+        """Atomically seed v2 history from every binding in legacy state."""
+        with self._exclusive_lock() as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            try:
+                if not self.path.is_file():
+                    raise DispatcharrChannelBindingError(
+                        "Binding registry must exist before migration")
+                document = self._load()
+                if document["version"] == STATE_VERSION:
+                    return
+                document["managed_uuids"] = sorted(
+                    _canonical_channel_uuid(entry["dispatcharr_channel_uuid"])
+                    for entry in document["bindings"].values())
+                document["version"] = STATE_VERSION
+                self._write_locked(document)
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
     def _write_locked(
         self,
@@ -496,12 +566,8 @@ class DispatcharrChannelBindingRegistry:
             )
         )
 
-        normalized_channel_uuid = (
-            _required_identifier(
-                dispatcharr_channel_uuid,
-                "dispatcharr_channel_uuid",
-            )
-        )
+        normalized_channel_uuid = _canonical_channel_uuid(
+            dispatcharr_channel_uuid)
 
         with self._exclusive_lock() as lock:
             fcntl.flock(
@@ -511,6 +577,9 @@ class DispatcharrChannelBindingRegistry:
 
             try:
                 document = self._load()
+                if document["version"] != STATE_VERSION:
+                    raise DispatcharrChannelBindingError(
+                        "Managed channel history requires migration")
 
                 for (
                     other_atlas_id,
@@ -560,6 +629,9 @@ class DispatcharrChannelBindingRegistry:
                         normalized_channel_uuid
                     ),
                 }
+                if normalized_channel_uuid not in document["managed_uuids"]:
+                    document["managed_uuids"].append(normalized_channel_uuid)
+                    document["managed_uuids"].sort()
 
                 self._write_locked(
                     document
@@ -602,6 +674,9 @@ class DispatcharrChannelBindingRegistry:
 
             try:
                 document = self._load()
+                if document["version"] != STATE_VERSION:
+                    raise DispatcharrChannelBindingError(
+                        "Managed channel history requires migration")
 
                 if (
                     normalized_atlas_id
