@@ -175,10 +175,26 @@ def test_release_gate_installs_sports_ffmpeg_dependency() -> None:
     )[0]
 
     assert "ffmpeg" in dockerfile
-    assert (
-        "sudo apt-get install -y --no-install-recommends ffmpeg"
-        in sports
-    )
+    assert "run: bash scripts/ci/prepare-sports-runtime.sh" in sports
+    helper = (root / "scripts/ci/prepare-sports-runtime.sh").read_text()
+    assert "apt-get install -y --no-install-recommends ffmpeg" in helper
+    assert "ffmpeg -version" in helper and "ffprobe -version" in helper
+
+
+def test_sports_setup_budget_preserves_test_time_and_required_gate() -> None:
+    content = workflow_text()
+    sports = content.split("  sports:\n", 1)[1].split("  portal:\n", 1)[0]
+    header, setup = sports.split("      - name: Install Sports runtime dependencies\n", 1)
+    setup, compile_step = setup.split("      - name: Compile Sports\n", 1)
+    compile_step, execution = compile_step.split("      - name: Run Sports integration suite\n", 1)
+    assert "timeout-minutes: 55" in header
+    assert "timeout-minutes: 35" in setup
+    assert "timeout-minutes: 2" in compile_step
+    assert "timeout-minutes: 15" in execution
+    assert "python modules/sports/tests/run_tests.py" in execution
+    assert "continue-on-error" not in sports and "if:" not in sports
+    assert "SPORTS_RESULT: ${{ needs.sports.result }}" in content
+    assert "[[ \"$result\" == 'success' ]]" in content
 
 
 # M-023.24.5 isolated runner state contracts
