@@ -27,12 +27,12 @@ def main():
         folder = Path(temporary)
         shutil.copytree(ROOT / 'overlay/apps', folder / 'apps')
         shutil.copytree(ROOT / 'tests', folder / 'tests')
-        for name in ('Dockerfile', 'manifest.json', 'test_stream_head.py'):
+        for name in ('Dockerfile', 'manifest.json', '.dockerignore', 'test_stream_head.py'):
             shutil.copyfile(ROOT / name, folder / name)
         harness = '''import sys,unittest
 suite=unittest.defaultTestLoader.discover(sys.argv[1],pattern='test_*.py')
 result=unittest.TextTestRunner(verbosity=1).run(suite)
-assert result.testsRun==66,(result.testsRun, 'Expected all historical and HEAD tests')
+assert result.testsRun==67,(result.testsRun, 'Expected all historical and HEAD tests')
 assert not result.skipped, 'Source tests must not be skipped'
 raise SystemExit(not result.wasSuccessful())
 '''
@@ -41,7 +41,7 @@ raise SystemExit(not result.wasSuccessful())
                                 env=dict(os.environ, PYTHONDONTWRITEBYTECODE='1'))
         if result.returncode:
             raise SystemExit(result.returncode)
-    print('DISPATCHARR_SOURCE_TESTS_PASSED=66')
+    print('DISPATCHARR_SOURCE_TESTS_PASSED=67')
 
 
 if __name__ == '__main__':

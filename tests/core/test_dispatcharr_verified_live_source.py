@@ -14,7 +14,7 @@ class VerifiedLiveSourceGate(unittest.TestCase):
             stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=120,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn('DISPATCHARR_SOURCE_TESTS_PASSED=66', result.stdout)
+        self.assertIn('DISPATCHARR_SOURCE_TESTS_PASSED=67', result.stdout)
 
 
 if __name__ == '__main__':

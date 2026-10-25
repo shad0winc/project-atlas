@@ -71,7 +71,7 @@
     "tests/test_atlas_policy_claims.py": "1249d62cb5e34b47e64fcbac89b240474a811ea0658d2152024b58e5ace1b130",
     "tests/test_atlas_verified_policy_adapter.py": "a7e2fde0ad9103a29f87c773e336498c8b694eaf60d9022f8da4cbed8f9ffe13",
     "tests/test_bound_live_plan.py": "1d371415521954f9c45da0a04fd9f6ba76bd366e892c63b9d8369fb206effdd6",
-    "tests/test_head_compatibility.py": "136277eda7255b80c655d0029dde6b0d4bb0b68cb865128306a420f8fd9c2d5d",
+    "tests/test_head_compatibility.py": "264c81824cae82afce5d0ba66b9a97e71afd9428f8ee2c3acbf737f0ef5860dc",
     "tests/test_provider_capacity_observation.py": "4df8905b19be5d9327b691310363eee7067bfcdb4a448a7f869d15ca6863adab",
     "tests/test_verified_follower_only.py": "4b626ededa0e97ff747cb4b742e1c5a43a56491550d412844dccdb82d263ca0b",
     "tests/test_verified_http_close.py": "dec7d4e062c414c3aea6552fdb3c1b617206c6714679b8975cbbe92a7ff3a112",

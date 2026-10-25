@@ -17,8 +17,8 @@ CT100 disposable build and tests (no production mounts or runtime mutation):
 
     ./run-disposable-image-tests.sh
 
-The source suite covers the 58 historical live-path tests plus eight HEAD and packaging
-contracts (66 total). The disposable image command additionally runs three
+The source suite covers the 58 historical live-path tests plus nine HEAD and packaging
+contracts (67 total). The disposable image command additionally runs three
 private-Redis admission checks; those checks require separate image validation.
 Atlas Sports' classifier test is excluded because that source lives in the
 separate Atlas policy PR. Django system check requires an ephemeral signing
@@ -46,3 +46,8 @@ The original production Dockerfile, Compose selection, mode flags, data, and
 running containers are unchanged. Strict activation and ledger migration remain
 separate guarded work. Historical staged archive hashes identify provenance;
 `overlay_files` binds the reconciled source rather than those historical archives.
+
+Build context regression coverage keeps the manifest and actual framework-test
+fixture available to Docker COPY. The guarded image-validation runner stages
+only these committed files with readable build-context modes; it does not mount
+production data or start the application.

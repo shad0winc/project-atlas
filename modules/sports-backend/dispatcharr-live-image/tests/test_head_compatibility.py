@@ -89,6 +89,19 @@ class HeadCompatibilityTests(unittest.TestCase):
         self.assertIn('verified-live-head-compatibility-v1', dockerfile)
         self.assertIn('sha256:e764cd3fb3a4b14e0c96eeb830cce645b44ef0a2494838e21462c71dde5abeb4', dockerfile)
 
+    def test_dockerignore_keeps_all_required_build_inputs(self):
+        from fnmatch import fnmatchcase
+        patterns = [line.strip() for line in (ROOT / '.dockerignore').read_text().splitlines()
+                    if line.strip() and not line.lstrip().startswith('#')]
+        for name in ('manifest.json', 'Dockerfile', '.dockerignore',
+                     'tests/fixtures/stream_ts_before_head.py', 'test_stream_head.py'):
+            self.assertTrue((ROOT / name).is_file(), name)
+            for pattern in patterns:
+                with self.subTest(source=name, pattern=pattern):
+                    self.assertFalse(fnmatchcase(name, pattern)
+                                     or name.startswith(pattern.rstrip('/') + '/'),
+                                     'Required Docker COPY source is excluded')
+
     def test_manifest_binds_final_view_and_pre_head_fixture(self):
         manifest = json.loads((ROOT / 'manifest.json').read_bytes())
         self.assertEqual(hashlib.sha256(VIEW.read_bytes()).hexdigest(),
