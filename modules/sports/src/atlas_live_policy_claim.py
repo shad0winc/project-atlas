@@ -23,10 +23,21 @@ class AtlasLivePolicyClaim:
     account_id: int
     configured_max_connections: int
     credential_realm: str
-    provider: str
-    provider_event_id: str
+    provider: str | None
+    provider_event_id: str | None
+    identity_kind: str = "event"
+    standalone_channel_id: str | None = None
 
     def to_mapping(self) -> dict[str, object]:
+        if self.identity_kind == "standalone":
+            return {
+                "channel_uuid": self.channel_uuid, "source_id": self.source_id,
+                "account_id": self.account_id,
+                "configured_max_connections": self.configured_max_connections,
+                "credential_realm": self.credential_realm,
+                "identity_kind": "standalone",
+                "standalone_channel_id": self.standalone_channel_id,
+            }
         return {
             "channel_uuid": self.channel_uuid,
             "source_id": self.source_id,
@@ -74,7 +85,14 @@ def claim_for_channel(*, channel_uuid: str, source_id: str,
             not parsed.path.endswith("/proxy/ts/stream/" + channel_uuid)
             or unquote(parsed.path.rsplit("/", 1)[-1]) != channel_uuid):
         raise AtlasLivePolicyUnavailable("Published channel URL changed")
-    if (not isinstance(live.provider, str) or not live.provider
+    standalone = getattr(live, "standalone", False)
+    if type(standalone) is not bool:
+        raise AtlasLivePolicyUnavailable("Live identity kind invalid")
+    if standalone:
+        if (live.provider is not None or live.provider_event_id is not None
+                or not re.fullmatch(r"sports-live-[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}", live.atlas_channel_id)):
+            raise AtlasLivePolicyUnavailable("Standalone channel identity unavailable")
+    elif (not isinstance(live.provider, str) or not live.provider
             or not isinstance(live.provider_event_id, str) or not live.provider_event_id):
         raise AtlasLivePolicyUnavailable("Event identity unavailable")
 
@@ -103,6 +121,8 @@ def claim_for_channel(*, channel_uuid: str, source_id: str,
     return AtlasLivePolicyClaim(
         channel_uuid, source_id, account_id, source.max_connections, realm,
         live.provider, live.provider_event_id,
+        "standalone" if standalone else "event",
+        live.atlas_channel_id if standalone else None,
     )
 
 

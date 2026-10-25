@@ -245,12 +245,9 @@ def _parse_source(
         entry.get("provider_event_id")
     )
 
-    standalone = bool(
-        entry.get(
-            "standalone",
-            False,
-        )
-    )
+    standalone = entry.get("standalone", False)
+    if type(standalone) is not bool:
+        raise LiveSourceCatalogError("standalone must be a boolean")
 
     raw_resource_source_ids = entry.get(
         "resource_source_ids",
