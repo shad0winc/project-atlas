@@ -13,7 +13,17 @@ ROOT = Path(__file__).resolve().parent
 
 def main():
     manifest = json.loads((ROOT / 'manifest.json').read_bytes())
-    actual = {str(p.relative_to(ROOT / 'overlay')) for p in (ROOT / 'overlay').rglob('*') if p.is_file()}
+    # Test collection and compile steps can create caches beside pinned source.
+    # Ignore only regular bytecode in __pycache__; retain exact source inventory.
+    actual = set()
+    for path in (ROOT / 'overlay').rglob('*'):
+        assert not path.is_symlink(), 'Overlay symlinks are not supported'
+        if not path.is_file():
+            continue
+        relative = path.relative_to(ROOT / 'overlay')
+        if '__pycache__' in relative.parts and path.suffix == '.pyc':
+            continue
+        actual.add(str(relative))
     assert actual == set(manifest['overlay_files'])
     for name, expected in manifest['overlay_files'].items():
         path = ROOT / 'overlay' / name
@@ -25,7 +35,8 @@ def main():
         assert hashlib.sha256(path.read_bytes()).hexdigest() == expected
     with tempfile.TemporaryDirectory(prefix='atlas-dispatcharr-source-') as temporary:
         folder = Path(temporary)
-        shutil.copytree(ROOT / 'overlay/apps', folder / 'apps')
+        shutil.copytree(ROOT / 'overlay/apps', folder / 'apps',
+                        ignore=shutil.ignore_patterns('__pycache__'))
         shutil.copytree(ROOT / 'tests', folder / 'tests')
         for name in ('Dockerfile', 'manifest.json', '.dockerignore', 'test_stream_head.py'):
             shutil.copyfile(ROOT / name, folder / name)
