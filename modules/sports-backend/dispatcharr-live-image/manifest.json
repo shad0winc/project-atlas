@@ -28,7 +28,7 @@
   "overlay_files": {
     "apps/channels/models.py": "ca2c8fff68f895c311dd480f8ae08c9709f76b76718d3e8af00a05877be72b52",
     "apps/m3u/atlas_channel_classification.py": "2f44a7ee795093e4b12eac7fbc6169e1902cead8b11a164906f97ac561885c2d",
-    "apps/m3u/atlas_policy_claims.py": "5027f3a3dfd2bb038da17c9be0eb65a1ef2f2c9348fdaa44e8b54a9e11eaa7b3",
+    "apps/m3u/atlas_policy_claims.py": "19987e84f6668bbe3e4fabf45159bcb8048ca9bd274d5bfadb1d0ff0166de6c8",
     "apps/m3u/atlas_verified_policy_adapter.py": "09166c1162b02e816753f12ec040cd54e4fc5c3c24da3f1d495c3d9be0fee08e",
     "apps/m3u/connection_pool.py": "4bcbfd5f0875f495d12024d9d481f23c31780a7f18f5989b21fc01f21654d754",
     "apps/m3u/provider_capacity_observation.py": "a1d1727cf8bd0e9889957aec014fdf4bddb1a5990d70704ce838f51726a37983",

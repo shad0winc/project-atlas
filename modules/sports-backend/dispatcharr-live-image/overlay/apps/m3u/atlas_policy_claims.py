@@ -26,8 +26,10 @@ class AtlasPolicyClaim:
     account_id: int
     configured_max_connections: int
     credential_realm: str
-    provider: str
-    provider_event_id: str
+    provider: str | None
+    provider_event_id: str | None
+    identity_kind: str = "event"
+    standalone_channel_id: str | None = None
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -96,10 +98,20 @@ class AtlasPolicyClaimClient:
             raise AtlasPolicyUnavailable("Atlas policy claim count invalid")
         claims = []
         for row in rows:
-            if not isinstance(row, dict) or set(row) != {
-                "channel_uuid", "source_id", "account_id", "configured_max_connections",
-                "credential_realm", "provider", "provider_event_id",
-            }:
+            common = {"channel_uuid", "source_id", "account_id", "configured_max_connections", "credential_realm"}
+            if not isinstance(row, dict):
+                raise AtlasPolicyUnavailable("Atlas policy claim invalid")
+            event = set(row) == common | {"provider", "provider_event_id"}
+            standalone = set(row) == common | {"identity_kind", "standalone_channel_id"}
+            if not (event or standalone):
+                raise AtlasPolicyUnavailable("Atlas policy claim invalid")
+            if event:
+                if (not isinstance(row["provider"], str) or not row["provider"]
+                        or not isinstance(row["provider_event_id"], str) or not row["provider_event_id"]):
+                    raise AtlasPolicyUnavailable("Atlas policy claim invalid")
+            elif (row["identity_kind"] != "standalone"
+                    or not isinstance(row["standalone_channel_id"], str)
+                    or not re.fullmatch(r"sports-live-[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}", row["standalone_channel_id"])):
                 raise AtlasPolicyUnavailable("Atlas policy claim invalid")
             source_id = row["source_id"]
             if (row["channel_uuid"] != channel_uuid
@@ -110,15 +122,13 @@ class AtlasPolicyClaimClient:
                     or row["configured_max_connections"] <= 0
                     or not isinstance(row["credential_realm"], str)
                     or not re.fullmatch(r"[a-z0-9][a-z0-9.-]{0,127}",
-                                        row["credential_realm"])
-                    or not isinstance(row["provider"], str) or not row["provider"]
-                    or not isinstance(row["provider_event_id"], str)
-                    or not row["provider_event_id"]):
+                                        row["credential_realm"])):
                 raise AtlasPolicyUnavailable("Atlas policy claim invalid")
-            claims.append(AtlasPolicyClaim(**row))
+            claims.append(AtlasPolicyClaim(**row) if event else
+                          AtlasPolicyClaim(**row, provider=None, provider_event_id=None))
         if (len({c.account_id for c in claims}) != len(claims)
                 or len({c.source_id for c in claims}) != len(claims)
-                or len({(c.provider, c.provider_event_id) for c in claims}) != 1):
+                or len({(c.identity_kind, c.provider, c.provider_event_id, c.standalone_channel_id) for c in claims}) != 1):
             raise AtlasPolicyUnavailable("Atlas policy claims conflict")
         return tuple(claims)
 
