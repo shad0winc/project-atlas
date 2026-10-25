@@ -8,7 +8,7 @@ docker run --rm -i --network none --read-only \
   --security-opt no-new-privileges --cap-drop ALL \
   --pids-limit 128 --memory 256m --cpus 1 --user 65534:65534 \
   -e ATLAS_VERIFIED_LIVE_MODE=off \
-  -v "$root/tests:/app/tests:ro" --entrypoint python "$image" \
+  -v "$root/test_stream_head.py:/app/test_stream_head.py:ro" -v "$root/tests:/app/tests:ro" --entrypoint python "$image" \
   -m unittest discover -s /app/tests -p 'test_*.py' -q
 docker run --rm -i --network none --read-only \
   --tmpfs /tmp:rw,nosuid,nodev,size=64m,mode=1777 \
