@@ -1,0 +1,4 @@
+README.md
+run-disposable-image-tests.sh
+__pycache__/
+*.pyc
