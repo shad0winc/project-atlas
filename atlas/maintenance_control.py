@@ -188,6 +188,21 @@ class MaintenanceAuthority:
         """Host-only repair forces maintenance on; never reopens or releases recovery."""
         self._identity(actor, 'cli')
         with self._exclusive():
+            if self._present(self.pending):
+                fd = os.open(self.pending, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+                try:
+                    info = os.fstat(fd)
+                    if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_size > 65536:
+                        raise MaintenanceControlError('state_unavailable')
+                    raw = os.read(fd, 65537)
+                finally:
+                    os.close(fd)
+                try:
+                    pending = json.loads(raw)
+                except (ValueError, UnicodeError):
+                    pending = None
+                if isinstance(pending, dict) and pending.get('operation') == 'publication-completion':
+                    raise MaintenanceControlError('publication_completion_requires_host_handoff')
             self._enable()
             request_id = uuid.uuid4().hex
             self._append_audit('recover_hold', actor, 'cli', request_id, 'completed')
