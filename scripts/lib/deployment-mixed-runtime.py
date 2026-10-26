@@ -79,11 +79,26 @@ def extension_module():
     return module
 
 
+SPORTS_EXTENSION_NAMES = ('sports-runtime-extension.json', 'sports-application-source.tar.gz',
+    'sports-application-tracked.json', 'sports-release-gate.json', 'sports-image-validation.json')
+
+
+def sports_extension_module():
+    spec = importlib.util.spec_from_file_location(
+        'atlas_sports_provenance', Path(__file__).with_name('deployment-sports-provenance.py'))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def mixed(record):
+    if any((record / name).exists() or (record / name).is_symlink()
+           for name in SPORTS_EXTENSION_NAMES):
+        return True
     values = metadata(record)
     return (any(k in values for k in MARKERS)
             or any((record / name).exists() or (record / name).is_symlink()
-                   for name in SUPPLEMENTS[:3] + EXTENSION_NAMES))
+                   for name in SUPPLEMENTS[:3] + EXTENSION_NAMES + SPORTS_EXTENSION_NAMES))
 
 
 def safe_name(name):
@@ -167,6 +182,10 @@ def expected_copies(files):
 
 def check_record(record):
     values = metadata(record)
+    if values.get('runtime_provenance_schema') == '3':
+        return sports_extension_module().check_record(__import__('types').SimpleNamespace(**globals()), record)
+    need(not any((record / name).exists() or (record / name).is_symlink() for name in SPORTS_EXTENSION_NAMES),
+         'Sports supplements cannot be interpreted as an older schema')
     extended = values.get('runtime_provenance_schema') == '2'
     if extended:
         ext = extension_module()
@@ -264,6 +283,8 @@ def inspect(name):
 
 
 def check_live(record, excluded=''):
+    need(metadata(record).get('runtime_provenance_schema') != '3',
+         'Schema-3 live inspection requires the pending held Sports adapter')
     ledger, files, activation = check_record(record)
     if metadata(record).get('runtime_provenance_schema') == '2':
         extension_module().check_live(__import__('types').SimpleNamespace(
@@ -346,8 +367,8 @@ def inherit(source, destination, recovery_transaction=None):
     if not mixed(source):
         return
     check_record(source)
-    need(metadata(source).get('runtime_provenance_schema') != '2',
-         'Schema-2 inheritance requires the pending recovery coordinator')
+    need(metadata(source).get('runtime_provenance_schema') not in ('2', '3'),
+         'Extended inheritance requires the pending recovery coordinator')
     need(destination.is_dir() and not destination.is_symlink(), 'Invalid inheritance destination')
     for name in SUPPLEMENTS:
         need(not (destination / name).exists() and not (destination / name).is_symlink(),
@@ -370,8 +391,8 @@ def inherit(source, destination, recovery_transaction=None):
 
 def prepare_restore(record, destination):
     ledger, _, activation = check_record(record)
-    need(metadata(record).get('runtime_provenance_schema') != '2',
-         'Schema-2 restore requires the pending recovery coordinator')
+    need(metadata(record).get('runtime_provenance_schema') not in ('2', '3'),
+         'Extended restore requires the pending recovery coordinator')
     need(destination.is_absolute() and destination.is_dir() and not destination.is_symlink(),
          'Invalid private restore destination')
     # Only the native records/<transaction>/recovery-sports.* namespace is writable here.
