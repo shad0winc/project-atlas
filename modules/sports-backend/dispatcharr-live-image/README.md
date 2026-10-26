@@ -6,7 +6,7 @@ is pinned below. Preserve upstream notices and review the license/source
 distribution requirements before publishing an image or merging this draft.
 
 This source review pins the running upstream image by digest and verifies the
-18 exported base source files before copying 27 changed/new live files. It
+24 exported base source files before copying 28 changed/new live files. It
 excludes the staged VOD and timeshift modifications. The runtime's verified
 live mode remains its default `off`; this is not a production rollout.
 
@@ -17,8 +17,8 @@ CT100 disposable build and tests (no production mounts or runtime mutation):
 
     ./run-disposable-image-tests.sh
 
-The source suite covers the 58 historical live-path tests plus nine HEAD and packaging
-contracts (67 total). The disposable image command additionally runs three
+The source suite covers 58 historical live-path tests, nine HEAD and packaging
+contracts, and 12 pilot boundary checks (79 total). The disposable image command additionally runs three
 private-Redis admission checks; those checks require separate image validation.
 Atlas Sports' classifier test is excluded because that source lives in the
 separate Atlas policy PR. Django system check requires an ephemeral signing
@@ -51,3 +51,13 @@ Build context regression coverage keeps the manifest and actual framework-test
 fixture available to Docker COPY. The guarded image-validation runner stages
 only these committed files with readable build-context modes; it does not mount
 production data or start the application.
+
+## Live-only pilot source boundary
+
+An opt-in pilot guard now restricts provider playback to managed verified live
+Sports. It does not complete VOD/timeshift migration. See
+`docs/operations/SPORTS_LIVE_PILOT.md` in the Atlas repository. The guard remains
+off unless explicitly configured; this source change grants no activation or
+ledger cutover authority. Actual Django/image route validation and guarded
+deployment acceptance remain pending. The source suite now includes 12 pilot
+checks in addition to the 67 existing checks (79 total).

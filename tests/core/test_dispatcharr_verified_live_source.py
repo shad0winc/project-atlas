@@ -16,7 +16,7 @@ class VerifiedLiveSourceGate(unittest.TestCase):
             stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=120,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn('DISPATCHARR_SOURCE_TESTS_PASSED=67', result.stdout)
+        self.assertIn('DISPATCHARR_SOURCE_TESTS_PASSED=79', result.stdout)
 
     def test_cached_overlay_passes_but_unexpected_source_is_rejected(self):
         original = ROOT / 'modules/sports-backend/dispatcharr-live-image'
@@ -34,7 +34,7 @@ class VerifiedLiveSourceGate(unittest.TestCase):
                     stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=120)
             result = run()
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn('DISPATCHARR_SOURCE_TESTS_PASSED=67', result.stdout)
+            self.assertIn('DISPATCHARR_SOURCE_TESTS_PASSED=79', result.stdout)
             self.assertEqual(cache.read_bytes(), b'generated-cache-fixture')
             for unexpected in (overlay / 'unexpected.py', cache.parent / 'unexpected.py'):
                 with self.subTest(path=str(unexpected.relative_to(copied))):
