@@ -24,7 +24,8 @@
     "apps/proxy/vod_proxy/urls.py": "8fee6b6403ba88ab80097a0e31ad33928990fa28be668e041b4efb84e4ca56e4",
     "apps/timeshift/urls.py": "44209fe7edebae8246a67637470c6e2cc4b7406c7931ebe43d78fe656e34e7d0",
     "apps/timeshift/views.py": "c9f2995b2910502503c1a2047f28b2a04d635df9dfacc2b52dff22177c993ec0",
-    "dispatcharr/urls.py": "98266b2fc6ce2e495dfc6840589691b1ab67015d49c3596c6ddb764ec593429f"
+    "dispatcharr/urls.py": "98266b2fc6ce2e495dfc6840589691b1ab67015d49c3596c6ddb764ec593429f",
+    "docker/entrypoint.sh": "2c96dd61a1999654e32ac7b60999d0b9af196cded50952e4650f8530df426ceb"
   },
   "base_image": "ghcr.io/dispatcharr/dispatcharr@sha256:e764cd3fb3a4b14e0c96eeb830cce645b44ef0a2494838e21462c71dde5abeb4",
   "excluded_files": [
@@ -82,6 +83,7 @@
   },
   "staged_archive_sha256": "7cb179a95b06d746327351ce99e57b70a1499cb5d7c64bbea343089b65a123e0",
   "test_files": {
+    "tests/fixtures/entrypoint_before_environment.sh": "2c96dd61a1999654e32ac7b60999d0b9af196cded50952e4650f8530df426ceb",
     "tests/fixtures/pilot_proxy_urls.py": "16273fdc75a77d950b1172b3391b26321bb04854adb19a5c5c5c34cb00134d00",
     "tests/fixtures/pilot_root_urls.py": "98266b2fc6ce2e495dfc6840589691b1ab67015d49c3596c6ddb764ec593429f",
     "tests/fixtures/stream_ts_before_head.py": "a9c42ad7e928d58e3b1aff3479352ffb62040eba55e0495e90d5a5074670a8b9",
@@ -105,6 +107,22 @@
     "tests/test_verified_server_close.py": "471171de450ff6c276ac3327704e7ff8cf44a09bc26a67c1863abccdbca57e3e",
     "tests/test_verified_stop_routing.py": "12cf98e6816e4333bc281c986780ab7024938210efb594b039739a6267e381df",
     "tests/test_verified_switch_guard.py": "f79e70651b55dbffc81c2df5f061a5a0e1af90505cdf06b0f0d67a0dd688b6ae",
-    "tests/test_verified_viewer_delivery.py": "3f94d3f6038ed08521cbb696496d98e6ef0063f86f238b9ede8026e3c220f287"
+    "tests/test_verified_viewer_delivery.py": "3f94d3f6038ed08521cbb696496d98e6ef0063f86f238b9ede8026e3c220f287",
+    "tests/test_worker_environment.py": "4c82f79cb33dfa8d40afc837e2a41a6772e76ed04c442003fb3149e7ae642598"
+  },
+  "worker_environment": {
+    "environment_names": [
+      "ATLAS_SPORTS_PILOT_MODE",
+      "ATLAS_VERIFIED_LIVE_MODE",
+      "ATLAS_RESERVATION_LEDGER_MIGRATED",
+      "ATLAS_SPORTS_POLICY_ORIGIN",
+      "ATLAS_SPORTS_LIVE_POLICY_TOKEN",
+      "ATLAS_VERIFIED_LIVE_SCOPE_KEY_FILE"
+    ],
+    "installed_entrypoint_sha256": "9a34696893749938916f8928422c607362a316c89c8498ca0cc49e6b56b2fadb",
+    "installer_sha256": "1af6d0202cde1443e89192c4ffc82d7945ae9052878b136348c31002470fba5f",
+    "login_launch_sites": 3,
+    "secret_values_written_to_profile": false,
+    "upstream_entrypoint_sha256": "2c96dd61a1999654e32ac7b60999d0b9af196cded50952e4650f8530df426ceb"
   }
 }

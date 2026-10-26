@@ -6,7 +6,7 @@ is pinned below. Preserve upstream notices and review the license/source
 distribution requirements before publishing an image or merging this draft.
 
 This source review pins the running upstream image by digest and verifies the
-24 exported base source files before copying 28 changed/new live files. It
+25 exported base source files before copying 28 changed/new live files. It
 excludes the staged VOD and timeshift modifications. The runtime's verified
 live mode remains its default `off`; this is not a production rollout.
 
@@ -18,7 +18,7 @@ CT100 disposable build and tests (no production mounts or runtime mutation):
     ./run-disposable-image-tests.sh
 
 The source suite covers 58 historical live-path tests, nine HEAD and packaging
-contracts, and 12 pilot boundary checks (79 total). The disposable image command additionally runs three
+contracts, 12 pilot boundary checks, and nine worker environment checks (88 total). The disposable image command additionally runs three
 private-Redis admission checks; those checks require separate image validation.
 Atlas Sports' classifier test is excluded because that source lives in the
 separate Atlas policy PR. Django system check requires an ephemeral signing
@@ -60,4 +60,14 @@ Sports. It does not complete VOD/timeshift migration. See
 off unless explicitly configured; this source change grants no activation or
 ledger cutover authority. Actual Django/image route validation and guarded
 deployment acceptance remain pending. The source suite now includes 12 pilot
-checks in addition to the 67 existing checks (79 total).
+checks and nine worker environment checks in addition to the 67 existing checks (88 total).
+
+## Atlas worker environment
+
+The upstream entrypoint uses login shells and an explicit profile allowlist.
+The image now pins that entrypoint and preserves exactly six Atlas settings at
+the migrate, collectstatic, and uWSGI login launches using the login tool's
+`--whitelist-environment` option. Values are inherited directly; the policy
+token is not added to the generated profile. The source suite has 88 checks.
+An installed-image login-shell and normal-startup acceptance check remains
+required before rollout. See `docs/operations/SPORTS_WORKER_ENVIRONMENT.md`.
