@@ -12,3 +12,8 @@ for name, expected in manifest.items():
         raise SystemExit("source drift: " + name)
     compile(content, name, "exec")
 print("verified_source_files=", len(manifest))
+
+entrypoint = root / "docker/entrypoint.sh"
+if entrypoint.is_symlink() or not entrypoint.is_file() or hashlib.sha256(entrypoint.read_bytes()).hexdigest() != '9a34696893749938916f8928422c607362a316c89c8498ca0cc49e6b56b2fadb':
+    raise SystemExit("worker entrypoint drift")
+print("verified_worker_environment_launch_sites=3")

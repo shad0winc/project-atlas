@@ -4,6 +4,8 @@ RUN python /tmp/atlas-verify-base.py
 COPY overlay/apps/ /app/apps/
 COPY install_live_pilot.py /tmp/atlas-install-live-pilot.py
 RUN python -B /tmp/atlas-install-live-pilot.py
+COPY install_worker_environment.py /tmp/atlas-install-worker-environment.py
+RUN python -B /tmp/atlas-install-worker-environment.py
 COPY Dockerfile manifest.json .dockerignore /app/
 COPY verify_overlay.py /tmp/atlas-verify-overlay.py
 RUN python /tmp/atlas-verify-overlay.py
