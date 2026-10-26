@@ -18,10 +18,11 @@ revision is recorded separately from the revision against which those inputs
 were verified. New image references are immutable image IDs.
 
 This change provides record validation, downgrade protection, and refusal guards.
-It supplies no current-pointer publisher, live inspection adapter, maintenance
-release, recovery-owner recreation, registry mutation, or application action.
-Schema-3 live inspection deliberately refuses until the held Sports adapter is
-implemented and tested. Ordinary updates,
+It supplies no current-pointer publisher, maintenance release, recovery-owner
+recreation, registry mutation, or application action. Ordinary schema-3 live
+inspection deliberately refuses. A separate held provenance API, described in
+SPORTS_HELD_RUNTIME.md, requires trusted host exclusion/configuration callbacks
+and verifies source and image identity without granting runtime acceptance. Ordinary updates,
 inheritance and restores also refuse this schema before modifying a destination.
 
 The ordinary publication-completion verifier retains its current-pointer

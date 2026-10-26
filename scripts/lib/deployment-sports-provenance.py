@@ -2,10 +2,11 @@
 
 The schema-2 base remains independently valid and unchanged. Its recipes and
 historical service ledger are retained as history; effective writer/backend
-origins are explicit overrides. Live admission/publication integration is pending.
+origins are explicit overrides. A separate held provenance API requires a trusted host exclusion adapter.
+Live admission and current-pointer publication integration remain pending.
 """
 from pathlib import Path
-import copy, hashlib, json, re, tarfile
+import copy, hashlib, json, os, re, stat, subprocess, tarfile
 
 SUPPLEMENTS = ('sports-runtime-extension.json', 'sports-application-source.tar.gz',
               'sports-application-tracked.json', 'sports-release-gate.json', 'sports-image-validation.json')
@@ -177,3 +178,152 @@ def successor_proof(m,record,previous_publication):
     return dict(previous_publication=previous_publication,successor_publication=record.name,
         previous_manifest_sha256=ext['base_publication']['manifest_sha256'],
         successor_manifest_sha256=m.digest(record/'MANIFEST.sha256'))
+
+
+HELD_FIELDS = {'schema_version','scope','transaction','base_publication','candidate_publication',
+    'candidate_manifest_sha256','current_publication','hold_context_sha256','maintenance_sha256',
+    'hold_marker_path','hold_marker_sha256','authority_dropin_path'}
+
+
+def held_proof(value, record, extension, manifest_pin):
+    need(isinstance(value,dict) and set(value)==HELD_FIELDS, 'Held provenance context fields differ')
+    need(type(value['schema_version']) is int and value['schema_version']==1
+         and value['scope']=='held-sports-provenance-only', 'Held provenance scope differs')
+    need(identifier(value['transaction']) and value['base_publication']==extension['base_publication']['id']
+         and value['candidate_publication']==record.name and value['candidate_manifest_sha256']==manifest_pin
+         and value['current_publication'] in (value['base_publication'],record.name), 'Held publication identity differs')
+    for name in ('hold_context_sha256','maintenance_sha256','hold_marker_sha256'):
+        need(sha(value[name]), 'Held provenance pin missing')
+    marker=Path('/var/lib/atlas-sports-cutover')/value['transaction']/'held'
+    need(value['hold_marker_path']==str(marker)
+         and value['authority_dropin_path']=='/etc/systemd/system/atlas-maintenance-control.service.d/90-atlas-sports-cutover.conf',
+         'Held provenance path mapping differs')
+    return copy.deepcopy(value)
+
+
+def held_file(path):
+    """Read an owned bounded host authority input without following path links."""
+    path=Path(path)
+    need(path.is_absolute() and path.resolve(strict=True)==path, 'Linked held authority input')
+    for parent in path.parents:
+        info=parent.lstat()
+        need(stat.S_ISDIR(info.st_mode) and info.st_uid==0 and not info.st_mode&0o022,
+             'Unsafe held authority parent')
+    fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+    try:
+        before=os.fstat(fd)
+        signature=lambda st:(st.st_dev,st.st_ino,st.st_mode,st.st_uid,st.st_gid,st.st_nlink,st.st_size,st.st_mtime_ns,st.st_ctime_ns)
+        need(stat.S_ISREG(before.st_mode) and before.st_uid==0 and before.st_nlink==1
+             and not before.st_mode&0o022 and before.st_size<=1024**2, 'Unsafe held authority input')
+        with os.fdopen(fd,'rb',closefd=False) as stream:raw=stream.read(1024**2+1)
+        need(len(raw)<=1024**2 and signature(before)==signature(os.fstat(fd))==signature(path.lstat()),
+             'Held authority input changed')
+        need(path.resolve(strict=True)==path, 'Held authority path changed')
+        return raw
+    finally:os.close(fd)
+
+
+def check_held_authority(m, record, proof):
+    ingress=m.extension_module()
+    ext=json.loads(m.read(record/'ingress-runtime-extension.json'))
+    properties=ingress.service_properties()
+    expected={'LoadState':'loaded','ActiveState':'inactive','SubState':'dead','MainPID':'0',
+        'FragmentPath':ext['authority']['unit_path'],'DropInPaths':proof['authority_dropin_path'],
+        'NeedDaemonReload':'no','WorkingDirectory':ext['caddy']['immutable_source'],'User':'root','Group':'20000'}
+    need(all(properties.get(k)==v for k,v in expected.items()), 'Held authority service differs')
+    unit=held_file(properties['FragmentPath'])
+    need(unit==m.read(record/'maintenance-authority.service'), 'Held authority unit bytes differ')
+    marker=held_file(proof['hold_marker_path'])
+    need(hashlib.sha256(marker).hexdigest()==proof['hold_marker_sha256'], 'Held authority marker differs')
+    marker_value=json.loads(marker)
+    need(marker_value=={'transaction':proof['transaction'],'context_sha256':proof['hold_context_sha256']},
+         'Held authority context differs')
+    need(held_file(proof['authority_dropin_path'])==(
+        '[Unit]\nConditionPathExists=!'+proof['hold_marker_path']+'\n').encode(), 'Held authority condition differs')
+    # Service inactivity alone is not enough: no stale control socket may listen.
+    rows=[line.split() for line in m.read(Path('/proc/net/unix')).decode().splitlines()[1:]]
+    need(not any(len(row)==8 and row[7]==ext['authority']['socket'] and row[3]=='00010000' for row in rows),
+         'Held authority socket is still listening')
+    return properties
+
+
+BACKEND_FILES_PROBE = r'''import hashlib,json,os,pathlib,stat,sys
+expected=json.load(sys.stdin)
+for name,pin in expected.items():
+ path=pathlib.Path(name)
+ assert path.resolve(strict=True)==path
+ fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+ try:
+  before=os.fstat(fd)
+  assert stat.S_ISREG(before.st_mode) and before.st_uid==0 and not before.st_mode&0o022
+  with os.fdopen(fd,'rb',closefd=False) as stream: actual=hashlib.file_digest(stream,'sha256').hexdigest()
+  after=os.fstat(fd)
+  signature=lambda st:(st.st_dev,st.st_ino,st.st_size,st.st_mtime_ns,st.st_ctime_ns)
+  assert actual==pin and signature(before)==signature(after)==signature(path.lstat())
+ finally:os.close(fd)
+'''
+
+
+def runtime_identity(row, *, healthy=True):
+    state=row['State']
+    need(state.get('Running') is True and not any(state.get(k) for k in ('Paused','Restarting','Dead','OOMKilled')),
+         'Sports runtime is not running')
+    need((not healthy or state.get('Health',{}).get('Status')=='healthy') and type(state.get('Pid')) is int and state['Pid']>0,
+         'Sports runtime is not healthy')
+    return {k:copy.deepcopy(row[k]) for k in ('Id','Image','Name','Config','HostConfig','RestartCount')} | {
+        'Mounts':sorted(copy.deepcopy(row['Mounts']),key=lambda item:json.dumps(item,sort_keys=True)),
+        'Networks':copy.deepcopy(row['NetworkSettings']['Networks']),
+        'State':{k:state[k] for k in ('Pid','StartedAt')}}
+
+
+def check_live_held(m, record, context):
+    """Read-only provenance under an externally owned, continuously verified hold.
+
+    `context` is trusted host adapter code, never deserialized evidence. Its
+    exclusion() must validate an inherited exclusive scheduler lock. verify_hold()
+    must verify enabled maintenance, persistent scheduler/control exclusions,
+    producer quiescence and the current pointer, and return HELD_FIELDS. Exact
+    replacement Config/HostConfig/mounts/networks are checked independently by
+    context.verify_configuration(role, row). These callbacks grant no execution.
+    Ordinary check_live remains fail-closed for schema 3.
+    """
+    need(all(callable(getattr(context,name,None)) for name in ('exclusion','verify_hold','verify_configuration')),
+         'Held host adapter is incomplete')
+    record=Path(record)
+    with context.exclusion():
+        ledger,files,activation=check_record(m,record)
+        pin=m.digest(record/'MANIFEST.sha256')
+        ext=json.loads(m.read(record/'sports-runtime-extension.json'))
+        def hold():
+            return held_proof(context.verify_hold(),record,ext,pin)
+        initial=hold()
+        def authority():
+            need(hold()==initial,'Held provenance context changed')
+            return check_held_authority(m,record,initial)
+        authority()
+        first={}
+        for role,name in (('backend','atlas-dispatcharr'),('writer','atlas-sports-writer')):
+            row=m.inspect(name);first[name]=runtime_identity(row)
+            need(row['Name']=='/'+name and row['Image']==ext['components'][role]['image_id'], 'Sports effective image differs')
+            need(context.verify_configuration(role,copy.deepcopy(row)) is True, 'Sports replacement configuration differs')
+        controller_before=runtime_identity(m.inspect('atlas-sports-controller'),healthy=False)
+        m.extension_module()._check_live_components(m,record,authority)
+        m._check_sports_live(record,ledger,files,activation)
+        # The existing native writer/controller verifier checks exact Python
+        # inventory and old controller source. Backend code must also match its
+        # independent installed manifest; inspect no Django application modules.
+        result=subprocess.run(['docker','exec','-i','atlas-dispatcharr','python','-I','-B','-c',BACKEND_FILES_PROBE],
+            input=json.dumps(ext['components']['backend']['installed_file_sha256']).encode(),capture_output=True,timeout=90)
+        need(result.returncode==0,'Backend installed-file provenance differs')
+        authority()
+        for role,name in (('backend','atlas-dispatcharr'),('writer','atlas-sports-writer')):
+            row=m.inspect(name)
+            need(runtime_identity(row)==first[name], 'Sports runtime changed during held inspection')
+            need(context.verify_configuration(role,copy.deepcopy(row)) is True, 'Sports replacement configuration changed')
+        need(runtime_identity(m.inspect('atlas-sports-controller'),healthy=False)==controller_before,
+             'Controller runtime changed during held inspection')
+        check_record(m,record)
+        need(m.digest(record/'MANIFEST.sha256')==pin and hold()==initial, 'Held publication changed during inspection')
+        return dict(scope='held-sports-provenance-only',publication=record.name,manifest_sha256=pin,
+            current_publication=initial['current_publication'],hold_context_sha256=initial['hold_context_sha256'],
+            production_execution_authorized=False,runtime_acceptance_granted=False,public_reopen_performed=False)
