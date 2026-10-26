@@ -1,6 +1,7 @@
 {
   "base_archive_sha256": "0ed5de0113c510ea0dca015afe9d1c6bd0cbebfa8f1c2993db69c2149d13e36e",
   "base_files": {
+    "apps/api/urls.py": "45d99dcbc43e2a5e3c9538ac28647d5b5ed75547656b87d86c7ef504d34fe666",
     "apps/channels/models.py": "64a3c662b627edeffc80782ea9b7bfed5c99eff7c29887d1491b3afe11f45e21",
     "apps/m3u/connection_pool.py": "82d2b9697b902021abbb589de5a41fb785f77ab9e3ab1c5f08d0d2fd6e058cc3",
     "apps/proxy/live_proxy/client_manager.py": "04504f8ff943fa825ac5f7810bcf14d0913b24adca3a07ecfd9903dce8c425e3",
@@ -16,21 +17,36 @@
     "apps/proxy/live_proxy/server.py": "104a12f402860671c8f816c0fdac2b38c9afe20d69154fab3a55bb62fcc3e9e2",
     "apps/proxy/live_proxy/services/channel_service.py": "6d77dcee57445ff95cf98e3ae27e08737fbbbb80e563068171eb90b010e1b9c7",
     "apps/proxy/live_proxy/url_utils.py": "9eca9ebb20f6b402716f3d98bb4068ddab505bfba0aa7b1d62c6e7de994cb0fc",
+    "apps/proxy/live_proxy/urls.py": "08d48d586ac4fc180e07f8222d8efb16a830271d1b324dda5e56207c830d5da4",
     "apps/proxy/live_proxy/views.py": "0234a6a8adb7a8cbb1396a8a2637fc9cc5bfac0409ba98943f36e474c2496398",
+    "apps/proxy/urls.py": "16273fdc75a77d950b1172b3391b26321bb04854adb19a5c5c5c34cb00134d00",
     "apps/proxy/vod_proxy/multi_worker_connection_manager.py": "0a9f5600f4ec95d714803dd0985f8f1485f876092f7c761bb098e324338f700f",
-    "apps/timeshift/views.py": "c9f2995b2910502503c1a2047f28b2a04d635df9dfacc2b52dff22177c993ec0"
+    "apps/proxy/vod_proxy/urls.py": "8fee6b6403ba88ab80097a0e31ad33928990fa28be668e041b4efb84e4ca56e4",
+    "apps/timeshift/urls.py": "44209fe7edebae8246a67637470c6e2cc4b7406c7931ebe43d78fe656e34e7d0",
+    "apps/timeshift/views.py": "c9f2995b2910502503c1a2047f28b2a04d635df9dfacc2b52dff22177c993ec0",
+    "dispatcharr/urls.py": "98266b2fc6ce2e495dfc6840589691b1ab67015d49c3596c6ddb764ec593429f"
   },
   "base_image": "ghcr.io/dispatcharr/dispatcharr@sha256:e764cd3fb3a4b14e0c96eeb830cce645b44ef0a2494838e21462c71dde5abeb4",
   "excluded_files": [
     "apps/proxy/vod_proxy/multi_worker_connection_manager.py",
     "apps/timeshift/views.py"
   ],
+  "live_pilot": {
+    "default_mode": "off",
+    "enabled_mode": "live-only",
+    "mode_variable": "ATLAS_SPORTS_PILOT_MODE",
+    "requires_ledger_migrated": "1",
+    "requires_verified_live_mode": "strict",
+    "settings_base_sha256": "de4cbe40fde55e1fe8f51324ab3a2a23c159d855652fea86ba12996e0b4fb5ea",
+    "settings_installer_sha256": "7d69318180d99e7427463e7d542d8383b719ee4a78a34380e3e686abcbeb5cd7"
+  },
   "overlay_files": {
     "apps/channels/models.py": "ca2c8fff68f895c311dd480f8ae08c9709f76b76718d3e8af00a05877be72b52",
     "apps/m3u/atlas_channel_classification.py": "2f44a7ee795093e4b12eac7fbc6169e1902cead8b11a164906f97ac561885c2d",
     "apps/m3u/atlas_policy_claims.py": "19987e84f6668bbe3e4fabf45159bcb8048ca9bd274d5bfadb1d0ff0166de6c8",
     "apps/m3u/atlas_verified_policy_adapter.py": "09166c1162b02e816753f12ec040cd54e4fc5c3c24da3f1d495c3d9be0fee08e",
     "apps/m3u/connection_pool.py": "4bcbfd5f0875f495d12024d9d481f23c31780a7f18f5989b21fc01f21654d754",
+    "apps/m3u/live_pilot_gate.py": "a686ea627d48a5d83ea9239830124c45c4d83cbf8ce7e73f877e959700c270f8",
     "apps/m3u/provider_capacity_observation.py": "a1d1727cf8bd0e9889957aec014fdf4bddb1a5990d70704ce838f51726a37983",
     "apps/m3u/reservation_ledger.py": "56785c0c0653e0191a08e071ee1e728776af18669ed0706f9a93347e5f9033f0",
     "apps/m3u/strict_effective_credentials.py": "d027d67ce509ea7ced22b7afc65526d4a3acc022820b4062ddfd6a4b5c8b1a10",
@@ -50,9 +66,9 @@
     "apps/proxy/live_proxy/services/channel_service.py": "ca478be42de0b2f448045ce5b9d91983e936fc2fdcf1275f6e3aa2b10af4d93b",
     "apps/proxy/live_proxy/url_utils.py": "4a1258a6492ef0a00460c38aa02b6206da9279b19ddd5a4de80cfc87764f677b",
     "apps/proxy/live_proxy/verified_policy_cache.py": "05dbae506a22b620d121e0f5708006e5f80cd43557d1711b8436ec5dce5fa4f0",
-    "apps/proxy/live_proxy/verified_routing.py": "0dc5b3189f216cc15fbe98c6b0675a841265797e9fc26410f1d203ebb6354a89",
+    "apps/proxy/live_proxy/verified_routing.py": "61fbcf7895df3cc421cc32513819f8dfbfe297b46534f61962a36f2058b14bbf",
     "apps/proxy/live_proxy/verified_selection.py": "873639e50bd9a5ff1f0686d29af197b428d26e7062fb3dae24ce9f630fe1125c",
-    "apps/proxy/live_proxy/views.py": "01899cfa1f330d28ad9221121010c05f3d6c0d3215565b638de9c26c13ea0ed5"
+    "apps/proxy/live_proxy/views.py": "ee396e606130252b58e1db7f0c89a27863ae04f7d4e0cd83c6f7d6e238da6b9f"
   },
   "reconciliation": {
     "current_main": "2bfd102a072d7057174c9550e3f3e0182e76cc98",
@@ -66,12 +82,15 @@
   },
   "staged_archive_sha256": "7cb179a95b06d746327351ce99e57b70a1499cb5d7c64bbea343089b65a123e0",
   "test_files": {
+    "tests/fixtures/pilot_proxy_urls.py": "16273fdc75a77d950b1172b3391b26321bb04854adb19a5c5c5c34cb00134d00",
+    "tests/fixtures/pilot_root_urls.py": "98266b2fc6ce2e495dfc6840589691b1ab67015d49c3596c6ddb764ec593429f",
     "tests/fixtures/stream_ts_before_head.py": "a9c42ad7e928d58e3b1aff3479352ffb62040eba55e0495e90d5a5074670a8b9",
     "tests/real_redis_viewer_policy.py": "3864411437951eabc0074d7e5f4321c8c7a96f12c8c2024424af190492bc5044",
     "tests/test_atlas_policy_claims.py": "1249d62cb5e34b47e64fcbac89b240474a811ea0658d2152024b58e5ace1b130",
     "tests/test_atlas_verified_policy_adapter.py": "a7e2fde0ad9103a29f87c773e336498c8b694eaf60d9022f8da4cbed8f9ffe13",
     "tests/test_bound_live_plan.py": "1d371415521954f9c45da0a04fd9f6ba76bd366e892c63b9d8369fb206effdd6",
     "tests/test_head_compatibility.py": "264c81824cae82afce5d0ba66b9a97e71afd9428f8ee2c3acbf737f0ef5860dc",
+    "tests/test_live_pilot_gate.py": "cf69daa7e773b41b9443cb3e0db00cb48432a4661425579a99a25e4d64819ec7",
     "tests/test_provider_capacity_observation.py": "4df8905b19be5d9327b691310363eee7067bfcdb4a448a7f869d15ca6863adab",
     "tests/test_verified_follower_only.py": "4b626ededa0e97ff747cb4b742e1c5a43a56491550d412844dccdb82d263ca0b",
     "tests/test_verified_http_close.py": "dec7d4e062c414c3aea6552fdb3c1b617206c6714679b8975cbbe92a7ff3a112",
