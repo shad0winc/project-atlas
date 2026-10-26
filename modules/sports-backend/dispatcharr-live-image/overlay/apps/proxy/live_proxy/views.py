@@ -1393,3 +1393,11 @@ def next_stream(request, channel_id):
         return JsonResponse({"error": str(e)}, status=500)
     finally:
         close_old_connections()
+
+
+# Pilot guard wraps the decorated entry point, including internal XC calls.
+from apps.m3u.live_pilot_gate import wrap_live_view
+stream_ts = wrap_live_view(
+    stream_ts, network_allowed=network_access_allowed, get_object=get_stream_object,
+    channel_type=Channel, server_factory=ProxyServer.get_instance,
+)

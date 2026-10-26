@@ -2,6 +2,8 @@ FROM ghcr.io/dispatcharr/dispatcharr@sha256:e764cd3fb3a4b14e0c96eeb830cce645b44e
 COPY verify_base.py /tmp/atlas-verify-base.py
 RUN python /tmp/atlas-verify-base.py
 COPY overlay/apps/ /app/apps/
+COPY install_live_pilot.py /tmp/atlas-install-live-pilot.py
+RUN python -B /tmp/atlas-install-live-pilot.py
 COPY Dockerfile manifest.json .dockerignore /app/
 COPY verify_overlay.py /tmp/atlas-verify-overlay.py
 RUN python /tmp/atlas-verify-overlay.py

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from apps.m3u.live_pilot_gate import pilot_enabled
+
 from apps.m3u.atlas_channel_classification import AtlasManagedClassificationUnavailable
 
 
@@ -26,4 +28,6 @@ def owner_route(channel_uuid: str, *, classifier, verified_policy) -> str:
         if not callable(verified_policy):
             raise AtlasManagedClassificationUnavailable("Verified policy unavailable")
         return "verified"
+    if pilot_enabled():
+        raise AtlasManagedClassificationUnavailable("Unmanaged playback unavailable during pilot")
     return "legacy"
