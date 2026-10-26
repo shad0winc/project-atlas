@@ -11,11 +11,13 @@ atlas_deployment_is_mixed() {
     accepted-private-sustained.json ingress-runtime-extension.json \
     ingress-application-source.tar.gz ingress-application-tracked.json \
     ingress-api-build.Dockerfile ingress-portal-build.Dockerfile \
-    maintenance-authority.service ingress-release-gate.json; do
+    maintenance-authority.service ingress-release-gate.json sports-runtime-extension.json \
+    sports-application-source.tar.gz sports-application-tracked.json sports-release-gate.json \
+    sports-image-validation.json; do
     [[ ! -e "$record/$name" && ! -L "$record/$name" ]] || return 0
   done
   if [[ -f "$record/MANIFEST.sha256" ]] &&
-    grep -Eq '  (service-sources|repair-tracked-source|recovery-chain|ingress-runtime-extension|ingress-application-tracked|ingress-release-gate)\.json$' "$record/MANIFEST.sha256"; then
+    grep -Eq '  (service-sources|repair-tracked-source|recovery-chain|ingress-runtime-extension|ingress-application-tracked|ingress-release-gate|sports-runtime-extension|sports-application-tracked|sports-release-gate|sports-image-validation)\.json$' "$record/MANIFEST.sha256"; then
     return 0
   fi
   grep -Eq '^(requires_mixed_runtime_contract|runtime_provenance_schema|ingress_source_mode)=' \
@@ -34,8 +36,12 @@ atlas_deployment_mixed_contract() {
 atlas_deployment_validate_update_inheritance() {
   local record="$1"
   local scope="$2"
-  if grep -Eq '^(runtime_provenance_schema|requires_mixed_runtime_contract)=2$' "$record/metadata"; then
-    echo 'ERROR: schema-2 updates require the pending component/recovery coordinator; runtime was not mutated.' >&2
+  if grep -Eq '^(runtime_provenance_schema|requires_mixed_runtime_contract)=[23]$' "$record/metadata"; then
+    local schema=2
+    if grep -Eq '^(runtime_provenance_schema|requires_mixed_runtime_contract)=3$' "$record/metadata"; then
+      schema=3
+    fi
+    echo "ERROR: schema-${schema} updates require the pending component/recovery coordinator; runtime was not mutated." >&2
     return 1
   fi
   if atlas_deployment_is_mixed "$record" && [[ "$scope" != all ]]; then
