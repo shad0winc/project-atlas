@@ -134,14 +134,16 @@ class PublicationCompletion:
             if probe is not None:os.close(probe)
             os.close(borrowed)
 
-    def context(self,plan):
+    def context(self,plan,*,expected_current=None):
         require(set(plan)=={'schema_version','publication_id','marker','maintenance_flag_sha256',
                             'archive_intent_sha256','archive_completed_sha256'})
         require(plan['schema_version']==1 and plan['publication_id']==self.publication)
         require(isinstance(plan['marker'],dict))
         flag,_=read(self.maintenance/'enabled')
         require(digest(flag)==plan['maintenance_flag_sha256'])
-        require(read(self.root/'deployments/current')[0]==(self.publication+'\n').encode())
+        expected=self.publication if expected_current is None else expected_current
+        require(isinstance(expected,str) and re.fullmatch('[A-Za-z0-9][A-Za-z0-9_.-]{0,127}',expected))
+        require(read(self.root/'deployments/current')[0]==(expected+'\n').encode())
         require(not os.path.lexists(self.root/'deployments/update.lock'))
         journal=self.root/'deployments/publication-journals'/self.publication
         for name,key in (('owner-archive-intent.json','archive_intent_sha256'),
@@ -160,8 +162,11 @@ class PublicationCompletion:
         return 'marker-live' if locations[0]==self.live else 'marker-archived'
 
     def inspect(self,plan,admission):
+        return self._inspect(plan,admission)
+
+    def _inspect(self,plan,admission,*,expected_current=None):
         with self.exclusion():
-            phase=self.context(plan)
+            phase=self.context(plan,expected_current=expected_current)
             intent=encoded(dict(schema_version=1,scope='publication-fence-completion-only',plan=plan,admission=admission))
             durable=os.path.lexists(self.folder/'intent.json')
             if durable:require(read(self.folder/'intent.json')[0]==intent)
@@ -216,6 +221,36 @@ class PublicationCompletion:
                         marker_path=str(self.live if phase=='marker-live' else self.archived),
                         maintenance_enabled=True,public_reopen_permitted=False,
                         maintenance_handoff_pending=completed and not handoff_done or fenced)
+
+    def inspect_completed_history(self,plan,admission,successor,*,verify_successor):
+        """Read archived completion after an independently verified successor.
+
+        This never authorizes completion, handoff, maintenance release or runtime
+        actions. The normal inspect/complete/handoff APIs retain their old current
+        pointer requirement. The verifier must use the native successor contract.
+        """
+        require(isinstance(successor,str) and successor!=self.publication
+                and re.fullmatch('[A-Za-z0-9][A-Za-z0-9_.-]{0,127}',successor)
+                and callable(verify_successor))
+        with self.exclusion():
+            before=read(self.root/'deployments/current')[0]
+            require(before==(successor+'\n').encode())
+            def verify():
+                proof=verify_successor(self.publication,successor)
+                require(isinstance(proof,dict) and set(proof)=={'previous_publication','successor_publication',
+                    'previous_manifest_sha256','successor_manifest_sha256'})
+                require(proof['previous_publication']==self.publication and proof['successor_publication']==successor)
+                for publication,key in ((self.publication,'previous_manifest_sha256'),(successor,'successor_manifest_sha256')):
+                    require(isinstance(proof[key],str) and re.fullmatch('[a-f0-9]{64}',proof[key]))
+                    require(digest(read(self.root/'deployments/records'/publication/'MANIFEST.sha256')[0])==proof[key])
+                return proof
+            first=verify()
+            result=self._inspect(plan,admission,expected_current=successor)
+            require(result['phase']=='completed-maintenance-held' and not result['maintenance_handoff_pending'])
+            require(verify()==first and read(self.root/'deployments/current')[0]==before)
+            return dict(result,scope='archived-completion-continuity-only',historical_publication=self.publication,
+                current_publication=successor,successor_proof_sha256=digest(encoded(first)),
+                runtime_acceptance_granted=False,production_execution_authorized=False)
 
     def complete(self,plan,admission,*,admit):
         require(callable(admit) and isinstance(admission,dict) and admission
