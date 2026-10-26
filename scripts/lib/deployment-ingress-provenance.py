@@ -501,10 +501,16 @@ if(process.getuid()!==1001 || process.getuid()!==Number(row[2]) || process.getgi
 
 
 def check_live(m, record):
+    return _check_live_components(m, record, lambda: verify_authority(
+        m, record, json.loads(m.read(record / 'ingress-runtime-extension.json'))))
+
+
+def _check_live_components(m, record, authority_check):
+    """Internal shared code verifier. Callers must supply native authority proof."""
     ext = json.loads(m.read(record / 'ingress-runtime-extension.json'))
     archived = m.archive_files(record / 'ingress-application-source.tar.gz', ext['source_archive_commit'])
     verify_source(ext['caddy']['immutable_source'], archived)
-    authority_before = verify_authority(m, record, ext)
+    authority_before = authority_check()
     first = {}
     for role in ('api', 'portal', 'caddy'):
         row = m.inspect('atlas-' + role)
@@ -521,6 +527,6 @@ def check_live(m, record):
     query(['docker', 'exec', '-i', 'atlas-api', 'python3', '-I', '-B', '-c', API_FILES_PROBE],
           data=json.dumps(copied).encode(), timeout=90)
     query(['docker', 'exec', 'atlas-portal', 'node', '-e', PORTAL_IDENTITY_PROBE])
-    need(verify_authority(m, record, ext) == authority_before, 'Host authority changed during Ingress verification')
+    need(authority_check() == authority_before, 'Host authority changed during Ingress verification')
     for role in first:
         need(state_identity(m.inspect('atlas-' + role)) == first[role], 'Ingress runtime changed during verification')

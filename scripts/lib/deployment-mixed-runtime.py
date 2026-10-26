@@ -289,6 +289,10 @@ def check_live(record, excluded=''):
     if metadata(record).get('runtime_provenance_schema') == '2':
         extension_module().check_live(__import__('types').SimpleNamespace(
             read=read, archive_files=archive_files, inspect=inspect), record)
+    return _check_sports_live(record, ledger, files, activation, excluded)
+
+
+def _check_sports_live(record, ledger, files, activation, excluded=''):
     writer = ledger['ingress']['overrides']['sports-writer']
     row = inspect('atlas-sports-writer')
     need(row['Image'] == writer['image'] and row['State']['Running'], 'Writer runtime identity differs')
