@@ -144,16 +144,20 @@ def check_record(m,record):
         # are byte-identical in the independently verified source archive.
         allowed=('modules/sports/',) if role=='writer' else (PREFIX,)
         for name,pin in inputs.items():
-            m.safe_name(name);need(name.startswith(allowed) and name in archived and archived[name]['sha256']==pin,
+            m.safe_name(name);permitted=name.startswith(allowed) or (role=='writer' and name=='atlas/sports_shared_admission_config.py')
+            need(permitted and name in archived and archived[name]['sha256']==pin,
                                  'Sports reused build input differs from verified source')
         required={name for name in archived if (role=='backend' and name.startswith(PREFIX+'overlay/'))}
         if role=='backend':required|={PREFIX+n for n in ('Dockerfile','manifest.json','install_live_pilot.py','install_worker_environment.py','verify_base.py','verify_overlay.py')}
         else:
             required={'modules/sports/Dockerfile.private-api'}
-            for name in archived:
-                if name.startswith('modules/sports/src/') and name.endswith('.py'):
-                    destination='/srv/sports/'+name[len('modules/sports/src/'):]
-                    if destination in expected_files['writer']:required.add(name)
+            # Match every actual COPY input, including the shared Atlas helper
+            # and non-Python configuration. expected_copies already validates
+            # this bounded Dockerfile syntax and installed destination map.
+            for line in archived['modules/sports/Dockerfile.private-api']['text'].splitlines():
+                if line.startswith('COPY '):
+                    _,source,_=line.split()
+                    required.update(name for name in archived if name==source or name.startswith(source+'/'))
         need(required<=set(inputs),'Sports build input coverage incomplete')
         row=effective[targets[role]]
         need(row[6]==item['image_id'],'Sports effective image manifest differs')

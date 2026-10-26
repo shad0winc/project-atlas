@@ -32,3 +32,10 @@ Its mandatory verifier callback must use the schema-3 `successor_proof` validato
 it binds both manifest digests and checks the current pointer before and after.
 It preserves archived fence identities and grants no runtime acceptance or
 production execution. Completion and handoff mutation APIs cannot use this path.
+
+Writer build-input evidence must cover the Dockerfile and every file selected by
+its COPY instructions, including non-Python configuration. The one shared input
+outside modules/sports is atlas/sports_shared_admission_config.py; this exact path
+is allowed, while unrelated Atlas modules remain refused. Installed destinations
+and bytes are independently derived from the verified source archive. The real
+accepted writer Dockerfile is used in regression fixtures with synthetic contents.
