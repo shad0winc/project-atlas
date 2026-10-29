@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { SportsDiscoveryRateLimitError } from "./federatedDiscovery";
 
 describe("Sports search rate-limit contract", () => {
   const source = readFileSync(
@@ -17,7 +18,7 @@ describe("Sports search rate-limit contract", () => {
   });
 
   it("shows a Sports-specific temporary rate-limit message", () => {
-    expect(source).toContain(
+    expect(new SportsDiscoveryRateLimitError().message).toContain(
       "Sports search is temporarily rate limited."
     );
   });
