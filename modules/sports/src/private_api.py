@@ -949,8 +949,11 @@ class Handler(BaseHTTPRequestHandler):
         except LookupError:
             self._json(HTTPStatus.NOT_FOUND, {"code": "provider_not_found", "error": "Sports provider is unavailable."})
             return
-        except Exception:
-            self._backend_unavailable()
+        except Exception as error:
+            if getattr(error, "provider_rate_limited", False):
+                self._provider_rate_limited(error)
+            else:
+                self._backend_unavailable()
             return
         events = []
         for event in provider_events:
