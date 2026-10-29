@@ -20,6 +20,7 @@ export type SportsRequestViewProps = Readonly<{
   events: readonly SportsEvent[];
   scheduleUnavailable?: boolean;
   discoveryState?: "loading" | "complete" | "partial" | "unavailable";
+  discoveryRateLimited?: boolean;
   eventChannels?: ReactNode;
   followedEvents?: readonly SportsEvent[];
   follows: readonly SportsFollow[];
@@ -50,6 +51,7 @@ export function SportsRequestView({
   events,
   scheduleUnavailable = false,
   discoveryState,
+  discoveryRateLimited = false,
   eventChannels,
   followedEvents = [],
   follows,
@@ -163,7 +165,12 @@ export function SportsRequestView({
         <section aria-live="polite" className="requests-message-panel">
           <p>{discoveryState === "partial"
             ? "Some Sports results are unavailable. Showing results from available sources."
-            : "Sports search is unavailable. Try again shortly."}</p>
+            : discoveryRateLimited
+              ? "Sports search is temporarily rate limited. Please try again shortly."
+              : "Sports search is unavailable. Try again shortly."}</p>
+          {discoveryState === "partial" && discoveryRateLimited ? (
+            <p>A Sports source is temporarily rate limited. Please try again shortly.</p>
+          ) : null}
         </section>
       ) : discoveryState === "loading" ? (
         <p role="status">Searching Sports sources...</p>

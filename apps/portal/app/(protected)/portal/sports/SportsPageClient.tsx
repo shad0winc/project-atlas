@@ -708,6 +708,7 @@ export function SportsPageClient(): React.ReactElement {
           events={events}
           scheduleUnavailable={liveMetadataUnavailable}
           discoveryState={discovery?.state}
+          discoveryRateLimited={discovery?.sources.some(source => source.reason === "rate-limit") ?? false}
           followedEvents={followedEvents}
           follows={follows}
           eventChannels={

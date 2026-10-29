@@ -1,4 +1,4 @@
-import { parseDiscoveryProviders, type SportsDiscoveryProvider } from "./federatedDiscovery";
+import { SportsDiscoveryRateLimitError, parseDiscoveryProviders, type SportsDiscoveryProvider } from "./federatedDiscovery";
 import { atlasApiRequest } from "../../../lib/api/client";
 import { AtlasApiError } from "../../../lib/api/errors";
 import {
@@ -557,10 +557,7 @@ export async function searchSports(
       error instanceof AtlasApiError &&
       error.kind === "rate-limit"
     ) {
-      throw new Error(
-        "Sports search is temporarily rate limited. "
-          + "Please try again shortly."
-      );
+      throw new SportsDiscoveryRateLimitError();
     }
 
     throw error;
