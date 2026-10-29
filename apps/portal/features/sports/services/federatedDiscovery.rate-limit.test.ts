@@ -19,7 +19,7 @@ describe("federated discovery rate-limit reporting", () => {
   it("retains another provider's results during a throttle", async () => {
     const result = await run(async (_type, _query, { provider }) => {
       if (provider === "thesportsdb") throw new SportsDiscoveryRateLimitError();
-      return [{ kind: "league", provider: "espn", id: "nba", name: "NBA" }];
+      return [{ kind: "league", provider: "espn", id: "nba", name: "NBA", sport: "Basketball", league: "NBA" }];
     }, async () => [{ provider: "thesportsdb", enabled: true }, { provider: "espn", enabled: true }]);
     expect(result.state).toBe("partial");
     expect(result.results).toHaveLength(1);
