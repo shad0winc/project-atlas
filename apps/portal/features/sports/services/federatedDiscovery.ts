@@ -1,7 +1,14 @@
 import type { SportsSearchResult, SportsSearchType } from "../types/sports";
 
+export class SportsDiscoveryRateLimitError extends Error {
+  constructor() {
+    super("Sports search is temporarily rate limited. Please try again shortly.");
+    this.name = "SportsDiscoveryRateLimitError";
+  }
+}
+
 export type SportsDiscoveryProvider = Readonly<{ provider: "thesportsdb" | "espn"; enabled: boolean }>;
-export type SportsDiscoverySource = Readonly<{ provider: string; outcome: "pending" | "available" | "unavailable" }>;
+export type SportsDiscoverySource = Readonly<{ provider: string; outcome: "pending" | "available" | "unavailable"; reason?: "rate-limit" }>;
 export type SportsDiscoverySnapshot = Readonly<{
   results: readonly SportsSearchResult[];
   sources: readonly SportsDiscoverySource[];
@@ -42,7 +49,8 @@ function bounded<T>(task: (signal: AbortSignal) => Promise<T>, signal: AbortSign
       return task(controller.signal);
     }).then(
       value => finish(() => resolve(value)),
-      () => finish(() => reject(new Error("Sports source is unavailable."))),
+      error => finish(() => reject(error instanceof SportsDiscoveryRateLimitError
+        ? error : new Error("Sports source is unavailable."))),
     );
   });
 }
@@ -73,9 +81,11 @@ export async function searchFederatedSports({ type, query, signal, loadProviders
   if (active.length === 0) { publish({ results: [], sources: [], state: "unavailable" }); return; }
   const outcomes = new Map(active.map(row => [row.provider, "pending" as SportsDiscoverySource["outcome"]]));
   const found = new Map<string, readonly SportsSearchResult[]>();
+  const rateLimited = new Set<string>();
   const emit = () => {
     if (signal.aborted) return;
-    const sources = active.map(row => ({ provider: row.provider, outcome: outcomes.get(row.provider)! }));
+    const sources = active.map(row => ({ provider: row.provider, outcome: outcomes.get(row.provider)!,
+      ...(rateLimited.has(row.provider) ? { reason: "rate-limit" as const } : {}) }));
     const pending = sources.some(row => row.outcome === "pending");
     const failed = sources.some(row => row.outcome === "unavailable");
     const available = sources.some(row => row.outcome === "available");
@@ -97,7 +107,8 @@ export async function searchFederatedSports({ type, query, signal, loadProviders
       }
       found.set(source.provider, [...unique.values()]);
       outcomes.set(source.provider, "available");
-    } catch {
+    } catch (error) {
+      if (error instanceof SportsDiscoveryRateLimitError) rateLimited.add(source.provider);
       outcomes.set(source.provider, "unavailable");
     }
     emit();
