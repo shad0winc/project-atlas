@@ -141,6 +141,12 @@ def list_sports_events(
                 else None
             ),
         )
+    except SportsProviderRateLimitError as error:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Sports provider is temporarily rate limited. Try again shortly.",
+            headers={"Retry-After": str(error.retry_after_seconds)},
+        ) from error
     except SportsProviderNotFoundError as error:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
