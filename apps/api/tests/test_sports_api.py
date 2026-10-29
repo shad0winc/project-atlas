@@ -15,6 +15,7 @@ from atlas_api.routes.v1.sports import (
     router,
 )
 from atlas_api.services.sports import (
+    SportsProviderRateLimitError,
     SportsWriterBackedAPIService,
     SportsWriterTransportError,
 )
@@ -404,3 +405,15 @@ def test_discovery_configuration_transport_failure_remains_unavailable() -> None
     response = build_client(service).get("/api/v1/sports/discovery/providers")
     assert response.status_code == 503
     assert response.json() == {"detail":"Sports discovery configuration is unavailable."}
+
+
+def test_list_events_preserves_provider_throttle_and_retry_after() -> None:
+    service = FakeSportsService()
+    def limited(**kwargs):
+        raise SportsProviderRateLimitError("limited", 55)
+    service.list_events_for_user = limited  # type: ignore[method-assign]
+    client = build_client(service)
+    response = client.get("/api/v1/sports/events", params={"provider": "thesportsdb", "league_id": "4391"})
+    assert response.status_code == 429
+    assert response.headers["Retry-After"] == "55"
+    assert "rate limited" in response.json()["detail"]

@@ -22,18 +22,18 @@ def test_writer_transport_preserves_private_rate_limit_code() -> None:
     assert "raise SportsProviderRateLimitError(" in source
 
 
-def test_public_search_routes_preserve_429_and_retry_after() -> None:
+def test_public_search_and_events_routes_preserve_429_and_retry_after() -> None:
     source = ROUTES.read_text(encoding="utf-8")
 
     assert source.count(
         "except SportsProviderRateLimitError as error:"
-    ) == 3
+    ) == 4
     assert source.count(
         "status_code=status.HTTP_429_TOO_MANY_REQUESTS"
-    ) == 3
+    ) == 4
     assert source.count(
         '"Retry-After": str(error.retry_after_seconds)'
-    ) == 3
+    ) == 4
 
 
 def test_generic_search_transport_failure_remains_503() -> None:

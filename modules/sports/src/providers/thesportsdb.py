@@ -10,6 +10,8 @@ import math
 import stat
 import tempfile
 from contextlib import contextmanager
+from contextvars import ContextVar
+from providers.shared_request_cache import SharedRequestCache, SharedRequestDeferred
 import os
 import threading
 import time
@@ -36,6 +38,7 @@ class SportsProviderRateLimitError(RuntimeError):
         )
 
 
+_BACKGROUND_FETCH = ContextVar("sports_background_fetch", default=False)
 _CACHE_LOCK = threading.Lock()
 _RESPONSE_CACHE: OrderedDict[
     tuple[str, tuple[tuple[str, str], ...]],
@@ -314,7 +317,41 @@ class TheSportsDBProvider(SportsProvider):
             self.api_key
         )
 
-    def request_json(
+    def request_json(self, endpoint: str, parameters: dict[str, str]) -> dict[str, Any]:
+        enabled = os.getenv("SPORTS_SHARED_METADATA_CACHE_ENABLED", "0")
+        if enabled not in {"0", "1"}:
+            raise RuntimeError("Invalid shared metadata cache activation")
+        if enabled == "0":
+            return self._request_json_local(endpoint, parameters)
+        cache = SharedRequestCache(
+            _PROVIDER_BUDGET_FILE.parent / "provider-request-coordination",
+            self.api_key, clock=lambda: time.time(),
+        )
+        key = _cache_key(endpoint, parameters)
+        def fetch():
+            # A memory hit must not be persisted under a new observation time.
+            with _CACHE_LOCK:
+                _RESPONSE_CACHE.pop(key, None)
+            return self._request_json_local(endpoint, parameters)
+        try:
+            reply = cache.get_or_fetch(endpoint, parameters,
+                ttl=_cache_ttl_seconds(endpoint), background=_BACKGROUND_FETCH.get(), fetch=fetch)
+        except SharedRequestDeferred as error:
+            raise SportsProviderRateLimitError(error.retry_after_seconds) from None
+        age = time.time() - reply.observed_at
+        if not math.isfinite(age) or age < 0 or age >= _cache_ttl_seconds(endpoint):
+            raise RuntimeError("Shared metadata age is invalid")
+        with _CACHE_LOCK:
+            _RESPONSE_CACHE[key] = (
+                time.monotonic() + _cache_ttl_seconds(endpoint) - age,
+                copy.deepcopy(reply.payload),
+            )
+            _RESPONSE_CACHE.move_to_end(key)
+            while len(_RESPONSE_CACHE) > _CACHE_MAX_ENTRIES:
+                _RESPONSE_CACHE.popitem(last=False)
+        return copy.deepcopy(reply.payload)
+
+    def _request_json_local(
         self,
         endpoint: str,
         parameters: dict[str, str],
@@ -859,7 +896,14 @@ class TheSportsDBProvider(SportsProvider):
                         "oldest_response_age_seconds": round(completed_monotonic - oldest, 3)}}
         return None, complete
 
-    def fetch_games_resumable(
+    def fetch_games_resumable(self, *args, **kwargs):
+        token = _BACKGROUND_FETCH.set(True)
+        try:
+            return self._fetch_games_resumable(*args, **kwargs)
+        finally:
+            _BACKGROUND_FETCH.reset(token)
+
+    def _fetch_games_resumable(
         self,
         tracked_event_ids: list[str] | None = None,
         event_ids: list[str] | None = None,
