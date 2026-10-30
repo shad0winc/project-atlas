@@ -1,3 +1,4 @@
+import { parseAtlasRetryAfter } from "./retryAfter";
 /**
  * Executes one Atlas API request attempt.
  *
@@ -325,6 +326,7 @@ export async function performAtlasApiRequestWithMetadata<T>(
   if (!response.ok) {
     const errorDetails = {
       detail: await readErrorDetail(response),
+      retryAfterSeconds: response.status === 429 ? parseAtlasRetryAfter(response.headers.get("Retry-After")) : null,
       method,
       path: requestPath,
       requestId: responseRequestId

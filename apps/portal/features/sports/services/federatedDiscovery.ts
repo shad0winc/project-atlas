@@ -55,7 +55,7 @@ function bounded<T>(task: (signal: AbortSignal) => Promise<T>, signal: AbortSign
   });
 }
 
-export async function searchFederatedSports({ type, query, signal, loadProviders, search, publish, timeoutMs = 10_000 }: Readonly<{
+export async function searchFederatedSports({ type, query, signal, loadProviders, search, publish, timeoutMs = 30_000 }: Readonly<{
   type: SportsSearchType;
   query: string;
   signal: AbortSignal;
