@@ -13,8 +13,9 @@ describe("Sports search rate-limit contract", () => {
     expect(source).toContain('error.kind === "rate-limit"');
   });
 
-  it("does not automatically retry Sports searches", () => {
+  it("keeps transport retries disabled while pacing safe Sports reads", () => {
     expect(source).toContain("maxRetries: 0");
+    expect(source).toContain("withSportsBudgetRetry(");
   });
 
   it("shows a Sports-specific temporary rate-limit message", () => {

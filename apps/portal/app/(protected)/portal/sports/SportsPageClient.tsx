@@ -65,6 +65,7 @@ export function SportsPageClient(): React.ReactElement {
   >([]);
   const [discovery, setDiscovery] = useState<SportsDiscoverySnapshot | null>(null);
   const discoveryAbort = useRef<AbortController | null>(null);
+  const browseAbort = useRef<AbortController | null>(null);
   const [searchType, setSearchType] = useState<SportsSearchType>("event");
   const [channelQuery, setChannelQuery] = useState("");
   const [freshFollowedEvents, setFreshFollowedEvents] = useState<
@@ -383,6 +384,7 @@ export function SportsPageClient(): React.ReactElement {
     const currentTerminalRelease = terminalRelease.current;
     return () => {
       discoveryAbort.current?.abort();
+      browseAbort.current?.abort();
       liveRequestVersionRef.current += 1;
       clearLiveHeartbeat();
 
@@ -524,19 +526,25 @@ export function SportsPageClient(): React.ReactElement {
     providerId: string,
     provider: string,
   ): Promise<void> {
-    const loadedEvents = await loadSportsEvents(
-      {},
-      type === "team" ? { provider, teamIds: [providerId] } : { provider, leagueIds: [providerId] },
-    );
-
-    setEvents(upcomingSportsEvents(loadedEvents));
-    setBrowsedSports({ provider, type, providerId });
-
-    window.requestAnimationFrame(() => {
-      document
-        .getElementById("sports-upcoming-events")
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
+    browseAbort.current?.abort();
+    const controller = new AbortController();
+    browseAbort.current = controller;
+    try {
+      const loadedEvents = await loadSportsEvents(
+        { signal: controller.signal },
+        type === "team" ? { provider, teamIds: [providerId] } : { provider, leagueIds: [providerId] },
+      );
+      if (controller.signal.aborted) return;
+      setEvents(upcomingSportsEvents(loadedEvents));
+      setBrowsedSports({ provider, type, providerId });
+      window.requestAnimationFrame(() => {
+        if (!controller.signal.aborted) document
+          .getElementById("sports-upcoming-events")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    } finally {
+      if (browseAbort.current === controller) browseAbort.current = null;
+    }
   }
 
   async function handleRequestEvent(

@@ -38,6 +38,22 @@ class CacheTests(unittest.TestCase):
         return (cache or self.cache).get_or_fetch('search.php', {'q': query}, ttl=ttl,
             background=background, fetch=fetch or self.fetch)
 
+    def test_background_burst_leaves_two_interactive_slots(self):
+        self.get('bg1', background=True); self.get('bg2', background=True)
+        with self.assertRaises(SharedRequestDeferred) as caught:
+            self.get('bg3', background=True)
+        self.assertEqual(caught.exception.retry_after_seconds, 10)
+        self.get('user1'); self.get('user2')
+        with self.assertRaises(SharedRequestDeferred): self.get('user3')
+        self.assertEqual(self.calls, 4)
+    def test_background_burst_reopens_after_hint_without_extra_cache_calls(self):
+        self.get('bg1', background=True); self.get('bg2', background=True)
+        self.get('bg1', background=True)
+        self.assertEqual(self.calls, 2)
+        self.clock.value += 10
+        self.get('bg3', background=True)
+        self.assertEqual(self.calls, 3)
+
     def test_reload_and_new_instances_reuse_one_response_without_renewing_age(self):
         first = self.get()
         self.clock.value += 30
@@ -62,9 +78,9 @@ class CacheTests(unittest.TestCase):
         self.assertEqual(self.calls, 3)
     def test_background_cannot_consume_reserved_interactive_capacity(self):
         for i in range(12):
-            self.clock.value = 1000+i*4
+            self.clock.value = 1000+i*5
             self.get(str(i), background=True)
-        self.clock.value = 1048
+        self.clock.value = 1056
         with self.assertRaises(SharedRequestDeferred): self.get('background-13', background=True)
         self.get('interactive', background=False)
         self.assertEqual(self.calls, 13)
@@ -186,6 +202,29 @@ class ProviderTests(unittest.TestCase):
         thesportsdb._reset_request_budget_for_tests()
     def tearDown(self):
         self.budget.stop();self.env.stop();self.folder.cleanup()
+    def test_one_cold_seven_day_schedule_needs_pacing_and_reuses_completed_dates(self):
+        clock=Clock()
+        module=self.provider_module
+        with patch.object(module.time, 'time', side_effect=clock), patch.object(
+            module.urllib.request, 'urlopen',
+            side_effect=lambda *_a, **_k: io.StringIO(json.dumps({'events': []})),
+        ) as fetch:
+            provider=module.TheSportsDBProvider()
+            with self.assertRaises(module.SportsProviderRateLimitError) as caught:
+                provider.fetch_games(league_ids=['4391'], date_value='2026-10-30', days_ahead=7)
+            self.assertEqual(fetch.call_count, 4)
+            self.assertEqual(caught.exception.retry_after_seconds, 10)
+            clock.value += caught.exception.retry_after_seconds
+            games=provider.fetch_games(league_ids=['4391'], date_value='2026-10-30', days_ahead=7)
+            self.assertEqual(games, [])
+            self.assertEqual(fetch.call_count, 8)
+            days=[dict(__import__('urllib.parse', fromlist=['parse_qsl']).parse_qsl(
+                __import__('urllib.parse', fromlist=['urlparse']).urlparse(call.args[0].full_url).query))['d']
+                for call in fetch.call_args_list]
+            self.assertEqual(len(set(days)), 8)
+            self.assertEqual(days[0], '2026-10-30')
+            self.assertEqual(days[-1], '2026-11-06')
+
     def test_provider_instances_reuse_one_upstream_search(self):
         response=lambda *_args,**_kwargs:io.StringIO(json.dumps({'teams':[]}))
         with patch.object(self.provider_module.urllib.request,'urlopen',side_effect=response) as fetch:
