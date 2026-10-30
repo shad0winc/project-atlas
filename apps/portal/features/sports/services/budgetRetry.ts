@@ -7,18 +7,20 @@ type Dependencies = Readonly<{
 
 function waitForBudget(milliseconds: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    if (signal.aborted) {
+      reject(signal.reason ?? new DOMException("Sports request cancelled.", "AbortError"));
+      return;
+    }
     const cancelled = () => {
       clearTimeout(timer);
       signal.removeEventListener("abort", cancelled);
       reject(signal.reason ?? new DOMException("Sports request cancelled.", "AbortError"));
     };
-    if (signal.aborted) { cancelled(); return; }
-    signal.addEventListener("abort", cancelled, { once: true });
-    timer = setTimeout(() => {
+    const timer = setTimeout(() => {
       signal.removeEventListener("abort", cancelled);
       resolve();
     }, milliseconds);
+    signal.addEventListener("abort", cancelled, { once: true });
   });
 }
 
