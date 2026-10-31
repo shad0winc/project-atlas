@@ -374,10 +374,14 @@ describe("SportsRequestView", () => {
       />,
     );
 
-    expect(markup).toContain("Detroit Lions vs New Orleans Saints");
-    expect(markup).toContain("Request event");
-    expect(markup).toContain("Record event");
-    expect(markup).not.toContain("View upcoming");
+    const eventResults = markup.match(
+      /<section aria-label="Sports event search results"[^>]*>[\s\S]*?<\/section>/,
+    )?.[0];
+    expect(eventResults).toBeDefined();
+    expect(eventResults).toContain("Detroit Lions vs New Orleans Saints");
+    expect(eventResults).toContain("Request event");
+    expect(eventResults).toContain("Record event");
+    expect(eventResults).not.toContain("View upcoming");
   });
 });
 

@@ -19,6 +19,11 @@ export type SportsRequestInput = Readonly<{
 export type SportsRequestViewProps = Readonly<{
   events: readonly SportsEvent[];
   scheduleUnavailable?: boolean;
+  scheduleRefreshing?: boolean;
+  scheduleLoadedAt?: number;
+  upcomingScopeLabel?: string;
+  allFollowedSelected?: boolean;
+  onViewAllUpcoming?: () => void;
   discoveryState?: "loading" | "complete" | "partial" | "unavailable";
   discoveryRateLimited?: boolean;
   eventChannels?: ReactNode;
@@ -50,6 +55,11 @@ export type SportsRequestViewProps = Readonly<{
 export function SportsRequestView({
   events,
   scheduleUnavailable = false,
+  scheduleRefreshing = false,
+  scheduleLoadedAt,
+  upcomingScopeLabel = "All followed Sports",
+  allFollowedSelected = true,
+  onViewAllUpcoming,
   discoveryState,
   discoveryRateLimited = false,
   eventChannels,
@@ -489,19 +499,33 @@ export function SportsRequestView({
         <div>
           <p className="portal-page-eyebrow">Upcoming events</p>
           <h2>Next 7 days</h2>
+          {onViewAllUpcoming ? (
+            <button type="button" className="requests-refresh-button"
+              aria-pressed={allFollowedSelected} onClick={onViewAllUpcoming}>
+              View all followed upcoming
+            </button>
+          ) : null}
           <p>
-            Upcoming events from your followed Sports and the team or league
-            you choose to browse. Times use your device timezone. Following and
-            recording remain separate. Channel schedules require a linked guide.
+            Showing: {upcomingScopeLabel}. Choose View upcoming on a team or league
+            for just that selection, or View all followed upcoming for your follows.
+            Times use your device timezone. Following and recording remain separate.
+            Channel schedules require a linked guide.
           </p>
         </div>
       </div>
 
       {scheduleUnavailable ? (
         <p role="status">
-          Some followed Sports schedules are temporarily unavailable. This list
-          may be incomplete.
+          Schedule update temporarily unavailable.
+          {events.length > 0 ? " Showing previously loaded upcoming events; details may have changed." : " Please try again shortly."}
         </p>
+      ) : null}
+
+      {scheduleRefreshing ? <p role="status">Updating upcoming events…</p> : null}
+      {scheduleLoadedAt !== undefined ? (
+        <p>Last successful load: <time dateTime={new Date(scheduleLoadedAt).toISOString()}>
+          {new Date(scheduleLoadedAt).toLocaleString()}
+        </time></p>
       ) : null}
 
       {events.length === 0 && scheduleUnavailable ? (
