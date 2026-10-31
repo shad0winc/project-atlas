@@ -514,6 +514,33 @@ class TheSportsDBProvider(SportsProvider):
         if not normalized_query:
             return []
 
+        # NCAA football aliases use its reviewed provider identity, not an
+        # exact team-directory name or a truncated free-tier all-leagues list.
+        alias = " ".join(normalized_query.casefold().replace("-", " ").split())
+        if alias in {"ncaa", "ncaaf", "ncaa football", "college football",
+                     "ncaa division 1", "ncaa division 1 football"}:
+            response = self.request_json("lookupleague.php", {"id": "4479"})
+            leagues = response.get("leagues") or []
+            if not isinstance(leagues, list):
+                raise RuntimeError("Invalid college football league response")
+            results = []
+            for league in leagues:
+                if not isinstance(league, dict):
+                    raise RuntimeError("Invalid college football league response")
+                if (str(league.get("idLeague") or "").strip() != "4479"
+                    or str(league.get("strSport") or "").strip().casefold() != "american football"):
+                    raise RuntimeError("College football league identity mismatch")
+                name = str(league.get("strLeague") or "").strip()
+                if not name:
+                    raise RuntimeError("College football league name missing")
+                result = {"provider": self.name, "id": "4479", "name": name,
+                          "sport": league["strSport"], "country": league.get("strCountry")}
+                if not results:
+                    results.append(result)
+                elif results[0] != result:
+                    raise RuntimeError("Conflicting college football league response")
+            return results
+
         response = self.request_json(
             "search_all_teams.php",
             {
