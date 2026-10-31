@@ -18,6 +18,7 @@ export interface AtlasApiErrorOptions {
   readonly path: string;
   readonly requestId: string;
   readonly kind: AtlasApiHttpErrorKind;
+  readonly retryAfterSeconds?: number | null;
 }
 
 type AtlasApiAuthorizationErrorOptions = Readonly<Omit<AtlasApiErrorOptions, "status" | "kind">>;
@@ -57,8 +58,9 @@ export class AtlasApiError extends AtlasApiClientError {
   readonly status: number;
   readonly detail: string;
   readonly kind: AtlasApiHttpErrorKind;
+  readonly retryAfterSeconds: number | null;
 
-  constructor({ status, detail, method, path, requestId, kind }: AtlasApiErrorOptions) {
+  constructor({ status, detail, method, path, requestId, kind, retryAfterSeconds = null }: AtlasApiErrorOptions) {
     super({
       name: "AtlasApiError",
       message: detail,
@@ -70,6 +72,7 @@ export class AtlasApiError extends AtlasApiClientError {
     this.status = status;
     this.detail = detail;
     this.kind = kind;
+    this.retryAfterSeconds = typeof retryAfterSeconds === "number" && Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0 && retryAfterSeconds <= 3600 ? retryAfterSeconds : null;
   }
 }
 

@@ -22,6 +22,7 @@ MAX_TOTAL_BYTES = 4 * 1024 * 1024
 TOTAL_PER_MINUTE = 20
 BACKGROUND_PER_MINUTE = 12
 BURST_PER_TEN_SECONDS = 4
+BACKGROUND_BURST_PER_TEN_SECONDS = 2
 
 class SharedRequestDeferred(RuntimeError):
     def __init__(self, seconds):
@@ -167,6 +168,9 @@ class SharedRequestCache:
                 burst = [at for at,_ in stamps if now-at < 10]
                 if len(burst) >= BURST_PER_TEN_SECONDS:
                     waits.append(burst[0]+10-now)
+                bg_burst = [at for at,is_background in stamps if is_background and now-at < 10]
+                if background and len(bg_burst) >= BACKGROUND_BURST_PER_TEN_SECONDS:
+                    waits.append(bg_burst[0]+10-now)
                 if waits:
                     raise SharedRequestDeferred(max(waits))
                 db.execute('INSERT INTO admissions VALUES (?,?)', (now, int(background)))

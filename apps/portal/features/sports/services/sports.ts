@@ -1,3 +1,4 @@
+import { withSportsBudgetRetry } from "./budgetRetry";
 import { SportsDiscoveryRateLimitError, parseDiscoveryProviders, type SportsDiscoveryProvider } from "./federatedDiscovery";
 import { atlasApiRequest } from "../../../lib/api/client";
 import { AtlasApiError } from "../../../lib/api/errors";
@@ -190,13 +191,17 @@ export async function loadSportsEvents(options: SportsRequestOptions = {}, filte
   }
   for (const id of filter.teamIds ?? []) if (id.trim()) params.append("team_id", id.trim());
   for (const id of filter.leagueIds ?? []) if (id.trim()) params.append("league_id", id.trim());
-  const response = await authenticatedAtlasApiRequest<SportsEventCollectionTransport>(
-    `/sports/events?${params.toString()}`,
-    {
-      method: "GET",
-      cache: "no-store",
-      signal: options.signal
-    }
+  const response = await withSportsBudgetRetry(
+    (signal) => authenticatedAtlasApiRequest<SportsEventCollectionTransport>(
+      `/sports/events?${params.toString()}`,
+      {
+        method: "GET",
+        cache: "no-store",
+        signal,
+        retryPolicy: { maxRetries: 0, baseDelayMs: 250, maxDelayMs: 5_000 }
+      }
+    ),
+    options
   );
 
   return createSportsEventCollection(response);
@@ -538,17 +543,23 @@ export async function searchSports(
 
     if (type === "event") {
       const response =
-        await authenticatedAtlasApiRequest<SportsEventCollectionTransport>(
-          `/sports/search/${path}?provider=${encodeURIComponent(provider)}&query=${encodeURIComponent(normalizedQuery)}`,
-          requestOptions
+        await withSportsBudgetRetry(
+          (signal) => authenticatedAtlasApiRequest<SportsEventCollectionTransport>(
+            `/sports/search/${path}?provider=${encodeURIComponent(provider)}&query=${encodeURIComponent(normalizedQuery)}`,
+            { ...requestOptions, signal }
+          ),
+          options
         );
       return createSportsEventSearchCollection(response);
     }
 
     const response =
-      await authenticatedAtlasApiRequest<SportsSearchCollectionTransport>(
-        `/sports/search/${path}?provider=${encodeURIComponent(provider)}&query=${encodeURIComponent(normalizedQuery)}`,
-        requestOptions
+      await withSportsBudgetRetry(
+        (signal) => authenticatedAtlasApiRequest<SportsSearchCollectionTransport>(
+          `/sports/search/${path}?provider=${encodeURIComponent(provider)}&query=${encodeURIComponent(normalizedQuery)}`,
+          { ...requestOptions, signal }
+        ),
+        options
       );
 
     return createSportsSearchCollection(type, response, provider);
