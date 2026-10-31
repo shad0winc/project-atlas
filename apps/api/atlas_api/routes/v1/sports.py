@@ -17,6 +17,9 @@ from fastapi import (
 from atlas_api.auth.models import AuthenticatedUser
 from atlas_api.schemas.sports import (
     SportsDiscoveryProvidersResponse,
+    SportsCuratedCatalogResponse,
+    SportsCuratedTeamsResponse,
+    SportsCuratedScheduleResponse,
     SportsLiveChannelListResponse,
     SportsLiveChannelResponse,
     SportsEventListResponse,
@@ -74,6 +77,63 @@ def get_sports_api_service(
     """Return the process-wide Sports application service."""
 
     return build_default_sports_api_service()
+
+
+@router.get("/curated/catalog", response_model=SportsCuratedCatalogResponse,
+            summary="Read the curated Sports competition catalog")
+def sports_curated_catalog(
+    response: Response,
+    current_user: Annotated[AuthenticatedUser, Depends(require_sports_read)],
+    service: Annotated[SportsAPIService, Depends(get_sports_api_service)],
+) -> SportsCuratedCatalogResponse:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return SportsCuratedCatalogResponse(**service.curated_catalog())
+    except SportsWriterTransportError:
+        raise HTTPException(503, "Shared Sports catalog is unavailable.", headers={"Cache-Control": "no-store"}) from None
+
+
+@router.get("/curated/teams", response_model=SportsCuratedTeamsResponse,
+            summary="Read cached teams for a curated competition")
+def sports_curated_teams(
+    response: Response,
+    current_user: Annotated[AuthenticatedUser, Depends(require_sports_read)],
+    service: Annotated[SportsAPIService, Depends(get_sports_api_service)],
+    competition: Annotated[str, Query(min_length=1, max_length=64)],
+) -> SportsCuratedTeamsResponse:
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return SportsCuratedTeamsResponse(**service.curated_teams(competition))
+    except SportsWriterTransportError:
+        raise HTTPException(503, "Shared Sports team directory is unavailable.", headers={"Cache-Control": "no-store"}) from None
+
+
+@router.get("/curated/schedule", response_model=SportsCuratedScheduleResponse,
+            summary="Read cached events without triggering provider fetches")
+def sports_curated_schedule(
+    response: Response,
+    current_user: Annotated[AuthenticatedUser, Depends(require_sports_read)],
+    service: Annotated[SportsAPIService, Depends(get_sports_api_service)],
+    competition: Annotated[str, Query(min_length=1, max_length=64)],
+    start_at: Annotated[str, Query(min_length=20, max_length=40)],
+    end_at: Annotated[str, Query(min_length=20, max_length=40)],
+) -> SportsCuratedScheduleResponse:
+    from datetime import datetime, timedelta, timezone
+    try:
+        start = datetime.fromisoformat(start_at.replace("Z", "+00:00"))
+        end = datetime.fromisoformat(end_at.replace("Z", "+00:00"))
+        today = datetime.now(timezone.utc).date()
+        if (start.tzinfo is None or end.tzinfo is None or not 0 < (end-start).total_seconds() <= 7*86400
+            or start.astimezone(timezone.utc).date() < today-timedelta(days=1)
+            or end.astimezone(timezone.utc).date() > today+timedelta(days=7)):
+            raise ValueError("Invalid window")
+    except ValueError:
+        raise HTTPException(422, "Choose an aware schedule window within the next seven days.", headers={"Cache-Control": "no-store"}) from None
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        return SportsCuratedScheduleResponse(**service.curated_schedule(competition, start_at, end_at))
+    except SportsWriterTransportError:
+        raise HTTPException(503, "Shared Sports schedule is unavailable.", headers={"Cache-Control": "no-store"}) from None
 
 
 @router.get("/discovery/providers", response_model=SportsDiscoveryProvidersResponse,

@@ -39,6 +39,7 @@ import { searchFederatedSports, type SportsDiscoverySnapshot } from "../../../..
 
 import { followedLiveEvents } from "../../../../features/sports/services/currentlyLive";
 import { SportsCurrentlyLive } from "../../../../features/sports/components/SportsCurrentlyLive";
+import { SportsScheduleBrowser } from "../../../../features/sports/components/SportsScheduleBrowser";
 import { SportsLiveChannels } from "../../../../features/sports/components/SportsLiveChannels";
 
 import { loadSportsPlaybackOptions, preferredSportsPlaybackOption, type SportsPlaybackOption } from "../../../../features/sports/services/playbackOptions";
@@ -676,6 +677,8 @@ export function SportsPageClient(): React.ReactElement {
           ) : null}
         </section>
       ) : null}
+
+      <SportsScheduleBrowser follows={follows} onFollow={handleFollow} />
 
       <SportsCurrentlyLive
         events={currentLiveEvents}
