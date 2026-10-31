@@ -1,4 +1,4 @@
-import { withSportsBudgetRetry } from "./budgetRetry";
+import { withSportsBudgetRetry, withSportsScheduleBudgetRetry } from "./budgetRetry";
 import { SportsDiscoveryRateLimitError, parseDiscoveryProviders, type SportsDiscoveryProvider } from "./federatedDiscovery";
 import { atlasApiRequest } from "../../../lib/api/client";
 import { AtlasApiError } from "../../../lib/api/errors";
@@ -191,7 +191,7 @@ export async function loadSportsEvents(options: SportsRequestOptions = {}, filte
   }
   for (const id of filter.teamIds ?? []) if (id.trim()) params.append("team_id", id.trim());
   for (const id of filter.leagueIds ?? []) if (id.trim()) params.append("league_id", id.trim());
-  const response = await withSportsBudgetRetry(
+  const response = await withSportsScheduleBudgetRetry(
     (signal) => authenticatedAtlasApiRequest<SportsEventCollectionTransport>(
       `/sports/events?${params.toString()}`,
       {
