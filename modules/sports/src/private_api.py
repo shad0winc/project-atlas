@@ -431,6 +431,33 @@ class Handler(BaseHTTPRequestHandler):
         if not self._require_auth():
             return
 
+        if parsed.path in {"/internal/v1/curated/catalog", "/internal/v1/curated/teams", "/internal/v1/curated/schedule"}:
+            try:
+                from providers.curated_schedule import configured_curated_schedules
+                curated = configured_curated_schedules()
+            except Exception:
+                self._backend_unavailable()
+                return
+            try:
+                query = urllib.parse.parse_qs(parsed.query, keep_blank_values=True,
+                                              strict_parsing=True, max_num_fields=3)
+                fields = (set() if parsed.path.endswith("/catalog") else {"competition"}
+                          if parsed.path.endswith("/teams") else {"competition", "start_at", "end_at"})
+                if set(query) != fields or any(len(values) != 1 for values in query.values()):
+                    raise ValueError("Invalid curated query")
+                if parsed.path.endswith("/catalog"):
+                    document = curated.catalog()
+                elif parsed.path.endswith("/teams"):
+                    document = curated.teams(query["competition"][0])
+                else:
+                    document = curated.schedule(query["competition"][0], query["start_at"][0], query["end_at"][0])
+                self._json(HTTPStatus.OK, document)
+            except ValueError:
+                self._json(HTTPStatus.BAD_REQUEST, {"error": "Invalid curated schedule query."})
+            except Exception:
+                self._backend_unavailable()
+            return
+
         if parsed.path == "/internal/v1/discovery/providers":
             if parsed.query:
                 self._json(HTTPStatus.BAD_REQUEST, {"error": "Unexpected discovery query."})

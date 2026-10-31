@@ -287,6 +287,39 @@ class SportsWriterBackedAPIService:
         self._token = normalized_token
         self._timeout_seconds = timeout_seconds
 
+    def _curated_document(self, kind: str, params: dict[str, str]) -> dict[str, Any]:
+        from atlas_api.schemas.sports import (SportsCuratedCatalogResponse,
+            SportsCuratedTeamsResponse, SportsCuratedScheduleResponse)
+        models = {"catalog": SportsCuratedCatalogResponse, "teams": SportsCuratedTeamsResponse,
+                  "schedule": SportsCuratedScheduleResponse}
+        if kind not in models:
+            raise SportsWriterTransportError("Invalid curated Sports request.")
+        path = "/internal/v1/curated/" + kind
+        if params:
+            path += "?" + urllib.parse.urlencode(params)
+        payload = self._request("GET", path)
+        try:
+            result = models[kind].model_validate(payload)
+            if "competition" in params and result.competition_id != params["competition"]:
+                raise ValueError("Curated competition identity mismatch")
+            if kind == "schedule":
+                from datetime import datetime
+                if (result.start_at != datetime.fromisoformat(params["start_at"].replace("Z", "+00:00"))
+                    or result.end_at != datetime.fromisoformat(params["end_at"].replace("Z", "+00:00"))):
+                    raise ValueError("Curated schedule window mismatch")
+            return result.model_dump(mode="json")
+        except (ValueError, TypeError, AttributeError):
+            raise SportsWriterTransportError("Shared Sports schedule snapshot is unavailable.") from None
+
+    def curated_catalog(self) -> dict[str, Any]:
+        return self._curated_document("catalog", {})
+
+    def curated_teams(self, competition: str) -> dict[str, Any]:
+        return self._curated_document("teams", {"competition": competition})
+
+    def curated_schedule(self, competition: str, start_at: str, end_at: str) -> dict[str, Any]:
+        return self._curated_document("schedule", {"competition": competition, "start_at": start_at, "end_at": end_at})
+
     def discovery_providers(self) -> dict[str, Any]:
         payload = self._request("GET", "/internal/v1/discovery/providers")
         if not isinstance(payload, dict) or set(payload) != {"version", "providers"} or type(payload.get("version")) is not int or payload["version"] != 1:

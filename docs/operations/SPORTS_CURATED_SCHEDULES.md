@@ -1,0 +1,15 @@
+# Curated shared schedule browser
+
+This source change adds a default-off browser over the existing ESPN metadata snapshots. The writer flag `ATLAS_SPORTS_CURATED_BROWSE_ENABLED=1` admits the curated catalog. Competitions are configured only when the separately admitted refresh policy includes their route. This PR creates no refresh policy, starts no refresh worker, changes no environment and issues no provider request.
+
+The initial reviewed routes are NFL, NBA, MLB, NHL, Premier League and UFC. College football and college basketball are explicitly listed as coverage pending; UFC has no team directory. A configured route is not evidence of a warm or complete provider schedule.
+
+Authenticated public GETs `/sports/curated/catalog`, `/teams`, `/schedule` forward only to authenticated writer cache readers. Reads use a read-only SQLite transaction and never construct the provisioning store or provider registry. Missing, stale, invalid and partially observed schedules differ from a checked empty schedule. Complete cache coverage does not prove provider completeness. Original observation ages, revisions, cancellation/conflict reconciliation and provider-scoped identities are preserved.
+
+The Portal groups competitions by sport and offers Today, Tomorrow and a rolling 168-hour next-seven-days window. Individual days use device-local midnight, including daylight-saving days. Team filtering is local. There is one cache read per competition/date selection, no automatic polling and a minimum 60-second refresh-button interval. A failed refresh preserves the displayed snapshot. Empty newer partial observations are not merged with older events, to avoid resurrecting cancellations. A missing snapshot may retain prior rows for at most 24 hours, with their original age. No playback or recording permission is inferred from listings. Existing configured channel browsing stays in its current section and is not replaced by an assumed network list.
+
+League/team follows use the existing explicit ESPN identity and mutation flow. Existing TheSportsDB follows are not automatically migrated or treated as equivalent. Following does not record an event.
+
+Before activation: validate college coverage separately if desired; admit a bounded background refresh policy and revise the existing metadata-refresh-disabled native contracts; warm the selected routes; verify ages, coverage and failure behavior; build and review the API/writer/Portal artifacts with current publication lineage and recovery. Test natural throttling retention in the browser and production authentication. The dropdown alone does not solve provider availability and this source PR does not certify invite/release readiness.
+
+Validation includes 23 deterministic reader/private-handler tests, eleven API contract/adapter and credential-realm tests and 15 frontend scenarios. The preparation helper additionally requires full Portal lint, typecheck, tests and build on the isolated checkout before pushing a draft PR. Full release CI and live browser acceptance remain separate.
