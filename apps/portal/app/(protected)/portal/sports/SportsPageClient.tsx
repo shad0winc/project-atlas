@@ -30,7 +30,7 @@ import {
 } from "../../../../features/sports";
 import { startFollowedSportsRefresh } from "../../../../features/sports/services/followedSportsRefresh";
 import { reconcileFollowedEventMetadata } from "../../../../features/sports/services/followedEventMetadata";
-import { upcomingSportsEvents } from "../../../../features/sports/services/upcomingSports";
+import { reconcileUpcomingSchedule, selectedUpcomingSchedule, upcomingLastLoadedAt, type UpcomingSnapshot } from "../../../../features/sports/services/upcomingSchedule";
 import { startLiveAvailabilityRefresh } from "../../../../features/sports/services/liveAvailabilityRefresh";
 import { PORTAL_ROUTES } from "../../../../lib/navigation/portal";
 
@@ -48,7 +48,8 @@ import { SportsPlaybackChoices } from "../../../../features/sports/components/Sp
 const sportsRoute = PORTAL_ROUTES.sports;
 
 export function SportsPageClient(): React.ReactElement {
-  const [events, setEvents] = useState<readonly SportsEvent[]>([]);
+  const [upcomingSnapshot, setUpcomingSnapshot] = useState<UpcomingSnapshot>({});
+  const [scheduleRefreshing, setScheduleRefreshing] = useState(false);
   const [followedEvents, setFollowedEvents] = useState<readonly SportsEvent[]>(
     [],
   );
@@ -57,6 +58,17 @@ export function SportsPageClient(): React.ReactElement {
     Readonly<{ provider: string; type: "team" | "league"; providerId: string }>
     | undefined
   >(undefined);
+  const events = selectedUpcomingSchedule(upcomingSnapshot, follows, browsedSports);
+  const upcomingLoadedAt = upcomingLastLoadedAt(upcomingSnapshot, follows, browsedSports);
+  const upcomingScopeLabel = browsedSports
+    ? follows.find(f => f.provider === browsedSports.provider && f.type === browsedSports.type && f.providerId === browsedSports.providerId)?.name
+      ?? `Selected ${browsedSports.type}`
+    : "All followed Sports";
+  function setEvents(update: (current: readonly SportsEvent[]) => readonly SportsEvent[]): void {
+    setUpcomingSnapshot(current => Object.fromEntries(Object.entries(current).map(([provider, snapshot]) =>
+      [provider, { ...snapshot, events: update(snapshot.events) }],
+    )));
+  }
   const [liveAvailabilityByEvent, setLiveAvailabilityByEvent] = useState<
     Readonly<Record<string, SportsLiveAvailability>>
   >({});
@@ -65,7 +77,7 @@ export function SportsPageClient(): React.ReactElement {
   >([]);
   const [discovery, setDiscovery] = useState<SportsDiscoverySnapshot | null>(null);
   const discoveryAbort = useRef<AbortController | null>(null);
-  const browseAbort = useRef<AbortController | null>(null);
+  const scheduleCooldowns = useRef(new Map<string, number>());
   const [searchType, setSearchType] = useState<SportsSearchType>("event");
   const [channelQuery, setChannelQuery] = useState("");
   const [freshFollowedEvents, setFreshFollowedEvents] = useState<
@@ -365,7 +377,7 @@ export function SportsPageClient(): React.ReactElement {
 
     try {
       const loadedFollows = await loadSportsFollows();
-      setEvents([]);
+      setUpcomingSnapshot({});
       setFollows(loadedFollows);
     } catch (loadError) {
       setError(
@@ -384,7 +396,6 @@ export function SportsPageClient(): React.ReactElement {
     const currentTerminalRelease = terminalRelease.current;
     return () => {
       discoveryAbort.current?.abort();
-      browseAbort.current?.abort();
       liveRequestVersionRef.current += 1;
       clearLiveHeartbeat();
 
@@ -436,6 +447,8 @@ export function SportsPageClient(): React.ReactElement {
       follows,
       browse: browsedSports,
       load: loadSportsEvents,
+      onRefreshing: setScheduleRefreshing,
+      cooldowns: scheduleCooldowns.current,
       publish: (providers, results) => {
         if (results === null) {
           setFreshFollowedEvents([]);
@@ -449,7 +462,7 @@ export function SportsPageClient(): React.ReactElement {
             : [],
         );
         setFreshFollowedEvents(refreshedEvents);
-        setEvents(upcomingSportsEvents(refreshedEvents));
+        setUpcomingSnapshot(current => reconcileUpcomingSchedule(current, providers, results));
         setLiveMetadataUnavailable(
           results.some((result) => result.status === "rejected"),
         );
@@ -526,25 +539,11 @@ export function SportsPageClient(): React.ReactElement {
     providerId: string,
     provider: string,
   ): Promise<void> {
-    browseAbort.current?.abort();
-    const controller = new AbortController();
-    browseAbort.current = controller;
-    try {
-      const loadedEvents = await loadSportsEvents(
-        { signal: controller.signal },
-        type === "team" ? { provider, teamIds: [providerId] } : { provider, leagueIds: [providerId] },
-      );
-      if (controller.signal.aborted) return;
-      setEvents(upcomingSportsEvents(loadedEvents));
-      setBrowsedSports({ provider, type, providerId });
-      window.requestAnimationFrame(() => {
-        if (!controller.signal.aborted) document
-          .getElementById("sports-upcoming-events")
-          ?.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
-    } finally {
-      if (browseAbort.current === controller) browseAbort.current = null;
-    }
+    setBrowsedSports({ provider, type, providerId });
+    window.requestAnimationFrame(() => {
+      document.getElementById("sports-upcoming-events")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
 
   async function handleRequestEvent(
@@ -715,6 +714,11 @@ export function SportsPageClient(): React.ReactElement {
         <SportsRequestView
           events={events}
           scheduleUnavailable={liveMetadataUnavailable}
+          scheduleRefreshing={scheduleRefreshing}
+          scheduleLoadedAt={upcomingLoadedAt}
+          upcomingScopeLabel={upcomingScopeLabel}
+          allFollowedSelected={browsedSports === undefined}
+          onViewAllUpcoming={() => setBrowsedSports(undefined)}
           discoveryState={discovery?.state}
           discoveryRateLimited={discovery?.sources.some(source => source.reason === "rate-limit") ?? false}
           followedEvents={followedEvents}

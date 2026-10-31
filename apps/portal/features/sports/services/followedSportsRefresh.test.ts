@@ -151,7 +151,38 @@ describe("metadata expiry refresh", () => {
     await vi.advanceTimersByTimeAsync(4999);
     expect(load).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(1);
-    expect(load).toHaveBeenCalledTimes(2);
+    expect(load).toHaveBeenCalledTimes(1);
     expect(publish.mock.lastCall?.[1]).toBeNull();
+    await vi.advanceTimersByTimeAsync(55_000);
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("quiet schedule refresh", () => {
+  it("backs off a failed automatic refresh and respects Retry-After", async () => {
+    const load = vi.fn().mockRejectedValue({ retryAfterSeconds: 120 });
+    stop = startFollowedSportsRefresh({ follows: [saved("league", "nba")], load, publish: vi.fn() });
+    await flush();
+    await vi.advanceTimersByTimeAsync(119_999);
+    expect(load).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+  it("visibility changes cannot bypass a cooldown or overlap a pending request", async () => {
+    const load = vi.fn().mockRejectedValue({ retryAfterSeconds: 120 });
+    stop = startFollowedSportsRefresh({ follows: [saved("league", "nba")], load, publish: vi.fn() });
+    await flush();
+    document.dispatchEvent(new Event("visibilitychange"));
+    await flush();
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+  it("selection restarts preserve the provider cooldown", async () => {
+    const cooldowns = new Map<string, number>();
+    const load = vi.fn().mockRejectedValue({ retryAfterSeconds: 120 });
+    stop = startFollowedSportsRefresh({ follows: [saved("league", "nba")], load, publish: vi.fn(), cooldowns });
+    await flush(); stop();
+    stop = startFollowedSportsRefresh({ follows: [saved("league", "nfl")], load, publish: vi.fn(), cooldowns });
+    await flush(); expect(load).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(120_000); expect(load).toHaveBeenCalledTimes(2);
   });
 });
