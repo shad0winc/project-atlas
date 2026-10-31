@@ -28,6 +28,7 @@ import {
   type SportsSearchType,
   type SportsSubscription,
 } from "../../../../features/sports";
+import { automaticScheduleDemand, manualScheduleDemand } from "../../../../features/sports/services/automaticScheduleDemand";
 import { startFollowedSportsRefresh } from "../../../../features/sports/services/followedSportsRefresh";
 import { reconcileFollowedEventMetadata } from "../../../../features/sports/services/followedEventMetadata";
 import { reconcileUpcomingSchedule, selectedUpcomingSchedule, upcomingLastLoadedAt, type UpcomingSnapshot } from "../../../../features/sports/services/upcomingSchedule";
@@ -51,6 +52,8 @@ const sportsRoute = PORTAL_ROUTES.sports;
 export function SportsPageClient(): React.ReactElement {
   const [upcomingSnapshot, setUpcomingSnapshot] = useState<UpcomingSnapshot>({});
   const [scheduleRefreshing, setScheduleRefreshing] = useState(false);
+  const [curatedEnabled, setCuratedEnabled] = useState<boolean | null | undefined>(undefined);
+  const manualBrowseAbort = useRef<AbortController | null>(null);
   const [followedEvents, setFollowedEvents] = useState<readonly SportsEvent[]>(
     [],
   );
@@ -397,6 +400,8 @@ export function SportsPageClient(): React.ReactElement {
     const currentTerminalRelease = terminalRelease.current;
     return () => {
       discoveryAbort.current?.abort();
+      manualBrowseAbort.current?.abort();
+      manualBrowseAbort.current = null;
       liveRequestVersionRef.current += 1;
       clearLiveHeartbeat();
 
@@ -444,9 +449,10 @@ export function SportsPageClient(): React.ReactElement {
   }, []);
 
   useEffect(() => {
+    const automatic = automaticScheduleDemand(follows, browsedSports, curatedEnabled);
     return startFollowedSportsRefresh({
-      follows,
-      browse: browsedSports,
+      follows: automatic.follows,
+      browse: automatic.browse,
       load: loadSportsEvents,
       onRefreshing: setScheduleRefreshing,
       cooldowns: scheduleCooldowns.current,
@@ -477,7 +483,7 @@ export function SportsPageClient(): React.ReactElement {
         );
       },
     });
-  }, [follows, browsedSports]);
+  }, [follows, browsedSports, curatedEnabled]);
 
   useEffect(() => {
     return startLiveAvailabilityRefresh({
@@ -491,6 +497,9 @@ export function SportsPageClient(): React.ReactElement {
     type: SportsSearchType,
     query: string,
   ): Promise<void> {
+    manualBrowseAbort.current?.abort();
+    manualBrowseAbort.current = null;
+    setScheduleRefreshing(false);
     setSearchType(type);
     if (type === "event") setChannelQuery(query);
     discoveryAbort.current?.abort();
@@ -540,11 +549,37 @@ export function SportsPageClient(): React.ReactElement {
     providerId: string,
     provider: string,
   ): Promise<void> {
-    setBrowsedSports({ provider, type, providerId });
+    manualBrowseAbort.current?.abort();
+    manualBrowseAbort.current = null;
+    setScheduleRefreshing(false);
+    const selection = { provider, type, providerId };
+    setBrowsedSports(selection);
     window.requestAnimationFrame(() => {
       document.getElementById("sports-upcoming-events")
         ?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
+    if (curatedEnabled !== false && provider !== "espn") {
+      const controller = new AbortController();
+      manualBrowseAbort.current = controller;
+      setScheduleRefreshing(true);
+      try {
+        const loaded = await loadSportsEvents({ signal: controller.signal }, manualScheduleDemand(follows, selection));
+        if (controller.signal.aborted) return;
+        const rows = loaded.filter(event => event.provider === provider);
+        const results = [{ status: "fulfilled" as const, value: rows }];
+        setUpcomingSnapshot(current => reconcileUpcomingSchedule(current, [provider], results));
+        setFollowedEvents(current => reconcileFollowedEventMetadata(current, follows, [provider], results));
+        setFreshFollowedEvents(current => [...current.filter(event => event.provider !== provider), ...rows]);
+        setLiveMetadataUnavailable(false);
+      } catch {
+        if (!controller.signal.aborted) setLiveMetadataUnavailable(true);
+      } finally {
+        if (manualBrowseAbort.current === controller) {
+          manualBrowseAbort.current = null;
+          setScheduleRefreshing(false);
+        }
+      }
+    }
   }
 
   async function handleRequestEvent(
@@ -678,7 +713,10 @@ export function SportsPageClient(): React.ReactElement {
         </section>
       ) : null}
 
-      <SportsScheduleBrowser follows={follows} onFollow={handleFollow} />
+      <SportsScheduleBrowser follows={follows} onFollow={handleFollow} onCatalogAvailabilityChanged={setCuratedEnabled} />
+      {(curatedEnabled === true || curatedEnabled === null) && follows.some(follow => follow.enabled && follow.provider !== "espn" && follow.type !== "channel") ? (
+        <p role="status">{curatedEnabled === true ? "Saved Sports from search update when you choose View upcoming. For shared schedules, choose a competition above." : "Shared schedules are temporarily unavailable. Choose View upcoming on a saved Sport to load its schedule."}</p>
+      ) : null}
 
       <SportsCurrentlyLive
         events={currentLiveEvents}

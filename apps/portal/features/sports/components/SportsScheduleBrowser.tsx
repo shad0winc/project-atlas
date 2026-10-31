@@ -10,10 +10,11 @@ import {
 
 type Props = Readonly<{
   follows: readonly SportsFollow[];
+  onCatalogAvailabilityChanged?: (enabled: boolean | null) => void;
   onFollow: (type: "team" | "league", id: string, provider: string) => Promise<void>;
 }>;
 
-export function SportsScheduleBrowser({ follows, onFollow }: Props): React.ReactElement | null {
+export function SportsScheduleBrowser({ follows, onFollow, onCatalogAvailabilityChanged }: Props): React.ReactElement | null {
   const [catalog, setCatalog] = useState<CuratedCatalog | null>(null);
   const [competitionId, setCompetitionId] = useState("");
   const [period, setPeriod] = useState<CuratedPeriod>("today");
@@ -38,10 +39,13 @@ export function SportsScheduleBrowser({ follows, onFollow }: Props): React.React
     void loadCuratedCatalog(controller.signal).then(value => {
       if (controller.signal.aborted) return;
       setCatalog(value);
+      onCatalogAvailabilityChanged?.(value.enabled);
       setCompetitionId(value.competitions.find(item => item.status === "configured")?.id ?? value.competitions[0]?.id ?? "");
-    }).catch(() => { /* Existing Sports remains available when this optional surface is unavailable. */ });
+    }).catch(() => {
+      if (!controller.signal.aborted) onCatalogAvailabilityChanged?.(null);
+    });
     return () => controller.abort();
-  }, []);
+  }, [onCatalogAvailabilityChanged]);
 
   useEffect(() => {
     if (!competition || competition.status !== "configured" || !competition.teamDirectorySupported) return;
