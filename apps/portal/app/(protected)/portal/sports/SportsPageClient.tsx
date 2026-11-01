@@ -38,6 +38,7 @@ import { PORTAL_ROUTES } from "../../../../lib/navigation/portal";
 import { loadSportsDiscoveryProviders } from "../../../../features/sports/services/sports";
 import { searchFederatedSports, type SportsDiscoverySnapshot } from "../../../../features/sports/services/federatedDiscovery";
 
+import { mergeSportsObservations } from "../../../../features/sports/services/curatedLiveState";
 import { followedLiveEvents } from "../../../../features/sports/services/currentlyLive";
 import { SportsCurrentlyLive } from "../../../../features/sports/components/SportsCurrentlyLive";
 import { SportsScheduleBrowser } from "../../../../features/sports/components/SportsScheduleBrowser";
@@ -57,6 +58,7 @@ export function SportsPageClient(): React.ReactElement {
   const [followedEvents, setFollowedEvents] = useState<readonly SportsEvent[]>(
     [],
   );
+  const [curatedEvents, setCuratedEvents] = useState<readonly SportsEvent[]>([]);
   const [follows, setFollows] = useState<readonly SportsFollow[]>([]);
   const [browsedSports, setBrowsedSports] = useState<
     Readonly<{ provider: string; type: "team" | "league"; providerId: string }>
@@ -89,8 +91,8 @@ export function SportsPageClient(): React.ReactElement {
   >([]);
   const [liveMetadataUnavailable, setLiveMetadataUnavailable] = useState(false);
   const currentLiveEvents = useMemo(
-    () => followedLiveEvents(freshFollowedEvents, follows),
-    [freshFollowedEvents, follows],
+    () => followedLiveEvents(mergeSportsObservations(freshFollowedEvents, curatedEvents), follows),
+    [freshFollowedEvents, curatedEvents, follows],
   );
   const liveEventFollows = useMemo(
     () =>
@@ -713,7 +715,8 @@ export function SportsPageClient(): React.ReactElement {
         </section>
       ) : null}
 
-      <SportsScheduleBrowser follows={follows} onFollow={handleFollow} onCatalogAvailabilityChanged={setCuratedEnabled} />
+      <SportsScheduleBrowser follows={follows} onFollow={handleFollow} onCatalogAvailabilityChanged={setCuratedEnabled}
+        onScheduleChanged={setCuratedEvents} onRequestEvent={handleRequestEvent} onWatchLive={handleWatchLive} />
       {(curatedEnabled === true || curatedEnabled === null) && follows.some(follow => follow.enabled && follow.provider !== "espn" && follow.type !== "channel") ? (
         <p role="status">{curatedEnabled === true ? "Saved Sports from search update when you choose View upcoming. For shared schedules, choose a competition above." : "Shared schedules are temporarily unavailable. Choose View upcoming on a saved Sport to load its schedule."}</p>
       ) : null}

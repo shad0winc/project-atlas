@@ -18,6 +18,7 @@ from providers.espn_metadata import ROUTES, parse_scoreboard
 from providers.espn_directory import parse_team_directory, encode_entity_id
 from providers.metadata_broker import MetadataDayCache, MetadataSnapshot, MetadataDirectorySnapshot
 from providers.metadata_schedule import reconcile_schedule, schedule_days
+from providers.metadata_freshness import scoreboard_expiry
 
 COMPETITIONS = (
     ('nfl', 'American football', 'NFL', 'football/nfl'),
@@ -51,7 +52,10 @@ def identity(info):
 
 class SnapshotReader:
     """One read-only SQLite snapshot for each browser operation."""
-    def __init__(self, directory, *, clock=time.time):
+    def __init__(self, directory, *, clock=time.time, current_ttl=300):
+        if type(current_ttl) is not int or not 1 <= current_ttl <= 3600:
+            raise ValueError("Invalid current scoreboard lifetime")
+        self.current_ttl = current_ttl
         self.directory = Path(directory)
         self.clock = clock
 
@@ -90,8 +94,7 @@ class SnapshotReader:
         finally:
             db.close()
 
-    @staticmethod
-    def bucket(db, route, day, now):
+    def bucket(self, db, route, day, now):
         holds = db.execute('SELECT until_stamp FROM metadata_holds WHERE key IN (?,?)',
                            ('espn:cooldown', route + ':' + day)).fetchall()
         if any(not finite(row[0]) for row in holds):
@@ -115,6 +118,8 @@ class SnapshotReader:
                 snapshot = MetadataDirectorySnapshot(route, values, observed, expires, True, stale)
             else:
                 values = parse_scoreboard(route, document)
+                expires = scoreboard_expiry(day, values, observed, expires, now, self.current_ttl)
+                stale = expires <= now
                 snapshot = MetadataSnapshot(route, day, values, observed, expires, True, stale)
         except (ValueError, TypeError, KeyError):
             return MetadataDayCache(day, None, 'invalid', retry)
@@ -259,4 +264,4 @@ def configured_curated_schedules():
     policy = load_refresh_policy()
     directory = os.getenv('ATLAS_SPORTS_METADATA_STATE_DIR', '')
     return CuratedSchedules(enabled=True, routes=policy.routes if policy else (),
-                            reader=SnapshotReader(directory) if directory else None)
+                            reader=SnapshotReader(directory, current_ttl=policy.current_ttl if policy else 300) if directory else None)
