@@ -19,6 +19,7 @@ import urllib.request
 
 from providers.espn_metadata import MetadataError, ROUTES, parse_scoreboard
 from providers.espn_directory import parse_team_directory
+from providers.metadata_freshness import scoreboard_expiry
 
 
 class MetadataUnavailable(RuntimeError):
@@ -177,6 +178,7 @@ class BoundedESPNTransport:
             raise MetadataUnavailable('invalid-response', retry_after=15) from None
 
 
+
 @dataclass(frozen=True)
 class MetadataSnapshot:
     route: str
@@ -240,7 +242,8 @@ class MetadataBroker:
             raise MetadataUnavailable('cache-invalid') from None
         if day == '@teams':
             return MetadataDirectorySnapshot(route, events, observed, expires, cache_hit, stale)
-        return MetadataSnapshot(route, day, events, observed, expires, cache_hit, stale)
+        expires = scoreboard_expiry(day, events, observed, expires, now, self.current_ttl)
+        return MetadataSnapshot(route, day, events, observed, expires, cache_hit, stale or expires <= now)
 
     def fetch_day(self, route, day):
         if route not in ROUTES or type(day) is not date:
@@ -271,7 +274,9 @@ class MetadataBroker:
                     'SELECT payload, observed, expires FROM metadata_cache WHERE route=? AND day=?',
                     (route, key_day)).fetchone()
                 if row and row[2] > now:
-                    return self._snapshot(route, key_day, row, now, cache_hit=True)
+                    cached = self._snapshot(route, key_day, row, now, cache_hit=True)
+                    if not cached.stale:
+                        return cached
                 latest = connection.execute('SELECT MAX(stamp) FROM metadata_attempts').fetchone()[0]
                 if latest is not None and latest > now:
                     raise MetadataUnavailable('clock-regressed')
@@ -289,7 +294,7 @@ class MetadataBroker:
             try:
                 payload = (self.transport.fetch_teams(route) if day is None
                            else self.transport(route, day))
-                parser(route, payload)
+                values = parser(route, payload)
                 encoded = json.dumps(payload, separators=(',', ':'), allow_nan=False)
                 if len(encoded.encode()) > 4_000_000:
                     raise MetadataUnavailable('response-budget')
@@ -311,6 +316,8 @@ class MetadataBroker:
             ttl = (self.directory_ttl if day is None else
                    self.future_ttl if day > today else self.past_ttl if day < today else self.current_ttl)
             expires = observed + ttl
+            if day is not None:
+                expires = scoreboard_expiry(key_day, values, observed, expires, observed, self.current_ttl)
             with self.store.connection() as connection:
                 connection.execute('INSERT OR REPLACE INTO metadata_cache VALUES (?,?,?,?,?)',
                                    (route, key_day, encoded, observed, expires))
