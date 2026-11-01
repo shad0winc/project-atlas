@@ -295,5 +295,34 @@ class CombinedRecoveryTests(unittest.TestCase):
         for name in driver.PINS:driver.component(ROOT,name)
         self.assertGreater(len(driver.SUPPORT_HASHES),10)
 
+    def provider_import_bootstrap(self):
+        data,bootstrap=driver.pack(ROOT)
+        # Exercise the actual pack verifier and temporary extraction. Import
+        # providers without invoking the Docker recovery drill entry point.
+        marker=" runpy.run_path(str(root/'scripts/lib/sports-combined-recovery-drill.py'),run_name='__main__')"
+        self.assertTrue(bootstrap.endswith(marker+'\n'))
+        bootstrap=bootstrap[:-len(marker+'\n')]+(
+            " sys.path.insert(0,str(root/'modules/sports/src'))\n"
+            " import providers.metadata_refresh,providers.metadata_broker,providers.metadata_freshness\n"
+            " assert pathlib.Path(providers.metadata_freshness.__file__).resolve().is_relative_to(root.resolve())\n")
+        return data,bootstrap
+
+    def test_packed_active_scoreboard_dependencies_import_in_isolation(self):
+        data,bootstrap=self.provider_import_bootstrap()
+        name='modules/sports/src/providers/metadata_freshness.py'
+        self.assertIn(name,driver.SUPPORT_HASHES)
+        result=subprocess.run([sys.executable,'-I','-S','-B','-c',bootstrap],
+                              input=data,capture_output=True,timeout=15)
+        self.assertEqual(result.returncode,0,result.stderr.decode(errors='replace'))
+
+    def test_packed_active_scoreboard_dependency_tampering_is_rejected(self):
+        data,bootstrap=self.provider_import_bootstrap()
+        payload=json.loads(data)
+        payload['modules/sports/src/providers/metadata_freshness.py']+='\n# altered fixture bytes\n'
+        result=subprocess.run([sys.executable,'-I','-S','-B','-c',bootstrap],
+                              input=json.dumps(payload).encode(),capture_output=True,timeout=15)
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn(b'AssertionError',result.stderr)
+
 
 if __name__=='__main__':unittest.main()
