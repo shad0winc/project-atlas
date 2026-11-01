@@ -152,6 +152,24 @@ class Handler(BaseHTTPRequestHandler):
             expected,
         )
 
+    def _curated_read_authorized(self) -> bool:
+        # This credential grants only these two cache reads, never writer actions.
+        if getattr(self, "command", None) != "GET":
+            return False
+        if urllib.parse.urlsplit(self.path).path not in (
+            "/internal/v1/curated/teams", "/internal/v1/curated/schedule"
+        ):
+            return False
+        expected = os.getenv("ATLAS_SPORTS_CURATED_READ_TOKEN", "")
+        supplied = self.headers.get("Authorization", "")
+        return (
+            len(expected) >= 32
+            and expected != os.getenv("ATLAS_SPORTS_WRITER_TOKEN", "").strip()
+            and expected != os.getenv("ATLAS_SPORTS_LIVE_POLICY_TOKEN", "")
+            and supplied.startswith("Bearer ")
+            and hmac.compare_digest(supplied[7:], expected)
+        )
+
     def _live_policy_authorized(self) -> bool:
         expected = os.getenv("ATLAS_SPORTS_LIVE_POLICY_TOKEN", "")
         supplied = self.headers.get("Authorization", "")
@@ -178,7 +196,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(encoded)
 
     def _require_auth(self) -> bool:
-        if self._authorized():
+        if self._authorized() or self._curated_read_authorized():
             return True
         self._json(
             HTTPStatus.UNAUTHORIZED,
