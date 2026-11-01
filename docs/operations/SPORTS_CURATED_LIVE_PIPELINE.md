@@ -21,10 +21,16 @@ stream reuse across events does not authorize overwriting their bindings.
 
 The feature defaults off. A separately reviewed controller deployment must set
 `ATLAS_SPORTS_CURATED_LIVE_ENABLED=1`, provide the internal
-`ATLAS_SPORTS_WRITER_URL` and `ATLAS_SPORTS_WRITER_TOKEN`, and bind the new source
+`ATLAS_SPORTS_WRITER_URL` and `ATLAS_SPORTS_CURATED_READ_TOKEN`, and bind the new source
 and images to publication/recovery records. No controller runtime is altered by
-the source PR helper. The controller needs permission to read the curated writer
-endpoints; credential scope must be checked during deployment preparation.
+the source PR helper. The controller and writer share a dedicated, separately generated token of at
+least 32 characters. It must differ from the general writer and live-policy tokens.
+It authorizes GET only on `/internal/v1/curated/teams` and
+`/internal/v1/curated/schedule`; other routes and all mutation methods reject it.
+The controller does not receive the general writer token, and its cache client
+does not fall back to that token. Existing writer-token callers retain their
+existing authorization. Provision this credential only in a separately reviewed
+writer/controller deployment, with source/image/publication and recovery bindings.
 
 The reader makes at most ten internal GETs per cycle, with a twenty-second
 deadline, three-second request timeout, four-MiB response limit and no redirects
