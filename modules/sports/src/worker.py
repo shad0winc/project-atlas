@@ -15,6 +15,9 @@ from typing import Any
 from atlas.events import publish_event
 from controller import load_state, process_games
 from feed import generate_feed_snapshot
+from curated_live_events import (
+    load_curated_live_events, merge_event_games, ImportedStreamSnapshot,
+)
 from jellyfin_channel_identity import (
     atlas_jellyfin_channel_number,
 )
@@ -632,6 +635,9 @@ def run_live_source_provisioning_pipeline(
         else DispatcharrAdminClient.from_environment()
     )
 
+    if any(game.get("provider") == "espn" for game in surfaced_games):
+        client = ImportedStreamSnapshot(client)
+
     binding_registry = (
         bindings
         if bindings is not None
@@ -937,14 +943,17 @@ def run_operations_pipeline(
         if game_id in current_game_ids
     ]
 
+    curated_games = load_curated_live_events(
+        subscriptions=active_subscriptions(), pregame_minutes=PREGAME_WINDOW_MINUTES,
+    )
     run_live_source_provisioning_pipeline(
-        current_games
+        merge_event_games(current_games, curated_games)
     )
 
     (
         feed_result,
         published_channel_ids,
-    ) = generate_feed_snapshot()
+    ) = generate_feed_snapshot(curated_games=curated_games)
 
     if feed_result != 0:
         raise RuntimeError(
