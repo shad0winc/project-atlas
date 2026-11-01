@@ -142,7 +142,7 @@ def load_curated_live_events(*,subscriptions=None,now=None,pregame_minutes=60,cl
     if not demanded:
         return []
     client=client or CacheClient(env.get('ATLAS_SPORTS_WRITER_URL','http://atlas-sports-writer:8003'),
-                                env.get('ATLAS_SPORTS_WRITER_TOKEN',''))
+                                env.get('ATLAS_SPORTS_CURATED_READ_TOKEN',''))
     result=[]
     for competition,route in demanded:
         directory=client.get('teams',{'competition':competition})
