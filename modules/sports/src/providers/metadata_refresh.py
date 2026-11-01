@@ -15,6 +15,7 @@ import threading
 import time
 
 from providers.espn_metadata import ROUTES
+from providers.metadata_freshness import active_scoreboard
 from providers.metadata_broker import MetadataUnavailable, _unique
 
 
@@ -116,7 +117,7 @@ def next_refresh_job(broker,policy,now,*,stop_requested=lambda:False):
             if bucket.status=='fresh' or bucket.retry_after_seconds:
                 continue
             day=datetime.fromisoformat(bucket.requested_day).date()
-            priority=(0 if day==today else 2 if bucket.snapshot is None else 3,
+            priority=(0 if day==today or (bucket.snapshot is not None and active_scoreboard(bucket.requested_day, bucket.snapshot.events, now)) else 2 if bucket.snapshot is None else 3,
                       bucket.snapshot.expires_at if bucket.snapshot else -1,route,day.isoformat())
             jobs.append(RefreshJob(route,day,priority))
         if not ROUTES[route][2]:

@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { SportsFollow } from "../types/sports";
+import type { SportsEvent, SportsFollow } from "../types/sports";
+import { loadSportsLiveAvailability } from "../services/sports";
+import { curatedEventFresh, curatedStartLabel } from "../services/curatedLiveState";
 import {
   filterCuratedTeam, loadCuratedCatalog, loadCuratedSchedule, loadCuratedTeams,
   retainCuratedSchedule, type CuratedCatalog, type CuratedPeriod,
@@ -10,11 +12,14 @@ import {
 
 type Props = Readonly<{
   follows: readonly SportsFollow[];
+  onScheduleChanged: (events: readonly SportsEvent[]) => void;
+  onRequestEvent: (input: Readonly<{ provider: string; providerEventId: string }>) => Promise<unknown>;
+  onWatchLive: (channelId: string) => Promise<void>;
   onCatalogAvailabilityChanged?: (enabled: boolean | null) => void;
   onFollow: (type: "team" | "league", id: string, provider: string) => Promise<void>;
 }>;
 
-export function SportsScheduleBrowser({ follows, onFollow, onCatalogAvailabilityChanged }: Props): React.ReactElement | null {
+export function SportsScheduleBrowser({ follows, onFollow, onCatalogAvailabilityChanged, onScheduleChanged, onRequestEvent, onWatchLive }: Props): React.ReactElement | null {
   const [catalog, setCatalog] = useState<CuratedCatalog | null>(null);
   const [competitionId, setCompetitionId] = useState("");
   const [period, setPeriod] = useState<CuratedPeriod>("today");
@@ -24,6 +29,8 @@ export function SportsScheduleBrowser({ follows, onFollow, onCatalogAvailability
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [following, setFollowing] = useState(false);
+  const [pendingEvent, setPendingEvent] = useState<string | null>(null);
+  const [playbackMessage, setPlaybackMessage] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
   const nextRefresh = useRef(0);
   const [refreshAt, setRefreshAt] = useState(0);
@@ -87,6 +94,22 @@ export function SportsScheduleBrowser({ follows, onFollow, onCatalogAvailability
     return () => clearTimeout(timer);
   }, [refreshAt, snapshot?.expiresAt, now]);
 
+  useEffect(() => {
+    onScheduleChanged(snapshot?.events ?? []);
+  }, [snapshot, onScheduleChanged]);
+
+  useEffect(() => {
+    if (!competition || competition.status !== "configured") return;
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible" && Date.now() >= nextRefresh.current) {
+        nextRefresh.current = Date.now() + 60_000;
+        setNow(Date.now());
+        setRefresh(value => value + 1);
+      }
+    }, 60_000);
+    return () => clearInterval(timer);
+  }, [competition, period]);
+
   if (!catalog?.enabled) return null;
   const followed = (type: "league" | "team", id: string) => follows.some(item => item.enabled && item.provider === "espn" && item.type === type && item.providerId === id);
   const follow = async (type: "league" | "team", id: string) => {
@@ -94,6 +117,21 @@ export function SportsScheduleBrowser({ follows, onFollow, onCatalogAvailability
     try { await onFollow(type, id, "espn"); }
     catch { setError("Atlas could not save this follow. Please try again."); }
     finally { setFollowing(false); }
+  };
+  const request = async (event: SportsEvent) => {
+    setPendingEvent(event.providerEventId); setError(null);
+    try { await onRequestEvent({ provider: event.provider, providerEventId: event.providerEventId }); }
+    catch { setError("Atlas could not confirm this event follow. Refresh before trying again."); }
+    finally { setPendingEvent(null); }
+  };
+  const checkLive = async (event: SportsEvent) => {
+    setPendingEvent(event.providerEventId); setPlaybackMessage(null);
+    try {
+      const available = await loadSportsLiveAvailability(event.provider, event.providerEventId);
+      if (available.available && available.atlasChannelId) await onWatchLive(available.atlasChannelId);
+      else setPlaybackMessage("No verified Atlas channel is linked to this ESPN event. Browse configured channels below; a schedule listing does not confirm stream availability.");
+    } catch { setPlaybackMessage("Atlas could not verify live playback availability. Please try again."); }
+    finally { setPendingEvent(null); }
   };
   const unsupported = competition?.status === "unsupported";
   const enabled = competition?.status === "configured";
@@ -110,7 +148,7 @@ export function SportsScheduleBrowser({ follows, onFollow, onCatalogAvailability
         ))}
       </select></label>{" "}
       <label>Date <select value={period} onChange={event => setPeriod(event.target.value as CuratedPeriod)}>
-        <option value="today">Today</option><option value="tomorrow">Tomorrow</option><option value="week">Next 7 days</option>
+        <option value="today">Today</option><option value="tomorrow">Tomorrow</option><option value="week">Upcoming next 7 days</option>
       </select></label>{" "}
       <label>Team <select value={teamId} onChange={event => setTeamId(event.target.value)} disabled={!teams?.teams.length}>
         <option value="">All teams</option>{teams?.teams.map(team => <option key={team.id} value={team.id}>{team.name}</option>)}
@@ -128,10 +166,32 @@ export function SportsScheduleBrowser({ follows, onFollow, onCatalogAvailability
         {busy ? <p role="status">Loading shared schedule…</p> : null}
         {error ? <p role="status">{error}</p> : null}
         {snapshot ? <>
-          <p>Source: ESPN. Times use your device timezone. {snapshot.observedAt ? `Last observed: ${new Date(snapshot.observedAt).toLocaleString()}.` : "No completed observation yet."}</p>
+          <p>Source: ESPN. Times use your device timezone ({Intl.DateTimeFormat().resolvedOptions().timeZone}). {snapshot.observedAt ? `Last observed: ${new Date(snapshot.observedAt).toLocaleString()}.` : "No completed observation yet."}</p>
           {snapshot.status !== "ready" || snapshot.retained || (!!snapshot.expiresAt && Date.parse(snapshot.expiresAt) <= now) ? <p role="status">Schedule status: {snapshot.status}. Coverage may be incomplete or out of date. Loaded events remain available.</p> : null}
+          {period === "week" ? <p>This window starts now and excludes games whose scheduled start has passed. Choose Today for games already started.</p> : null}
+          {playbackMessage ? <p role="status">{playbackMessage}</p> : null}
           {events.length ? <div className="requests-grid">{events.map(event => <article className="requests-message-panel" key={event.providerEventId}>
-            <h3>{event.name}</h3><p>{new Date(event.startAt).toLocaleString()}</p><p>{event.status}</p>
+            <h3>{event.name}</h3>
+            <p><time dateTime={event.startAt}>{curatedStartLabel(event.startAt)}</time></p>
+            <p>{curatedEventFresh(event, now) ? event.status : `Last reported: ${event.status} — status needs refresh`}</p>
+            {event.metadataObservedAt ? <p>Status observed: {curatedStartLabel(event.metadataObservedAt)}</p> : null}
+            {event.status === "scheduled" && Date.parse(event.startAt) <= now ? <p>Scheduled start has passed; waiting for an updated provider status.</p> : null}
+            {([event.awayTeamId, event.homeTeamId].filter((id): id is string => Boolean(id))).map(id => {
+              const name = teams?.teams.find(team => team.id === id)?.name ?? "team";
+              return <button key={id} type="button" className="requests-refresh-button"
+                disabled={following || teams?.status !== "ready" || followed("team", id)}
+                onClick={() => { void follow("team", id); }}>
+                {followed("team", id) ? `Following ${name}` : `Follow ${name}`}
+              </button>;
+            })}
+            <button type="button" className="requests-refresh-button"
+              disabled={pendingEvent !== null || follows.some(item => item.enabled && item.type === "event" && item.provider === event.provider && item.providerId === event.providerEventId)}
+              onClick={() => { void request(event); }}>
+              {follows.some(item => item.enabled && item.type === "event" && item.provider === event.provider && item.providerId === event.providerEventId) ? "Following event" : pendingEvent === event.providerEventId ? "Checking…" : "Follow event"}
+            </button>
+            {event.status === "live" && curatedEventFresh(event, now) ? <button type="button" className="requests-refresh-button"
+              disabled={pendingEvent !== null} onClick={() => { void checkLive(event); }}>Check live playback</button> : null}
+            <p>Recording is unavailable for ESPN schedule-only events.</p>
           </article>)}</div> : snapshot.coverageComplete ? <p>No events in the loaded schedule match this selection.</p> : <p>The schedule is being prepared or is temporarily unavailable. This does not confirm that there are no events.</p>}
         </> : null}
       </>}
