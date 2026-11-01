@@ -140,6 +140,28 @@ class TransportTests(unittest.TestCase):
         client.list_streams(account_id=2);self.assertEqual(calls,[1,2]);self.assertEqual(client.create_channel(),'existing mutation boundary')
 
 class ControllerIntegrationTests(unittest.TestCase):
+    def test_disabled_feature_preserves_zero_argument_feed_and_skips_follow_read(self):
+        tree=ast.parse((ROOT/'modules/sports/src/worker.py').read_text())
+        fn=next(node for node in tree.body if isinstance(node,ast.FunctionDef) and node.name=='run_operations_pipeline')
+        calls=[]
+        no_op=lambda *args,**kwargs:None
+        def snapshot():calls.append('legacy-feed');return 0,()
+        def fail_follow_read():self.fail('disabled integration must not read follows')
+        namespace=dict(Any=object,os=types.SimpleNamespace(getenv=lambda *args:'0'),
+            prune_unmanaged_games=no_op,process_games=lambda *a,**kw:{},
+            load_curated_live_events=lambda **kw:c.load_curated_live_events(**kw,environ={}),
+            active_subscriptions=fail_follow_read,PREGAME_WINDOW_MINUTES=60,
+            merge_event_games=c.merge_event_games,run_live_source_provisioning_pipeline=no_op,
+            generate_feed_snapshot=snapshot,refresh_jellyfin_live_tv=no_op,
+            converge_jellyfin_live_tv_bindings=no_op,write_provider_health=no_op,
+            publish_provider_health_event=no_op,write_heartbeat=no_op,
+            write_health_report=lambda:{'status':'healthy'},
+            recording_counts=lambda recordings:dict(pending=0,active=0,completed=0),print=no_op)
+        exec(compile(ast.Module(body=[fn],type_ignores=[]),'reviewed_worker.py','exec'),namespace)
+        result=dict(previous_games={},subscribed_previous_games={},provider_games=[],
+            provider_health={},subscribed_games=[],degraded_count=0)
+        self.assertEqual(namespace['run_operations_pipeline'](result,{}),0)
+        self.assertEqual(calls,['legacy-feed'])
     def test_one_snapshot_reaches_provisioning_and_feed_in_same_cycle(self):
         tree=ast.parse((ROOT/'modules/sports/src/worker.py').read_text())
         fn=next(node for node in tree.body if isinstance(node,ast.FunctionDef) and node.name=='run_operations_pipeline')
@@ -149,7 +171,7 @@ class ControllerIntegrationTests(unittest.TestCase):
         def provision(games):captured['provision']=games
         def snapshot(*,curated_games):captured['feed']=curated_games;return 0,()
         no_op=lambda *args,**kwargs:None
-        namespace=dict(Any=object,prune_unmanaged_games=no_op,process_games=lambda *a,**kw:{},
+        namespace=dict(Any=object,os=types.SimpleNamespace(getenv=lambda *args:'1'),prune_unmanaged_games=no_op,process_games=lambda *a,**kw:{},
             load_curated_live_events=lambda **kw:projected,active_subscriptions=lambda:[],
             PREGAME_WINDOW_MINUTES=60,merge_event_games=c.merge_event_games,
             run_live_source_provisioning_pipeline=provision,generate_feed_snapshot=snapshot,

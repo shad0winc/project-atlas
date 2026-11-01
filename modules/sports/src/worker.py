@@ -944,7 +944,7 @@ def run_operations_pipeline(
     ]
 
     curated_games = load_curated_live_events(
-        subscriptions=active_subscriptions(), pregame_minutes=PREGAME_WINDOW_MINUTES,
+        pregame_minutes=PREGAME_WINDOW_MINUTES,
     )
     run_live_source_provisioning_pipeline(
         merge_event_games(current_games, curated_games)
@@ -953,7 +953,11 @@ def run_operations_pipeline(
     (
         feed_result,
         published_channel_ids,
-    ) = generate_feed_snapshot(curated_games=curated_games)
+    ) = (
+        generate_feed_snapshot(curated_games=curated_games)
+        if os.getenv("ATLAS_SPORTS_CURATED_LIVE_ENABLED", "0") == "1"
+        else generate_feed_snapshot()
+    )
 
     if feed_result != 0:
         raise RuntimeError(
