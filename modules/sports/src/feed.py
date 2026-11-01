@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from games_state import load_games
+from curated_live_events import load_curated_live_events, merge_event_games
 from jellyfin_channel_identity import (
     ATLAS_JELLYFIN_CHANNEL_NUMBER_BASE,
     ATLAS_JELLYFIN_CHANNEL_NUMBER_SLOTS,
@@ -354,7 +355,7 @@ def published_atlas_channel_ids(
     )
 
 
-def generate_feed_snapshot() -> tuple[int, tuple[str, ...]]:
+def generate_feed_snapshot(*, curated_games=None) -> tuple[int, tuple[str, ...]]:
     OUTPUT_DIR.mkdir(
         parents=True,
         exist_ok=True,
@@ -363,6 +364,10 @@ def generate_feed_snapshot() -> tuple[int, tuple[str, ...]]:
     active = active_games(
         load_games()
     )
+
+    if curated_games is None:
+        curated_games = load_curated_live_events(pregame_minutes=PREGAME_WINDOW_MINUTES)
+    active = merge_event_games(active, curated_games)
 
     try:
         catalog = load_live_source_catalog()
