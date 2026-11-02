@@ -11,6 +11,7 @@ import type { SubtitleSelection } from "../services/session";
 import { bootstrapPlaybackStream } from "../services/stream";
 import { refreshPlaybackForRetry, retryResumePosition } from "../services/retry";
 import { createPlaybackDiagnostics } from "../services/diagnostics";
+import { captionStartupPolicy } from "../services/caption-startup";
 import { safeLiveSeekPosition } from "../services/live-seek";
 import { nextEpisodeTarget } from "../services/episode-navigation";
 import { readResume, resumeKey, restoreContinuity, writeResume } from "../services/continuity";
@@ -98,6 +99,8 @@ export function AtlasTheaterPlayer({
   const [subtitleSelection, setSubtitleSelection] = useState<SubtitleSelection>("auto");
 
   const [subtitleChanging, setSubtitleChanging] = useState(false);
+  const captionStartupRef = useRef(false);
+  const [captionPreparing, setCaptionPreparing] = useState(false);
 
   const [state, setState] = useState<PlayerState>({
     status: "connecting"
@@ -223,6 +226,7 @@ export function AtlasTheaterPlayer({
         // Prefer managed HLS for both library and live streams. Native HLS
         // remains the fallback when MediaSource playback is unavailable.
         if (nativeHls && !managedHls) {
+          setCaptionPreparing(false);
           video.crossOrigin = "use-credentials";
           video.src = streamUrl;
           video.load();
@@ -235,16 +239,28 @@ export function AtlasTheaterPlayer({
           throw new Error("This browser cannot play the Jellyfin HLS stream.");
         }
 
+        const normalFragmentPolicy = Hls.DefaultConfig?.fragLoadPolicy?.default;
+        const captionStartup = activeSession.sourceType === "library" &&
+          captionStartupRef.current && normalFragmentPolicy !== undefined;
         const hls = new Hls({
+          ...(captionStartup ? {
+            fragLoadPolicy: { default: captionStartupPolicy(normalFragmentPolicy) }
+          } : {}),
           xhrSetup(xhr) {
             xhr.withCredentials = true;
           }
         });
 
         destroyHls = () => hls.destroy();
+        setCaptionPreparing(captionStartup);
 
         const diagnostic = createPlaybackDiagnostics(video);
         hls.on(Hls.Events.FRAG_LOADED, (_event, data) => {
+          if (!disposed && captionStartup && data.frag.type === "main") {
+            hls.config.fragLoadPolicy.default = normalFragmentPolicy;
+            captionStartupRef.current = false;
+            setCaptionPreparing(false);
+          }
           diagnostic("fragment_loaded", { fragmentSequence: data.frag.sn,
             fragmentStart: data.frag.start, fragmentDuration: data.frag.duration });
         });
@@ -262,6 +278,7 @@ export function AtlasTheaterPlayer({
           }
 
           terminalErrorReported = true;
+          setCaptionPreparing(false);
           restored = false;
           resumeAtRef.current = retryResumePosition(
             activeSession.canSeek,
@@ -288,6 +305,7 @@ export function AtlasTheaterPlayer({
           return;
         }
 
+        setCaptionPreparing(false);
         setState({
           status: "error",
           message: error instanceof Error ? error.message : "Atlas could not start playback."
@@ -338,6 +356,7 @@ export function AtlasTheaterPlayer({
         throw new Error("Playback is not currently available.");
       }
 
+      captionStartupRef.current = refreshed.sourceType === "library" && typeof selection === "number";
       setActiveSession(refreshed);
     } catch (error: unknown) {
       setState({
@@ -467,7 +486,7 @@ export function AtlasTheaterPlayer({
             <span>Closed captions</span>{" "}
             <select
               aria-label="Closed captions"
-              disabled={subtitleChanging || state.status === "connecting"}
+              disabled={subtitleChanging || captionPreparing || state.status === "connecting"}
               onChange={(event) => {
                 void changeSubtitle(parseSubtitleSelection(event.currentTarget.value));
               }}
@@ -488,6 +507,7 @@ export function AtlasTheaterPlayer({
         )}
 
         {subtitleChanging ? <span role="status">Changing captions…</span> : null}
+        {captionPreparing ? <span role="status">Preparing captions…</span> : null}
       </div>
     </div>
   );
