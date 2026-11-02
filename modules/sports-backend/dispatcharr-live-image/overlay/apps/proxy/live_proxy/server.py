@@ -682,6 +682,34 @@ class ProxyServer:
             if channel_id in lease_values and self.redis_client.get(lock_key) is None:
                 return False
 
+            if channel_id in lease_values:
+                # Validate ownership and renew the lease atomically.
+                renewal_script = """
+                if redis.call('GET', KEYS[1]) ~= ARGV[1] then
+                    return 0
+                end
+                return redis.call('EXPIRE', KEYS[1], tonumber(ARGV[2]))
+                """
+
+                renewed = self._execute_redis_command(lambda: self.redis_client.eval(
+                    renewal_script,
+                    1,
+                    lock_key,
+                    lease,
+                    ttl,
+                ))
+
+                if renewed == 1:
+                    logger.info(
+                        f"Worker {self.worker_id} refreshed ownership "
+                        f"of channel {channel_id}"
+                    )
+                    return True
+
+                if renewed is None:
+                    logger.warning("Redis command failed during ownership renewal")
+                return False
+
             # A verified producer may renew an existing owner but may
             # never recreate a missing owner while its grant is live.
             if getattr(manager, "_verified_generation_required", False):
@@ -700,9 +728,9 @@ class ProxyServer:
                     return False
             else:
                 acquired = self._execute_redis_command(
-                    lambda: self.redis_client.set(
+                    lambda: bool(self.redis_client.set(
                         lock_key, lease, nx=True, ex=ttl
-                    )
+                    ))
                 )
 
             if acquired is None:  # Redis command failed
@@ -714,32 +742,6 @@ class ProxyServer:
             if acquired:
                 lease_values[channel_id] = lease
                 logger.info(f"Worker {self.worker_id} acquired ownership of channel {channel_id}")
-                return True
-
-            if channel_id not in lease_values:
-                return False
-
-            # Validate ownership and renew the lease atomically.
-            renewal_script = """
-            if redis.call('GET', KEYS[1]) ~= ARGV[1] then
-                return 0
-            end
-            return redis.call('EXPIRE', KEYS[1], tonumber(ARGV[2]))
-            """
-
-            renewed = self.redis_client.eval(
-                renewal_script,
-                1,
-                lock_key,
-                lease,
-                ttl,
-            )
-
-            if renewed == 1:
-                logger.info(
-                    f"Worker {self.worker_id} refreshed ownership "
-                    f"of channel {channel_id}"
-                )
                 return True
 
             return False
