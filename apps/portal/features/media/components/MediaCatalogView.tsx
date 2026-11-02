@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { CatalogArtwork } from "./MediaArtwork";
 
 import { DislikeAction } from "../../dislikes";
 import { loadFavorites } from "../../favorites";
@@ -100,6 +101,7 @@ export function MediaCatalogContent({
 
             return (
               <article className="media-discovery-card" key={identity}>
+                <CatalogArtwork title={item.title} year={item.year} provider={item.provider} itemId={item.itemId} />
                 <div className="media-discovery-card-header">
                   <div>
                     <p className="media-discovery-kind">{item.mediaType}</p>

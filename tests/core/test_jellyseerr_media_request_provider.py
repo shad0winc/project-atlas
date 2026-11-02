@@ -390,6 +390,8 @@ def test_submit_requires_numeric_tmdb_id(
         (2, 4, MediaRequestStatus.IMPORTING),
         (2, 5, MediaRequestStatus.PROCESSING),
         (2, 6, MediaRequestStatus.FAILED),
+        (5, 7, MediaRequestStatus.FAILED),
+        (2, 7, MediaRequestStatus.FAILED),
         (3, 2, MediaRequestStatus.REJECTED),
     ],
 )

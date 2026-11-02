@@ -1717,7 +1717,8 @@ def _normalize_status(
         return MediaRequestStatus.PROCESSING
     if request_status == 3:
         return MediaRequestStatus.REJECTED
-    if media_status == 6:
+    if media_status in {6, 7}:
+        # Blocklisted/deleted media cannot be made Ready to Watch.
         return MediaRequestStatus.FAILED
     if media_status == 4:
         return MediaRequestStatus.IMPORTING

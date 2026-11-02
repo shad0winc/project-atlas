@@ -147,7 +147,7 @@ def test_run_reconciliation_uses_service_factory(
     assert calls[0][0] is service
 
 
-def test_main_renders_json_and_succeeds_with_refresh_failures(
+def test_main_renders_json_and_fails_with_refresh_failures(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     outcome = ReconciliationOutcome(
@@ -178,7 +178,7 @@ def test_main_renders_json_and_succeeds_with_refresh_failures(
         stderr=stderr,
     )
 
-    assert result == 0
+    assert result == 1
     assert stderr.getvalue() == ""
 
     payload = json.loads(stdout.getvalue())
@@ -456,3 +456,19 @@ def test_default_service_remains_jellyseerr_only(
         "example",
     )
     assert jellyfin_calls == []
+
+@pytest.mark.parametrize('failed,expected', [(0,0),(1,1)])
+def test_main_reports_refresh_failure_with_submission_recovery(monkeypatch,failed,expected):
+    from atlas.media_requests.scheduled_reconcile import ScheduledRecoveryOutcome
+    from atlas.media_requests.submission_reconciler import SubmissionRecoveryOutcome
+    reconciliation = ReconciliationOutcome(
+        considered=1,refreshed=1-failed,skipped=0,failed=failed,
+        failures=(ReconciliationFailure('req-broken','provider unavailable'),) if failed else (),
+    )
+    outcome = ScheduledRecoveryOutcome(reconciliation,SubmissionRecoveryOutcome(0,0,0,0,0),0,0,0)
+    monkeypatch.setattr('atlas.media_requests.scheduled_reconcile.run_reconciliation',lambda **_:outcome)
+    stdout=StringIO()
+    assert main([],stdout=stdout,stderr=StringIO()) == expected
+    payload=json.loads(stdout.getvalue())
+    assert payload['failed'] == failed
+    assert payload['submission_recovery']['events_pending'] == 0

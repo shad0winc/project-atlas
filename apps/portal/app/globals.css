@@ -3064,3 +3064,19 @@ section[aria-labelledby="service-detail-title"] dd {
     object-position: center;
   }
 }
+
+
+.media-artwork {
+  width: min(100%, 10rem);
+  aspect-ratio: 2 / 3;
+  justify-self: center;
+  overflow: hidden;
+  border-radius: 0.6rem;
+  background: var(--surface-raised, rgba(15, 23, 42, 0.72));
+}
+.media-artwork img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.media-artwork-fallback {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 100%; padding: 0.75rem; box-sizing: border-box;
+  text-align: center; color: var(--text-muted, #94a3b8); font-size: 0.875rem;
+}
