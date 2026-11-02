@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, type FormEvent } from "react";
+import { DiscoveryArtwork } from "./MediaArtwork";
 
 import { useAuth } from "../../../lib/auth/use-auth";
 import { ATLAS_PERMISSIONS } from "../../../lib/authorization/permissions";
@@ -404,6 +405,7 @@ export function MediaDiscoveryContent({
                     data-request-eligible={item.requestEligible ? "true" : "false"}
                     key={itemKey}
                   >
+                    <DiscoveryArtwork title={item.title} year={item.year} posterPath={item.posterPath} />
                     <header className="media-discovery-card-header">
                       <div>
                         <p className="media-discovery-kind">

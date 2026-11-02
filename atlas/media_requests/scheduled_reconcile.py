@@ -219,7 +219,8 @@ def main(
         file=output,
     )
 
-    return 0
+    reconciliation = outcome.reconciliation if isinstance(outcome, ScheduledRecoveryOutcome) else outcome
+    return 1 if reconciliation.failed else 0
 
 
 if __name__ == "__main__":
