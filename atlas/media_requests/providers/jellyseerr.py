@@ -316,7 +316,7 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
             status = _normalize_status(resource)
             stamp = _required_timestamp(resource.get("updatedAt") or resource.get("createdAt"), "Recovery timestamp")
             return ProviderStatusResult(provider=self.name, provider_request_id=str(receipt_id), status=status,
-                                        updated_at=stamp, context=self._context(request, resource))
+                                        updated_at=stamp, error=("Jellyseerr reports blocked or deleted media." if status is MediaRequestStatus.FAILED else None), context=self._context(request, resource))
         except Exception:
             raise MediaRequestProviderError("Submission backend identity could not be verified") from None
 
@@ -422,6 +422,11 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
             status=status,
             updated_at=updated_at,
             available_at=available_at,
+            error=(
+                "Jellyseerr reports blocked or deleted media."
+                if status is MediaRequestStatus.FAILED
+                else None
+            ),
             context=_context_from_resource(resource),
         )
 
