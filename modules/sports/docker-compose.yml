@@ -50,6 +50,7 @@ services:
       - .env
 
     environment:
+      ATLAS_DISPATCHARR_PROXY_PROFILE_ID: "${ATLAS_DISPATCHARR_PROXY_PROFILE_ID:-}"
       PYTHONUNBUFFERED: "1"
       ATLAS_BINARY: "/opt/project-atlas/scripts/atlas"
       SPORTS_CONTROLLER_INTERVAL_SECONDS: "${SPORTS_CONTROLLER_INTERVAL_SECONDS:-30}"
