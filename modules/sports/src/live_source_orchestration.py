@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
+import os
 from urllib.parse import quote, urlsplit, urlunsplit
 
 from dispatcharr_admin import (
@@ -248,6 +249,12 @@ def reconcile_dispatcharr_channel(
     identities.
     """
 
+    # Deployment must bind this value to a verified TS Proxy profile.
+    raw_profile = os.environ.get("ATLAS_DISPATCHARR_PROXY_PROFILE_ID", "")
+    if not raw_profile.isascii() or not raw_profile.isdigit() or int(raw_profile) < 1:
+        raise ValueError("A verified Dispatcharr Proxy profile ID is required")
+    proxy_profile_id = int(raw_profile)
+
     binding = bindings.resolve(
         plan.atlas_channel_id
     )
@@ -256,6 +263,7 @@ def reconcile_dispatcharr_channel(
         channel = dispatcharr.create_channel(
             name=plan.name,
             stream_ids=plan.stream_ids,
+            stream_profile_id=proxy_profile_id,
         )
     else:
         channel = dispatcharr.update_channel(
@@ -264,6 +272,7 @@ def reconcile_dispatcharr_channel(
             ),
             name=plan.name,
             stream_ids=plan.stream_ids,
+            stream_profile_id=proxy_profile_id,
         )
 
     persisted = bindings.set(
