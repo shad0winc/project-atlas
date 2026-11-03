@@ -1102,6 +1102,7 @@ class DispatcharrAdminClient:
         *,
         name: str,
         stream_ids: Iterable[int],
+        stream_profile_id: int | None = None,
     ) -> SafeDispatcharrChannel:
         """Create one shared Atlas Sports channel in Dispatcharr."""
 
@@ -1121,6 +1122,13 @@ class DispatcharrAdminClient:
             )
         )
 
+        profile_fields = {}
+        if stream_profile_id is not None:
+            if type(stream_profile_id) is not int or stream_profile_id <= 0:
+                raise DispatcharrAdminError("Stream profile identifier must be a positive integer")
+            profile_fields["stream_profile_id"] = self._positive_identifier(
+                stream_profile_id, field="stream profile identifier"
+            )
         token = self._access_token()
 
         payload = self._json_request(
@@ -1136,6 +1144,7 @@ class DispatcharrAdminClient:
                 # shared-event exposure, not a
                 # per-user entitlement decision.
                 "channel_profile_ids": [0],
+                **profile_fields,
             },
             access_token=token,
         )
@@ -1150,6 +1159,7 @@ class DispatcharrAdminClient:
         channel_id: int,
         name: str | None = None,
         stream_ids: Iterable[int] | None = None,
+        stream_profile_id: int | None = None,
     ) -> SafeDispatcharrChannel:
         """Reconcile one existing shared Sports channel."""
 
@@ -1185,6 +1195,13 @@ class DispatcharrAdminClient:
 
             body["streams"] = list(
                 normalized_stream_ids
+            )
+
+        if stream_profile_id is not None:
+            if type(stream_profile_id) is not int or stream_profile_id <= 0:
+                raise DispatcharrAdminError("Stream profile identifier must be a positive integer")
+            body["stream_profile_id"] = self._positive_identifier(
+                stream_profile_id, field="stream profile identifier"
             )
 
         if not body:
