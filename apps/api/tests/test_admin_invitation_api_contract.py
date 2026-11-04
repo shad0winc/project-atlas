@@ -244,6 +244,18 @@ class AdminInvitationAPIContractTests(unittest.TestCase):
         self.assertIn("expires_at", body)
         self.assertNotIn("token_hash", body)
 
+    def test_member_role_uses_legacy_invitation_storage_role(self) -> None:
+        client = self.client_for(self.global_admin_profile)
+
+        response = client.post(
+            "/api/v1/admin/invitations",
+            json={"email": "friend@example.com", "role": "member", "days": 7},
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["role"], "user")
+        self.assertEqual(response.json()["status"], "pending")
+
     def test_create_token_is_returned_once_only(self) -> None:
         client = self.client_for(self.global_admin_profile)
 
