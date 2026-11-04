@@ -25,6 +25,18 @@ All notable changes to Project Atlas are documented in this file.
 
 ## [Unreleased]
 
+### Sports and operations checkpoint, 2026-11-04
+
+- Added explicit Dispatcharr Proxy profile binding for Sports channel creation
+  and reconciliation. The controller-only rollout completed with maintenance
+  enabled. Private live playback acceptance remains pending.
+- Verified admin-only maintenance access and recovery of the Premier League
+  schedule in the portal after a stale observation.
+- Verified on the Atlas host that the media pool starts before CT100 and that
+  the API recovers with its maintenance-control dependency.
+
+See the [Sports Proxy deployment checkpoint](docs/operations/SPORTS_PROXY_PROFILE.md) for scope and verification details.
+
 ## T42-F02 — Administrator Identity Mutation Boundary
 
 - Added private least-privilege `identity-writer` runtime for administrator
