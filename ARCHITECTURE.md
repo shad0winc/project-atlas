@@ -47,6 +47,15 @@ Atlas extends existing contracts before replacing them, refactors before rewriti
 
 ---
 
+## Runtime boundaries verified on the Atlas host
+
+- **Host storage and boot.** Proxmox mounts the required disks and starts the mergerfs pool before CT100. The host storage watcher checks health independently and uses a failure latch. Inside CT100, Docker waits for the maintenance-control runtime directory before restoring containers.
+- **Maintenance authority.** Caddy enforces the maintenance access boundary. The API checks administrator authorization and talks to a narrow maintenance-control service over a Unix socket. An active transaction or recovery hold can prevent reopening.
+- **Sports metadata.** The Sports writer owns background provider refresh and serves cached schedule snapshots. Worker-wide fetch success and competition-specific snapshot freshness are separate observations.
+- **Sports playback.** The Sports controller reconciles channels through Dispatcharr and explicitly binds the verified Proxy profile. Event discovery and follows use schedule metadata. Live playback also requires a mapped stream and admission.
+
+See the [Sports Proxy deployment checkpoint](docs/operations/SPORTS_PROXY_PROFILE.md) for the scoped publication and acceptance status.
+
 ## System context
 
 ```text

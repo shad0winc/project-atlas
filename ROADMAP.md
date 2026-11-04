@@ -48,7 +48,16 @@ reserved for this release.
 
 ## v1.0.0-rc.1 — Release Candidate Development
 
-**Status:** Active development
+**Status:** Release candidate in private acceptance as of 2026-11-04
+
+- [x] Publish the controller-only Sports Proxy profile change under maintenance.
+- [x] Verify admin maintenance access, regular-user denial, and host boot order.
+- [ ] Verify private playback on a newly provisioned or reconciled Proxy channel and confirm session release.
+- [ ] Reproduce and verify recovery from a transient schedule refresh failure for the same competition.
+- [ ] Validate and ship Sports writer and competition freshness in Administration. The implementation is still local.
+- [ ] Complete release acceptance and authorize reopening before sending invitations.
+
+The [Sports Proxy deployment checkpoint](docs/operations/SPORTS_PROXY_PROFILE.md) records deployment evidence and pending acceptance.
 
 **Primary objective:** Complete the stable v1.0 Media and Sports experience.
 

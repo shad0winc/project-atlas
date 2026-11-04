@@ -18,13 +18,21 @@ Examples:
 
 ---
 
+## v1.0.0-rc.1 — Active release candidate
+
+The repository version is `1.0.0-rc.1`. The Nov. 4 scoped Sports controller
+deployment completed in maintenance, with private playback acceptance pending.
+See the [Sports Proxy deployment checkpoint](docs/operations/SPORTS_PROXY_PROFILE.md) and [roadmap](ROADMAP.md).
+
+---
+
 # v0.5.0 — Foundation Release
 
 Release Date:
 2026-07-05
 
 Status:
-Current
+Historical foundation release
 
 ---
 
