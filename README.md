@@ -12,11 +12,11 @@ The platform is designed to hide infrastructure complexity from ordinary users w
 
 ## Project status
 
-- **Release line:** `v0.9.x` release-candidate development
+- **Release line:** `v1.0.0-rc.1` private acceptance
 - **Primary objective:** Complete the stable Atlas v1.0 Media and Sports experience
 - **Current focus:** Portal, API, authentication, authorization, ACP, operations, and production readiness
 
-The authoritative version is stored in `VERSION`. The detailed implementation plan is maintained in `ROADMAP.md`.
+The authoritative version is stored in [VERSION](VERSION). See the [roadmap](ROADMAP.md), [build log](BUILD_LOG.md), [changelog](CHANGELOG.md), and [architecture](ARCHITECTURE.md) for current progress. The [Sports Proxy deployment checkpoint](docs/operations/SPORTS_PROXY_PROFILE.md) tracks the latest scoped rollout and pending playback acceptance.
 
 ---
 
