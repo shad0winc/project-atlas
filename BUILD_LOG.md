@@ -1,3 +1,17 @@
+# Project Atlas Build Log
+
+## 2026-11-04 — Sports Proxy rollout and maintenance verification
+
+- Verified Proxmox boot ordering after a graceful shutdown. The media pool was ready before CT100 started, the storage watcher reported healthy, and Docker and the Atlas API recovered.
+- Rehearsed the rollout in maintenance. The first controller failed readiness and rolled back. Corrected traversal permissions on the staged source and verified all 38 pinned files as the container's runtime user.
+- Activated the controller-only publication `baseline-sports-proxy-profile-7455a793428d`. Verified administrator console access and regular-user denial with maintenance enabled.
+- Observed the Sports writer recover after a refresh failure. The portal and writer both confirmed the empty Premier League schedule for Nov. 4. Recurrence remains open.
+- Followed Bucks–Celtics for private live acceptance. Playback and session release remain to be verified.
+- Ran 27 metadata refresh and 7 isolated maintenance recovery tests successfully. The maintenance-control suite passed 16 checks, with its Unix-socket transport test blocked by workspace permissions.
+
+See the [Sports Proxy deployment checkpoint](docs/operations/SPORTS_PROXY_PROFILE.md) for operational details.
+
+## Earlier build history
 
 -------------------------------------------------------------------------------
 Production HTTPS Deployment
