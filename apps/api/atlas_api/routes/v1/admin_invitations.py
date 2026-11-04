@@ -47,6 +47,7 @@ InvitationStatus = Literal[
 InvitationRole = Literal[
     "admin",
     "user",
+    "member",
 ]
 
 
@@ -157,7 +158,7 @@ def create_admin_invitation(
     try:
         issue = writer.create_invitation(
             email=payload.email,
-            role=payload.role,
+            role="user" if payload.role == "member" else payload.role,
             days=payload.days,
             created_by=_actor_id(user),
         )
