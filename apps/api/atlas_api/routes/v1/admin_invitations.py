@@ -18,6 +18,7 @@ from atlas_api.services.identity_writer import (
     IdentityWriterError,
 )
 from atlas_api.security.dependencies import require_permission
+from atlas_api.services.invitation_email import deliver_invitation_email
 
 
 router = APIRouter(
@@ -173,6 +174,11 @@ def create_admin_invitation(
     )
 
     result["token"] = issue["token"]
+    result["email_delivery_status"] = deliver_invitation_email(
+        recipient=issue["invitation"].get("email"),
+        token=issue["token"],
+        expires_at=issue["invitation"].get("expires_at"),
+    )
 
     return result
 

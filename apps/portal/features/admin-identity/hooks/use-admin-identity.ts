@@ -33,6 +33,7 @@ export function useAdminIdentity() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [mutationError, setMutationError] = useState<Error | null>(null);
   const [createdToken, setCreatedToken] = useState<string | null>(null);
+  const [emailDeliveryStatus, setEmailDeliveryStatus] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
   const refresh = useCallback(() => { setState({ status: "loading" }); setMutationError(null); setRequestVersion((v) => v + 1); }, []);
@@ -166,10 +167,11 @@ export function useAdminIdentity() {
   );
 
   const createInvitation = useCallback(async (input: InvitationCreateInput): Promise<boolean> => {
-    setBusyKey("invitation:create"); setMutationError(null); setCreatedToken(null);
+    setBusyKey("invitation:create"); setMutationError(null); setCreatedToken(null); setEmailDeliveryStatus(null);
     try {
       const created = await createAdminInvitation(input);
       setCreatedToken(created.token ?? null);
+      setEmailDeliveryStatus(created.emailDeliveryStatus ?? null);
       setState((current) => current.status !== "ready" ? current : { ...current, invitations: [created, ...current.invitations.filter((i) => i.inviteId !== created.inviteId)] });
       return true;
     } catch (error: unknown) { setMutationError(normalizeError(error, "Unable to create the invitation.")); return false; }
@@ -194,6 +196,7 @@ export function useAdminIdentity() {
     revokeInvitation,
     mutationError,
     createdToken,
+    emailDeliveryStatus,
     clearCreatedToken: () => setCreatedToken(null),
     busyKey
   };

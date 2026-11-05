@@ -48,6 +48,7 @@ export type AdminInvitation = Readonly<{
   createdAt: string | null;
   expiresAt: string | null;
   token?: string;
+  emailDeliveryStatus?: string;
 }>;
 
 export type InvitationCreateInput = Readonly<{
@@ -127,6 +128,7 @@ function mapInvitation(response: AdminInvitationTransport): AdminInvitation {
     email: optionalString(response.email),
     role: requiredString(response.role, "role"),
     status: requiredString(response.status, "status"),
+    emailDeliveryStatus: optionalString(response.email_delivery_status) ?? undefined,
     createdAt: optionalString(response.created_at),
     expiresAt: optionalString(response.expires_at ?? response.expires),
     ...(typeof response.token === "string" && response.token.trim()
