@@ -409,6 +409,7 @@ export function AdminIdentityView(): React.ReactElement {
     revokeInvitation,
     mutationError,
     createdToken,
+    emailDeliveryStatus,
     clearCreatedToken,
     busyKey
   } = useAdminIdentity();
@@ -846,6 +847,15 @@ export function AdminIdentityView(): React.ReactElement {
         {invitationCreated ? (
           <section role="status">
             <h4>Invitation created</h4>
+            {emailDeliveryStatus === "accepted" ? (
+              <p>The mail server accepted the invitation email. Ask the recipient to check their inbox and spam folder.</p>
+            ) : null}
+            {emailDeliveryStatus === "failed" || emailDeliveryStatus === "unavailable" ? (
+              <p role="alert">The invitation was created, but email delivery could not be confirmed. Copy the token below to share it manually.</p>
+            ) : null}
+            {emailDeliveryStatus === "skipped" ? (
+              <p>No email address was supplied. Share the token below manually.</p>
+            ) : null}
             <p>Copy this invitation token now. Atlas discloses the token only at creation.</p>
             {createdToken ? (
               <label>
