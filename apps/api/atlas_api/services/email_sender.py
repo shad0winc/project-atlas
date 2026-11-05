@@ -3,9 +3,23 @@
 from __future__ import annotations
 
 from email.message import EmailMessage
+from datetime import datetime, timezone
 from html import escape
 import smtplib
 import ssl
+
+from atlas_api.services.invitation_art import invitation_art
+
+
+def invitation_expiry(value: str) -> str:
+    """Show an explicit UTC expiry without guessing the recipient's timezone."""
+    try:
+        instant = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if instant.tzinfo is None:
+            return value
+        return instant.astimezone(timezone.utc).strftime("%B %d, %Y at %H:%M UTC")
+    except ValueError:
+        return value
 
 
 class EmailDeliveryError(RuntimeError):
@@ -99,35 +113,50 @@ class SMTPEmailSender:
         message["Subject"] = "You're invited to Project Atlas"
         message["From"] = self.sender
         message["To"] = recipient
+        # The image travels with the email, independent of site maintenance.
+        expiry_text = invitation_expiry(expires_at)
         message.set_content(
-            "You're invited to Project Atlas.\n\n"
+            "We saved you a seat.\n\n"
+            "Welcome to Project Atlas, our place for movies, shows, and shared favorites.\n"
+            "Your next movie night starts here.\n\n"
             f"Create your account: {registration_url}\n\n"
-            f"This invitation expires at {expires_at}.\n"
+            f"This invitation expires {expiry_text}.\n"
             "If you were not expecting this invitation, you can ignore it.\n"
         )
         url = escape(registration_url, quote=True)
-        expiry = escape(expires_at)
+        expiry = escape(expiry_text)
         message.add_alternative(
             f"""<!doctype html>
 <html lang="en"><body style="margin:0;background:#090e1c;color:#eaf0ff;
 font-family:Arial,sans-serif;padding:32px 16px">
 <table role="presentation" style="width:100%;max-width:560px;margin:auto;
-background:#121b2e;border:1px solid #2a3853;border-radius:16px">
+background:#121b2e;border:1px solid #2a3853;border-radius:16px;border-spacing:0">
+<tr><td style="padding:0"><a href="{url}" aria-label="Accept your Project Atlas invitation">
+<img src="cid:atlas-invitation-art" width="560"
+alt="The Atlas panda offers you an invitation. Tap to accept."
+style="display:block;width:100%;max-width:560px;height:auto;border:0;border-radius:16px 16px 0 0"></a></td></tr>
 <tr><td style="padding:36px">
 <p style="color:#72c8ff;font-size:12px;letter-spacing:3px">PROJECT ATLAS</p>
-<h1 style="font-size:28px;line-height:1.2">Your invitation awaits.</h1>
-<p style="color:#c5d1e8;line-height:1.6">You have been invited to join
-Project Atlas. Create your account to get started.</p>
+<h1 style="font-size:28px;line-height:1.2;color:#eaf0ff">We saved you a seat.</h1>
+<p style="color:#c5d1e8;line-height:1.6">Welcome to Project Atlas, our place for
+movies, shows, and shared favorites. Your next movie night starts here.</p>
+<p style="color:#c5d1e8;line-height:1.6">Tap the panda's invitation or use the
+button below to create your account. We'd love to have you join us.</p>
 <p style="margin:32px 0"><a href="{url}" style="display:inline-block;
 background:#75c9ff;color:#091021;padding:14px 24px;border-radius:8px;
-font-weight:bold;text-decoration:none">Accept invitation</a></p>
-<p style="color:#c5d1e8;font-size:14px">Expires at {expiry}.</p>
+font-weight:bold;text-decoration:none"><span style="color:#091021">Accept invitation</span></a></p>
+<p style="color:#c5d1e8;font-size:14px">This invitation expires {expiry}.</p>
 <p style="color:#c5d1e8;font-size:13px">Button not working?
 <a href="{url}" style="color:#75c9ff">Open your registration link</a>.</p>
 <p style="color:#96a5bf;font-size:12px;line-height:1.6">If you were not
 expecting this invitation, you can ignore this email.</p>
 </td></tr></table></body></html>""",
             subtype="html",
+        )
+        message.get_payload()[-1].add_related(
+            invitation_art(), maintype="image", subtype="jpeg",
+            cid="<atlas-invitation-art>", disposition="inline",
+            filename="atlas-invitation.jpg",
         )
         self._send(message, failure_message="Invitation email delivery failed.")
 
