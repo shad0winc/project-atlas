@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from unittest.mock import patch
 from datetime import timedelta
 from pathlib import Path
 
@@ -78,6 +79,12 @@ class _NoopSecurityAuditWriter:
 
 class AdminInvitationAPIContractTests(unittest.TestCase):
     def setUp(self) -> None:
+        self.mail = patch(
+            "atlas_api.routes.v1.admin_invitations.deliver_invitation_email",
+            return_value="accepted",
+        )
+        self.mock_mail = self.mail.start()
+        self.addCleanup(self.mail.stop)
         self.temp = tempfile.TemporaryDirectory()
         self.identity_root = Path(self.temp.name) / "identity"
 
@@ -243,6 +250,24 @@ class AdminInvitationAPIContractTests(unittest.TestCase):
         self.assertIn("invite_id", body)
         self.assertIn("expires_at", body)
         self.assertNotIn("token_hash", body)
+
+    def test_email_failure_preserves_pending_invitation_and_token(self) -> None:
+        self.mock_mail.return_value = "failed"
+        client = self.client_for(self.global_admin_profile)
+        response = client.post(
+            "/api/v1/admin/invitations",
+            json={"email": "friend@example.com", "role": "member", "days": 7},
+        )
+        self.assertEqual(response.status_code, 201)
+        body = response.json()
+        self.assertEqual(body["email_delivery_status"], "failed")
+        self.assertEqual(body["status"], "pending")
+        self.assertTrue(body["token"].startswith("atlas_inv_"))
+        self.mock_mail.assert_called_once_with(
+            recipient="friend@example.com", token=body["token"],
+            expires_at=body["expires_at"],
+        )
+        self.assertEqual(self.invitations.get(body["invite_id"])["status"], "pending")
 
     def test_member_role_uses_legacy_invitation_storage_role(self) -> None:
         client = self.client_for(self.global_admin_profile)
