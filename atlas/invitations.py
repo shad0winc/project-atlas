@@ -47,7 +47,12 @@ class InvitationStore:
     clock: Callable[[], datetime] = utc_now
 
     def initialize(self) -> None:
-        self.paths.initialize()
+        for directory in (
+            self.paths.active_invitations,
+            self.paths.completed_invitations,
+            self.paths.revoked_invitations,
+        ):
+            directory.mkdir(parents=True, exist_ok=True)
         if not self.paths.invitation_registry.exists():
             write_json_atomic(
                 self.paths.invitation_registry,
