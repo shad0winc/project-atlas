@@ -47,6 +47,14 @@ class InvitationEmailTests(unittest.TestCase):
         with patch("atlas_api.services.email_sender.smtplib.SMTP", side_effect=smtplib.SMTPException("private")):
             self.assertEqual(self.deliver(), "failed")
 
+    def test_missing_expiration_never_attempts_email(self):
+        with patch("atlas_api.services.invitation_email.SMTPEmailSender") as sender:
+            for expiry in (None, "", "   "):
+                self.assertEqual(deliver_invitation_email(
+                    recipient="friend@example.test", token="secret", expires_at=expiry,
+                ), "unavailable")
+            sender.assert_not_called()
+
     def test_missing_recipient_skips_without_configuration(self):
         with patch.dict(os.environ, {}, clear=True):
             self.assertEqual(deliver_invitation_email(recipient=None, token="secret", expires_at="later"), "skipped")

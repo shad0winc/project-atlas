@@ -7,11 +7,13 @@ from atlas_api.services.email_sender import EmailDeliveryError, SMTPEmailSender
 
 
 def deliver_invitation_email(
-    *, recipient: str | None, token: str, expires_at: str,
+    *, recipient: str | None, token: str, expires_at: str | None,
 ) -> str:
     """Report SMTP acceptance while preserving the successful invitation issue."""
     if not recipient:
         return "skipped"
+    if not isinstance(expires_at, str) or not expires_at.strip():
+        return "unavailable"
     try:
         settings = AtlasAPISettings.from_environment()
         origin = urlsplit(settings.base_url)
