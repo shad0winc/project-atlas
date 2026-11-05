@@ -40,6 +40,16 @@ class InvitationStoreTests(unittest.TestCase):
         )
         self.assertEqual(registry, {"schema_version": 1, "invitations": {}})
 
+    def test_create_without_password_recovery_storage(self) -> None:
+        self.root.mkdir()
+        recovery = self.root / "password-recovery"
+        recovery.write_text("unavailable to the invitation writer")
+
+        issue = self.store.create(role="user")
+
+        self.assertEqual(issue.invitation["status"], "pending")
+        self.assertEqual(recovery.read_text(), "unavailable to the invitation writer")
+
     def test_list_treats_unused_store_as_empty_without_initializing(self) -> None:
         invitations_root = self.root / "invitations"
         invitations_root.mkdir(parents=True)
