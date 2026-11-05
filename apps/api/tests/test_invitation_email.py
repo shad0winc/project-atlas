@@ -3,9 +3,13 @@
 import os
 import smtplib
 import unittest
+from email import policy
+from email.parser import BytesParser
+from html.parser import HTMLParser
 from unittest.mock import Mock, patch
 
-from atlas_api.services.email_sender import EmailDeliveryError, SMTPEmailSender
+from atlas_api.services.email_sender import EmailDeliveryError, SMTPEmailSender, invitation_expiry
+from atlas_api.services.invitation_art import invitation_art
 from atlas_api.services.invitation_email import deliver_invitation_email
 
 
@@ -30,11 +34,53 @@ class InvitationEmailTests(unittest.TestCase):
         self.assertEqual(message["To"], "friend@example.test")
         self.assertIn("Project Atlas", message["From"])
         self.assertEqual(message.get_content_type(), "multipart/alternative")
-        for part in message.iter_parts():
+        message = BytesParser(policy=policy.default).parsebytes(message.as_bytes())
+        for kind in ("plain", "html"):
+            part = message.get_body(preferencelist=(kind,))
             content = part.get_content()
             self.assertIn("https://atlas.example.test/register#token=atlas_inv_test", content)
-            self.assertIn("2030-01-01T00:00:00Z", content)
+            self.assertIn("January 01, 2030 at 00:00 UTC", content)
         self.assertIn("Accept invitation", message.get_body(preferencelist=("html",)).get_content())
+        images = [part for part in message.walk() if part.get_content_type() == "image/jpeg"]
+        self.assertEqual(len(images), 1)
+        self.assertEqual(images[0]["Content-ID"], "<atlas-invitation-art>")
+        self.assertEqual(images[0].get_content_disposition(), "inline")
+        self.assertEqual(images[0].get_payload(decode=True), invitation_art())
+        self.assertLess(len(message.as_bytes()), 250_000)
+
+    def test_art_button_and_fallback_share_registration_link(self):
+        class Links(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.links = []
+                self.image_link = None
+                self.active = None
+            def handle_starttag(self, tag, attrs):
+                attrs = dict(attrs)
+                if tag == "a":
+                    self.active = attrs.get("href")
+                    self.links.append(self.active)
+                if tag == "img":
+                    self.image_link = self.active
+            def handle_endtag(self, tag):
+                if tag == "a":
+                    self.active = None
+        sender = SMTPEmailSender(host="smtp.test", port=587, sender="atlas@example.test")
+        sender._send = Mock()
+        url = "https://atlas.test/register#token=private%2Btoken&test=1"
+        sender.send_invitation(recipient="friend@example.test", registration_url=url,
+                               expires_at="2030-01-01T00:00:00Z")
+        html = sender._send.call_args.args[0].get_body(preferencelist=("html",)).get_content()
+        parsed = Links()
+        parsed.feed(html)
+        self.assertEqual(parsed.links, [url, url, url])
+        self.assertEqual(parsed.image_link, url)
+        self.assertNotIn('src="http', html)
+
+    def test_expiry_converts_offsets_without_guessing_naive_dates(self):
+        self.assertEqual(invitation_expiry("2030-01-01T03:30:00+03:30"),
+                         "January 01, 2030 at 00:00 UTC")
+        self.assertEqual(invitation_expiry("2030-01-01T03:30:00"), "2030-01-01T03:30:00")
 
     def deliver(self, **environment):
         with patch.dict(os.environ, {**self.environment, **environment}, clear=True):
