@@ -6,6 +6,7 @@ import { ATLAS_PERMISSIONS, usePermission } from "../../../lib/authorization";
 import { loadAssignableRoleCatalog, type AssignableRole } from "../../administration/api/roles";
 import type { AdminInvitation, AdminUser } from "../api/admin-identity";
 import { useAdminIdentity } from "../hooks/use-admin-identity";
+import { InvitationEmailEditor } from "./InvitationEmailEditor";
 
 function rolesLabel(user: AdminUser): string {
   return user.roles.length ? user.roles.join(", ") : "No roles";
@@ -788,6 +789,8 @@ export function AdminIdentityView(): React.ReactElement {
             </button>
           ) : null}
         </div>
+
+        {canUpdate ? <InvitationEmailEditor /> : null}
 
         {showInvitationForm ? (
           <form

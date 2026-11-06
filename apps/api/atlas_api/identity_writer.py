@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from atlas.identity import default_identity_paths
 from atlas.invitations import InvitationError, InvitationStore
+from atlas.invitation_email_template import InvitationEmailTemplateStore, InvitationTemplateError
 from atlas.custom_roles import (
     CustomRoleDefinition,
     CustomRoleError,
@@ -234,6 +235,11 @@ class InvitationRevokeRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     revoked_by: str
+
+
+class InvitationEmailTemplateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    template: dict[str, str]
 
 
 app = FastAPI(
@@ -607,6 +613,20 @@ def delete_custom_role(role_name: str) -> dict[str, Any]:
         code = status.HTTP_404_NOT_FOUND if "not found" in message.lower() else status.HTTP_409_CONFLICT
         raise HTTPException(status_code=code, detail=message) from error
     return {"status": "deleted", "name": role_name.strip().lower()}
+
+
+@app.put(
+    "/internal/v1/invitation-email-template",
+    dependencies=[Depends(_require_service_token)],
+)
+def update_invitation_email_template(request: InvitationEmailTemplateRequest) -> dict[str, Any]:
+    try:
+        template = InvitationEmailTemplateStore(default_identity_paths()).save(request.template)
+    except InvitationTemplateError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except OSError as error:
+        raise HTTPException(status_code=503, detail="Invitation email settings could not be saved.") from error
+    return {"template": template}
 
 
 @app.post(
