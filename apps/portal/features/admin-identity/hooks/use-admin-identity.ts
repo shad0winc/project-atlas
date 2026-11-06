@@ -35,6 +35,7 @@ export function useAdminIdentity() {
   const [createdToken, setCreatedToken] = useState<string | null>(null);
   const [emailDeliveryStatus, setEmailDeliveryStatus] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [invitationRefreshError, setInvitationRefreshError] = useState<Error | null>(null);
 
   const refresh = useCallback(() => { setState({ status: "loading" }); setMutationError(null); setRequestVersion((v) => v + 1); }, []);
 
@@ -42,13 +43,40 @@ export function useAdminIdentity() {
     const controller = new AbortController();
     if (!isAuthenticated) return () => controller.abort();
     Promise.all([loadAdminUsers(controller.signal), loadAdminInvitations(controller.signal)])
-      .then(([users, invitations]) => { if (!controller.signal.aborted) setState({ status: "ready", users, invitations }); })
+      .then(([users, invitations]) => { if (!controller.signal.aborted) { setState({ status: "ready", users, invitations }); setInvitationRefreshError(null); } })
       .catch((error: unknown) => {
         if (controller.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) return;
         setState({ status: "error", error: normalizeError(error, "Unable to load Atlas Administrator identity data.") });
       });
     return () => controller.abort();
   }, [isAuthenticated, requestVersion]);
+
+  useEffect(() => {
+    if (!isAuthenticated || busyKey !== null) return;
+    const controller = new AbortController();
+    let running = false;
+    const poll = async () => {
+      if (running || document.visibilityState === "hidden") return;
+      running = true;
+      try {
+        const invitations = await loadAdminInvitations(controller.signal);
+        if (!controller.signal.aborted) {
+          setState((current) => current.status === "ready" ? { ...current, invitations } : current);
+          setInvitationRefreshError(null);
+        }
+      } catch (error: unknown) {
+        if (!controller.signal.aborted) setInvitationRefreshError(normalizeError(error, "Unable to refresh invitations."));
+      } finally { running = false; }
+    };
+    const timer = window.setInterval(() => { void poll(); }, 60_000);
+    const focused = () => { void poll(); };
+    window.addEventListener("focus", focused);
+    return () => {
+      controller.abort();
+      window.clearInterval(timer);
+      window.removeEventListener("focus", focused);
+    };
+  }, [isAuthenticated, busyKey]);
 
   const inspectUser = useCallback(async (identifier: string) => {
     setDetailLoading(true); setMutationError(null);
@@ -195,6 +223,7 @@ export function useAdminIdentity() {
     createInvitation,
     revokeInvitation,
     mutationError,
+    invitationRefreshError,
     createdToken,
     emailDeliveryStatus,
     clearCreatedToken: () => setCreatedToken(null),
