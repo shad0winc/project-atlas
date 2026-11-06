@@ -1,6 +1,8 @@
 """Deliver newly issued invitation tokens through the existing SMTP transport."""
 
 from urllib.parse import quote, urlsplit
+from atlas.identity import default_identity_paths
+from atlas.invitation_email_template import InvitationEmailTemplateStore
 
 from atlas_api.core.settings import AtlasAPISettings
 from atlas_api.services.email_sender import EmailDeliveryError, SMTPEmailSender
@@ -33,6 +35,7 @@ def deliver_invitation_email(
             recipient=recipient,
             registration_url=f"{settings.base_url.rstrip('/')}/register#token={quote(token, safe='')}",
             expires_at=expires_at,
+            template=InvitationEmailTemplateStore(default_identity_paths()).load(),
         )
     except (EmailDeliveryError, ValueError):
         return "failed"
