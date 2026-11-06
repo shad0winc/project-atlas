@@ -48,7 +48,7 @@ class InvitationEmailTests(unittest.TestCase):
         self.assertEqual(images[0].get_payload(decode=True), invitation_art())
         self.assertLess(len(message.as_bytes()), 250_000)
 
-    def test_art_button_and_fallback_share_registration_link(self):
+    def test_button_and_fallback_link_work_with_unlinked_art(self):
         class Links(HTMLParser):
             def __init__(self):
                 super().__init__()
@@ -73,9 +73,50 @@ class InvitationEmailTests(unittest.TestCase):
         html = sender._send.call_args.args[0].get_body(preferencelist=("html",)).get_content()
         parsed = Links()
         parsed.feed(html)
-        self.assertEqual(parsed.links, [url, url, url])
-        self.assertEqual(parsed.image_link, url)
+        self.assertEqual(parsed.links, [url, url])
+        self.assertIsNone(parsed.image_link)
         self.assertNotIn('src="http', html)
+        self.assertNotIn("Tap to accept", html)
+
+    def test_welcome_covers_media_and_identifies_future_features(self):
+        with patch("atlas_api.services.email_sender.smtplib.SMTP") as smtp:
+            self.deliver()
+        message = smtp.return_value.__enter__.return_value.send_message.call_args.args[0]
+        expected = (
+            "Welcome to Project Atlas, your home for all things media. "
+            "Explore movies, shows, and sports, with game servers and "
+            "tech and gaming news on the horizon."
+        )
+        for kind in ("plain", "html"):
+            body = message.get_body(preferencelist=(kind,)).get_content()
+            self.assertIn(expected, body)
+            self.assertNotIn("Your next movie night starts here", body)
+
+    def test_accept_button_declares_black_text_with_legacy_color_fallback(self):
+        class Button(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.links = []
+                self.labels = []
+            def handle_starttag(self, tag, attrs):
+                if tag == "a":
+                    self.links.append(dict(attrs))
+                if tag == "font":
+                    self.labels.append(dict(attrs))
+        sender = SMTPEmailSender(host="smtp.test", port=587, sender="atlas@example.test")
+        sender._send = Mock()
+        sender.send_invitation(recipient="friend@example.test", registration_url="https://atlas.test/register",
+                               expires_at="2030-01-01T00:00:00Z")
+        html = sender._send.call_args.args[0].get_body(preferencelist=("html",)).get_content()
+        parsed = Button()
+        parsed.feed(html)
+        self.assertEqual(len(parsed.links), 2)
+        button_style = parsed.links[0]["style"]
+        self.assertIn("background:#75c9ff", button_style)
+        self.assertIn("color:#000000 !important", button_style)
+        self.assertIn("-webkit-text-fill-color:#000000 !important", button_style)
+        self.assertEqual(parsed.labels[0]["color"], "#000000")
+        self.assertIn("color:#000000 !important", parsed.labels[0]["style"])
 
     def test_expiry_converts_offsets_without_guessing_naive_dates(self):
         self.assertEqual(invitation_expiry("2030-01-01T03:30:00+03:30"),

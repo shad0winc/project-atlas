@@ -115,36 +115,42 @@ class SMTPEmailSender:
         message["To"] = recipient
         # The image travels with the email, independent of site maintenance.
         expiry_text = invitation_expiry(expires_at)
+        welcome_text = (
+            "Welcome to Project Atlas, your home for all things media. "
+            "Explore movies, shows, and sports, with game servers and "
+            "tech and gaming news on the horizon."
+        )
         message.set_content(
             "We saved you a seat.\n\n"
-            "Welcome to Project Atlas, our place for movies, shows, and shared favorites.\n"
-            "Your next movie night starts here.\n\n"
+            f"{welcome_text}\n\n"
             f"Create your account: {registration_url}\n\n"
             f"This invitation expires {expiry_text}.\n"
             "If you were not expecting this invitation, you can ignore it.\n"
         )
         url = escape(registration_url, quote=True)
         expiry = escape(expiry_text)
+        welcome = escape(welcome_text)
         message.add_alternative(
             f"""<!doctype html>
 <html lang="en"><body style="margin:0;background:#090e1c;color:#eaf0ff;
 font-family:Arial,sans-serif;padding:32px 16px">
 <table role="presentation" style="width:100%;max-width:560px;margin:auto;
 background:#121b2e;border:1px solid #2a3853;border-radius:16px;border-spacing:0">
-<tr><td style="padding:0"><a href="{url}" aria-label="Accept your Project Atlas invitation">
+<tr><td style="padding:0">
 <img src="cid:atlas-invitation-art" width="560"
-alt="The Atlas panda offers you an invitation. Tap to accept."
-style="display:block;width:100%;max-width:560px;height:auto;border:0;border-radius:16px 16px 0 0"></a></td></tr>
+alt="The Atlas panda offers you an invitation."
+style="display:block;width:100%;max-width:560px;height:auto;border:0;border-radius:16px 16px 0 0"></td></tr>
 <tr><td style="padding:36px">
 <p style="color:#72c8ff;font-size:12px;letter-spacing:3px">PROJECT ATLAS</p>
 <h1 style="font-size:28px;line-height:1.2;color:#eaf0ff">We saved you a seat.</h1>
-<p style="color:#c5d1e8;line-height:1.6">Welcome to Project Atlas, our place for
-movies, shows, and shared favorites. Your next movie night starts here.</p>
-<p style="color:#c5d1e8;line-height:1.6">Tap the panda's invitation or use the
-button below to create your account. We'd love to have you join us.</p>
+<p style="color:#c5d1e8;line-height:1.6">{welcome}</p>
+<p style="color:#c5d1e8;line-height:1.6">Use the button below to create your
+account. We'd love to have you join us.</p>
 <p style="margin:32px 0"><a href="{url}" style="display:inline-block;
-background:#75c9ff;color:#091021;padding:14px 24px;border-radius:8px;
-font-weight:bold;text-decoration:none"><span style="color:#091021">Accept invitation</span></a></p>
+background:#75c9ff;color:#000000 !important;-webkit-text-fill-color:#000000 !important;
+padding:14px 24px;border-radius:8px;font-weight:bold;text-decoration:none">
+<font color="#000000" style="color:#000000 !important;
+-webkit-text-fill-color:#000000 !important">Accept invitation</font></a></p>
 <p style="color:#c5d1e8;font-size:14px">This invitation expires {expiry}.</p>
 <p style="color:#c5d1e8;font-size:13px">Button not working?
 <a href="{url}" style="color:#75c9ff">Open your registration link</a>.</p>
