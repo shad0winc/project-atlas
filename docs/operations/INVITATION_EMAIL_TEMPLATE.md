@@ -1,6 +1,8 @@
 # Invitation email copy
 
-In **Administration → Invitations**, users with `users.update` can open
+The **Invitations** panel appears directly on **Administration** for users with
+`users.read`. It also remains under **Users and access → Invitations**.
+Users with `users.update` can open
 **Customize invitation email**. Edit the subject, heading, welcome message,
 instructions and button label. The preview shows the editable text; Atlas adds
 the panda artwork, registration links and expiry when sending.
@@ -8,6 +10,27 @@ the panda artwork, registration links and expiry when sending.
 **Save email template** applies the text to future invitation emails. Sent emails
 remain unchanged. **Reset draft to defaults** loads the defaults into the editor;
 save to apply them. A failed save keeps the draft available for retry.
+
+## Invitation history
+
+**Current** is the default invitation view. Completed (accepted) and revoked
+invitations move to **Archived** once 24 hours have passed since `completed_at`
+or `revoked_at`, respectively. Existing records already past that boundary appear
+in Archived immediately. Creation time is never used as the archive clock.
+Pending invitations and records without valid terminal timestamps stay visible
+in Current. This view does not change token validity, expiry, lifecycle status,
+the registry or retained record files; nothing is deleted.
+
+The page reevaluates the cutoff every minute and on focus. Invitation status is
+refreshed in the background every minute while the page is visible and no identity
+mutation is in progress, and when the window regains focus. Background refresh
+preserves open forms and email drafts. Failed refreshes preserve the current data
+and display a retry message. **Refresh invitations** performs an explicit reload.
+The archive can be inspected at any time using the **Archived** button and count.
+
+This history/navigation change requires only a Portal image update. The existing
+API already returns lifecycle timestamps, and completed/revoked records are
+already retained in the invitation store. No migration or scheduler job is needed.
 
 These are plain-text fields, not HTML or template code. HTML output is escaped.
 The secure registration URL, token, expiry, SMTP sender, artwork and styles remain
