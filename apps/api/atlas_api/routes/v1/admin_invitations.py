@@ -9,6 +9,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from atlas.identity import default_identity_paths
 from atlas.invitations import InvitationError, InvitationStore
+from atlas.invitation_email_template import (
+    InvitationEmailTemplateStore, InvitationTemplateError, template_document, validate_template,
+)
 from atlas_api.auth.models import AuthenticatedUser
 from atlas_api.dependencies import (
     get_identity_writer_client,
@@ -63,6 +66,41 @@ class InvitationCreateRequest(BaseModel):
         default=7,
         ge=1,
     )
+
+
+class InvitationEmailTemplateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    template: dict[str, str]
+
+
+@router.get("/email-template")
+def get_invitation_email_template(
+    _user: AuthenticatedUser = Depends(require_invitations_update),
+) -> dict[str, Any]:
+    try:
+        return template_document(InvitationEmailTemplateStore(default_identity_paths()).load())
+    except InvitationTemplateError as error:
+        raise HTTPException(status_code=503, detail="Invitation email settings are unavailable.") from error
+
+
+@router.put("/email-template")
+def update_invitation_email_template(
+    request: InvitationEmailTemplateRequest,
+    _user: AuthenticatedUser = Depends(require_invitations_update),
+    writer: IdentityWriterClient = Depends(get_identity_writer_client),
+) -> dict[str, Any]:
+    try:
+        normalized = validate_template(request.template)
+    except InvitationTemplateError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    try:
+        saved = writer.update_invitation_email_template(normalized)
+    except IdentityWriterError as error:
+        raise HTTPException(status_code=error.status_code, detail=str(error)) from error
+    try:
+        return template_document(saved["template"])
+    except (KeyError, InvitationTemplateError) as error:
+        raise HTTPException(status_code=502, detail="Identity writer returned invalid email settings.") from error
 
 
 def get_invitation_store() -> InvitationStore:

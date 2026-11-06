@@ -245,6 +245,9 @@ class IdentityWriterClient:
             },
         )
 
+    def update_invitation_email_template(self, template: dict[str, str]) -> dict[str, Any]:
+        return self._request("PUT", "/internal/v1/invitation-email-template", {"template": template})
+
     def revoke_invitation(
         self,
         invite_id: str,

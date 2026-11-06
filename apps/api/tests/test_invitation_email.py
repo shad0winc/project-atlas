@@ -84,8 +84,8 @@ class InvitationEmailTests(unittest.TestCase):
         message = smtp.return_value.__enter__.return_value.send_message.call_args.args[0]
         expected = (
             "Welcome to Project Atlas, your home for all things media. "
-            "Explore movies, shows, and sports, with game servers and "
-            "tech and gaming news on the horizon."
+            "Explore movies, shows, and sports. Game servers and the latest "
+            "tech/gaming news are on the horizon."
         )
         for kind in ("plain", "html"):
             body = message.get_body(preferencelist=(kind,)).get_content()
