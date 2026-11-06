@@ -47,6 +47,8 @@ export type AdminInvitation = Readonly<{
   status: string;
   createdAt: string | null;
   expiresAt: string | null;
+  completedAt?: string | null;
+  revokedAt?: string | null;
   token?: string;
   emailDeliveryStatus?: string;
 }>;
@@ -131,6 +133,8 @@ function mapInvitation(response: AdminInvitationTransport): AdminInvitation {
     emailDeliveryStatus: optionalString(response.email_delivery_status) ?? undefined,
     createdAt: optionalString(response.created_at),
     expiresAt: optionalString(response.expires_at ?? response.expires),
+    completedAt: optionalString(response.completed_at),
+    revokedAt: optionalString(response.revoked_at),
     ...(typeof response.token === "string" && response.token.trim()
       ? { token: response.token.trim() }
       : {})

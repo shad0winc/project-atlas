@@ -8,6 +8,7 @@ import { LiveSessionManagement } from "./LiveSessionManagement";
 import { ProviderAccountManagement } from "./ProviderAccountManagement";
 import { RoleManagement } from "./RoleManagement";
 import { AutomationHealthPanel } from "./AutomationHealthPanel";
+import { AdminIdentityView } from "../../admin-identity";
 
 const administrationDestinations = [
   {
@@ -76,6 +77,8 @@ export function AdministrationView(): React.ReactElement {
           </Card>
         ))}
       </div>
+
+      {can(PORTAL_ROUTES.users.permission) ? <AdminIdentityView invitationsOnly /> : null}
 
       <AutomationHealthPanel />
       <ProviderAccountManagement />
