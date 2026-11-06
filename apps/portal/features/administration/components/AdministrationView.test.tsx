@@ -1,6 +1,11 @@
 vi.mock("./SportsSessionStatus", () => ({ SportsSessionStatus: () => <section>Sports live sessions</section> }));
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("../../admin-identity", () => ({
+  AdminIdentityView: ({ invitationsOnly }: { invitationsOnly?: boolean }) => (
+    <section>{invitationsOnly ? "Invitations and email settings" : "All identity controls"}</section>
+  )
+}));
 
 const can = vi.fn<(permission: string) => boolean>();
 vi.mock("./AutomationHealthPanel", () => ({
@@ -50,6 +55,8 @@ describe("AdministrationView", () => {
     const markup = renderToStaticMarkup(<AdministrationView />);
 
     expect(markup).toContain("Management surfaces");
+    expect(markup).toContain("Invitations and email settings");
+    expect(markup).not.toContain("All identity controls");
     expect(markup).toContain("Live-session management");
     expect(markup).toContain("Provider account management");
     expect(markup).toContain('href="/portal/users"');
@@ -66,6 +73,7 @@ describe("AdministrationView", () => {
 
     expect(markup).toContain('href="/portal/services"');
     expect(markup).not.toContain('href="/portal/users"');
+    expect(markup).not.toContain("Invitations and email settings");
     expect(markup).not.toContain('href="/portal/administration/downloads"');
     expect(markup).not.toContain('href="/portal/requests"');
     expect(markup).not.toContain('href="/portal/media"');

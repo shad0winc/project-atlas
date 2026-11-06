@@ -7,6 +7,7 @@ import { loadAssignableRoleCatalog, type AssignableRole } from "../../administra
 import type { AdminInvitation, AdminUser } from "../api/admin-identity";
 import { useAdminIdentity } from "../hooks/use-admin-identity";
 import { InvitationEmailEditor } from "./InvitationEmailEditor";
+import { partitionInvitations } from "../services/invitation-archive";
 
 function rolesLabel(user: AdminUser): string {
   return user.roles.length ? user.roles.join(", ") : "No roles";
@@ -394,7 +395,7 @@ function UserDetail({
   );
 }
 
-export function AdminIdentityView(): React.ReactElement {
+export function AdminIdentityView({ invitationsOnly = false }: Readonly<{ invitationsOnly?: boolean }> = {}): React.ReactElement {
   const { can } = usePermission();
   const {
     state,
@@ -409,6 +410,7 @@ export function AdminIdentityView(): React.ReactElement {
     createInvitation,
     revokeInvitation,
     mutationError,
+    invitationRefreshError,
     createdToken,
     emailDeliveryStatus,
     clearCreatedToken,
@@ -438,11 +440,23 @@ export function AdminIdentityView(): React.ReactElement {
   const [role, setRole] = useState("member");
   const [days, setDays] = useState("7");
   const [invitationCreated, setInvitationCreated] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [archiveNow, setArchiveNow] = useState(() => Date.now());
   const [assignableRoles, setAssignableRoles] = useState<readonly AssignableRole[]>([]);
 
   const canCreate = can(ATLAS_PERMISSIONS.usersCreate);
   const canUpdate = can(ATLAS_PERMISSIONS.usersUpdate);
   const canAssignRoles = can(ATLAS_PERMISSIONS.rolesAssign);
+
+  useEffect(() => {
+    const updateClock = () => setArchiveNow(Date.now());
+    const timer = window.setInterval(updateClock, 60_000);
+    window.addEventListener("focus", updateClock);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", updateClock);
+    };
+  }, []);
 
   useEffect(() => {
     if (!canAssignRoles) return;
@@ -469,7 +483,7 @@ export function AdminIdentityView(): React.ReactElement {
   }, [canAssignRoles]);
 
   if (state.status === "loading") {
-    return <section aria-busy="true"><p>Loading users and invitations…</p></section>;
+    return <section aria-busy="true"><p>{invitationsOnly ? "Loading invitations…" : "Loading users and invitations…"}</p></section>;
   }
 
   if (state.status === "error") {
@@ -482,6 +496,9 @@ export function AdminIdentityView(): React.ReactElement {
     );
   }
 
+  const invitationGroups = partitionInvitations(state.invitations, archiveNow);
+  const visibleInvitations = showArchived ? invitationGroups.archived : invitationGroups.current;
+
   return (
     <div>
       {mutationError ? (
@@ -491,7 +508,7 @@ export function AdminIdentityView(): React.ReactElement {
         </section>
       ) : null}
 
-      <section aria-labelledby="user-accounts-title">
+      {!invitationsOnly ? <section aria-labelledby="user-accounts-title">
         <div>
           <h3 id="user-accounts-title">User accounts</h3>
 
@@ -767,13 +784,13 @@ export function AdminIdentityView(): React.ReactElement {
             })}
           </div>
         ) : <p>No Atlas users were returned.</p>}
-      </section>
+      </section> : null}
 
-      {detailLoading && !selectedUser ? (
+      {!invitationsOnly && detailLoading && !selectedUser ? (
         <p aria-busy="true">Loading user detail…</p>
       ) : null}
 
-      <section aria-labelledby="invitations-title">
+      <section id="invitations" aria-labelledby="invitations-title">
         <div>
           <h3 id="invitations-title">Invitations</h3>
           {canCreate && canAssignRoles ? (
@@ -792,6 +809,18 @@ export function AdminIdentityView(): React.ReactElement {
 
         {canUpdate ? <InvitationEmailEditor /> : null}
 
+        <p>Accepted and revoked invitations move to Archived after 24 hours. Their records are kept.</p>
+        {invitationRefreshError ? <p role="alert">Invitation updates are temporarily unavailable. Refresh to try again.</p> : null}
+        <div role="group" aria-label="Invitation views">
+          <button type="button" aria-pressed={!showArchived} onClick={() => setShowArchived(false)}>
+            Current ({invitationGroups.current.length})
+          </button>
+          <button type="button" aria-pressed={showArchived} onClick={() => setShowArchived(true)}>
+            Archived ({invitationGroups.archived.length})
+          </button>
+          <button type="button" disabled={busyKey !== null} onClick={refresh}>Refresh invitations</button>
+        </div>
+
         {showInvitationForm ? (
           <form
             onSubmit={(event) => {
@@ -803,6 +832,7 @@ export function AdminIdentityView(): React.ReactElement {
               }).then((created) => {
                 if (created) {
                   setInvitationCreated(true);
+                  setShowArchived(false);
                   setShowInvitationForm(false);
                 }
               });
@@ -869,9 +899,9 @@ export function AdminIdentityView(): React.ReactElement {
           </section>
         ) : null}
 
-        {state.invitations.length ? (
+        {visibleInvitations.length ? (
           <div>
-            {state.invitations.map((invitation) => (
+            {visibleInvitations.map((invitation) => (
               <InvitationRow
                 busy={busyKey === `invitation:${invitation.inviteId}`}
                 canRevoke={canUpdate}
@@ -881,7 +911,7 @@ export function AdminIdentityView(): React.ReactElement {
               />
             ))}
           </div>
-        ) : <p>No invitations have been issued.</p>}
+        ) : <p>{showArchived ? "No archived invitations." : "No current invitations."}</p>}
       </section>
     </div>
   );

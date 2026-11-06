@@ -1,4 +1,7 @@
+// @vitest-environment happy-dom
 import { readFileSync } from "node:fs";
+import { act } from "react";
+import { createRoot } from "react-dom/client";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,6 +10,7 @@ const { canMock, useAdminIdentityMock } = vi.hoisted(() => ({
   canMock: vi.fn<(permission: string) => boolean>(),
   useAdminIdentityMock: vi.fn()
 }));
+vi.mock("../../administration/api/roles", () => ({ loadAssignableRoleCatalog: vi.fn().mockResolvedValue([]) }));
 
 vi.mock("../../../lib/authorization", async (importOriginal) => {
   const actual =
@@ -74,6 +78,44 @@ describe("AdminIdentityView surface spacing", () => {
     );
     expect(markup).toContain("Example User");
   });
+  it("shows invitation controls without user management in the Administration panel", () => {
+    const markup = renderToStaticMarkup(<AdminIdentityView invitationsOnly />);
+    expect(markup).toContain("Invitations");
+    expect(markup).toContain("Customize invitation email");
+    expect(markup).not.toContain("User accounts");
+    expect(markup).not.toContain("Example User");
+  });
+
+  it("lets an administrator inspect archived history and moves a revoked row at the 24-hour cutoff", async () => {
+    vi.useFakeTimers();
+    const now = Date.parse("2026-11-07T12:00:00Z");
+    vi.setSystemTime(now);
+    const current = useAdminIdentityMock.getMockImplementation()!();
+    current.state.invitations = [
+      { inviteId: "pending", email: "pending@example.invalid", status: "pending", role: "member" },
+      { inviteId: "old", email: "old@example.invalid", status: "completed", role: "member", completedAt: "2020-01-01T00:00:00Z" },
+      { inviteId: "recent", email: "recent@example.invalid", status: "revoked", role: "member", revokedAt: new Date(now - 24 * 60 * 60 * 1000 + 60_000).toISOString() }
+    ];
+    useAdminIdentityMock.mockReturnValue(current);
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    const button = (label: string) => [...container.querySelectorAll("button")].find((item) => item.textContent === label)!;
+    try {
+      await act(async () => { root.render(<AdminIdentityView invitationsOnly />); });
+      expect(container.textContent).toContain("Current (2)");
+      expect(container.textContent).not.toContain("old@example.invalid");
+      await act(async () => { button("Archived (1)").click(); });
+      expect(container.textContent).toContain("old@example.invalid");
+      expect(container.textContent).not.toContain("pending@example.invalid");
+      await act(async () => { button("Current (2)").click(); vi.advanceTimersByTime(60_000); });
+      expect(container.textContent).toContain("Current (1)");
+      expect(container.textContent).toContain("Archived (2)");
+      expect(container.textContent).not.toContain("recent@example.invalid");
+    } finally {
+      await act(async () => { root.unmount(); });
+      vi.useRealTimers();
+    }
+  });
   it("does not expose a free-text role editor", () => {
     const source = readFileSync(
       join(
@@ -97,7 +139,7 @@ describe("AdminIdentityView surface spacing", () => {
 
     const mapStart = source.indexOf("{state.users.map((user) => {");
     const invitationsStart = source.indexOf(
-      '<section aria-labelledby="invitations-title">'
+      'aria-labelledby="invitations-title"'
     );
 
     expect(mapStart).toBeGreaterThan(-1);
