@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from html import escape
 import smtplib
 import ssl
+from typing import Mapping
+from atlas.invitation_email_template import DEFAULT_TEMPLATE, validate_template
 
 from atlas_api.services.invitation_art import invitation_art
 
@@ -107,29 +109,25 @@ class SMTPEmailSender:
 
     def send_invitation(
         self, *, recipient: str, registration_url: str, expires_at: str,
+        template: Mapping[str, object] | None = None,
     ) -> None:
         """Send a multipart invitation using the configured account transport."""
         message = EmailMessage()
-        message["Subject"] = "You're invited to Project Atlas"
+        copy = validate_template(DEFAULT_TEMPLATE if template is None else template)
+        message["Subject"] = copy["subject"]
         message["From"] = self.sender
         message["To"] = recipient
         # The image travels with the email, independent of site maintenance.
         expiry_text = invitation_expiry(expires_at)
-        welcome_text = (
-            "Welcome to Project Atlas, your home for all things media. "
-            "Explore movies, shows, and sports, with game servers and "
-            "tech and gaming news on the horizon."
-        )
         message.set_content(
-            "We saved you a seat.\n\n"
-            f"{welcome_text}\n\n"
-            f"Create your account: {registration_url}\n\n"
+            f"{copy['heading']}\n\n{copy['welcome']}\n\n{copy['instructions']}\n\n"
+            f"{copy['button_label']}: {registration_url}\n\n"
             f"This invitation expires {expiry_text}.\n"
             "If you were not expecting this invitation, you can ignore it.\n"
         )
         url = escape(registration_url, quote=True)
         expiry = escape(expiry_text)
-        welcome = escape(welcome_text)
+        rendered = {key: escape(value).replace("\n", "<br>") for key, value in copy.items()}
         message.add_alternative(
             f"""<!doctype html>
 <html lang="en"><body style="margin:0;background:#090e1c;color:#eaf0ff;
@@ -142,15 +140,14 @@ alt="The Atlas panda offers you an invitation."
 style="display:block;width:100%;max-width:560px;height:auto;border:0;border-radius:16px 16px 0 0"></td></tr>
 <tr><td style="padding:36px">
 <p style="color:#72c8ff;font-size:12px;letter-spacing:3px">PROJECT ATLAS</p>
-<h1 style="font-size:28px;line-height:1.2;color:#eaf0ff">We saved you a seat.</h1>
-<p style="color:#c5d1e8;line-height:1.6">{welcome}</p>
-<p style="color:#c5d1e8;line-height:1.6">Use the button below to create your
-account. We'd love to have you join us.</p>
+<h1 style="font-size:28px;line-height:1.2;color:#eaf0ff">{rendered['heading']}</h1>
+<p style="color:#c5d1e8;line-height:1.6">{rendered['welcome']}</p>
+<p style="color:#c5d1e8;line-height:1.6">{rendered['instructions']}</p>
 <p style="margin:32px 0"><a href="{url}" style="display:inline-block;
 background:#75c9ff;color:#000000 !important;-webkit-text-fill-color:#000000 !important;
 padding:14px 24px;border-radius:8px;font-weight:bold;text-decoration:none">
 <font color="#000000" style="color:#000000 !important;
--webkit-text-fill-color:#000000 !important">Accept invitation</font></a></p>
+-webkit-text-fill-color:#000000 !important">{rendered['button_label']}</font></a></p>
 <p style="color:#c5d1e8;font-size:14px">This invitation expires {expiry}.</p>
 <p style="color:#c5d1e8;font-size:13px">Button not working?
 <a href="{url}" style="color:#75c9ff">Open your registration link</a>.</p>

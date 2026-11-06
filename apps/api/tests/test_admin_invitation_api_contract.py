@@ -78,6 +78,17 @@ class _NoopSecurityAuditWriter:
 
 
 class AdminInvitationAPIContractTests(unittest.TestCase):
+    def test_email_template_editor_requires_user_update_permission(self) -> None:
+        with patch('atlas_api.routes.v1.admin_invitations.default_identity_paths',return_value=self.paths):
+            member = self.client_for(self.member_profile)
+            self.assertEqual(member.get('/api/v1/admin/invitations/email-template').status_code,403)
+            self.assertEqual(member.put('/api/v1/admin/invitations/email-template',json={'template':{}}).status_code,403)
+            admin = self.client_for(self.global_admin_profile)
+            response = admin.get('/api/v1/admin/invitations/email-template')
+            self.assertEqual(response.status_code,200)
+            self.assertIn('defaults',response.json())
+            self.assertEqual(admin.put('/api/v1/admin/invitations/email-template',json={'template':{}}).status_code,422)
+
     def setUp(self) -> None:
         self.mail = patch(
             "atlas_api.routes.v1.admin_invitations.deliver_invitation_email",
