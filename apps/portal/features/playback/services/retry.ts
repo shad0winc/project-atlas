@@ -1,6 +1,18 @@
 import type { PlaybackSession } from "../types/session";
 import type { SubtitleSelection } from "./session";
 
+export function adminPlaybackRefreshDelay(accessToken: string, now = Date.now()): number | null {
+  try {
+    const payload = accessToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const { exp, iat } = JSON.parse(atob(payload));
+    if (!Number.isSafeInteger(exp) || !Number.isSafeInteger(iat) || exp <= iat) return null;
+    const lead = Math.min(60_000, (exp - iat) * 100);
+    return Math.max(0, exp * 1_000 - now - lead);
+  } catch {
+    return null;
+  }
+}
+
 export type PlaybackSessionResolver = (
   provider: string,
   itemId: string,

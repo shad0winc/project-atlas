@@ -4,7 +4,11 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { AtlasTheaterPlayer } from "./AtlasTheaterPlayer";
 import type { PlaybackSession } from "../types/session";
-vi.mock("../services/stream", () => ({ bootstrapPlaybackStream: async () => ({ streamUrl: "https://playback.example.test/videos/fixture/master.m3u8" }) }));
+import { bootstrapPlaybackStream } from "../services/stream";
+import { registerAtlasAuthLifecycle } from "../../../lib/auth/session-lifecycle";
+import { clearAtlasAuthSession, writeAtlasAuthSession } from "../../../lib/auth/storage";
+import type { AtlasAuthSession } from "../../../lib/auth/types";
+vi.mock("../services/stream", () => ({ bootstrapPlaybackStream: vi.fn(async () => ({ streamUrl: "https://playback.example.test/videos/fixture/master.m3u8" })) }));
 const session: PlaybackSession = {available:true,action:"watch_now",label:"Watch Now",backend:"jellyfin",sourceType:"library",provider:"jellyfin",requestedTargetId:"e1",playableTargetId:"e1",title:"Fixture",mediaType:"tv",canSeek:true,playbackBootstrapUrl:"",playbackCapability:"fixture",audioTracks:[],subtitleTracks:[{index:3,kind:"subtitle",label:"Signs & Songs",default:false,forced:false}],seriesId:"s1",nextTargetId:"e3"};
 const hlsMock = vi.hoisted(() => ({
   supported: false,
@@ -47,8 +51,52 @@ beforeEach(() => {
   vi.spyOn(HTMLMediaElement.prototype,"pause").mockImplementation(function(this:HTMLMediaElement){playing=false;this.dispatchEvent(new Event("pause"));});
   container=document.createElement("div");document.body.append(container);root=createRoot(container);
 });
-afterEach(async()=>{await act(async()=>root.unmount());container.remove();vi.restoreAllMocks();});
+afterEach(async()=>{await act(async()=>root.unmount());container.remove();clearAtlasAuthSession();vi.useRealTimers();vi.restoreAllMocks();});
 describe("mounted player continuity",()=>{
+  it("renews admin library playback before expiry without reattaching the stream", async () => {
+    vi.useFakeTimers();
+    const accessToken = () => {
+      const iat = Math.floor(Date.now() / 1000);
+      return `test.${btoa(JSON.stringify({ iat, exp: iat + 900 }))}.test`;
+    };
+    const login: AtlasAuthSession = {
+      tokens: { accessToken: accessToken(), refreshToken: "", tokenType: "bearer" },
+      user: {
+        user_id: "admin-a", username: "admin", display_name: "Admin", roles: ["admin"],
+        first_name: null, last_name: null, email: null, discord_account: null,
+        email_notifications_enabled: false, discord_notifications_enabled: false,
+        provider: "atlas", granted_permission_patterns: [], denied_permission_patterns: []
+      }
+    };
+    writeAtlasAuthSession(login);
+    const refresh = vi.fn(async () => {
+      const replacement = accessToken();
+      writeAtlasAuthSession({ ...login, tokens: { ...login.tokens, accessToken: replacement } });
+      return replacement;
+    });
+    const unregister = registerAtlasAuthLifecycle({ refreshAccessToken: refresh, expireSession: clearAtlasAuthSession });
+    const renewed = { ...session, playbackCapability: "renewed" };
+    const resolver = vi.fn(async () => renewed);
+    vi.mocked(bootstrapPlaybackStream).mockClear();
+    hlsMock.supported = true;
+    try {
+      await act(async () => root.render(<AtlasTheaterPlayer session={session} viewerId="admin-a" sessionResolver={resolver} />));
+      await flush();
+      const video = container.querySelector("video")!;
+      video.currentTime = 128;
+      await act(async () => vi.advanceTimersByTimeAsync(840_000));
+      expect(refresh).toHaveBeenCalledTimes(1);
+      expect(resolver).toHaveBeenCalledWith("jellyfin", "e1", expect.any(AbortSignal), "auto");
+      expect(bootstrapPlaybackStream).toHaveBeenLastCalledWith(renewed, expect.any(AbortSignal));
+      await act(async () => vi.advanceTimersByTimeAsync(61_000));
+      expect(hlsMock.attach).toHaveBeenCalledTimes(1);
+      expect(hlsMock.destroy).not.toHaveBeenCalled();
+      expect(video.currentTime).toBe(128);
+      expect(container.querySelector('[role="alert"]')).toBeNull();
+    } finally {
+      unregister();
+    }
+  });
   it("prefers managed HLS for library playback even when native HLS is supported", async () => {
     hlsMock.supported=true;
     await act(async()=>root.render(<AtlasTheaterPlayer session={session}/>));await flush();
