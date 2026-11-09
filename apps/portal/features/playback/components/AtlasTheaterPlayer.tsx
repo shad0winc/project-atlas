@@ -5,11 +5,13 @@ import { useEffect, useRef, useState } from "react";
 import { DislikeAction } from "../../dislikes";
 import { MediaRetentionStatus } from "../../media/components/MediaRetentionStatus";
 import type { MediaRetention } from "../../media/types/retention";
+import { refreshAtlasAuthAccessToken, subscribeAtlasAuthLifecycle } from "../../../lib/auth/session-lifecycle";
+import { readAtlasAuthSession } from "../../../lib/auth/storage";
 
 import { resolvePlaybackSession } from "../services/session";
 import type { SubtitleSelection } from "../services/session";
 import { bootstrapPlaybackStream } from "../services/stream";
-import { refreshPlaybackForRetry, retryResumePosition } from "../services/retry";
+import { adminPlaybackRefreshDelay, refreshPlaybackForRetry, retryResumePosition } from "../services/retry";
 import { createPlaybackDiagnostics } from "../services/diagnostics";
 import { captionStartupPolicy } from "../services/caption-startup";
 import { safeLiveSeekPosition } from "../services/live-seek";
@@ -52,6 +54,13 @@ function parseSubtitleSelection(value: string): SubtitleSelection {
 
 type FavoriteState = "loading" | "idle" | "submitting" | "complete" | "unavailable";
 
+function adminAccessToken(viewerId: string | undefined): string | null {
+  const login = readAtlasAuthSession();
+  if (!login || login.user.user_id !== viewerId ||
+      !login.user.roles.some((role) => role === "admin" || role === "global_admin")) return null;
+  return login.tokens.accessToken;
+}
+
 export function AtlasTheaterPlayer({
   session,
   viewerId,
@@ -93,6 +102,7 @@ export function AtlasTheaterPlayer({
   const shouldPlayRef = useRef(true);
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const retryRequestRef = useRef<AbortController | null>(null);
+  const streamUrlRef = useRef<string | null>(null);
 
   const [activeSession, setActiveSession] = useState<PlaybackSession>(session);
 
@@ -123,6 +133,10 @@ export function AtlasTheaterPlayer({
     retryRequestRef.current = controller;
     setState({ status: "connecting" });
     try {
+      const token = adminAccessToken(viewerId);
+      if (activeSession.sourceType === "library" && token && adminPlaybackRefreshDelay(token) === 0) {
+        await refreshAtlasAuthAccessToken();
+      }
       const refreshed = await refreshPlaybackForRetry(
         activeSession,
         sessionResolver,
@@ -141,6 +155,64 @@ export function AtlasTheaterPlayer({
       if (retryRequestRef.current === controller) retryRequestRef.current = null;
     }
   }
+
+  useEffect(() => {
+    const streamUrl = streamUrlRef.current;
+    const initialToken = adminAccessToken(viewerId);
+    if (state.status !== "ready" || subtitleChanging || activeSession.sourceType !== "library" ||
+        !streamUrl || !initialToken) return;
+
+    const videoScope = new URL(streamUrl).pathname.split("/")[2];
+    const controller = new AbortController();
+    const { signal } = controller;
+    let boundToken = initialToken;
+    let timer: number | undefined;
+    let renewing = false;
+
+    function schedule() {
+      window.clearTimeout(timer);
+      const delay = adminPlaybackRefreshDelay(boundToken);
+      if (delay !== null) timer = window.setTimeout(() => void renew(), delay);
+    }
+
+    async function renew() {
+      if (signal.aborted || renewing || retryRequestRef.current) return;
+      renewing = true;
+      window.clearTimeout(timer);
+      try {
+        const current = adminAccessToken(viewerId);
+        if (!current) return;
+        const token = current === boundToken
+          ? await refreshAtlasAuthAccessToken()
+          : current;
+        signal.throwIfAborted();
+        if (!adminAccessToken(viewerId)) throw new Error("Administrator access ended.");
+        const refreshed = await refreshPlaybackForRetry(activeSession, sessionResolver, subtitleSelection, signal);
+        const renewed = await bootstrapPlaybackStream(refreshed, signal);
+        signal.throwIfAborted();
+        // Library playback cookies cover one /videos/<id>/ prefix.
+        if (new URL(renewed.streamUrl).pathname.split("/")[2] !== videoScope) {
+          throw new Error("The playback scope changed during renewal.");
+        }
+        boundToken = token;
+        schedule();
+      } catch {
+        if (!signal.aborted) {
+          setState({ status: "error", message: "Atlas could not renew secure playback. Try again." });
+        }
+      } finally {
+        renewing = false;
+      }
+    }
+
+    const unsubscribe = subscribeAtlasAuthLifecycle({ onRefreshSucceeded: () => void renew() });
+    schedule();
+    return () => {
+      unsubscribe();
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [activeSession, sessionResolver, state.status, subtitleChanging, subtitleSelection, viewerId]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -213,6 +285,7 @@ export function AtlasTheaterPlayer({
         if (disposed) {
           return;
         }
+        streamUrlRef.current = streamUrl;
 
         const { default: Hls } = await import("hls.js");
 
@@ -314,6 +387,7 @@ export function AtlasTheaterPlayer({
 
     return () => {
       disposed = true;
+      streamUrlRef.current = null;
       controller.abort();
       destroyHls?.();
 
