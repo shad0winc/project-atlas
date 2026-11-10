@@ -53,6 +53,7 @@ export function ServiceView(): React.ReactElement {
             : undefined
       }
       detailLoading={detailState.status === "loading"}
+      onCheckForUpdates={refresh}
       onClearSelection={clearSelection}
       onSelectService={selectService}
       snapshot={state.data}

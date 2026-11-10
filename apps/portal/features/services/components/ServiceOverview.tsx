@@ -18,6 +18,7 @@ type ServiceOverviewProps = Readonly<{
   detailLoading?: boolean;
   onSelectService: (identifier: string) => void;
   onClearSelection: () => void;
+  onCheckForUpdates?: () => void;
 }>;
 
 function serviceStatus(service: ManagedService): string {
@@ -95,7 +96,8 @@ export function ServiceOverview({
   detailError,
   detailLoading = false,
   onSelectService,
-  onClearSelection
+  onClearSelection,
+  onCheckForUpdates
 }: ServiceOverviewProps): React.ReactElement {
   const updateStatusByService = new Map(
     snapshot.updates.updates.map((update) => [update.serviceIdentifier, update.status])
@@ -130,6 +132,11 @@ export function ServiceOverview({
             Current {snapshot.updates.current} · Unknown {snapshot.updates.unknown} · Unsupported{" "}
             {snapshot.updates.unsupported}
           </p>
+          {onCheckForUpdates ? (
+            <button className="dashboard-retry-button" onClick={onCheckForUpdates} type="button">
+              Check for updates
+            </button>
+          ) : null}
         </Card>
 
         <Card className="service-lifecycle-card">

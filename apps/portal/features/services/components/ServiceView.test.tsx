@@ -355,6 +355,7 @@ describe("Service Lifecycle presentation", () => {
   it("renders managed-service cards with production-derived service state", () => {
     const markup = renderToStaticMarkup(
       <ServiceOverview
+        onCheckForUpdates={() => undefined}
         onClearSelection={() => undefined}
         onSelectService={() => undefined}
         snapshot={snapshot}
@@ -368,6 +369,7 @@ describe("Service Lifecycle presentation", () => {
     expect(markup).toContain("Health: healthy");
     expect(markup).toContain("Health: degraded");
     expect(markup).toContain("Update availability");
+    expect(markup).toContain(">Check for updates</button>");
     expect(markup).toContain("1 update available");
     expect(markup).toContain("Maintenance history");
     expect(markup).toContain("2 maintenance records");
