@@ -1,5 +1,7 @@
 import { Card } from "../../../components/ui/Card";
 
+import type { UpdateCheckStatus } from "../hooks/use-services";
+
 import type {
   ManagedService,
   ManagedServiceDetail,
@@ -19,6 +21,7 @@ type ServiceOverviewProps = Readonly<{
   onSelectService: (identifier: string) => void;
   onClearSelection: () => void;
   onCheckForUpdates?: () => void;
+  updateCheckStatus?: UpdateCheckStatus;
 }>;
 
 function serviceStatus(service: ManagedService): string {
@@ -97,7 +100,8 @@ export function ServiceOverview({
   detailLoading = false,
   onSelectService,
   onClearSelection,
-  onCheckForUpdates
+  onCheckForUpdates,
+  updateCheckStatus = "idle"
 }: ServiceOverviewProps): React.ReactElement {
   const updateStatusByService = new Map(
     snapshot.updates.updates.map((update) => [update.serviceIdentifier, update.status])
@@ -137,10 +141,26 @@ export function ServiceOverview({
             Current {snapshot.updates.current} · Unknown {snapshot.updates.unknown} · Unsupported{" "}
             {snapshot.updates.unsupported}
           </p>
+          {snapshot.updates.evaluatedAt ? (
+            <p>Last evaluated {maintenanceTime(snapshot.updates.evaluatedAt)}</p>
+          ) : null}
           {onCheckForUpdates ? (
-            <button className="dashboard-retry-button" onClick={onCheckForUpdates} type="button">
-              Check for updates
-            </button>
+            <>
+              <button
+                className="dashboard-retry-button"
+                disabled={updateCheckStatus === "checking"}
+                onClick={onCheckForUpdates}
+                type="button"
+              >
+                {updateCheckStatus === "checking" ? "Checking for updates…" : "Check for updates"}
+              </button>
+              <div role="status">
+                {updateCheckStatus === "complete" ? <p>Update check complete.</p> : null}
+                {updateCheckStatus === "error" ? (
+                  <p>Could not check for updates. Showing the previous results.</p>
+                ) : null}
+              </div>
+            </>
           ) : null}
         </Card>
 
