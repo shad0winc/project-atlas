@@ -3,8 +3,10 @@ import { authenticatedAtlasApiRequest } from "../../../lib/services/authenticate
 import {
   createManagedServiceDetail,
   createServiceLifecycleSnapshot,
+  createServiceUpdateReport,
   type ManagedServiceDetail,
-  type ServiceLifecycleSnapshot
+  type ServiceLifecycleSnapshot,
+  type ServiceUpdateReport
 } from "../types/services";
 
 export type LoadServiceLifecycleOptions = Readonly<{
@@ -44,6 +46,20 @@ function getRequestOptions(signal: AbortSignal | undefined) {
   };
 }
 
+function requestServiceUpdates(signal: AbortSignal | undefined) {
+  return authenticatedAtlasApiRequest<ServiceUpdateReportTransportResponse>(
+    "/services/updates",
+    getRequestOptions(signal)
+  );
+}
+
+export async function loadServiceUpdateReport({
+  signal
+}: LoadServiceLifecycleOptions = {}): Promise<ServiceUpdateReport> {
+  const { report } = await requestServiceUpdates(signal);
+  return createServiceUpdateReport(report);
+}
+
 export async function loadServiceLifecycleOverview({
   signal
 }: LoadServiceLifecycleOptions = {}): Promise<ServiceLifecycleSnapshot> {
@@ -60,10 +76,7 @@ export async function loadServiceLifecycleOverview({
       "/services/summary",
       getRequestOptions(signal)
     ),
-    authenticatedAtlasApiRequest<ServiceUpdateReportTransportResponse>(
-      "/services/updates",
-      getRequestOptions(signal)
-    ),
+    requestServiceUpdates(signal),
     authenticatedAtlasApiRequest<ServiceMaintenanceHistoryTransportResponse>(
       "/services/history",
       getRequestOptions(signal)

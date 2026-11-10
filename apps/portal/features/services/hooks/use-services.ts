@@ -4,7 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "../../../lib/auth/use-auth";
 
-import { loadManagedServiceDetail, loadServiceLifecycleOverview } from "../api/services";
+import {
+  loadManagedServiceDetail,
+  loadServiceLifecycleOverview,
+  loadServiceUpdateReport
+} from "../api/services";
 import {
   mergeManagedServiceDetail,
   type ManagedServiceDetail,
@@ -13,10 +17,14 @@ import {
   type ServiceLifecycleState
 } from "../types/services";
 
+export type UpdateCheckStatus = "idle" | "checking" | "complete" | "error";
+
 export type UseServicesResult = Readonly<{
   state: ServiceLifecycleState;
   detailState: ServiceDetailState;
   refresh: () => void;
+  checkForUpdates: () => void;
+  updateCheckStatus: UpdateCheckStatus;
   selectService: (identifier: string) => void;
   clearSelection: () => void;
 }>;
@@ -40,6 +48,8 @@ export function useServices(): UseServicesResult {
   const [detailError, setDetailError] = useState<Error | null>(null);
   const [selectedIdentifier, setSelectedIdentifier] = useState<string | null>(null);
 
+  const [updateCheckStatus, setUpdateCheckStatus] = useState<UpdateCheckStatus>("idle");
+  const updateController = useRef<AbortController | null>(null);
   const detailController = useRef<AbortController | null>(null);
 
   const refresh = useCallback((): void => {
@@ -47,6 +57,42 @@ export function useServices(): UseServicesResult {
     setError(null);
     setRequestVersion((currentVersion) => currentVersion + 1);
   }, []);
+
+  const checkForUpdates = useCallback((): void => {
+    if (!isAuthenticated || updateController.current) {
+      return;
+    }
+
+    const controller = new AbortController();
+    updateController.current = controller;
+    setUpdateCheckStatus("checking");
+
+    void loadServiceUpdateReport({ signal: controller.signal })
+      .then((updates) => {
+        if (!controller.signal.aborted) {
+          setData((snapshot) => (snapshot ? { ...snapshot, updates } : snapshot));
+          setUpdateCheckStatus("complete");
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setUpdateCheckStatus("error");
+        }
+      })
+      .finally(() => {
+        if (updateController.current === controller) {
+          updateController.current = null;
+        }
+      });
+  }, [isAuthenticated]);
+
+  useEffect(
+    () => () => {
+      updateController.current?.abort();
+      updateController.current = null;
+    },
+    [isAuthenticated]
+  );
 
   const clearSelection = useCallback((): void => {
     detailController.current?.abort();
@@ -122,6 +168,7 @@ export function useServices(): UseServicesResult {
 
         setData(snapshot);
         setError(null);
+        setUpdateCheckStatus("idle");
       })
       .catch((requestError: unknown) => {
         if (
@@ -199,6 +246,8 @@ export function useServices(): UseServicesResult {
     state,
     detailState,
     refresh,
+    checkForUpdates,
+    updateCheckStatus,
     selectService,
     clearSelection
   };
