@@ -1,10 +1,12 @@
 "use client";
 
+import { useAuth } from "../../../lib/auth/use-auth";
 import { useServices } from "../hooks/use-services";
 
 import { ServiceOverview } from "./ServiceOverview";
 
 export function ServiceView(): React.ReactElement {
+  const { user } = useAuth();
   const {
     state,
     detailState,
@@ -51,6 +53,7 @@ export function ServiceView(): React.ReactElement {
 
   return (
     <ServiceOverview
+      canPreviewBazarrUpdate={user?.roles.includes("global_admin")}
       detail={detailState.status === "ready" ? detailState.data : undefined}
       detailError={detailState.status === "error" ? detailState.error.message : undefined}
       detailIdentifier={

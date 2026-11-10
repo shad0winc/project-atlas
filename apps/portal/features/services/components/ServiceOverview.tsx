@@ -10,6 +10,7 @@ import type {
   ServiceUpdateStatus
 } from "../types/services";
 
+import { BazarrUpdatePreview } from "./BazarrUpdatePreview";
 import { ServiceHealthCard } from "./ServiceHealthCard";
 
 type ServiceOverviewProps = Readonly<{
@@ -22,6 +23,7 @@ type ServiceOverviewProps = Readonly<{
   onClearSelection: () => void;
   onCheckForUpdates?: () => void;
   updateCheckStatus?: UpdateCheckStatus;
+  canPreviewBazarrUpdate?: boolean;
 }>;
 
 function serviceStatus(service: ManagedService): string {
@@ -101,7 +103,8 @@ export function ServiceOverview({
   onSelectService,
   onClearSelection,
   onCheckForUpdates,
-  updateCheckStatus = "idle"
+  updateCheckStatus = "idle",
+  canPreviewBazarrUpdate = false
 }: ServiceOverviewProps): React.ReactElement {
   const updateStatusByService = new Map(
     snapshot.updates.updates.map((update) => [update.serviceIdentifier, update.status])
@@ -272,6 +275,11 @@ export function ServiceOverview({
                 <dd>{selectedUpdate.availableImage || "Not reported"}</dd>
               </dl>
               {selectedUpdate.reason ? <p>{selectedUpdate.reason}</p> : null}
+              {canPreviewBazarrUpdate &&
+              selectedUpdate.serviceIdentifier === "bazarr" &&
+              selectedUpdate.status === "update-available" ? (
+                <BazarrUpdatePreview key={selectedUpdate.availableImage} />
+              ) : null}
             </Card>
           ) : null}
 
