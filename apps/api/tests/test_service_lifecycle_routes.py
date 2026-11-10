@@ -7,14 +7,18 @@ import unittest
 from fastapi import HTTPException, status
 from fastapi.testclient import TestClient
 
-from atlas.service_lifecycle import ServiceLifecycleError
+from atlas.service_lifecycle import ImageReference, ServiceLifecycleError, ServiceUpdate, UpdateStatus
+from atlas_api.auth.models import AuthenticatedUser
 from atlas_api.dependencies import (
+    get_jwt_service,
+    get_security_audit_writer,
     get_service_lifecycle_service,
     get_service_maintenance_history_service,
     get_service_update_service,
 )
 from atlas_api.main import create_app
 from atlas_api.routes.v1.services import (
+    require_bazarr_preview_admin,
     require_service_lifecycle_read,
 )
 
@@ -253,6 +257,48 @@ class ServiceLifecycleRouteTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.app.dependency_overrides.clear()
         self.client.close()
+
+    def test_bazarr_preview_requires_authentication(self) -> None:
+        self.app.dependency_overrides[get_jwt_service] = object
+        self.app.dependency_overrides[get_security_audit_writer] = lambda: None
+        response = self.client.get("/api/v1/services/bazarr/update-preview")
+        self.assertEqual(status.HTTP_401_UNAUTHORIZED, response.status_code)
+
+    def test_bazarr_preview_pins_both_images_and_refuses_identical_digests(self) -> None:
+        actor = AuthenticatedUser("admin", "admin", "Admin", ("global_admin",))
+        self.app.dependency_overrides[require_bazarr_preview_admin] = lambda: actor
+        repo = "lscr.io/linuxserver/bazarr"
+        local = "sha256:" + "a" * 64
+        remote = "sha256:" + "b" * 64
+        inspected: list[str] = []
+
+        def inspect(identifier: str):
+            inspected.append(identifier)
+            return ServiceUpdate(
+                service_identifier="bazarr",
+                service_name="Bazarr",
+                current_image=ImageReference(repository=repo, tag="latest"),
+                available_image=ImageReference(repository=repo, tag="latest", digest=remote),
+                status=UpdateStatus.UPDATE_AVAILABLE,
+                details={"registry_comparison": True, "local_descriptor_digest": local},
+            )
+
+        self.update_service.inspect_update = inspect
+        path = "/api/v1/services/bazarr/update-preview"
+        response = self.client.get(path)
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        self.assertEqual("no-store", response.headers["Cache-Control"])
+        plan = response.json()["plan"]
+        self.assertTrue(plan["dry_run"])
+        self.assertEqual("admin", plan["requested_by"])
+        self.assertEqual(local, plan["current_image"]["digest"])
+        self.assertEqual(remote, plan["target_image"]["digest"])
+        self.assertEqual(["bazarr"], inspected)
+        self.assertEqual(status.HTTP_404_NOT_FOUND, self.client.get(path.replace("bazarr", "sonarr")).status_code)
+        self.assertEqual(status.HTTP_405_METHOD_NOT_ALLOWED, self.client.post(path).status_code)
+
+        remote = local
+        self.assertEqual(status.HTTP_409_CONFLICT, self.client.get(path).status_code)
 
     def test_lists_managed_services(self) -> None:
         response = self.client.get(

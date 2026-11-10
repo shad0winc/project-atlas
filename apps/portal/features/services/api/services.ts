@@ -109,3 +109,17 @@ export async function loadManagedServiceDetail(
 
   return createManagedServiceDetail(response.service);
 }
+
+export type BazarrUpdatePlan = Readonly<{
+  current_image: { canonical_reference: string };
+  target_image: { canonical_reference: string };
+  warnings: readonly string[];
+}>;
+
+export async function loadBazarrUpdatePlan(signal: AbortSignal): Promise<BazarrUpdatePlan> {
+  const { plan } = await authenticatedAtlasApiRequest<{ plan: BazarrUpdatePlan }>(
+    "/services/bazarr/update-preview",
+    getRequestOptions(signal)
+  );
+  return plan;
+}
