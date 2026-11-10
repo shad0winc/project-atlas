@@ -5,7 +5,15 @@ import { useServices } from "../hooks/use-services";
 import { ServiceOverview } from "./ServiceOverview";
 
 export function ServiceView(): React.ReactElement {
-  const { state, detailState, refresh, selectService, clearSelection } = useServices();
+  const {
+    state,
+    detailState,
+    refresh,
+    checkForUpdates,
+    updateCheckStatus,
+    selectService,
+    clearSelection
+  } = useServices();
 
   if (state.status === "loading") {
     return (
@@ -53,10 +61,11 @@ export function ServiceView(): React.ReactElement {
             : undefined
       }
       detailLoading={detailState.status === "loading"}
-      onCheckForUpdates={refresh}
+      onCheckForUpdates={checkForUpdates}
       onClearSelection={clearSelection}
       onSelectService={selectService}
       snapshot={state.data}
+      updateCheckStatus={updateCheckStatus}
     />
   );
 }
