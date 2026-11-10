@@ -107,6 +107,11 @@ export function ServiceOverview({
     snapshot.updates.updates.map((update) => [update.serviceIdentifier, update.status])
   );
 
+  const selectedIdentifier = detail?.service.identifier ?? detailIdentifier;
+  const selectedUpdate = snapshot.updates.updates.find(
+    (update) => update.serviceIdentifier === selectedIdentifier
+  );
+
   return (
     <div className="dashboard-runtime">
       <section aria-label="Service Lifecycle summary" className="dashboard-metric-grid">
@@ -249,6 +254,26 @@ export function ServiceOverview({
               {detail?.service.name ?? detailIdentifier ?? "Managed service"}
             </h2>
           </div>
+
+          {selectedUpdate ? (
+            <Card className="service-lifecycle-card">
+              <h3>Image update details</h3>
+              <p>Status: {updateStatusLabel(selectedUpdate.status)}</p>
+              <dl style={{ overflowWrap: "anywhere" }}>
+                <dt>Current image</dt>
+                <dd>{selectedUpdate.currentImage || "Not reported"}</dd>
+                {selectedUpdate.localDescriptorDigest ? (
+                  <>
+                    <dt>Local descriptor digest</dt>
+                    <dd>{selectedUpdate.localDescriptorDigest}</dd>
+                  </>
+                ) : null}
+                <dt>Available image</dt>
+                <dd>{selectedUpdate.availableImage || "Not reported"}</dd>
+              </dl>
+              {selectedUpdate.reason ? <p>{selectedUpdate.reason}</p> : null}
+            </Card>
+          ) : null}
 
           {detailLoading ? (
             <Card className="service-lifecycle-card">

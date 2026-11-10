@@ -46,6 +46,10 @@ export type ServiceUpdate = Readonly<{
   serviceIdentifier: string;
   serviceName: string;
   status: ServiceUpdateStatus;
+  currentImage: string;
+  availableImage: string;
+  localDescriptorDigest: string;
+  reason: string;
   raw: Readonly<Record<string, unknown>>;
 }>;
 
@@ -322,6 +326,19 @@ export function createServiceLifecycleSummary(value: unknown): ServiceLifecycleS
   };
 }
 
+function updateImageReference(value: unknown): string {
+  const image = recordValue(value);
+  const reference = stringValue(image.canonical_reference, stringValue(image.raw_reference, ""));
+  if (reference) {
+    return reference;
+  }
+
+  const repository = stringValue(image.repository, "");
+  const tag = stringValue(image.tag, "");
+  const digest = stringValue(image.digest, "");
+  return repository ? `${repository}${tag ? `:${tag}` : ""}${digest ? `@${digest}` : ""}` : "";
+}
+
 export function createServiceUpdateReport(value: unknown): ServiceUpdateReport {
   const report = recordValue(value);
   const counts = recordValue(report.counts);
@@ -332,6 +349,10 @@ export function createServiceUpdateReport(value: unknown): ServiceUpdateReport {
       stringValue(entry.service_identifier, "Unknown service")
     ),
     status: updateStatusValue(entry.status),
+    currentImage: updateImageReference(entry.current_image),
+    availableImage: updateImageReference(entry.available_image),
+    localDescriptorDigest: stringValue(recordValue(entry.details).local_descriptor_digest, ""),
+    reason: stringValue(entry.reason, ""),
     raw: entry
   }));
 

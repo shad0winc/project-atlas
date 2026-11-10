@@ -143,13 +143,19 @@ describe("Service Lifecycle presentation", () => {
           service_identifier: "sonarr",
           service_name: "Sonarr",
           status: "update-available",
+          current_image: {
+            canonical_reference: "lscr.io/linuxserver/sonarr:latest"
+          },
+          reason: "The registry manifest differs from the local image descriptor.",
           available_image: {
             repository: "lscr.io/linuxserver/sonarr",
             tag: "latest",
             digest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
           },
           details: {
-            registry_comparison: true
+            registry_comparison: true,
+            local_descriptor_digest:
+              "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           }
         }
       ],
@@ -350,6 +356,26 @@ describe("Service Lifecycle presentation", () => {
     expect(markup).toContain("degraded");
     expect(markup).toContain("75%");
     expect(markup).toContain("Total services");
+  });
+
+  it("shows the current and available image identities for the selected service", () => {
+    const markup = renderToStaticMarkup(
+      <ServiceOverview
+        detailIdentifier="sonarr"
+        onClearSelection={() => undefined}
+        onSelectService={() => undefined}
+        snapshot={snapshot}
+      />
+    );
+
+    expect(markup).toContain("Image update details");
+    expect(markup).toContain("Current image");
+    expect(markup).toContain("lscr.io/linuxserver/sonarr:latest</dd>");
+    expect(markup).toContain("Available image");
+    expect(markup).toContain("lscr.io/linuxserver/sonarr:latest@sha256:bbbbbbbb");
+    expect(markup).toContain("Local descriptor digest");
+    expect(markup).toContain("sha256:aaaaaaaa");
+    expect(markup).toContain("The registry manifest differs from the local image descriptor.");
   });
 
   it("renders managed-service cards with production-derived service state", () => {
