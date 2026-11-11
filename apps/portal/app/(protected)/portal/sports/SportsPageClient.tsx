@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createTerminalLiveRelease } from "../../../../features/sports/services/terminalLiveRelease";
 
 import { useAuth } from "../../../../lib/auth/use-auth";
+import { AtlasApiError } from "../../../../lib/api/errors";
 import { renewSportsLivePlayback } from "../../../../features/sports/services/sports";
 import { PortalPage } from "../../../../components/portal/PortalPage";
 import { AtlasTheaterPlayer } from "../../../../features/playback/components/AtlasTheaterPlayer";
@@ -207,13 +208,13 @@ export function SportsPageClient(): React.ReactElement {
     void retryTerminalRelease();
   }
 
-  function scheduleLiveHeartbeat(liveSession: SportsLiveSessionResult): void {
+  function scheduleLiveHeartbeat(liveSession: SportsLiveSessionResult, retry = false): void {
     clearLiveHeartbeat();
     if (terminalRelease.blocksHeartbeat(liveSession.liveSessionId)) return;
 
     const { liveSessionId, ttlSeconds } = liveSession;
 
-    const delayMs = Math.max(1_000, Math.floor((ttlSeconds * 1000) / 2));
+    const delayMs = retry ? 250 : Math.max(1_000, Math.floor((ttlSeconds * 1000) / 2));
 
     liveHeartbeatTimeoutRef.current = setTimeout(() => {
       void heartbeatSportsLiveSession(liveSessionId)
@@ -233,11 +234,18 @@ export function SportsPageClient(): React.ReactElement {
           activeLiveSessionRef.current = refreshed;
           scheduleLiveHeartbeat(refreshed);
         })
-        .catch(() => {
+        .catch((error: unknown) => {
           const current = activeLiveSessionRef.current;
 
           if (current === null || current.liveSessionId !== liveSessionId ||
               terminalRelease.blocksHeartbeat(liveSessionId)) {
+            return;
+          }
+
+          // A request in flight during browser refresh can reach the
+          // maintenance guard with an access token that just rotated.
+          if (!retry && error instanceof AtlasApiError && error.status === 503) {
+            scheduleLiveHeartbeat(current, true);
             return;
           }
 
