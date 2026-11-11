@@ -470,7 +470,8 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
                     normalized_query,
                 "page":
                     normalized_page,
-            }
+            },
+            quote_via=quote,
         )
 
         response = self._get_json(
