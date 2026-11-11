@@ -29,6 +29,7 @@ class PlaybackCapabilityService:
     bootstrap_audience = "atlas-playback-bootstrap"
     session_audience = "atlas-playback-session"
     release_audience = "atlas-sports-session-release"
+    live_renewal_audience = "atlas-sports-playback-renewal"
     release_seconds = 6 * 60 * 60
     bootstrap_seconds = 120
     session_seconds = 6 * 60 * 60
@@ -59,6 +60,34 @@ class PlaybackCapabilityService:
                 **self._maintenance_claim(maintenance_binding),
             },
         )
+
+    def create_live_renewal(self, *, user_id: str, session_id: str,
+                            playable_target_id: str, stream_path: str) -> str:
+        stream, _ = self._stream_scope(stream_path)
+        self._live_identity(stream)  # Validate native identities when Jellyfin opened a stream.
+        return self._encode(
+            audience=self.live_renewal_audience,
+            lifetime_seconds=self.session_seconds,
+            payload={
+                "kind": "sports_playback_renewal",
+                "sub": self._required(user_id, "user_id"),
+                "session": self._required(session_id, "session_id"),
+                "item": self._required(playable_target_id, "item"),
+                "stream": stream,
+            },
+        )
+
+    def authorize_live_renewal(self, token: str, *, session_id: str,
+                               user_id: str) -> dict[str, Any]:
+        payload = self._decode(token, audience=self.live_renewal_audience,
+                               expected_kind="sports_playback_renewal")
+        if payload["sub"] != user_id or payload.get("session") != session_id:
+            raise PlaybackCapabilityError("Live renewal is out of scope.")
+        stream, _ = self._stream_scope(payload.get("stream") or "")
+        identity = self._live_identity(stream)
+        if not isinstance(payload.get("item"), str) or not payload["item"]:
+            raise PlaybackCapabilityError("Live renewal identity is invalid.")
+        return {**payload, "stream": stream, "live_identity": identity}
 
     def create_live_release(self, *, user_id: str, session_id: str,
                             target_id: str, lease_id: str) -> str:

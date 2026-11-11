@@ -688,6 +688,14 @@ def read_sports_live_session(
             stream_path=session.stream_path,
             **({"maintenance_binding": maintenance_binding} if maintenance_binding is not None else {}),
         )
+        renewal_capability = (
+            capabilities.create_live_renewal(
+                user_id=current_user.user_id,
+                session_id=live_session.session_id,
+                playable_target_id=session.playable_target_id,
+                stream_path=session.stream_path,
+            ) if maintenance_binding is not None else None
+        )
     except Exception:
         playback.release_live_stream(
             session_id=live_session.session_id, user_id=current_user.user_id
@@ -703,6 +711,8 @@ def read_sports_live_session(
         raise
 
     response.headers["X-Atlas-Live-Release-Capability"] = release_capability
+    if renewal_capability is not None:
+        response.headers["X-Atlas-Live-Renewal-Capability"] = renewal_capability
     response.headers["Cache-Control"] = "no-store"
     response.headers["X-Atlas-Live-Session-ID"] = live_session.session_id
     response.headers["X-Atlas-Live-Session-TTL"] = str(live_sessions.ttl_seconds)
@@ -793,6 +803,46 @@ def heartbeat_sports_live_session(
         "active": True,
         "ttl_seconds": live_sessions.ttl_seconds,
     }
+
+
+@router.post(
+    "/sessions/{session_id}/renew-playback",
+    summary="Renew gateway authorization for an existing Sports live stream",
+)
+def renew_sports_live_playback(
+    current_user: Annotated[AuthenticatedUser, Depends(require_sports_read)],
+    live_sessions: Annotated[SportsSessionRegistry, Depends(get_sports_session_registry)],
+    resource_pool: Annotated[SportsResourcePool, Depends(get_sports_resource_pool)],
+    session_id: Annotated[str, Path(min_length=1, max_length=256)],
+    playback: Annotated[PlaybackService, Depends(get_playback_service)],
+    capabilities: Annotated[PlaybackCapabilityService, Depends(get_playback_capability_service)],
+    maintenance_binding: Annotated[str | None, Depends(issue_maintenance_media_binding)],
+    renewal_capability: Annotated[str, Header(alias="X-Atlas-Live-Renewal-Capability", max_length=8192)],
+    response: Response,
+) -> dict[str, str]:
+    try:
+        claims = capabilities.authorize_live_renewal(
+            renewal_capability, session_id=session_id, user_id=current_user.user_id,
+        )
+    except PlaybackCapabilityError as exc:
+        raise HTTPException(401, "Live playback renewal is invalid or expired.") from exc
+    identity = claims["live_identity"]
+    if identity:
+        try:
+            playback.authorize_live_stream(
+                user_id=current_user.user_id, item_id=claims["item"],
+                live_stream_id=identity["livestreamid"],
+                play_session_id=identity["playsessionid"],
+                media_source_id=identity["mediasourceid"],
+            )
+        except LiveStreamOwnershipError as exc:
+            raise HTTPException(404, "Live playback owner is unavailable.") from exc
+    heartbeat_sports_live_session(current_user, live_sessions, resource_pool, session_id, playback)
+    response.headers["Cache-Control"] = "no-store"
+    return {"playback_capability": capabilities.create_bootstrap(
+        user_id=current_user.user_id, playable_target_id=claims["item"],
+        stream_path=claims["stream"], maintenance_binding=maintenance_binding,
+    )}
 
 
 @router.delete(

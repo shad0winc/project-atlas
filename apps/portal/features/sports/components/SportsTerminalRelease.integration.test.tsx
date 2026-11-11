@@ -7,16 +7,20 @@ import type { SportsLiveSessionResult } from "../services/sports";
 import { SportsPageClient } from "../../../app/(protected)/portal/sports/SportsPageClient";
 
 const mock = vi.hoisted(() => ({
-  create: vi.fn(), heartbeat: vi.fn(), release: vi.fn(),
+  create: vi.fn(), heartbeat: vi.fn(), release: vi.fn(), renew: vi.fn(),
   players: [] as Array<{
     session: PlaybackSession;
+    viewerId?: string;
+    liveSessionRenewer?: (signal: AbortSignal) => Promise<PlaybackSession>;
     onTerminalError: (session: PlaybackSession) => void;
   }>,
 }));
 vi.mock("../services/sports", () => ({
   createSportsLiveSession: mock.create,
+  renewSportsLivePlayback: mock.renew,
   releaseSportsLiveSession: mock.release,
 }));
+vi.mock("../../../lib/auth/use-auth", () => ({ useAuth: () => ({ user: { user_id: "admin" } }) }));
 vi.mock("..", () => ({
   heartbeatSportsLiveSession: mock.heartbeat,
   releaseSportsLiveSession: mock.release,
@@ -167,4 +171,19 @@ it("joins pending terminal cleanup when the page unmounts", async () => {
   expect(mock.release).toHaveBeenCalledTimes(1);
   await act(async () => release.resolve());
   expect(mock.release).toHaveBeenCalledTimes(1);
+});
+
+it("renews the existing live session without releasing or opening another feed", async () => {
+  const current = { ...owned("first"), renewalCapability: "renew-fixture" };
+  const renewed = { ...current.session, playbackCapability: "refreshed-fixture" };
+  mock.create.mockResolvedValueOnce(current);
+  mock.renew.mockResolvedValueOnce(renewed);
+  await click("Watch fixture");
+  const player = mock.players.at(-1)!;
+  expect(player.viewerId).toBe("admin");
+  const signal = new AbortController().signal;
+  await expect(player.liveSessionRenewer!(signal)).resolves.toEqual(renewed);
+  expect(mock.renew).toHaveBeenCalledWith(current, signal);
+  expect(mock.create).toHaveBeenCalledTimes(1);
+  expect(mock.release).not.toHaveBeenCalled();
 });

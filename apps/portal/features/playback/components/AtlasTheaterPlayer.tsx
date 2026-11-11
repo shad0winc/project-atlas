@@ -67,6 +67,7 @@ export function AtlasTheaterPlayer({
   onNextEpisode,
   autoAdvance = true,
   sessionResolver = resolvePlaybackSession,
+  liveSessionRenewer,
   retention = null,
   canFavorite = false,
   favoriteState = "loading",
@@ -86,6 +87,7 @@ export function AtlasTheaterPlayer({
     signal?: AbortSignal,
     subtitle?: SubtitleSelection
   ) => Promise<PlaybackSession>;
+  liveSessionRenewer?: (signal: AbortSignal) => Promise<PlaybackSession>;
   retention?: MediaRetention | null;
   canFavorite?: boolean;
   favoriteState?: FavoriteState;
@@ -103,6 +105,8 @@ export function AtlasTheaterPlayer({
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const retryRequestRef = useRef<AbortController | null>(null);
   const streamUrlRef = useRef<string | null>(null);
+  const sessionResolverRef = useRef(sessionResolver);
+  useEffect(() => { sessionResolverRef.current = sessionResolver; }, [sessionResolver]);
 
   const [activeSession, setActiveSession] = useState<PlaybackSession>(session);
 
@@ -159,7 +163,8 @@ export function AtlasTheaterPlayer({
   useEffect(() => {
     const streamUrl = streamUrlRef.current;
     const initialToken = adminAccessToken(viewerId);
-    if (state.status !== "ready" || subtitleChanging || activeSession.sourceType !== "library" ||
+    const live = activeSession.sourceType === "live";
+    if (state.status !== "ready" || subtitleChanging || (live && !liveSessionRenewer) ||
         !streamUrl || !initialToken) return;
 
     const videoScope = new URL(streamUrl).pathname.split("/")[2];
@@ -187,11 +192,16 @@ export function AtlasTheaterPlayer({
           : current;
         signal.throwIfAborted();
         if (!adminAccessToken(viewerId)) throw new Error("Administrator access ended.");
-        const refreshed = await refreshPlaybackForRetry(activeSession, sessionResolver, subtitleSelection, signal);
+        const refreshed = live && liveSessionRenewer
+          ? await liveSessionRenewer(signal)
+          : await refreshPlaybackForRetry(activeSession, sessionResolverRef.current, subtitleSelection, signal);
+        signal.throwIfAborted();
         const renewed = await bootstrapPlaybackStream(refreshed, signal);
         signal.throwIfAborted();
-        // Library playback cookies cover one /videos/<id>/ prefix.
-        if (new URL(renewed.streamUrl).pathname.split("/")[2] !== videoScope) {
+        const scopeChanged = live
+          ? renewed.streamUrl !== streamUrl
+          : new URL(renewed.streamUrl).pathname.split("/")[2] !== videoScope;
+        if (scopeChanged) {
           throw new Error("The playback scope changed during renewal.");
         }
         boundToken = token;
@@ -212,7 +222,7 @@ export function AtlasTheaterPlayer({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [activeSession, sessionResolver, state.status, subtitleChanging, subtitleSelection, viewerId]);
+  }, [activeSession, liveSessionRenewer, state.status, subtitleChanging, subtitleSelection, viewerId]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -304,6 +314,7 @@ export function AtlasTheaterPlayer({
           video.src = streamUrl;
           video.load();
           sourceAttached = true;
+          if (activeSession.sourceType === "live") void restorePlaybackPosition();
           setState({ status: "ready" });
           return;
         }
@@ -338,6 +349,9 @@ export function AtlasTheaterPlayer({
             fragmentStart: data.frag.start, fragmentDuration: data.frag.duration });
         });
         hls.on(Hls.Events.FRAG_BUFFERED, (_event, data) => {
+          if (activeSession.sourceType === "live" && data.frag.type === "main") {
+            void restorePlaybackPosition();
+          }
           diagnostic("fragment_buffered", { fragmentSequence: data.frag.sn,
             fragmentStart: data.frag.start, fragmentDuration: data.frag.duration });
         });
@@ -370,6 +384,7 @@ export function AtlasTheaterPlayer({
         hls.attachMedia(video);
         hls.loadSource(streamUrl);
         sourceAttached = true;
+        if (activeSession.sourceType === "live") void restorePlaybackPosition();
 
         setState({ status: "ready" });
       })

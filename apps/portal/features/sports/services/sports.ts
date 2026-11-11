@@ -93,6 +93,7 @@ export type SportsLiveSessionResult = Readonly<{
   ttlSeconds: number;
   playbackOptionId?: string;
   releaseCapability?: string;
+  renewalCapability?: string;
 }>;
 
 type SportsLiveHeartbeatTransport = Readonly<{
@@ -331,6 +332,7 @@ export async function createSportsLiveSession(
   }
 
   const releaseCapability = response.headers.get("X-Atlas-Live-Release-Capability")?.trim() || undefined;
+  const renewalCapability = response.headers.get("X-Atlas-Live-Renewal-Capability")?.trim() || undefined;
 
   try {
     const ttlHeader =
@@ -360,7 +362,8 @@ export async function createSportsLiveSession(
       session,
       liveSessionId,
       ttlSeconds,
-      ...(releaseCapability === undefined ? {} : { releaseCapability })
+      ...(releaseCapability === undefined ? {} : { releaseCapability }),
+      ...(renewalCapability === undefined ? {} : { renewalCapability })
     });
   } catch (validationError) {
     try {
@@ -374,6 +377,28 @@ export async function createSportsLiveSession(
 
     throw validationError;
   }
+}
+
+export async function renewSportsLivePlayback(
+  current: SportsLiveSessionResult,
+  signal: AbortSignal
+): Promise<PlaybackSession> {
+  if (!current.renewalCapability) {
+    throw new Error("Sports live playback renewal is unavailable.");
+  }
+  const response = await authenticatedAtlasApiRequest<{ playback_capability: string }>(
+    `/sports/live/sessions/${encodeURIComponent(current.liveSessionId)}/renew-playback`,
+    {
+      method: "POST",
+      cache: "no-store",
+      signal,
+      headers: { "X-Atlas-Live-Renewal-Capability": current.renewalCapability }
+    }
+  );
+  if (typeof response.playback_capability !== "string" || !response.playback_capability.trim()) {
+    throw new Error("Sports live playback renewal did not return a playback grant.");
+  }
+  return { ...current.session, playbackCapability: response.playback_capability };
 }
 
 export async function heartbeatSportsLiveSession(

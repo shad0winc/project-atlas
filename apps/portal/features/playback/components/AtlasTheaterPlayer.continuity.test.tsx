@@ -53,7 +53,7 @@ beforeEach(() => {
 });
 afterEach(async()=>{await act(async()=>root.unmount());container.remove();clearAtlasAuthSession();vi.useRealTimers();vi.restoreAllMocks();});
 describe("mounted player continuity",()=>{
-  it("renews admin library playback before expiry without reattaching the stream", async () => {
+  it.each(["library", "live"] as const)("renews admin %s playback before expiry without reattaching the stream", async (sourceType) => {
     vi.useFakeTimers();
     const accessToken = () => {
       const iat = Math.floor(Date.now() / 1000);
@@ -75,18 +75,26 @@ describe("mounted player continuity",()=>{
       return replacement;
     });
     const unregister = registerAtlasAuthLifecycle({ refreshAccessToken: refresh, expireSession: clearAtlasAuthSession });
-    const renewed = { ...session, playbackCapability: "renewed" };
+    const active = { ...session, sourceType, canSeek: sourceType === "library" };
+    const renewed = { ...active, playbackCapability: "renewed" };
     const resolver = vi.fn(async () => renewed);
+    const liveRenewer = vi.fn(async () => renewed);
     vi.mocked(bootstrapPlaybackStream).mockClear();
     hlsMock.supported = true;
     try {
-      await act(async () => root.render(<AtlasTheaterPlayer session={session} viewerId="admin-a" sessionResolver={resolver} />));
+      await act(async () => root.render(<AtlasTheaterPlayer session={active} viewerId="admin-a" sessionResolver={resolver}
+        liveSessionRenewer={sourceType === "live" ? liveRenewer : undefined} />));
       await flush();
       const video = container.querySelector("video")!;
       video.currentTime = 128;
       await act(async () => vi.advanceTimersByTimeAsync(840_000));
       expect(refresh).toHaveBeenCalledTimes(1);
-      expect(resolver).toHaveBeenCalledWith("jellyfin", "e1", expect.any(AbortSignal), "auto");
+      if (sourceType === "live") {
+        expect(liveRenewer).toHaveBeenCalledExactlyOnceWith(expect.any(AbortSignal));
+        expect(resolver).not.toHaveBeenCalled();
+      } else {
+        expect(resolver).toHaveBeenCalledWith("jellyfin", "e1", expect.any(AbortSignal), "auto");
+      }
       expect(bootstrapPlaybackStream).toHaveBeenLastCalledWith(renewed, expect.any(AbortSignal));
       await act(async () => vi.advanceTimersByTimeAsync(61_000));
       expect(hlsMock.attach).toHaveBeenCalledTimes(1);
