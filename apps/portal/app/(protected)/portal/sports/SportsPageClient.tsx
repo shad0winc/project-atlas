@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createTerminalLiveRelease } from "../../../../features/sports/services/terminalLiveRelease";
 
+import { useAuth } from "../../../../lib/auth/use-auth";
+import { renewSportsLivePlayback } from "../../../../features/sports/services/sports";
 import { PortalPage } from "../../../../components/portal/PortalPage";
 import { AtlasTheaterPlayer } from "../../../../features/playback/components/AtlasTheaterPlayer";
 import type { SubtitleSelection } from "../../../../features/playback/services/session";
@@ -51,6 +53,7 @@ import { SportsPlaybackChoices } from "../../../../features/sports/components/Sp
 const sportsRoute = PORTAL_ROUTES.sports;
 
 export function SportsPageClient(): React.ReactElement {
+  const { user } = useAuth();
   const [upcomingSnapshot, setUpcomingSnapshot] = useState<UpcomingSnapshot>({});
   const [scheduleRefreshing, setScheduleRefreshing] = useState(false);
   const [curatedEnabled, setCuratedEnabled] = useState<boolean | null | undefined>(undefined);
@@ -120,6 +123,16 @@ export function SportsPageClient(): React.ReactElement {
   );
 
   const activeLiveSessionRef = useRef<SportsLiveSessionResult | null>(null);
+
+  const renewLivePlayback = useCallback(async (signal: AbortSignal): Promise<PlaybackSession> => {
+    const current = activeLiveSessionRef.current;
+    if (!current) throw new Error("Sports live playback is no longer active.");
+    const renewed = await renewSportsLivePlayback(current, signal);
+    if (activeLiveSessionRef.current?.liveSessionId !== current.liveSessionId) {
+      throw new Error("The Sports live session changed during renewal.");
+    }
+    return renewed;
+  }, []);
 
   const liveHeartbeatTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
@@ -709,6 +722,8 @@ export function SportsPageClient(): React.ReactElement {
               key={activeLiveSession.atlasChannelId}
               session={activeLiveSession.session}
               sessionResolver={resolveSportsLiveSession}
+              viewerId={user?.user_id}
+              liveSessionRenewer={activeLiveSession.renewalCapability ? renewLivePlayback : undefined}
               onTerminalError={handleTerminalPlaybackError}
             />
           ) : null}
