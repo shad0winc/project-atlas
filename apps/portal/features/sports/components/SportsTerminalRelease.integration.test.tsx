@@ -2,6 +2,7 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { AtlasApiError } from "../../../lib/api/errors";
 import type { PlaybackSession } from "../../playback/types/session";
 import type { SportsLiveSessionResult } from "../services/sports";
 import { SportsPageClient } from "../../../app/(protected)/portal/sports/SportsPageClient";
@@ -99,6 +100,34 @@ async function failCurrent() {
   await act(async () => player.onTerminalError(player.session));
   return player;
 }
+
+it.each([true, false])("retries one unavailable heartbeat before deciding whether to release (recovers: %s)", async (recovers) => {
+  const unavailable = new AtlasApiError({
+    status: 503, detail: "Unavailable", method: "POST", path: "/heartbeat",
+    requestId: "fixture", kind: "unavailable",
+  });
+  mock.heartbeat.mockRejectedValueOnce(unavailable);
+  if (!recovers) mock.heartbeat.mockRejectedValueOnce(unavailable);
+  await click("Watch fixture");
+  await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+  expect(mock.heartbeat).toHaveBeenCalledExactlyOnceWith("first");
+  expect(mock.release).not.toHaveBeenCalled();
+  expect(container.querySelector('[data-testid="player"]')).not.toBeNull();
+
+  await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+  expect(mock.heartbeat.mock.calls).toEqual([["first"], ["first"]]);
+  if (recovers) {
+    expect(mock.release).not.toHaveBeenCalled();
+    expect(container.querySelector('[data-testid="player"]')).not.toBeNull();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(mock.heartbeat).toHaveBeenCalledTimes(3);
+  } else {
+    expect(mock.release).toHaveBeenCalledExactlyOnceWith("first", { releaseCapability: "credential-first" });
+    expect(container.querySelector('[data-testid="player"]')).toBeNull();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(mock.heartbeat).toHaveBeenCalledTimes(2);
+  }
+});
 
 it.each(["resolve", "reject"] as const)("does not renew after a late heartbeat %s", async (outcome) => {
   const heartbeat = deferred<{ ttlSeconds: number }>();
