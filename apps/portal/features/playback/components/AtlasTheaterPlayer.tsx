@@ -249,7 +249,13 @@ export function AtlasTheaterPlayer({
     setAutoplayBlocked(false);
     const savePosition = () => {
       if (!restored) return;
-      try { writeResume(window.localStorage, key, video.currentTime, video.ended); } catch { /* Optional storage. */ }
+      try {
+        writeResume(window.localStorage, key, video.currentTime, video.ended, {
+          title: activeSession.title,
+          duration: Number.isFinite(video.duration) ? video.duration : undefined,
+          episode: activeSession.mediaType === "tv" || Boolean(activeSession.seriesId)
+        });
+      } catch { /* Optional storage. */ }
     };
     const restorePlaybackPosition = async () => {
       if (disposed || !sourceAttached || restoring || restored) return;

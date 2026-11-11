@@ -31,6 +31,7 @@ function visibleLabels(effective: AtlasEffectivePermissionPatterns): string[] {
 describe("Portal route model", () => {
   it("registers every route ID exactly once", () => {
     expect(portalRoutes.map((route) => route.id)).toEqual([
+      "home",
       "dashboard",
       "media",
       "library",
@@ -54,7 +55,8 @@ describe("Portal route model", () => {
   });
 
   it("provides stable named route access", () => {
-    expect(PORTAL_ROUTES.dashboard.path).toBe("/portal");
+    expect(PORTAL_ROUTES.home.path).toBe("/portal");
+    expect(PORTAL_ROUTES.dashboard.path).toBe("/portal/administration/dashboard");
     expect(PORTAL_ROUTES.media.path).toBe("/portal/media");
     expect(PORTAL_ROUTES.library.path).toBe("/portal/library");
     expect(PORTAL_ROUTES.theater.path).toBe("/portal/theater");
@@ -76,11 +78,11 @@ describe("Portal route model", () => {
     ).toEqual([
       {
         label: PORTAL_ROUTE_SECTIONS.workspace,
-        routes: ["dashboard", "media", "library", "favorites", "sports", "theater", "settings"]
+        routes: ["home", "media", "favorites", "sports", "settings"]
       },
       {
         label: PORTAL_ROUTE_SECTIONS.management,
-        routes: ["downloadManagement", "users", "services", "administration"]
+        routes: ["dashboard", "downloadManagement", "users", "services", "administration"]
       }
     ]);
   });
@@ -90,11 +92,13 @@ describe("Portal route model", () => {
     expect(PORTAL_ROUTES.downloads.path).toBe("/portal/downloads");
     expect(PORTAL_ROUTES.requests.navigation).toBe(false);
     expect(PORTAL_ROUTES.downloads.navigation).toBe(false);
+    expect(PORTAL_ROUTES.library.navigation).toBe(false);
+    expect(PORTAL_ROUTES.theater.navigation).toBe(false);
   });
 
-  it("matches the dashboard only at its exact path", () => {
-    expect(portalRouteMatchesPathname(PORTAL_ROUTES.dashboard, "/portal")).toBe(true);
-    expect(portalRouteMatchesPathname(PORTAL_ROUTES.dashboard, "/portal/media")).toBe(false);
+  it("matches Home only at its exact path", () => {
+    expect(portalRouteMatchesPathname(PORTAL_ROUTES.home, "/portal")).toBe(true);
+    expect(portalRouteMatchesPathname(PORTAL_ROUTES.home, "/portal/media")).toBe(false);
   });
 
   it("matches feature roots and nested feature paths", () => {
@@ -106,14 +110,15 @@ describe("Portal route model", () => {
   });
 
   it("resolves the most specific matching route", () => {
-    expect(portalRouteForPathname("/portal")).toBe(PORTAL_ROUTES.dashboard);
+    expect(portalRouteForPathname("/portal")).toBe(PORTAL_ROUTES.home);
+    expect(portalRouteForPathname("/portal/administration/dashboard")).toBe(PORTAL_ROUTES.dashboard);
     expect(portalRouteForPathname("/portal/favorites/example")).toBe(PORTAL_ROUTES.favorites);
     expect(portalRouteForPathname("/portal/users/example")).toBe(PORTAL_ROUTES.users);
     expect(portalRouteForPathname("/not-a-portal-page")).toBeNull();
   });
 
   it("resolves Portal page titles through the route model", () => {
-    expect(portalPageTitle("/portal")).toBe("Dashboard");
+    expect(portalPageTitle("/portal")).toBe("Home");
     expect(portalPageTitle("/portal/favorites")).toBe("Favorites");
     expect(portalPageTitle("/portal/users/example")).toBe("Users");
     expect(portalPageTitle("/not-a-portal-page")).toBe("Portal");
@@ -132,10 +137,9 @@ describe("Portal navigation authorization", () => {
         ])
       )
     ).toEqual([
+      "Home",
       "Media",
-      "Library",
       "Favorites",
-      "Theater",
       "Settings"
     ]);
   });
@@ -156,13 +160,12 @@ describe("Portal navigation authorization", () => {
 
   it("shows all current navigation through wildcard grants", () => {
     expect(visibleLabels(authorization(["*"]))).toEqual([
-      "Dashboard",
+      "Home",
       "Media",
-      "Library",
       "Favorites",
       "Sports",
-      "Theater",
       "Settings",
+      "Admin Dashboard",
       "Download Management",
       "Users",
       "Services",
@@ -172,13 +175,12 @@ describe("Portal navigation authorization", () => {
 
   it("supports action wildcard navigation", () => {
     expect(visibleLabels(authorization(["*.read"]))).toEqual([
-      "Dashboard",
+      "Home",
       "Media",
-      "Library",
       "Favorites",
       "Sports",
-      "Theater",
       "Settings",
+      "Admin Dashboard",
       "Users",
       "Services",
       "Administration"
@@ -189,12 +191,11 @@ describe("Portal navigation authorization", () => {
     expect(
       visibleLabels(authorization(["*"], ["favorites.read", "users.read", "system.health.read"]))
     ).toEqual([
-      "Dashboard",
+      "Home",
       "Media",
-      "Library",
       "Sports",
-      "Theater",
       "Settings",
+      "Admin Dashboard",
       "Download Management"
     ]);
   });

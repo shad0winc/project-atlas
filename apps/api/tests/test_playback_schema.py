@@ -42,6 +42,7 @@ def test_playback_session_response_serializes_slotted_tracks() -> None:
         previous_target_id=None,
         next_target_id="next-episode-id",
         series_id="series-id",
+        overview="Episode synopsis.",
     )
 
     response = PlaybackSessionResponse.from_domain(
@@ -73,3 +74,4 @@ def test_playback_session_response_serializes_slotted_tracks() -> None:
 
 
     assert response.series_id == "series-id"
+    assert response.overview == "Episode synopsis."

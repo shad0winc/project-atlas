@@ -13,6 +13,7 @@ export const PORTAL_ROUTE_SECTIONS = {
 export type PortalRouteSection = (typeof PORTAL_ROUTE_SECTIONS)[keyof typeof PORTAL_ROUTE_SECTIONS];
 
 export type PortalRouteId =
+  | "home"
   | "dashboard"
   | "media"
   | "library"
@@ -53,13 +54,22 @@ export type PortalNavigationSection = Readonly<{
 
 export const portalRoutes: readonly PortalRoute[] = [
   {
-    id: "dashboard",
+    id: "home",
     path: "/portal",
-    label: "Dashboard",
+    label: "Home",
+    navigationDescription: "Continue watching and see what you follow",
+    abbreviation: "HM",
+    permission: ATLAS_PERMISSIONS.usersSelfRead,
+    section: PORTAL_ROUTE_SECTIONS.workspace
+  },
+  {
+    id: "dashboard",
+    path: "/portal/administration/dashboard",
+    label: "Admin Dashboard",
     navigationDescription: "Atlas system overview",
     abbreviation: "DB",
     permission: ATLAS_PERMISSIONS.dashboardRead,
-    section: PORTAL_ROUTE_SECTIONS.workspace,
+    section: PORTAL_ROUTE_SECTIONS.management,
     pageDescription: "Review the current state of your Project Atlas environment."
   },
   {
@@ -80,6 +90,7 @@ export const portalRoutes: readonly PortalRoute[] = [
     abbreviation: "LI",
     permission: ATLAS_PERMISSIONS.mediaRead,
     section: PORTAL_ROUTE_SECTIONS.workspace,
+    navigation: false,
     pageDescription: "Watch available media and follow the lifecycle of media requested through Atlas."
   },
   {
@@ -120,6 +131,7 @@ export const portalRoutes: readonly PortalRoute[] = [
     abbreviation: "TH",
     permission: ATLAS_PERMISSIONS.mediaRead,
     section: PORTAL_ROUTE_SECTIONS.workspace,
+    navigation: false,
     pageDescription: "Open your Atlas playback hub or continue to an exact playable item."
   },
   {
@@ -193,6 +205,7 @@ function routeById(routeId: PortalRouteId): PortalRoute {
 }
 
 export const PORTAL_ROUTES = {
+  home: routeById("home"),
   dashboard: routeById("dashboard"),
   media: routeById("media"),
   library: routeById("library"),
@@ -211,12 +224,19 @@ export const PORTAL_ROUTES = {
 /**
  * Determine whether a pathname belongs to a registered Portal route.
  *
- * The dashboard route matches only `/portal`, while feature routes also match
+ * Home matches only `/portal`, while feature routes also match
  * nested detail paths beneath their registered root.
  */
 export function portalRouteMatchesPathname(route: PortalRoute, pathname: string): boolean {
-  if (route.path === PORTAL_ROUTES.dashboard.path) {
+  if (route.path === PORTAL_ROUTES.home.path) {
     return pathname === route.path;
+  }
+
+  if (route.id === "administration" && portalRoutes.some(candidate =>
+    candidate.id !== route.id && candidate.navigation !== false &&
+    candidate.path.startsWith(`${route.path}/`) && portalRouteMatchesPathname(candidate, pathname)
+  )) {
+    return false;
   }
 
   return pathname === route.path || pathname.startsWith(`${route.path}/`);

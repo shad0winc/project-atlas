@@ -10,7 +10,7 @@ import { PortalSectionBanner } from "./PortalSectionBanner";
 
 export type PortalPageProps = Readonly<{
   permission: AtlasPermission;
-  eyebrow: string;
+  eyebrow?: string;
   title: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
@@ -56,7 +56,7 @@ export function PortalPage({
 
         <header className="portal-page-header">
           <div className="portal-page-heading">
-            <p className="portal-page-eyebrow">{eyebrow}</p>
+            {eyebrow ? <p className="portal-page-eyebrow">{eyebrow}</p> : null}
 
             <h2 className="portal-page-title">{title}</h2>
 

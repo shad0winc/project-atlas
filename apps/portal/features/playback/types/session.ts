@@ -20,6 +20,7 @@ export type PlaybackSession = Readonly<{
   requestedTargetId: string;
   playableTargetId: string;
   title: string;
+  overview?: string;
   mediaType: string;
   durationTicks?: number;
   canSeek: boolean;

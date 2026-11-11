@@ -9,9 +9,6 @@ import { PORTAL_ROUTES } from "../../../../lib/navigation/portal";
 const libraryRoute = PORTAL_ROUTES.library;
 
 export function LibraryPageClient(): React.ReactElement {
-  const { can } = usePermission();
-  const canReadRequests = can(ATLAS_PERMISSIONS.requestsRead);
-
   return (
     <PortalPage
       accessDeniedDescription="Your Atlas account does not have permission to view the media library."
@@ -23,6 +20,17 @@ export function LibraryPageClient(): React.ReactElement {
       permission={libraryRoute.permission}
       title="Your library"
     >
+      <MediaLibraryContent />
+    </PortalPage>
+  );
+}
+
+export function MediaLibraryContent(): React.ReactElement {
+  const { can } = usePermission();
+  const canReadRequests = can(ATLAS_PERMISSIONS.requestsRead);
+
+  return (
+    <>
       <MediaCatalogView />
 
       <section aria-labelledby="library-activity-title" className="media-discovery-view">
@@ -44,6 +52,6 @@ export function LibraryPageClient(): React.ReactElement {
           </p>
         )}
       </section>
-    </PortalPage>
+    </>
   );
 }

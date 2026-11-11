@@ -11,17 +11,12 @@ vi.mock("../../../components/portal/PortalPage", () => ({
   PortalPage: ({ children }: { children: React.ReactNode }) => <>{children}</>
 }));
 
-vi.mock("../../../features/media", () => ({
-  MediaCatalogView: () => <div>theater-catalog</div>
-}));
-
-describe("TheaterPageClient home", () => {
-  it("renders a playback hub when there is no exact target", () => {
+describe("TheaterPageClient without a target", () => {
+  it("links to the Media Library for selection", () => {
     const markup = renderToStaticMarkup(<TheaterPageClient />);
 
-    expect(markup).toContain("Playback hub");
-    expect(markup).toContain("Available to watch");
-    expect(markup).toContain("theater-catalog");
+    expect(markup).toContain('href="/portal/media?view=library"');
+    expect(markup).toContain("Choose a title in Library");
     expect(markup).not.toContain("Playback unavailable");
   });
 });

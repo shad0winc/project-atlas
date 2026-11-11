@@ -54,6 +54,7 @@ class PlaybackSession:
     previous_target_id: str | None = None
     next_target_id: str | None = None
     series_id: str | None = None
+    overview: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
