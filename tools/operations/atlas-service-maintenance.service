@@ -1,0 +1,15 @@
+[Unit]
+Description=Atlas service maintenance authority
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -I -S -B /usr/local/libexec/atlas-service-maintenance/atlas_service_maintenance.py serve
+Restart=on-failure
+RestartSec=5
+UMask=0077
+User=root
+
+[Install]
+WantedBy=multi-user.target

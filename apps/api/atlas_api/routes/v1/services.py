@@ -1,7 +1,8 @@
-"""Read-only Service Lifecycle routes for version 1 of the Atlas HTTP API."""
+"""Service Lifecycle reports and admin host maintenance routes."""
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 import re
 from typing import Annotated, Final
 from uuid import uuid4
@@ -38,6 +39,10 @@ from atlas_api.schemas.service_lifecycle import (
     ServiceUpdateReportResponse,
 )
 from atlas_api.security import require_permission, require_role
+from atlas_api.service_maintenance import (
+    ServiceMaintenanceClient, ServiceMaintenanceError, get_service_maintenance_client,
+)
+
 
 
 SERVICE_LIFECYCLE_READ_PERMISSION: Final = (
@@ -171,6 +176,65 @@ BAZARR_IMAGE_REPOSITORY = "lscr.io/linuxserver/bazarr"
 SHA256_DIGEST = re.compile(r"sha256:[a-f0-9]{64}")
 
 
+def _host_request(client: ServiceMaintenanceClient, operation: str, actor: str | None = None) -> dict:
+    try:
+        return client.request(operation, actor)
+    except ServiceMaintenanceError as error:
+        code = str(error)
+        conflict = code in {"operation_busy", "maintenance_required", "reviewed_operation_unavailable"}
+        raise HTTPException(
+            status_code=409 if conflict else 503,
+            detail={
+                "code": code,
+                "message": {
+                    "operation_busy": "A service operation is already running.",
+                    "maintenance_required": "Enable maintenance mode before changing services.",
+                    "reviewed_operation_unavailable": "No reviewed operation is available.",
+                }.get(code, "Service maintenance is unavailable."),
+            },
+        ) from error
+
+
+@router.get("/maintenance", summary="Read host service maintenance status")
+def read_host_maintenance(
+    response: Response,
+    _user: Annotated[AuthenticatedUser, Depends(require_bazarr_preview_admin)],
+    client: Annotated[ServiceMaintenanceClient, Depends(get_service_maintenance_client)],
+) -> dict:
+    response.headers["Cache-Control"] = "no-store"
+    return _host_request(client, "status")
+
+
+@router.post("/updates/refresh", status_code=202, summary="Scan current service images")
+def start_service_scan(
+    response: Response,
+    user: Annotated[AuthenticatedUser, Depends(require_bazarr_preview_admin)],
+    client: Annotated[ServiceMaintenanceClient, Depends(get_service_maintenance_client)],
+) -> dict:
+    response.headers["Cache-Control"] = "no-store"
+    return _host_request(client, "scan", user.user_id)
+
+
+@router.post("/bazarr/apply", status_code=202, summary="Apply the reviewed Bazarr operation")
+def apply_bazarr_update(
+    response: Response,
+    user: Annotated[AuthenticatedUser, Depends(require_bazarr_preview_admin)],
+    client: Annotated[ServiceMaintenanceClient, Depends(get_service_maintenance_client)],
+) -> dict:
+    response.headers["Cache-Control"] = "no-store"
+    return _host_request(client, "bazarr.apply", user.user_id)
+
+
+@router.post("/bazarr/rollback", status_code=202, summary="Restore the reviewed Bazarr backup")
+def rollback_bazarr_update(
+    response: Response,
+    user: Annotated[AuthenticatedUser, Depends(require_bazarr_preview_admin)],
+    client: Annotated[ServiceMaintenanceClient, Depends(get_service_maintenance_client)],
+) -> dict:
+    response.headers["Cache-Control"] = "no-store"
+    return _host_request(client, "bazarr.rollback", user.user_id)
+
+
 @router.get("/bazarr/update-preview", summary="Preview a Bazarr image update")
 def preview_bazarr_update(
     response: Response,
@@ -182,6 +246,13 @@ def preview_bazarr_update(
     response.headers["Cache-Control"] = "no-store"
     try:
         update = service.inspect_update("bazarr")
+        observed_at = datetime.fromisoformat(update.evaluated_at.replace("Z", "+00:00"))
+        age = datetime.now(timezone.utc) - observed_at
+        if age > timedelta(hours=2) or age < -timedelta(minutes=5):
+            raise HTTPException(
+                status_code=409,
+                detail="Run a fresh service scan before preparing this update.",
+            )
         available = update.available_image
         local_digest = update.details.get("local_descriptor_digest")
         if (

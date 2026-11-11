@@ -7,7 +7,8 @@ import { useAuth } from "../../../lib/auth/use-auth";
 import {
   loadManagedServiceDetail,
   loadServiceLifecycleOverview,
-  loadServiceUpdateReport
+  loadServiceUpdateReport,
+  scanServiceUpdates
 } from "../api/services";
 import {
   mergeManagedServiceDetail,
@@ -23,6 +24,7 @@ export type UseServicesResult = Readonly<{
   state: ServiceLifecycleState;
   detailState: ServiceDetailState;
   refresh: () => void;
+  reloadObservations: () => void;
   checkForUpdates: () => void;
   updateCheckStatus: UpdateCheckStatus;
   selectService: (identifier: string) => void;
@@ -38,7 +40,8 @@ function normalizeServiceError(value: unknown): Error {
 }
 
 export function useServices(): UseServicesResult {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const canRunMaintenance = user?.roles.includes("global_admin") === true;
 
   const [data, setData] = useState<ServiceLifecycleSnapshot | null>(null);
   const [error, setError] = useState<Error | null>(null);
@@ -51,12 +54,29 @@ export function useServices(): UseServicesResult {
   const [updateCheckStatus, setUpdateCheckStatus] = useState<UpdateCheckStatus>("idle");
   const updateController = useRef<AbortController | null>(null);
   const detailController = useRef<AbortController | null>(null);
+  const observationController = useRef<AbortController | null>(null);
 
   const refresh = useCallback((): void => {
     setData(null);
     setError(null);
     setRequestVersion((currentVersion) => currentVersion + 1);
   }, []);
+
+  const reloadObservations = useCallback((): void => {
+    if (!isAuthenticated) {
+      return;
+    }
+    observationController.current?.abort();
+    const controller = new AbortController();
+    observationController.current = controller;
+    void loadServiceLifecycleOverview({ signal: controller.signal })
+      .then((snapshot) => {
+        if (!controller.signal.aborted) {
+          setData(snapshot);
+        }
+      })
+      .catch(() => undefined);
+  }, [isAuthenticated]);
 
   const checkForUpdates = useCallback((): void => {
     if (!isAuthenticated || updateController.current) {
@@ -67,10 +87,21 @@ export function useServices(): UseServicesResult {
     updateController.current = controller;
     setUpdateCheckStatus("checking");
 
-    void loadServiceUpdateReport({ signal: controller.signal })
-      .then((updates) => {
+    const report = canRunMaintenance
+      ? scanServiceUpdates(controller.signal).then(() =>
+          loadServiceLifecycleOverview({ signal: controller.signal })
+        )
+      : loadServiceUpdateReport({ signal: controller.signal });
+
+    void report
+      .then((report) => {
         if (!controller.signal.aborted) {
-          setData((snapshot) => (snapshot ? { ...snapshot, updates } : snapshot));
+          setData((snapshot) => {
+            if ("services" in report) {
+              return report;
+            }
+            return snapshot ? { ...snapshot, updates: report } : snapshot;
+          });
           setUpdateCheckStatus("complete");
         }
       })
@@ -84,12 +115,14 @@ export function useServices(): UseServicesResult {
           updateController.current = null;
         }
       });
-  }, [isAuthenticated]);
+  }, [isAuthenticated, canRunMaintenance]);
 
   useEffect(
     () => () => {
       updateController.current?.abort();
       updateController.current = null;
+      observationController.current?.abort();
+      observationController.current = null;
     },
     [isAuthenticated]
   );
@@ -247,6 +280,7 @@ export function useServices(): UseServicesResult {
     detailState,
     refresh,
     checkForUpdates,
+    reloadObservations,
     updateCheckStatus,
     selectService,
     clearSelection
