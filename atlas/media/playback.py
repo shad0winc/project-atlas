@@ -55,6 +55,12 @@ class PlaybackSession:
     next_target_id: str | None = None
     series_id: str | None = None
     overview: str | None = None
+    cast: tuple[str, ...] = ()
+    directors: tuple[str, ...] = ()
+    producers: tuple[str, ...] = ()
+    production_locations: tuple[str, ...] = ()
+    video_width: int | None = None
+    video_height: int | None = None
 
 
 @dataclass(frozen=True, slots=True)

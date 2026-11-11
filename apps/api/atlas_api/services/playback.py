@@ -181,6 +181,7 @@ class PlaybackService:
             playable_target_id = normalized_item_id
             session_title = item.title
             overview = item.metadata.get("overview")
+            credits = item.metadata
             previous_target_id = None
             next_target_id = None
             series_id = None
@@ -209,6 +210,11 @@ class PlaybackService:
                 selected = episodes[0]
                 playable_target_id = selected["id"]
                 overview = selected.get("overview")
+                try:
+                    episode_metadata = self._jellyfin.get_item(playable_target_id).metadata
+                except MediaProviderError:
+                    episode_metadata = {}
+                credits = {**credits, **episode_metadata}
 
                 season = selected["season_number"]
                 episode = selected["episode_number"]
@@ -282,6 +288,12 @@ class PlaybackService:
             next_target_id=next_target_id,
             series_id=series_id,
             overview=overview if isinstance(overview, str) else None,
+            cast=credits.get("cast", ()),
+            directors=credits.get("directors", ()),
+            producers=credits.get("producers", ()),
+            production_locations=credits.get("production_locations", ()),
+            video_width=playback.get("video_width"),
+            video_height=playback.get("video_height"),
         )
 
     def resolve_live_session(

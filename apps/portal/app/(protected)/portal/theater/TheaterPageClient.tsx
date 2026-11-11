@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Fragment } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
@@ -9,6 +10,7 @@ import { loadFavorites } from "../../../../features/favorites";
 import { readMediaRetention } from "../../../../features/media/services/retention";
 import { addFavoriteAndRefreshRetention } from "../../../../features/media/services/retention-mutations";
 import { refreshMediaRetentionAfterMutation } from "../../../../features/media/services/retention-refresh";
+import { sourceQuality } from "../../../../features/media/types/quality";
 import type { MediaRetention } from "../../../../features/media/types/retention";
 import { loadPlaybackSession } from "../../../../features/playback/api/session";
 import { SeriesEpisodeNavigation } from "../../../../features/media/components/SeriesEpisodeNavigation";
@@ -327,6 +329,13 @@ export function TheaterPageClient(): React.ReactElement {
   }
 
   if (state.status === "ready") {
+    const { session } = state;
+    const credits = [
+      ["Cast", session.cast],
+      ["Directors", session.directors],
+      ["Producers", session.producers],
+      ["Production origin", session.productionLocations],
+    ] as const;
     return (
       <PortalPage
         accessDeniedDescription="Your Atlas account does not have permission to use Theater."
@@ -348,6 +357,18 @@ export function TheaterPageClient(): React.ReactElement {
             <dl>
               <dt>Source</dt>
               <dd>{state.session.provider === "jellyfin" ? "Jellyfin" : state.session.provider}</dd>
+              {session.sourceType === "library" && (
+                <>
+                  <dt>Source quality</dt>
+                  <dd>{sourceQuality(session.videoWidth, session.videoHeight)}</dd>
+                </>
+              )}
+              {credits.map(([label, names]) => names?.length ? (
+                <Fragment key={label}>
+                  <dt>{label}</dt>
+                  <dd>{names.join(", ")}</dd>
+                </Fragment>
+              ) : null)}
               {state.session.durationTicks && state.session.durationTicks > 0 ? (
                 <>
                   <dt>Runtime</dt>

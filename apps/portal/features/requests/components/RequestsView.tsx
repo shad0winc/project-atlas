@@ -34,6 +34,14 @@ export type RequestsContentProps = Readonly<{
   onConfirmCancellation: (requestId: string) => void | Promise<void>;
 }>;
 
+const REQUEST_ARCHIVE_DELAY_MS = 24 * 60 * 60 * 1000;
+
+function archiveTime(request: MediaRequest): number {
+  return request.status === "available" && request.availableAt
+    ? Date.parse(request.availableAt) + REQUEST_ARCHIVE_DELAY_MS
+    : Number.POSITIVE_INFINITY;
+}
+
 const MEDIA_TYPE_LABELS: Readonly<Record<MediaRequestType, string>> = {
   movie: "Movie",
   tv: "TV",
@@ -338,6 +346,26 @@ export function RequestsContent({
   onCancelConfirmation,
   onConfirmCancellation
 }: RequestsContentProps): React.ReactElement {
+  const [now, setNow] = useState(0);
+
+  useEffect(() => {
+    if (state.status !== "ready") return;
+    function refreshArchiveClock(): void {
+      const current = Date.now();
+      setNow(current);
+      const next = requests.reduce((earliest, request) => {
+        const at = archiveTime(request);
+        return at > current ? Math.min(at, earliest) : earliest;
+      }, Number.POSITIVE_INFINITY);
+      if (Number.isFinite(next)) {
+        timer = window.setTimeout(refreshArchiveClock, Math.min(next - current, 2_147_483_647));
+      }
+    }
+    const requests = state.data;
+    let timer = window.setTimeout(refreshArchiveClock, 0);
+    return () => window.clearTimeout(timer);
+  }, [state]);
+
   if (state.status === "loading") {
     return (
       <section aria-busy="true" aria-label="Loading requests" className="requests-grid">
@@ -389,6 +417,22 @@ export function RequestsContent({
     );
   }
 
+  const archived = state.data.filter(request => archiveTime(request) <= now);
+  const current = state.data.filter(request => !(archiveTime(request) <= now));
+  const renderCard = (request: MediaRequest) => (
+    <RequestCard
+      canCancel={canCancel}
+      cancellingRequestId={cancellingRequestId}
+      key={request.requestId}
+      locallyBlocked={blockedCancellationIds.includes(request.requestId)}
+      onBeginCancellation={onBeginCancellation}
+      onCancelConfirmation={onCancelConfirmation}
+      onConfirmCancellation={onConfirmCancellation}
+      pendingCancellationId={pendingCancellationId}
+      request={request}
+    />
+  );
+
   return (
     <div className="requests-view">
       {mutationFailure ? (
@@ -414,20 +458,16 @@ export function RequestsContent({
       ) : null}
 
       <section aria-label="Your media requests" className="requests-grid">
-        {state.data.map((request) => (
-          <RequestCard
-            canCancel={canCancel}
-            cancellingRequestId={cancellingRequestId}
-            key={request.requestId}
-            locallyBlocked={blockedCancellationIds.includes(request.requestId)}
-            onBeginCancellation={onBeginCancellation}
-            onCancelConfirmation={onCancelConfirmation}
-            onConfirmCancellation={onConfirmCancellation}
-            pendingCancellationId={pendingCancellationId}
-            request={request}
-          />
-        ))}
+        {current.length ? current.map(renderCard) : <p>No active requests.</p>}
       </section>
+      {archived.length > 0 && (
+        <details>
+          <summary>Archived requests ({archived.length})</summary>
+          <section aria-label="Archived media requests" className="requests-grid">
+            {archived.map(renderCard)}
+          </section>
+        </details>
+      )}
     </div>
   );
 }

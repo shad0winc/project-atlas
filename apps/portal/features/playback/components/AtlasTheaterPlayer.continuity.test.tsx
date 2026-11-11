@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { AtlasTheaterPlayer } from "./AtlasTheaterPlayer";
 import type { PlaybackSession } from "../types/session";
+import { listSavedResumes } from "../services/continuity";
 import { bootstrapPlaybackStream } from "../services/stream";
 import { registerAtlasAuthLifecycle } from "../../../lib/auth/session-lifecycle";
 import { clearAtlasAuthSession, writeAtlasAuthSession } from "../../../lib/auth/storage";
@@ -53,6 +54,25 @@ beforeEach(() => {
 });
 afterEach(async()=>{await act(async()=>root.unmount());container.remove();clearAtlasAuthSession();vi.useRealTimers();vi.restoreAllMocks();});
 describe("mounted player continuity",()=>{
+  it("keeps the Home resume entry when HLS teardown resets the video", async () => {
+    hlsMock.supported = true;
+    await act(async () => root.render(<AtlasTheaterPlayer session={session} viewerId="viewer" />));
+    await flush();
+    const video = container.querySelector("video")!;
+    video.currentTime = 43;
+    hlsMock.destroy.mockImplementationOnce(() => {
+      video.currentTime = 0;
+      video.dispatchEvent(new Event("pause"));
+    });
+
+    await act(async () => root.render(null));
+
+    expect(hlsMock.destroy).toHaveBeenCalledOnce();
+    expect(listSavedResumes(window.localStorage, "viewer")).toMatchObject([
+      { itemId: "e1", title: "Fixture", position: 43 }
+    ]);
+  });
+
   it.each(["library", "live"] as const)("renews admin %s playback before expiry without reattaching the stream", async (sourceType) => {
     vi.useFakeTimers();
     const accessToken = () => {

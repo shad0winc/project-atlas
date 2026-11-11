@@ -21,6 +21,12 @@ export type PlaybackSession = Readonly<{
   playableTargetId: string;
   title: string;
   overview?: string;
+  cast?: readonly string[];
+  directors?: readonly string[];
+  producers?: readonly string[];
+  productionLocations?: readonly string[];
+  videoWidth?: number;
+  videoHeight?: number;
   mediaType: string;
   durationTicks?: number;
   canSeek: boolean;

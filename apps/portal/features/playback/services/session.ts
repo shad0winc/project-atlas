@@ -22,6 +22,12 @@ type PlaybackSessionTransport = Readonly<{
   playable_target_id: string;
   title: string;
   overview?: string | null;
+  cast?: readonly string[];
+  directors?: readonly string[];
+  producers?: readonly string[];
+  production_locations?: readonly string[];
+  video_width?: number | null;
+  video_height?: number | null;
   media_type: string;
   duration_ticks: number | null;
   can_seek: boolean;
@@ -96,6 +102,12 @@ export async function resolvePlaybackSession(
     playableTargetId: response.playable_target_id,
     title: response.title,
     ...(response.overview?.trim() ? { overview: response.overview.trim() } : {}),
+    ...(response.cast?.length ? { cast: response.cast } : {}),
+    ...(response.directors?.length ? { directors: response.directors } : {}),
+    ...(response.producers?.length ? { producers: response.producers } : {}),
+    ...(response.production_locations?.length ? { productionLocations: response.production_locations } : {}),
+    ...(response.video_width != null ? { videoWidth: response.video_width } : {}),
+    ...(response.video_height != null ? { videoHeight: response.video_height } : {}),
     mediaType: response.media_type,
     ...(response.duration_ticks === null ? {} : { durationTicks: response.duration_ticks }),
     canSeek: response.can_seek,

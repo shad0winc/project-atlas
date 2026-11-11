@@ -61,6 +61,14 @@ class JellyfinProviderTests(unittest.TestCase):
                             "Name": "The Matrix",
                             "Type": "Movie",
                             "Overview": " A film synopsis. ",
+                            "People": [
+                                {"Name": " Keanu Reeves ", "Type": "Actor"},
+                                {"Name": "Keanu Reeves", "Type": "Actor"},
+                                {"Name": "Lana Wachowski", "Type": "Director"},
+                                {"Name": "Joel Silver", "Type": "Producer"},
+                                {"Name": None, "Type": "Actor"},
+                            ],
+                            "ProductionLocations": ["United States", "Australia"],
                             "ProductionYear": 1999,
                             "Path": "/media/Movies/The Matrix.mkv",
                         }
@@ -83,6 +91,10 @@ class JellyfinProviderTests(unittest.TestCase):
         self.assertEqual("movie", item.media_type)
         self.assertEqual("Movies", item.metadata["library"])
         self.assertEqual("A film synopsis.", item.metadata["overview"])
+        self.assertEqual(("Keanu Reeves",), item.metadata["cast"])
+        self.assertEqual(("Lana Wachowski",), item.metadata["directors"])
+        self.assertEqual(("Joel Silver",), item.metadata["producers"])
+        self.assertEqual(("United States", "Australia"), item.metadata["production_locations"])
         self.assertEqual(2, request.call_count)
         first_request = request.call_args_list[0].args[0]
         headers = {
@@ -99,7 +111,7 @@ class JellyfinProviderTests(unittest.TestCase):
         )
         self.assertNotIn("x-emby-token", headers)
         self.assertEqual(
-            "http://jellyfin:8096/Items?Ids=abc&Recursive=true&Limit=1&Fields=MediaStreams%2COverview",
+            "http://jellyfin:8096/Items?Ids=abc&Recursive=true&Limit=1&Fields=MediaStreams%2COverview%2CPeople%2CProductionLocations",
             request.call_args_list[0].args[0].full_url,
         )
     def test_series_maps_to_tv_and_ancestor_failure_is_nonfatal(self):
