@@ -157,5 +157,104 @@ class HostTests(unittest.TestCase):
                 thread.assert_not_called()
 
 
+class BazarrContextTests(unittest.TestCase):
+    def setUp(self):
+        from hashlib import sha256
+        self.sha = sha256
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.tx = self.root / 'bazarr-ls371-1c267431e51a'
+        self.tx.mkdir()
+        self.marker = self.root / 'maintenance/enabled'
+        self.marker.parent.mkdir()
+        self.marker.write_bytes(b'maintenance\n')
+        self.pointer = self.root / 'deployments/current'
+        record = self.root / 'deployments/records' / host.BAZARR_PUBLICATION
+        record.mkdir(parents=True)
+        (record / 'MANIFEST.sha256').write_bytes(b'baseline\n')
+        self.pointer.write_text(host.BAZARR_PUBLICATION + '\n')
+        self.runner = self.root / 'runner/atlas_bazarr_update.py'
+        self.runner.parent.mkdir()
+        self.runner.write_bytes(b'# reviewed runner fixture\n')
+        info = self.marker.stat()
+        self.inputs = {
+            'baseline_manifest_sha256': sha256(b'baseline\n').hexdigest(),
+            'maintenance_inode': [info.st_dev, info.st_ino],
+            'maintenance_sha256': sha256(self.marker.read_bytes()).hexdigest(),
+            'source_pins': {self.runner.name: sha256(self.runner.read_bytes()).hexdigest()},
+            'original': {'Id': 'old-bazarr'},
+            'protected': {'api': {'name': '/atlas-api', 'image': 'api-image',
+                                  'started_at': 'start', 'running': True,
+                                  'restart_count': 0, 'paused': False}},
+        }
+        (self.tx / 'inputs.json').write_text(json.dumps(self.inputs))
+        self.api = {'Id': 'api', 'Name': '/atlas-api', 'Image': 'api-image',
+                    'Config': {'Labels': {}}, 'State': {'StartedAt': 'start', 'Running': True},
+                    'RestartCount': 0}
+        self.command = Mock(side_effect=self.docker)
+        for name, value in (('BAZARR', self.tx), ('MARKER', self.marker), ('RUNNER', self.runner),
+                            ('docker', self.command)):
+            patcher = patch.object(host, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def docker(self, *args):
+        if args[0] == 'ps':
+            return b'api\n'
+        return json.dumps([self.api]).encode()
+
+    def test_unchanged_reviewed_context_is_recognized(self):
+        self.assertTrue(host.bazarr_context_matches())
+
+    def test_new_atlas_publication_requires_new_context_review(self):
+        self.pointer.write_text('baseline-services-maintenance-99595facca1d\n')
+        self.assertFalse(host.bazarr_context_matches())
+        self.command.assert_not_called()
+
+    def test_changed_protected_runtime_requires_new_context_review(self):
+        self.api['Image'] = 'replacement-api-image'
+        self.assertFalse(host.bazarr_context_matches())
+
+    def test_changed_runner_source_requires_review(self):
+        self.runner.write_bytes(b'# changed\n')
+        self.assertFalse(host.bazarr_context_matches())
+
+    def test_changed_maintenance_marker_requires_review(self):
+        self.marker.write_bytes(b'changed\n')
+        self.assertFalse(host.bazarr_context_matches())
+
+    def test_missing_context_fails_closed(self):
+        (self.tx / 'inputs.json').unlink()
+        self.assertFalse(host.bazarr_context_matches())
+
+    def test_retained_assets_do_not_offer_rollback_after_publication_changes(self):
+        self.pointer.write_text('baseline-services-maintenance-99595facca1d\n')
+        (self.tx / 'completed.json').write_text(json.dumps({
+            'retained_original_id': 'old-bazarr', 'container_id': 'active-bazarr',
+            'version_label': 'v1.6.2-ls371',
+        }))
+        (self.tx / 'fresh-backup.json').write_text('{}')
+        self.command.side_effect = None
+        self.command.return_value = b'[{"State":{"Running":false}}]'
+        with patch.object(host, 'container', return_value={'Id': 'active-bazarr'}):
+            state = host.bazarr_status()
+        self.assertEqual('updated', state['status'])
+        self.assertFalse(state['can_rollback'])
+        self.assertFalse(state['can_apply'])
+        self.assertEqual('deployment_context_changed', state['blocked_reason'])
+
+    def test_blocked_rollback_cannot_start_a_job(self):
+        jobs = host.Jobs.__new__(host.Jobs)
+        jobs.path = self.root / 'job.json'
+        with patch.object(host, 'bazarr_status', return_value={
+            'maintenance_enabled': True, 'can_rollback': False,
+        }), patch.object(host.threading, 'Thread') as thread:
+            with self.assertRaisesRegex(RuntimeError, 'reviewed_operation_unavailable'):
+                jobs.submit('bazarr.rollback', 'admin')
+        thread.assert_not_called()
+        self.assertFalse(jobs.path.exists())
+
+
 if __name__ == "__main__":
     unittest.main()

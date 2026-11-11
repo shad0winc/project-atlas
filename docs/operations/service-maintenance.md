@@ -48,8 +48,13 @@ a root-owned mode 0600 regular file containing the already approved review hash.
 The authorization is not stored in repository source. That runner remains
 the authority for locking, backups, replacement, validation and rollback.
 
-An already completed update offers rollback only while maintenance mode is active
-and the retained container and fresh backup remain available. Rollback restores
+An already completed update offers rollback only while maintenance mode is active,
+the retained container and fresh backup remain available, and the runner's saved
+publication, maintenance marker, source pins and protected-container context still
+match. A later Atlas API/Portal deployment invalidates that original context.
+The worker reports `deployment_context_changed` and disables Bazarr changes until
+a fresh review authorizes the new context; it never rewrites the original journal
+or bypasses the installed runner's guards. Scans and history remain available. Rollback restores
 the previous container, configuration and database and retains replaced data
 separately. The UI requires reviewing that consequence before submission. If an
 interrupted rollback leaves recovery intent, retry invokes the same journaled

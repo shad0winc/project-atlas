@@ -27,6 +27,7 @@ RUNNER = Path("/usr/local/libexec/atlas-bazarr-update-ls371/atlas_bazarr_update.
 AUTHORIZATION_PATH = Path("/etc/atlas/service-maintenance/bazarr-review.sha256")
 MARKER = Path("/mnt/storage/configs/atlas/maintenance/enabled")
 DEPLOYMENT_LOCK = Path("/mnt/storage/configs/atlas/deployment-scheduler.lock")
+BAZARR_PUBLICATION = "baseline-bazarr-preview-126003355a07"
 LIMIT = 16 * 1024 * 1024
 DIGEST = re.compile(r"sha256:[a-f0-9]{64}")
 LOCK = threading.RLock()
@@ -319,6 +320,50 @@ def bazarr_authorization():
     return value
 
 
+def bazarr_context_matches():
+    """Match the existing runner's admission context without executing it."""
+    try:
+        inputs = read_json(BAZARR / "inputs.json")
+        atlas = MARKER.parents[1]
+        if (atlas / "deployments/current").read_bytes() != (BAZARR_PUBLICATION + "\n").encode():
+            return False
+        if sha256((atlas / "deployments/records" / BAZARR_PUBLICATION / "MANIFEST.sha256").read_bytes()).hexdigest() != inputs["baseline_manifest_sha256"]:
+            return False
+        info = MARKER.lstat()
+        if (MARKER.is_symlink() or not MARKER.is_file()
+                or [info.st_dev, info.st_ino] != inputs["maintenance_inode"]
+                or sha256(MARKER.read_bytes()).hexdigest() != inputs["maintenance_sha256"]):
+            return False
+        if not RUNNER.is_file() or RUNNER.is_symlink():
+            return False
+        paths = sorted(RUNNER.parent.glob("*.py"))
+        if any(not path.is_file() or path.is_symlink() for path in paths):
+            return False
+        sources = {path.name: sha256(path.read_bytes()).hexdigest() for path in paths}
+        if sources != inputs["source_pins"]:
+            return False
+        ids = docker("ps", "--all", "--quiet", "--no-trunc").decode().split()
+        rows = json.loads(docker("inspect", "--type", "container", *ids)) if ids else []
+        original_id = inputs["original"]["Id"]
+        observed = {}
+        for row in rows:
+            labels = row["Config"].get("Labels") or {}
+            if row["Id"] == original_id or (
+                row["Name"] == "/bazarr"
+                and labels.get("io.project-atlas.service-update") == BAZARR.name
+                and labels.get("io.project-atlas.original-container") == original_id
+            ):
+                continue
+            observed[row["Id"]] = {
+                "name": row["Name"], "image": row["Image"],
+                "started_at": row["State"]["StartedAt"], "running": row["State"]["Running"],
+                "restart_count": row["RestartCount"], "paused": row["State"].get("Paused", False),
+            }
+        return observed == inputs["protected"]
+    except (OSError, ValueError, KeyError, TypeError, RuntimeError, subprocess.SubprocessError):
+        return False
+
+
 def bazarr_status():
     completed = read_json(BAZARR / "completed.json") if (BAZARR / "completed.json").is_file() else None
     rolled_back = (BAZARR / "rolled-back.json").is_file()
@@ -332,11 +377,13 @@ def bazarr_status():
                       and (BAZARR / "fresh-backup.json").is_file())
         except (RuntimeError, subprocess.SubprocessError):
             pass
+    context_matches = bazarr_context_matches()
     return {
         "status": "rolled-back" if rolled_back else "updated" if completed else "prepared" if BAZARR.is_dir() else "unprepared",
         "version_label": completed.get("version_label") if completed and not rolled_back else None,
-        "can_apply": BAZARR.is_dir() and not completed and not rolled_back,
-        "can_rollback": (assets or recovery_required) and MARKER.is_file(),
+        "can_apply": BAZARR.is_dir() and not completed and not rolled_back and context_matches,
+        "can_rollback": (assets or recovery_required) and MARKER.is_file() and context_matches,
+        "blocked_reason": "deployment_context_changed" if BAZARR.is_dir() and not context_matches else None,
         "recovery_required": recovery_required,
         "maintenance_enabled": MARKER.is_file(),
     }
