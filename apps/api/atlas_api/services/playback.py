@@ -180,6 +180,7 @@ class PlaybackService:
 
             playable_target_id = normalized_item_id
             session_title = item.title
+            overview = item.metadata.get("overview")
             previous_target_id = None
             next_target_id = None
             series_id = None
@@ -207,6 +208,7 @@ class PlaybackService:
 
                 selected = episodes[0]
                 playable_target_id = selected["id"]
+                overview = selected.get("overview")
 
                 season = selected["season_number"]
                 episode = selected["episode_number"]
@@ -279,6 +281,7 @@ class PlaybackService:
             previous_target_id=previous_target_id,
             next_target_id=next_target_id,
             series_id=series_id,
+            overview=overview if isinstance(overview, str) else None,
         )
 
     def resolve_live_session(

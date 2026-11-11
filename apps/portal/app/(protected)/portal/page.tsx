@@ -1,66 +1,20 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-
 import { PortalPage } from "../../../components/portal/PortalPage";
-import { PortalDashboardView } from "../../../features/portal-dashboard";
+import { PortalHome } from "../../../features/home/components/PortalHome";
 import { useAuth } from "../../../lib/auth/use-auth";
-import { usePermission } from "../../../lib/authorization/use-permission";
 import { PORTAL_ROUTES } from "../../../lib/navigation/portal";
 
-const dashboardRoute = PORTAL_ROUTES.dashboard;
-const mediaRoute = PORTAL_ROUTES.media;
-
 export default function PortalPageRoute(): React.ReactElement {
-  const router = useRouter();
   const { user } = useAuth();
-  const { can } = usePermission();
-
-  const authorizationReady = user !== null;
-  const canViewDashboard =
-    authorizationReady && can(dashboardRoute.permission);
-  const canViewMedia =
-    authorizationReady && can(mediaRoute.permission);
-  const shouldOpenMedia =
-    authorizationReady && !canViewDashboard && canViewMedia;
-
-  useEffect(() => {
-    if (shouldOpenMedia) {
-      router.replace(mediaRoute.path);
-    }
-  }, [router, shouldOpenMedia]);
-
-  if (!authorizationReady) {
-    return (
-      <section aria-busy="true">
-        <p>Loading Atlas…</p>
-      </section>
-    );
-  }
-
-  const displayName =
-    user?.display_name.trim() ||
-    user?.username.trim() ||
-    "Atlas user";
-
-  if (shouldOpenMedia) {
-    return (
-      <section aria-busy="true">
-        <p>Opening Media…</p>
-      </section>
-    );
-  }
 
   return (
     <PortalPage
-      accessDeniedDescription="Your Atlas account does not have permission to view the system dashboard."
-      description={dashboardRoute.pageDescription}
-      eyebrow={dashboardRoute.label}
-      permission={dashboardRoute.permission}
-      title={`Welcome back, ${displayName}`}
+      permission={PORTAL_ROUTES.home.permission}
+      title="Home"
+      description="Pick up where you left off and see what you follow."
     >
-      <PortalDashboardView />
+      {user && <PortalHome key={user.user_id} userId={user.user_id} />}
     </PortalPage>
   );
 }

@@ -6,7 +6,6 @@ import { useCallback, useEffect, useState } from "react";
 
 import { PortalPage } from "../../../../components/portal/PortalPage";
 import { loadFavorites } from "../../../../features/favorites";
-import { MediaCatalogView } from "../../../../features/media";
 import { readMediaRetention } from "../../../../features/media/services/retention";
 import { addFavoriteAndRefreshRetention } from "../../../../features/media/services/retention-mutations";
 import { refreshMediaRetentionAfterMutation } from "../../../../features/media/services/retention-refresh";
@@ -311,18 +310,7 @@ export function TheaterPageClient(): React.ReactElement {
         permission={theaterRoute.permission}
         title="Theater"
       >
-        <section aria-labelledby="theater-library-title" className="media-discovery-view">
-          <div className="media-discovery-results-header">
-            <div>
-              <p className="media-discovery-eyebrow">Playback hub</p>
-              <h2 id="theater-library-title">Available to watch</h2>
-              <p className="media-discovery-overview">
-                Choose an available item and Atlas will hand playback to Jellyfin.
-              </p>
-            </div>
-          </div>
-          <MediaCatalogView />
-        </section>
+        <Link href={`${PORTAL_ROUTES.media.path}?view=library`}>Choose a title in Library</Link>
       </PortalPage>
     );
   }
@@ -347,25 +335,29 @@ export function TheaterPageClient(): React.ReactElement {
         permission={theaterRoute.permission}
         title={state.session.title}
       >
-        <section aria-labelledby="atlas-player-title" className="media-discovery-view">
-          <div className="media-discovery-results-header">
-            <div>
-              <p className="media-discovery-eyebrow">Atlas Theater</p>
-              <h2 id="atlas-player-title">{state.session.title}</h2>
-              <p className="media-discovery-overview">
-                Atlas is the playback interface. Jellyfin selects and delivers the compatible media stream.
-              </p>
-            </div>
-          </div>
-          <AuthorizedTheaterPlayer
-            key={[
-              state.session.provider,
-              state.session.requestedTargetId,
-              state.session.playableTargetId
-            ].join(":")}
-            session={state.session}
-          />
-        </section>
+        <div className="theater-layout">
+          <section aria-label="Theater player">
+            <AuthorizedTheaterPlayer
+              key={JSON.stringify([state.session.provider, state.session.requestedTargetId, state.session.playableTargetId])}
+              session={state.session}
+            />
+          </section>
+          <section className="portal-home-card" aria-labelledby="theater-details-title">
+            <h3 id="theater-details-title">About this title</h3>
+            <p>{state.session.overview ?? "A summary is unavailable for this title."}</p>
+            <dl>
+              <dt>Source</dt>
+              <dd>{state.session.provider === "jellyfin" ? "Jellyfin" : state.session.provider}</dd>
+              {state.session.durationTicks && state.session.durationTicks > 0 ? (
+                <>
+                  <dt>Runtime</dt>
+                  <dd>{Math.ceil(state.session.durationTicks / 600_000_000)} min</dd>
+                </>
+              ) : null}
+            </dl>
+            <Link href={`${PORTAL_ROUTES.media.path}?view=library`}>Back to Library</Link>
+          </section>
+        </div>
       </PortalPage>
     );
   }

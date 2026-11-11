@@ -152,7 +152,7 @@ class JellyfinProvider:
                 "Ids": normalized_id,
                 "Recursive": "true",
                 "Limit": 1,
-                "Fields": "MediaStreams",
+                "Fields": "MediaStreams,Overview",
             }
         )
         payload = self._get_json(f"/Items?{query}")
@@ -205,6 +205,10 @@ class JellyfinProvider:
         if raw_type in {"movie", "episode"}:
             metadata.update(video_dimensions(item))
 
+        overview = item.get("Overview")
+        if isinstance(overview, str) and overview.strip():
+            metadata["overview"] = overview.strip()[:4000]
+
         if isinstance(item.get("ProductionYear"), int):
             metadata["year"] = item["ProductionYear"]
 
@@ -252,7 +256,7 @@ class JellyfinProvider:
                 "SortBy": "ParentIndexNumber,IndexNumber",
                 "SortOrder": "Ascending",
                 "Fields": (
-                    "SeriesName,ParentIndexNumber,IndexNumber,MediaStreams"
+                    "SeriesName,ParentIndexNumber,IndexNumber,MediaStreams,Overview"
                 ),
             }
         )
@@ -309,6 +313,7 @@ class JellyfinProvider:
             else:
                 series_name = series_name.strip()
 
+            overview = item.get("Overview")
             episodes.append(
                 {
                     "id": episode_id,
@@ -316,6 +321,8 @@ class JellyfinProvider:
                     "series_name": series_name,
                     "season_number": season_number,
                     "episode_number": episode_number,
+                    **({"overview": overview.strip()[:4000]}
+                       if isinstance(overview, str) and overview.strip() else {}),
                     **video_dimensions(item),
                 }
             )

@@ -12,7 +12,8 @@ type PortalNavLinkProps = Readonly<{
 
 export function PortalNavLink({ item, onNavigate }: PortalNavLinkProps): React.ReactElement {
   const pathname = usePathname();
-  const isActive = portalRouteMatchesPathname(item, pathname);
+  const isActive = portalRouteMatchesPathname(item, pathname) ||
+    (item.id === "media" && /^\/portal\/(?:library|theater)(?:\/|$)/.test(pathname));
 
   return (
     <Link

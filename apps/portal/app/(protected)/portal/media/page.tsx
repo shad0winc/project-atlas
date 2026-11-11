@@ -7,6 +7,9 @@ export const metadata: Metadata = {
   description: "Browse and search movies and TV shows through Project Atlas."
 };
 
-export default function MediaPage(): React.ReactElement {
-  return <MediaPageClient />;
+export default async function MediaPage({
+  searchParams
+}: { searchParams: Promise<{ view?: string | string[] }> }): Promise<React.ReactElement> {
+  const { view } = await searchParams;
+  return <MediaPageClient library={view === "library"} />;
 }

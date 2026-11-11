@@ -815,7 +815,7 @@ a {
   inset: 0 auto 0 0;
   z-index: 40;
   display: flex;
-  width: 18rem;
+  width: min(15rem, 88vw);
   flex-direction: column;
   border-right: 1px solid rgba(148, 163, 184, 0.16);
   background: rgba(7, 13, 26, 0.98);
@@ -1229,7 +1229,7 @@ a {
 
 @media (min-width: 1024px) {
   .portal-shell {
-    padding-left: 18rem;
+    padding-left: 15rem;
   }
 
   .portal-sidebar {
@@ -3079,4 +3079,42 @@ section[aria-labelledby="service-detail-title"] dd {
   display: flex; align-items: center; justify-content: center;
   width: 100%; height: 100%; padding: 0.75rem; box-sizing: border-box;
   text-align: center; color: var(--text-muted, #94a3b8); font-size: 0.875rem;
+}
+
+.portal-home-grid,
+.theater-layout {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+.portal-home-card {
+  min-width: 0;
+  padding: 1rem 1.2rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-medium);
+  background: var(--panel);
+}
+
+.portal-home-card h3 { margin: 0 0 .6rem; }
+.portal-home-card p { margin: .35rem 0; color: var(--text-muted); }
+.portal-home-card ul { list-style: none; padding: 0; margin: 0 0 .75rem; }
+.portal-home-card li + li { border-top: 1px solid var(--border); padding-top: .8rem; margin-top: .8rem; }
+.portal-home-card a:not(.requests-refresh-button) { color: var(--primary-bright); }
+.portal-home-card progress { display: block; max-width: 100%; accent-color: var(--primary-bright); margin: .4rem 0; }
+
+.portal-view-links { display: flex; gap: .5rem; flex-wrap: wrap; }
+.portal-view-links a { border: 1px solid var(--border); padding: .55rem .85rem; border-radius: 8px; }
+.portal-view-links a[aria-current="page"] { color: var(--primary-bright); border-color: var(--primary); }
+.portal-home-card a:focus-visible,
+.portal-view-links a:focus-visible { outline: 2px solid var(--primary-bright); outline-offset: 3px; }
+
+@media (min-width: 920px) {
+  .portal-home-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .portal-home-card:first-child { grid-column: 1 / -1; }
+}
+
+@media (min-width: 1280px) {
+  .theater-layout { grid-template-columns: minmax(0, 2fr) minmax(15rem, 1fr); }
 }

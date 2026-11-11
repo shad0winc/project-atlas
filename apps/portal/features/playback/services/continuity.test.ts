@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
-import { readResume, resumeKey, restoreContinuity, writeResume } from "./continuity";
+import { listSavedResumes, readResume, resumeKey, restoreContinuity, writeResume } from "./continuity";
 function storage() {
   const rows = new Map<string, string>();
-  return { getItem: (k: string) => rows.get(k) ?? null, setItem: (k: string, v: string) => { rows.set(k,v); }, removeItem: (k: string) => { rows.delete(k); } };
+  return { get length() { return rows.size; }, key: (index: number) => [...rows.keys()][index] ?? null, getItem: (k: string) => rows.get(k) ?? null, setItem: (k: string, v: string) => { rows.set(k,v); }, removeItem: (k: string) => { rows.delete(k); } };
 }
 function video() {
   return { currentTime: 0, duration: 500, readyState: 2, seekable: { length: 1, start: () => 0, end: () => 500 }, play: vi.fn(async () => {}) };
@@ -13,6 +13,21 @@ describe("playback continuity", () => {
     writeResume(s,key,128); expect(readResume(s,key)).toBe(128);
     for (const other of [resumeKey("b","jellyfin","episode1",true),resumeKey("a","other","episode1",true),resumeKey("a","jellyfin","episode2",true)]) expect(readResume(s,other)).toBeNull();
     expect(resumeKey(undefined,"jellyfin","episode1",true)).toBeNull(); expect(resumeKey("a","jellyfin","live",false)).toBeNull();
+  });
+  it("lists only titled progress for this viewer and preserves old direct resume positions", () => {
+    const s = storage();
+    const old = resumeKey("a", "jellyfin", "legacy", true);
+    const exact = resumeKey("a", "jellyfin", "episode2", true);
+    writeResume(s, old, 60);
+    writeResume(s, exact, 128, false, { title: "Episode two", duration: 300, episode: true });
+    writeResume(s, resumeKey("b", "jellyfin", "episode1", true), 80, false, { title: "Private episode" });
+    expect(readResume(s, old)).toBe(60);
+    expect(listSavedResumes(s, "a")).toEqual([{
+      provider: "jellyfin", itemId: "episode2", title: "Episode two", position: 128,
+      duration: 300, episode: true, updatedAt: expect.any(Number)
+    }]);
+    writeResume(s, exact, 300, true);
+    expect(listSavedResumes(s, "a")).toEqual([]);
   });
   it("survives reload and clears ended or explicitly restarted playback", () => {
     const s=storage(); writeResume(s,"k",128); expect(readResume(s,"k")).toBe(128);
