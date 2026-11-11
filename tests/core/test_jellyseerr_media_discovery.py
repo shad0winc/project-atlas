@@ -86,7 +86,7 @@ def test_search_normalizes_movie_and_tv_and_filters_people() -> None:
 
     get_json.assert_called_once_with(
         "/api/v1/search?"
-        "query=Star+Wars&"
+        "query=Star%20Wars&"
         "page=2"
     )
 
