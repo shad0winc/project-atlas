@@ -4,6 +4,7 @@ import { useAuth } from "../../../lib/auth/use-auth";
 import { useServices } from "../hooks/use-services";
 
 import { ServiceOverview } from "./ServiceOverview";
+import { BazarrMaintenanceControls } from "./BazarrMaintenanceControls";
 
 export function ServiceView(): React.ReactElement {
   const { user } = useAuth();
@@ -12,6 +13,7 @@ export function ServiceView(): React.ReactElement {
     detailState,
     refresh,
     checkForUpdates,
+    reloadObservations,
     updateCheckStatus,
     selectService,
     clearSelection
@@ -51,7 +53,12 @@ export function ServiceView(): React.ReactElement {
     );
   }
 
+  const selectedBazarr = detailState.status === "ready"
+    ? detailState.data.service.identifier === "bazarr"
+    : detailState.status !== "idle" && detailState.identifier === "bazarr";
+
   return (
+    <>
     <ServiceOverview
       canPreviewBazarrUpdate={user?.roles.includes("global_admin")}
       detail={detailState.status === "ready" ? detailState.data : undefined}
@@ -70,5 +77,9 @@ export function ServiceView(): React.ReactElement {
       snapshot={state.data}
       updateCheckStatus={updateCheckStatus}
     />
+    {user?.roles.includes("global_admin") && selectedBazarr ? (
+      <BazarrMaintenanceControls onCompleted={reloadObservations} />
+    ) : null}
+    </>
   );
 }

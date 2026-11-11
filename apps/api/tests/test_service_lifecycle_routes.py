@@ -17,6 +17,8 @@ from atlas_api.dependencies import (
     get_service_update_service,
 )
 from atlas_api.main import create_app
+from atlas_api.service_maintenance import ServiceMaintenanceError, get_service_maintenance_client
+from types import SimpleNamespace
 from atlas_api.routes.v1.services import (
     require_bazarr_preview_admin,
     require_service_lifecycle_read,
@@ -228,7 +230,7 @@ class FakeServiceMaintenanceHistoryService:
 
 
 class ServiceLifecycleRouteTests(unittest.TestCase):
-    """Verify GET-only Service Lifecycle HTTP behavior."""
+    """Verify service reports and the admin host-control boundary."""
 
     def setUp(self) -> None:
         self.app = create_app()
@@ -257,6 +259,56 @@ class ServiceLifecycleRouteTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.app.dependency_overrides.clear()
         self.client.close()
+
+    def test_host_control_routes_require_authentication(self) -> None:
+        self.app.dependency_overrides[get_jwt_service] = object
+        self.app.dependency_overrides[get_security_audit_writer] = lambda: None
+        self.assertEqual(401, self.client.get("/api/v1/services/maintenance").status_code)
+        self.assertEqual(401, self.client.post("/api/v1/services/updates/refresh").status_code)
+
+    def test_admin_host_routes_use_only_fixed_operations(self) -> None:
+        actor = AuthenticatedUser("admin", "admin", "Admin", ("global_admin",))
+        self.app.dependency_overrides[require_bazarr_preview_admin] = lambda: actor
+        calls = []
+        def request(operation, identity):
+            calls.append((operation, identity))
+            return {"job": {"id": "fixture", "status": "queued"}}
+        self.app.dependency_overrides[get_service_maintenance_client] = lambda: SimpleNamespace(request=request)
+        response = self.client.get("/api/v1/services/maintenance")
+        self.assertEqual(200, response.status_code)
+        self.assertEqual("no-store", response.headers["Cache-Control"])
+        for route in ("updates/refresh", "bazarr/apply", "bazarr/rollback"):
+            response = self.client.post("/api/v1/services/" + route, json={"operation": "arbitrary-command"})
+            self.assertEqual(202, response.status_code)
+        self.assertEqual([("status", None), ("scan", "admin"), ("bazarr.apply", "admin"),
+                          ("bazarr.rollback", "admin")], calls)
+
+    def test_busy_host_operation_is_retryable(self) -> None:
+        actor = AuthenticatedUser("admin", "admin", "Admin", ("global_admin",))
+        self.app.dependency_overrides[require_bazarr_preview_admin] = lambda: actor
+        def request(*args):
+            raise ServiceMaintenanceError("operation_busy")
+        self.app.dependency_overrides[get_service_maintenance_client] = lambda: SimpleNamespace(request=request)
+        response = self.client.post("/api/v1/services/updates/refresh")
+        self.assertEqual(409, response.status_code)
+        self.assertEqual("operation_busy", response.json()["detail"]["code"])
+
+    def test_stale_observations_cannot_prepare_bazarr_update(self) -> None:
+        actor = AuthenticatedUser("admin", "admin", "Admin", ("global_admin",))
+        self.app.dependency_overrides[require_bazarr_preview_admin] = lambda: actor
+        update = ServiceUpdate(
+            service_identifier="bazarr", service_name="Bazarr",
+            current_image=ImageReference(repository="lscr.io/linuxserver/bazarr", tag="latest"),
+            available_image=ImageReference(repository="lscr.io/linuxserver/bazarr", tag="latest",
+                                           digest="sha256:" + "b" * 64),
+            status=UpdateStatus.UPDATE_AVAILABLE,
+            details={"registry_comparison": True, "local_descriptor_digest": "sha256:" + "a" * 64},
+            evaluated_at="2000-01-01T00:00:00Z",
+        )
+        self.update_service.inspect_update = lambda identifier: update
+        response = self.client.get("/api/v1/services/bazarr/update-preview")
+        self.assertEqual(409, response.status_code)
+        self.assertIn("fresh service scan", response.json()["detail"])
 
     def test_bazarr_preview_requires_authentication(self) -> None:
         self.app.dependency_overrides[get_jwt_service] = object

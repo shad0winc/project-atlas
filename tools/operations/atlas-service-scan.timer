@@ -1,0 +1,11 @@
+[Unit]
+Description=Scan Atlas service images hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=60
+Unit=atlas-service-scan.service
+
+[Install]
+WantedBy=timers.target

@@ -123,3 +123,78 @@ export async function loadBazarrUpdatePlan(signal: AbortSignal): Promise<BazarrU
   );
   return plan;
 }
+
+export type ServiceMaintenanceJob = Readonly<{
+  id: string;
+  operation: string;
+  status: "queued" | "running" | "completed" | "failed";
+  progress: string;
+  error?: string | null;
+}>;
+
+export type ServiceMaintenanceState = Readonly<{
+  job: ServiceMaintenanceJob | null;
+  bazarr: {
+    status: string;
+    version_label: string | null;
+    can_apply: boolean;
+    can_rollback: boolean;
+    maintenance_enabled: boolean;
+  };
+}>;
+
+export function loadServiceMaintenance(signal: AbortSignal): Promise<ServiceMaintenanceState> {
+  return authenticatedAtlasApiRequest<ServiceMaintenanceState>(
+    "/services/maintenance",
+    getRequestOptions(signal)
+  );
+}
+
+export async function startServiceMaintenance(
+  operation: "scan" | "bazarr.apply" | "bazarr.rollback",
+  signal: AbortSignal
+): Promise<ServiceMaintenanceJob> {
+  const path = operation === "scan" ? "/services/updates/refresh" :
+    operation === "bazarr.apply" ? "/services/bazarr/apply" : "/services/bazarr/rollback";
+  const { job } = await authenticatedAtlasApiRequest<{ job: ServiceMaintenanceJob }>(
+    path, { method: "POST", cache: "no-store", signal, body: {} }
+  );
+  return job;
+}
+
+export function waitForServicePoll(signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    function abort() {
+      globalThis.clearTimeout(timer);
+      reject(new DOMException("Request aborted", "AbortError"));
+    }
+    const timer = globalThis.setTimeout(() => {
+      signal.removeEventListener("abort", abort);
+      resolve();
+    }, 1500);
+    if (signal.aborted) {
+      abort();
+    } else {
+      signal.addEventListener("abort", abort, { once: true });
+    }
+  });
+}
+
+export async function scanServiceUpdates(signal: AbortSignal): Promise<void> {
+  const job = await startServiceMaintenance("scan", signal);
+  const deadline = Date.now() + 10 * 60 * 1000;
+  while (!signal.aborted && Date.now() < deadline) {
+    await waitForServicePoll(signal);
+    const state = await loadServiceMaintenance(signal);
+    if (state.job?.id !== job.id) {
+      throw new Error("The scan status changed. Refresh the service report.");
+    }
+    if (state.job.status === "failed") {
+      throw new Error("The service scan failed. Try again.");
+    }
+    if (state.job.status === "completed") {
+      return;
+    }
+  }
+  throw new Error("The scan is still running. Check its status again.");
+}

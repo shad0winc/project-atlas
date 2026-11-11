@@ -1,0 +1,10 @@
+[Unit]
+Description=Schedule an Atlas service image scan
+After=atlas-service-maintenance.service
+Requires=atlas-service-maintenance.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 -I -S -B /usr/local/libexec/atlas-service-maintenance/atlas_service_maintenance.py scan
+UMask=0077
+User=root

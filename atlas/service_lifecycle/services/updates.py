@@ -46,10 +46,16 @@ class ServiceUpdateService:
             for service in services
         )
 
+        latest = max(
+            updates,
+            key=lambda update: datetime.fromisoformat(update.evaluated_at.replace("Z", "+00:00")),
+            default=None,
+        )
+
         return UpdateReport(
             updates=updates,
             provider=_provider_name(services),
-            evaluated_at=_utc_now(),
+            evaluated_at=latest.evaluated_at if latest is not None else _utc_now(),
         )
 
     def _inspect_managed_service(
