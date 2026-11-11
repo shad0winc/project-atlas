@@ -43,6 +43,12 @@ def test_playback_session_response_serializes_slotted_tracks() -> None:
         next_target_id="next-episode-id",
         series_id="series-id",
         overview="Episode synopsis.",
+        cast=("Actor",),
+        directors=("Director",),
+        producers=("Producer",),
+        production_locations=("South Korea",),
+        video_width=1920,
+        video_height=1080,
     )
 
     response = PlaybackSessionResponse.from_domain(
@@ -75,3 +81,8 @@ def test_playback_session_response_serializes_slotted_tracks() -> None:
 
     assert response.series_id == "series-id"
     assert response.overview == "Episode synopsis."
+    assert response.cast == ("Actor",)
+    assert response.directors == ("Director",)
+    assert response.producers == ("Producer",)
+    assert response.production_locations == ("South Korea",)
+    assert (response.video_width, response.video_height) == (1920, 1080)

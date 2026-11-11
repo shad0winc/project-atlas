@@ -410,8 +410,6 @@ export function AtlasTheaterPlayer({
       disposed = true;
       streamUrlRef.current = null;
       controller.abort();
-      destroyHls?.();
-
       savePosition();
       for (const event of ["loadedmetadata", "canplay", "progress", "durationchange"]) {
         video.removeEventListener(event, restorePlaybackPosition);
@@ -422,6 +420,7 @@ export function AtlasTheaterPlayer({
       video.removeEventListener("ended", savePosition);
       window.removeEventListener("pagehide", savePosition);
 
+      destroyHls?.();
       video.removeAttribute("src");
       video.load();
     };

@@ -98,6 +98,12 @@ class PlaybackSessionResponse(BaseModel):
     next_target_id: str | None = None
     series_id: str | None = None
     overview: str | None = None
+    cast: tuple[str, ...] = ()
+    directors: tuple[str, ...] = ()
+    producers: tuple[str, ...] = ()
+    production_locations: tuple[str, ...] = ()
+    video_width: int | None = None
+    video_height: int | None = None
 
     @classmethod
     def from_domain(
@@ -150,4 +156,10 @@ class PlaybackSessionResponse(BaseModel):
             next_target_id=session.next_target_id,
             series_id=session.series_id,
             overview=session.overview,
+            cast=session.cast,
+            directors=session.directors,
+            producers=session.producers,
+            production_locations=session.production_locations,
+            video_width=session.video_width,
+            video_height=session.video_height,
         )

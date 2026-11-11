@@ -31,6 +31,35 @@ from atlas.media.provider import (
 )
 
 
+def _credit_names(values: list[Any], limit: int) -> tuple[str, ...]:
+    names = dict.fromkeys(
+        value.strip()[:160] for value in values
+        if isinstance(value, str) and value.strip()
+    )
+    return tuple(names)[:limit]
+
+
+def _title_credits(item: dict[str, Any]) -> dict[str, tuple[str, ...]]:
+    people = item.get("People")
+    credits: dict[str, tuple[str, ...]] = {}
+    if isinstance(people, list):
+        for field, roles, limit in (
+            ("cast", {"actor", "gueststar"}, 12),
+            ("directors", {"director"}, 6),
+            ("producers", {"producer", "executiveproducer"}, 8),
+        ):
+            names = _credit_names([
+                person.get("Name") for person in people
+                if isinstance(person, dict) and str(person.get("Type", "")).lower() in roles
+            ], limit)
+            if names:
+                credits[field] = names
+    locations = item.get("ProductionLocations")
+    if isinstance(locations, list) and (names := _credit_names(locations, 8)):
+        credits["production_locations"] = names
+    return credits
+
+
 class _JellyfinResourceNotFoundError(MediaProviderError):
     """Raised when Jellyfin returns HTTP 404."""
 
@@ -152,7 +181,7 @@ class JellyfinProvider:
                 "Ids": normalized_id,
                 "Recursive": "true",
                 "Limit": 1,
-                "Fields": "MediaStreams,Overview",
+                "Fields": "MediaStreams,Overview,People,ProductionLocations",
             }
         )
         payload = self._get_json(f"/Items?{query}")
@@ -199,7 +228,8 @@ class JellyfinProvider:
         ).strip().lower()
 
         metadata: dict[str, Any] = {
-            "jellyfin_type": item.get("Type") or "Unknown"
+            "jellyfin_type": item.get("Type") or "Unknown",
+            **_title_credits(item),
         }
 
         if raw_type in {"movie", "episode"}:
@@ -1143,6 +1173,7 @@ class JellyfinProvider:
             "supports_transcoding": supports_transcoding,
             "tracks": tuple(tracks),
             "stream_path": stream_path,
+            **video_dimensions(source),
         }
 
     def preview_delete_item(
