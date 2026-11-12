@@ -62,7 +62,8 @@ describe("Service Lifecycle presentation", () => {
           },
           health: {
             status: "degraded",
-            score: 50
+            score: 50,
+            warnings: ["No Docker health check is configured"]
           },
           requires_attention: true
         }
@@ -369,6 +370,8 @@ describe("Service Lifecycle presentation", () => {
     );
 
     expect(markup).toContain("Image update details");
+    expect(markup).toContain("Apply this update through the service’s operator workflow.");
+    expect(markup.indexOf("Image update details")).toBeLessThan(markup.indexOf("id=\"maintenance-history-title\""));
     expect(markup).toContain("Current image");
     expect(markup).toContain("lscr.io/linuxserver/sonarr:latest</dd>");
     expect(markup).toContain("Available image");
@@ -394,6 +397,7 @@ describe("Service Lifecycle presentation", () => {
     expect(markup).toContain("Runtime: running");
     expect(markup).toContain("Health: healthy");
     expect(markup).toContain("Health: degraded");
+    expect(markup).toContain("No Docker health check is configured");
     expect(markup).toContain("Update availability");
     expect(markup).toContain(">Check for updates</button>");
     expect(markup).toContain("1 update available");
