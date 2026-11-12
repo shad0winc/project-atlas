@@ -22,6 +22,7 @@ export type SportsRequestViewProps = Readonly<{
   scheduleRefreshing?: boolean;
   scheduleLoadedAt?: number;
   upcomingScopeLabel?: string;
+  selectedLiveEvents?: ReactNode;
   allFollowedSelected?: boolean;
   onViewAllUpcoming?: () => void;
   discoveryState?: "loading" | "complete" | "partial" | "unavailable";
@@ -58,6 +59,7 @@ export function SportsRequestView({
   scheduleRefreshing = false,
   scheduleLoadedAt,
   upcomingScopeLabel = "All followed Sports",
+  selectedLiveEvents,
   allFollowedSelected = true,
   onViewAllUpcoming,
   discoveryState,
@@ -513,6 +515,8 @@ export function SportsRequestView({
           </p>
         </div>
       </div>
+
+      {selectedLiveEvents}
 
       {scheduleUnavailable ? (
         <p role="status">
