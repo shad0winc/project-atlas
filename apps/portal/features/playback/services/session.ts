@@ -1,5 +1,5 @@
 import { authenticatedAtlasApiRequest } from "../../../lib/services/authenticated";
-import type { PlaybackSession, PlaybackTrack } from "../types/session";
+import type { PlaybackSession, PlaybackTrack, PlaybackVersion } from "../types/session";
 
 type PlaybackTrackTransport = Readonly<{
   index: number;
@@ -28,6 +28,8 @@ type PlaybackSessionTransport = Readonly<{
   production_locations?: readonly string[];
   video_width?: number | null;
   video_height?: number | null;
+  versions?: readonly PlaybackVersion[];
+  selected_version_id?: string | null;
   media_type: string;
   duration_ticks: number | null;
   can_seek: boolean;
@@ -59,7 +61,8 @@ export async function resolvePlaybackSession(
   provider: string,
   itemId: string,
   signal?: AbortSignal,
-  subtitle: SubtitleSelection = "auto"
+  subtitle: SubtitleSelection = "auto",
+  versionId?: string
 ): Promise<PlaybackSession> {
   const normalizedProvider = provider.trim().toLowerCase();
   const normalizedItemId = itemId.trim();
@@ -76,6 +79,8 @@ export async function resolvePlaybackSession(
     query.set("subtitle", subtitleValue);
   }
 
+  if (versionId !== undefined) query.set("version", versionId);
+
   const suffix = query.size === 0 ? "" : `?${query.toString()}`;
 
   const response = await authenticatedAtlasApiRequest<PlaybackSessionTransport>(
@@ -90,6 +95,10 @@ export async function resolvePlaybackSession(
     throw new Error(
       "Playback response did not match the requested media identity."
     );
+  }
+
+  if (versionId !== undefined && response.selected_version_id !== versionId) {
+    throw new Error("Playback response did not match the requested quality version.");
   }
 
   return Object.freeze({
@@ -109,6 +118,8 @@ export async function resolvePlaybackSession(
     ...(response.production_locations?.length ? { productionLocations: response.production_locations } : {}),
     ...(response.video_width != null ? { videoWidth: response.video_width } : {}),
     ...(response.video_height != null ? { videoHeight: response.video_height } : {}),
+    ...(response.versions?.length ? { versions: response.versions } : {}),
+    ...(response.selected_version_id ? { selectedVersionId: response.selected_version_id } : {}),
     mediaType: response.media_type,
     ...(response.duration_ticks === null ? {} : { durationTicks: response.duration_ticks }),
     canSeek: response.can_seek,

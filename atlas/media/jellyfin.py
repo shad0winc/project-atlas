@@ -843,6 +843,7 @@ class JellyfinProvider:
         subtitle_stream_index: int | None = None,
         live_stream_owner: Any = None,
         prefer_english_audio: bool = False,
+        selected_version_id: str | None = None,
     ) -> dict[str, Any]:
         normalized_id = _required(item_id, "item_id")
         normalized_user_id = _required(user_id, "user_id")
@@ -960,6 +961,35 @@ class JellyfinProvider:
         )
 
         source = first_media_source(payload)
+        versions = []
+        if live_stream_owner is None:
+            sources = [entry for entry in payload["MediaSources"] if isinstance(entry, dict)]
+            ids = [entry.get("Id") for entry in sources]
+            for entry in sources:
+                version_id = entry.get("Id")
+                if (
+                    not isinstance(version_id, str)
+                    or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", version_id)
+                    or ids.count(version_id) != 1
+                    or entry.get("RequiresOpening") is True
+                    or entry.get("LiveStreamId")
+                    or not (entry.get("SupportsDirectPlay") or entry.get("DirectStreamUrl")
+                            or entry.get("TranscodingUrl"))
+                ):
+                    continue
+                dimensions = video_dimensions(entry)
+                if dimensions:
+                    versions.append({
+                        "id": version_id,
+                        "width": dimensions["video_width"],
+                        "height": dimensions["video_height"],
+                    })
+            if selected_version_id is not None:
+                if not any(version["id"] == selected_version_id for version in versions):
+                    raise MediaProviderError("The requested version is unavailable for this item")
+                source = next(entry for entry in sources if entry.get("Id") == selected_version_id)
+        elif selected_version_id is not None:
+            raise MediaProviderError("Version selection requires library playback")
 
         media_source_id = str(
             source.get("Id") or ""
@@ -984,7 +1014,8 @@ class JellyfinProvider:
                     for row in source.get("MediaStreams", []))
         )
 
-        if subtitle_stream_index is not None or select_audio:
+        select_tracks = subtitle_stream_index is not None or select_audio
+        if select_tracks or selected_version_id is not None:
             selected_profile = {
                 **playback_payload["DeviceProfile"],
                 "SubtitleProfiles": (
@@ -1002,7 +1033,7 @@ class JellyfinProvider:
 
             if subtitle_stream_index is not None:
                 selected_payload["SubtitleStreamIndex"] = subtitle_stream_index
-            if english_audio_index is not None:
+            if english_audio_index is not None and select_tracks:
                 selected_payload["AudioStreamIndex"] = english_audio_index
                 selected_payload["EnableDirectPlay"] = False
 
@@ -1018,6 +1049,10 @@ class JellyfinProvider:
             )
 
             source = first_media_source(payload)
+            if selected_version_id is not None and (
+                source.get("RequiresOpening") is True or source.get("LiveStreamId")
+            ):
+                raise MediaProviderError("Jellyfin returned a live source for a library version")
 
             selected_media_source_id = str(
                 source.get("Id") or ""
@@ -1034,7 +1069,7 @@ class JellyfinProvider:
                 )
 
             media_source_id = selected_media_source_id
-            if english_audio_index is not None:
+            if english_audio_index is not None and select_tracks:
                 returned_streams = source.get("MediaStreams") or []
                 assert_english = any(
                     isinstance(row, dict) and row.get("Index") == english_audio_index
@@ -1111,7 +1146,20 @@ class JellyfinProvider:
             normalized_id,
         )
 
-        if english_audio_index is not None and (select_audio or subtitle_stream_index is not None):
+        show_versions = len(versions) > 1 and any(
+            version["id"] == media_source_id for version in versions
+        )
+        if selected_version_id is not None or show_versions:
+            parsed = urlsplit(stream_path)
+            query = parse_qsl(parsed.query, keep_blank_values=True)
+            supplied = [value for key, value in query if key.lower() == "mediasourceid"]
+            if supplied and supplied != [media_source_id]:
+                raise MediaProviderError("Jellyfin returned inconsistent selected version identity")
+            if not supplied:
+                query.append(("MediaSourceId", media_source_id))
+                stream_path = urlunsplit(("", "", parsed.path, urlencode(query), ""))
+
+        if english_audio_index is not None and select_tracks:
             parsed = urlsplit(stream_path)
             query = parse_qsl(parsed.query, keep_blank_values=True)
             if any(key.lower() == "static" and value.lower() == "true" for key, value in query):
@@ -1193,6 +1241,9 @@ class JellyfinProvider:
             "tracks": tuple(tracks),
             "stream_path": stream_path,
             **video_dimensions(source),
+            **({"versions": tuple(versions)} if show_versions else {}),
+            **({"selected_version_id": media_source_id}
+               if show_versions or selected_version_id is not None else {}),
         }
 
     def preview_delete_item(

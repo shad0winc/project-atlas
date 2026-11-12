@@ -17,7 +17,8 @@ export type PlaybackSessionResolver = (
   provider: string,
   itemId: string,
   signal?: AbortSignal,
-  subtitle?: SubtitleSelection
+  subtitle?: SubtitleSelection,
+  versionId?: string
 ) => Promise<PlaybackSession>;
 
 export function retryResumePosition(
@@ -36,12 +37,17 @@ export async function refreshPlaybackForRetry(
   session: PlaybackSession,
   resolver: PlaybackSessionResolver,
   subtitle: SubtitleSelection,
-  signal: AbortSignal
+  signal: AbortSignal,
+  versionId = session.selectedVersionId
 ): Promise<PlaybackSession> {
   signal.throwIfAborted();
-  const refreshed = await resolver(session.provider, session.playableTargetId, signal, subtitle);
+  const refreshed = await resolver(
+    session.provider, session.playableTargetId, signal, subtitle,
+    ...(versionId === undefined ? [] : [versionId])
+  );
   signal.throwIfAborted();
-  if (!refreshed.available || !refreshed.playbackCapability.trim()) {
+  if (!refreshed.available || !refreshed.playbackCapability.trim() ||
+      (versionId !== undefined && refreshed.selectedVersionId !== versionId)) {
     throw new Error("Playback is not currently available.");
   }
   // Always replace the session object so the player exchanges the fresh capability.

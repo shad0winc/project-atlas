@@ -15,6 +15,7 @@ from atlas.media import (
     PlaybackTrack,
 )
 from atlas.media.jellyfin import JellyfinProvider, default_jellyfin_provider
+from atlas.media.playback import PlaybackVersion
 
 
 class PlaybackNotFoundError(LookupError):
@@ -148,6 +149,7 @@ class PlaybackService:
         item_id: str,
         jellyfin_user_id: str,
         subtitle_stream_index: int | None = None,
+        selected_version_id: str | None = None,
     ) -> PlaybackSession:
         normalized_provider = provider.strip().lower()
         if normalized_provider != "jellyfin":
@@ -233,19 +235,15 @@ class PlaybackService:
                 if len(episodes) > 1:
                     next_target_id = episodes[1]["id"]
 
-            if subtitle_stream_index is None:
-                playback = self._jellyfin.get_playback_info(
-                    playable_target_id,
-                    user_id=normalized_jellyfin_user_id,
-                    prefer_english_audio=True,
-                )
-            else:
-                playback = self._jellyfin.get_playback_info(
-                    playable_target_id,
-                    user_id=normalized_jellyfin_user_id,
-                    prefer_english_audio=True,
-                    subtitle_stream_index=subtitle_stream_index,
-                )
+            playback = self._jellyfin.get_playback_info(
+                playable_target_id,
+                user_id=normalized_jellyfin_user_id,
+                prefer_english_audio=True,
+                **({"subtitle_stream_index": subtitle_stream_index}
+                   if subtitle_stream_index is not None else {}),
+                **({"selected_version_id": selected_version_id}
+                   if selected_version_id is not None else {}),
+            )
         except PlaybackNotFoundError:
             raise
         except MediaProviderError as exc:
@@ -297,6 +295,8 @@ class PlaybackService:
             production_locations=credits.get("production_locations", ()),
             video_width=playback.get("video_width"),
             video_height=playback.get("video_height"),
+            versions=tuple(PlaybackVersion(**version) for version in playback.get("versions", ())),
+            selected_version_id=playback.get("selected_version_id"),
         )
 
     def resolve_live_session(

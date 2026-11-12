@@ -171,6 +171,7 @@ def read_playback_session(
         Query(max_length=16),
     ] = None,
     maintenance_binding: Annotated[str | None, Depends(issue_maintenance_media_binding)] = None,
+    version: Annotated[str | None, Query(pattern=r"^[A-Za-z0-9_-]{1,128}$")] = None,
 ) -> PlaybackSessionResponse:
     try:
         profile = profiles.get_user(current_user.user_id)
@@ -196,6 +197,7 @@ def read_playback_session(
             item_id=item_id,
             jellyfin_user_id=jellyfin_user_id,
             subtitle_stream_index=_subtitle_stream_index(subtitle),
+            **({"selected_version_id": version} if version is not None else {}),
         )
     except PlaybackNotFoundError as exc:
         raise HTTPException(

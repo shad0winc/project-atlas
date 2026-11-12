@@ -75,6 +75,14 @@ class PlaybackTrackResponse(BaseModel):
     forced: bool = False
 
 
+class PlaybackVersionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str
+    width: int
+    height: int
+
+
 class PlaybackSessionResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -105,6 +113,8 @@ class PlaybackSessionResponse(BaseModel):
     production_locations: tuple[str, ...] = ()
     video_width: int | None = None
     video_height: int | None = None
+    versions: tuple[PlaybackVersionResponse, ...] = ()
+    selected_version_id: str | None = None
 
     @classmethod
     def from_domain(
@@ -164,4 +174,9 @@ class PlaybackSessionResponse(BaseModel):
             production_locations=session.production_locations,
             video_width=session.video_width,
             video_height=session.video_height,
+            versions=tuple(
+                PlaybackVersionResponse(id=version.id, width=version.width, height=version.height)
+                for version in session.versions
+            ),
+            selected_version_id=session.selected_version_id,
         )

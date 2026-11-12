@@ -33,6 +33,13 @@ class PlaybackTrack:
 
 
 @dataclass(frozen=True, slots=True)
+class PlaybackVersion:
+    id: str
+    width: int
+    height: int
+
+
+@dataclass(frozen=True, slots=True)
 class PlaybackSession:
     """A safe Atlas Theater playback session contract."""
 
@@ -62,6 +69,8 @@ class PlaybackSession:
     series_tmdb_id: str | None = None
     video_width: int | None = None
     video_height: int | None = None
+    versions: tuple[PlaybackVersion, ...] = ()
+    selected_version_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
