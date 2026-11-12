@@ -71,3 +71,32 @@ it("does not change a disposed stream when its first fragment arrives late",asyn
   await act(async()=>loaded("loaded",{frag:{type:"main",sn:0,start:0,duration:3}}));
   expect(instance.destroyed).toBe(true);expect(instance.config.fragLoadPolicy.default.maxTimeToFirstByteMs).toBe(120000);
 });
+
+it("offers the previous selection when the caption stream fails before buffering", async () => {
+  const { instance, resolve } = await select("7");
+  const fatal = { fatal: true, type: "networkError", details: "fragLoadError",
+    frag: { type: "main", sn: 0, start: 0, duration: 3 } };
+  await act(async () => instance.handlers.get("error")!("error", fatal));
+  const resume = Array.from(container.querySelectorAll("button"))
+    .find((button) => button.textContent === "Resume with previous captions")!;
+  expect(resume).toBeDefined();
+  resolve.mockResolvedValueOnce({ ...session, sourceType: "library", playbackCapability: "restored" });
+  await act(async () => resume.click());
+  await flush();
+  expect(resolve).toHaveBeenLastCalledWith("jellyfin", "fixture", expect.any(AbortSignal), "auto");
+  expect(container.querySelector("select")!.value).toBe("auto");
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+});
+
+it("keeps the selected captions on a retry after video has buffered", async () => {
+  const { instance, resolve } = await select("7");
+  const frag = { type: "main", sn: 0, start: 0, duration: 3 };
+  const fatal = { fatal: true, type: "networkError", details: "fragLoadError", frag };
+  await act(async () => instance.handlers.get("buffered")!("buffered", { frag }));
+  await act(async () => instance.handlers.get("error")!("error", fatal));
+  const retry = Array.from(container.querySelectorAll("button"))
+    .find((button) => button.textContent === "Retry playback")!;
+  expect(retry).toBeDefined();
+  await act(async () => retry.click());
+  expect(resolve).toHaveBeenLastCalledWith("jellyfin", "fixture", expect.any(AbortSignal), 7);
+});
