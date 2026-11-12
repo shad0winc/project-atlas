@@ -8,6 +8,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import json
 import os
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable
@@ -37,6 +38,14 @@ def _credit_names(values: list[Any], limit: int) -> tuple[str, ...]:
         if isinstance(value, str) and value.strip()
     )
     return tuple(names)[:limit]
+
+
+def _series_tmdb_id(item: dict[str, object]) -> str | None:
+    provider_ids = item.get("ProviderIds")
+    value = provider_ids.get("Tmdb") if isinstance(provider_ids, dict) else None
+    if isinstance(value, str) and re.fullmatch(r"[1-9][0-9]{0,15}", value):
+        return value
+    return None
 
 
 def _title_credits(item: dict[str, Any]) -> dict[str, tuple[str, ...]]:
@@ -181,7 +190,7 @@ class JellyfinProvider:
                 "Ids": normalized_id,
                 "Recursive": "true",
                 "Limit": 1,
-                "Fields": "MediaStreams,Overview,People,ProductionLocations",
+                "Fields": "MediaStreams,Overview,People,ProductionLocations,ProviderIds",
             }
         )
         payload = self._get_json(f"/Items?{query}")
@@ -231,6 +240,9 @@ class JellyfinProvider:
             "jellyfin_type": item.get("Type") or "Unknown",
             **_title_credits(item),
         }
+
+        if raw_type == "series" and (tmdb_id := _series_tmdb_id(item)):
+            metadata["series_tmdb_id"] = tmdb_id
 
         if raw_type in {"movie", "episode"}:
             metadata.update(video_dimensions(item))
@@ -359,14 +371,19 @@ class JellyfinProvider:
 
         return tuple(episodes)
 
-    def get_retention_context(self, item_id: str) -> dict[str, str]:
+    def get_retention_context(
+        self, item_id: str, *, include_series_tmdb_id: bool = False,
+    ) -> dict[str, str]:
         """Read authoritative cleanup type and verify an episode's series.
 
         This deliberately does not use the optional library-name lookup:
         failures here must retain media rather than bypass protection.
         """
-        def read(identity: str) -> dict[str, object]:
-            query = urlencode({"Ids": identity, "Recursive": "true", "Limit": 1})
+        def read(identity: str, *, provider_ids: bool = False) -> dict[str, object]:
+            params = {"Ids": identity, "Recursive": "true", "Limit": 1}
+            if provider_ids:
+                params["Fields"] = "ProviderIds"
+            query = urlencode(params)
             payload = self._get_json(f"/Items?{query}")
             rows = payload.get("Items") if isinstance(payload, dict) else None
             if not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], dict):
@@ -387,10 +404,12 @@ class JellyfinProvider:
             series_id = _required(row.get("SeriesId"), "Jellyfin series ID")
             if series_id.replace("-", "").lower() == identity.replace("-", "").lower():
                 raise MediaProviderError("Jellyfin episode cannot be its own series")
-            parent = read(series_id)
+            parent = read(series_id, provider_ids=include_series_tmdb_id)
             if str(parent.get("Type", "")).lower() != "series":
                 raise MediaProviderError("Jellyfin episode parent is not a series")
             context["series_id"] = _required(parent.get("Id"), "Jellyfin series ID")
+            if include_series_tmdb_id and (tmdb_id := _series_tmdb_id(parent)):
+                context["series_tmdb_id"] = tmdb_id
         return context
 
     def get_retention_state(

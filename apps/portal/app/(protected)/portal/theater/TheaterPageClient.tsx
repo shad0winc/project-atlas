@@ -13,6 +13,9 @@ import { refreshMediaRetentionAfterMutation } from "../../../../features/media/s
 import { sourceQuality } from "../../../../features/media/types/quality";
 import type { MediaRetention } from "../../../../features/media/types/retention";
 import { loadPlaybackSession } from "../../../../features/playback/api/session";
+import { SeriesAiringNotice } from "../../../../features/media/components/SeriesAiringNotice";
+import { readMediaSeriesDetail } from "../../../../features/media/services/series";
+import type { MediaSeriesDetail } from "../../../../features/media/types/series";
 import { SeriesEpisodeNavigation } from "../../../../features/media/components/SeriesEpisodeNavigation";
 import { episodeHref } from "../../../../features/playback/services/episode-navigation";
 import { AtlasTheaterPlayer } from "../../../../features/playback/components/AtlasTheaterPlayer";
@@ -28,6 +31,28 @@ type TheaterState =
   | Readonly<{ status: "loading" }>
   | Readonly<{ status: "ready"; session: PlaybackSession }>
   | Readonly<{ status: "error"; message: string }>;
+
+function TheaterSeriesAiringNotice({ providerMediaId }: { providerMediaId: string }) {
+  const { can } = usePermission();
+  const canReadMedia = can(ATLAS_PERMISSIONS.mediaRead);
+  const [detail, setDetail] = useState<MediaSeriesDetail | null>(null);
+
+  useEffect(() => {
+    if (!canReadMedia) return;
+
+    const controller = new AbortController();
+    void readMediaSeriesDetail({ providerMediaId, signal: controller.signal })
+      .then(result => {
+        if (!controller.signal.aborted) setDetail(result);
+      })
+      .catch(() => {
+        // Discovery is optional while a title is playing.
+      });
+    return () => controller.abort();
+  }, [canReadMedia, providerMediaId]);
+
+  return canReadMedia && detail ? <SeriesAiringNotice detail={detail} /> : null;
+}
 
 function AuthorizedTheaterPlayer({
   session
@@ -354,6 +379,9 @@ export function TheaterPageClient(): React.ReactElement {
           <section className="portal-home-card" aria-labelledby="theater-details-title">
             <h3 id="theater-details-title">About this title</h3>
             <p>{state.session.overview ?? "A summary is unavailable for this title."}</p>
+            {session.seriesTmdbId && (
+              <TheaterSeriesAiringNotice key={session.seriesTmdbId} providerMediaId={session.seriesTmdbId} />
+            )}
             <dl>
               <dt>Source</dt>
               <dd>{state.session.provider === "jellyfin" ? "Jellyfin" : state.session.provider}</dd>
