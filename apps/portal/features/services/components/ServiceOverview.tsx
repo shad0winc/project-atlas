@@ -183,7 +183,7 @@ export function ServiceOverview({
 
       <section aria-labelledby="managed-services-title">
         <h2 id="managed-services-title">Managed services</h2>
-        <p>Select a service to inspect its normalized read-only details.</p>
+        <p>Select a service to see health and update details.</p>
 
         {snapshot.services.length === 0 ? (
           <Card className="service-lifecycle-card">
@@ -200,6 +200,11 @@ export function ServiceOverview({
                 <p>Status: {serviceStatus(service)}</p>
                 <p>Runtime: {service.runtimeStatus}</p>
                 <p>Health: {service.healthStatus}</p>
+                {service.healthMessages?.length ? (
+                  <ul aria-label={`${service.name} health details`}>
+                    {service.healthMessages.map((message) => <li key={message}>{message}</li>)}
+                  </ul>
+                ) : null}
                 <p>
                   Updates:{" "}
                   {updateStatusLabel(updateStatusByService.get(service.identifier) ?? "unknown")}
@@ -211,38 +216,6 @@ export function ServiceOverview({
                 >
                   View details
                 </button>
-              </Card>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section aria-labelledby="maintenance-history-title">
-        <h2 id="maintenance-history-title">Maintenance history</h2>
-        <p>Read-only maintenance observations reported by the Service Lifecycle provider.</p>
-
-        {snapshot.history.records.length === 0 ? (
-          <Card className="service-lifecycle-card">
-            <h3>No maintenance history recorded</h3>
-            <p>
-              Atlas has not received persisted Service Lifecycle maintenance records from{" "}
-              {snapshot.history.provider}.
-            </p>
-          </Card>
-        ) : (
-          <div className="dashboard-metric-grid">
-            {snapshot.history.records.map((record, index) => (
-              <Card
-                className="service-lifecycle-card"
-                key={`${record.serviceIdentifier}-${record.startedAt ?? "unknown"}-${index}`}
-              >
-                <p>{record.provider}</p>
-                <h3>{record.serviceName}</h3>
-                <p>Action: {record.action}</p>
-                <p>Result: {maintenanceResultLabel(record.result)}</p>
-                <p>Started: {maintenanceTime(record.startedAt)}</p>
-                <p>Completed: {maintenanceTime(record.completedAt)}</p>
-                <p>{record.summary}</p>
               </Card>
             ))}
           </div>
@@ -279,6 +252,8 @@ export function ServiceOverview({
               selectedUpdate.serviceIdentifier === "bazarr" &&
               selectedUpdate.status === "update-available" ? (
                 <BazarrUpdatePreview key={selectedUpdate.availableImage} />
+              ) : selectedUpdate.status === "update-available" && selectedUpdate.serviceIdentifier !== "bazarr" ? (
+                <p>Apply this update through the service’s operator workflow.</p>
               ) : null}
             </Card>
           ) : null}
@@ -318,6 +293,38 @@ export function ServiceOverview({
           </button>
         </section>
       ) : null}
+
+      <section aria-labelledby="maintenance-history-title">
+        <h2 id="maintenance-history-title">Maintenance history</h2>
+        <p>Read-only maintenance observations reported by the Service Lifecycle provider.</p>
+
+        {snapshot.history.records.length === 0 ? (
+          <Card className="service-lifecycle-card">
+            <h3>No maintenance history recorded</h3>
+            <p>
+              Atlas has not received persisted Service Lifecycle maintenance records from{" "}
+              {snapshot.history.provider}.
+            </p>
+          </Card>
+        ) : (
+          <div className="dashboard-metric-grid">
+            {snapshot.history.records.map((record, index) => (
+              <Card
+                className="service-lifecycle-card"
+                key={`${record.serviceIdentifier}-${record.startedAt ?? "unknown"}-${index}`}
+              >
+                <p>{record.provider}</p>
+                <h3>{record.serviceName}</h3>
+                <p>Action: {record.action}</p>
+                <p>Result: {maintenanceResultLabel(record.result)}</p>
+                <p>Started: {maintenanceTime(record.startedAt)}</p>
+                <p>Completed: {maintenanceTime(record.completedAt)}</p>
+                <p>{record.summary}</p>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

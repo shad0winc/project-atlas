@@ -9,6 +9,7 @@ export type ManagedService = Readonly<{
   enabled: boolean;
   runtimeStatus: ServiceRuntimeStatus;
   healthStatus: ServiceHealthStatus;
+  healthMessages?: readonly string[];
 }>;
 
 export type ManagedServiceDetail = Readonly<{
@@ -243,6 +244,10 @@ export function createManagedService(
     throw new Error("Atlas managed service is missing an identifier.");
   }
 
+  const healthMessages = [health.errors ?? embeddedHealth.errors, health.warnings ?? embeddedHealth.warnings]
+    .flatMap((values) => Array.isArray(values) ? values.map((value) => stringValue(value, "")) : [])
+    .filter(Boolean);
+
   return {
     identifier,
     name: stringValue(service.name, identifier),
@@ -256,7 +261,8 @@ export function createManagedService(
         embeddedRuntime.status ??
         service.runtime_status
     ),
-    healthStatus: healthStatusValue(health.status ?? embeddedHealth.status ?? service.health_status)
+    healthStatus: healthStatusValue(health.status ?? embeddedHealth.status ?? service.health_status),
+    ...(healthMessages.length ? { healthMessages: [...new Set(healthMessages)] } : {})
   };
 }
 
@@ -281,7 +287,8 @@ export function mergeManagedServiceDetail(
     service: {
       ...detail.service,
       runtimeStatus: overview.runtimeStatus,
-      healthStatus: overview.healthStatus
+      healthStatus: overview.healthStatus,
+      healthMessages: overview.healthMessages ?? detail.service.healthMessages
     },
     raw: detail.raw
   };
