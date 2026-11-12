@@ -37,4 +37,5 @@ export type PlaybackSession = Readonly<{
   previousTargetId?: string;
   nextTargetId?: string;
   seriesId?: string;
+  seriesTmdbId?: string;
 }>;

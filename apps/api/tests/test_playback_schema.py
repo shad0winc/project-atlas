@@ -42,6 +42,7 @@ def test_playback_session_response_serializes_slotted_tracks() -> None:
         previous_target_id=None,
         next_target_id="next-episode-id",
         series_id="series-id",
+        series_tmdb_id="62425",
         overview="Episode synopsis.",
         cast=("Actor",),
         directors=("Director",),
@@ -80,6 +81,7 @@ def test_playback_session_response_serializes_slotted_tracks() -> None:
 
 
     assert response.series_id == "series-id"
+    assert response.series_tmdb_id == "62425"
     assert response.overview == "Episode synopsis."
     assert response.cast == ("Actor",)
     assert response.directors == ("Director",)

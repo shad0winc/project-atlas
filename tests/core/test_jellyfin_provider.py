@@ -111,7 +111,7 @@ class JellyfinProviderTests(unittest.TestCase):
         )
         self.assertNotIn("x-emby-token", headers)
         self.assertEqual(
-            "http://jellyfin:8096/Items?Ids=abc&Recursive=true&Limit=1&Fields=MediaStreams%2COverview%2CPeople%2CProductionLocations",
+            "http://jellyfin:8096/Items?Ids=abc&Recursive=true&Limit=1&Fields=MediaStreams%2COverview%2CPeople%2CProductionLocations%2CProviderIds",
             request.call_args_list[0].args[0].full_url,
         )
     def test_series_maps_to_tv_and_ancestor_failure_is_nonfatal(self):
@@ -126,6 +126,7 @@ class JellyfinProviderTests(unittest.TestCase):
                                 "Id": "series",
                                 "Name": "Show",
                                 "Type": "Series",
+                                "ProviderIds": {"Tmdb": "62425"},
                             }
                         ],
                         "StartIndex": 0,
@@ -142,6 +143,8 @@ class JellyfinProviderTests(unittest.TestCase):
 
         self.assertEqual("tv", item.media_type)
         self.assertNotIn("library", item.metadata)
+        self.assertEqual("62425", item.metadata["series_tmdb_id"])
+
     def test_missing_key_and_not_found_are_clear(self):
         with self.assertRaisesRegex(MediaProviderError,"API_KEY"):
             JellyfinProvider("http://jellyfin:8096","").get_item("abc")

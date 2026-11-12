@@ -38,6 +38,7 @@ type PlaybackSessionTransport = Readonly<{
   previous_target_id: string | null;
   next_target_id: string | null;
   series_id?: string | null;
+  series_tmdb_id?: string | null;
 }>;
 
 function mapTrack(track: PlaybackTrackTransport): PlaybackTrack {
@@ -117,7 +118,8 @@ export async function resolvePlaybackSession(
     subtitleTracks: response.subtitle_tracks.map(mapTrack),
     ...(response.previous_target_id === null ? {} : { previousTargetId: response.previous_target_id }),
     ...(response.next_target_id === null ? {} : { nextTargetId: response.next_target_id }),
-    ...(response.series_id ? { seriesId: response.series_id } : {})
+    ...(response.series_id ? { seriesId: response.series_id } : {}),
+    ...(response.series_tmdb_id ? { seriesTmdbId: response.series_tmdb_id } : {})
   });
 }
 
