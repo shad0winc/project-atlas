@@ -201,6 +201,21 @@ describe("followed-event live availability refresh", () => {
     }
   });
 
+  it("keeps Watch Live through a pending poll and clears it if that poll is overdue", async () => {
+    const load = vi.fn().mockResolvedValueOnce(available).mockImplementation(() => new Promise(() => {}));
+    const publish = vi.fn();
+    const stop = startLiveAvailabilityRefresh({ follows: [follow], load, publish });
+    try {
+      await settle();
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(publish).toHaveBeenLastCalledWith({ "thesportsdb:event-001": available });
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(publish).toHaveBeenLastCalledWith({});
+    } finally {
+      stop();
+    }
+  });
+
   it("clears previously available playback when a refresh fails", async () => {
     const load = vi.fn()
       .mockResolvedValueOnce(available)

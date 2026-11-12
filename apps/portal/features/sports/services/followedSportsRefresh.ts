@@ -78,10 +78,14 @@ export function startFollowedSportsRefresh({
     if (stopped || controller !== null || document.visibilityState === "hidden") return;
     nextAllowedAt = Math.max(nextAllowedAt, ...providers.map(provider => cooldowns.get(provider) ?? 0));
     if (Date.now() < nextAllowedAt) { queue(); return; }
-    clearTimers();
+    if (timer !== null) clearTimeout(timer);
+    timer = null;
     controller = new AbortController();
     const active = controller;
-    publish(providers, null);
+    // A current ESPN observation stays usable until its expiry, including during a cache read.
+    if (expiryTimer === null || providers.some(provider => provider !== "espn")) {
+      publish(providers, null);
+    }
     if (providers.length === 0) { controller = null; onRefreshing?.(false); publish(providers, []); return; }
     onRefreshing?.(true);
     const results = await Promise.allSettled(
@@ -89,6 +93,8 @@ export function startFollowedSportsRefresh({
     );
     if (stopped || active.signal.aborted) return;
     controller = null;
+    if (expiryTimer !== null) clearTimeout(expiryTimer);
+    expiryTimer = null;
     onRefreshing?.(false);
     publish(providers, results);
     const rejected = results.filter(result => result.status === "rejected");
