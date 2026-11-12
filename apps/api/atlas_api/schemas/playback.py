@@ -97,6 +97,7 @@ class PlaybackSessionResponse(BaseModel):
     previous_target_id: str | None = None
     next_target_id: str | None = None
     series_id: str | None = None
+    series_tmdb_id: str | None = None
     overview: str | None = None
     cast: tuple[str, ...] = ()
     directors: tuple[str, ...] = ()
@@ -155,6 +156,7 @@ class PlaybackSessionResponse(BaseModel):
             previous_target_id=session.previous_target_id,
             next_target_id=session.next_target_id,
             series_id=session.series_id,
+            series_tmdb_id=session.series_tmdb_id,
             overview=session.overview,
             cast=session.cast,
             directors=session.directors,

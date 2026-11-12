@@ -10,9 +10,10 @@ class Provider:
         self.fail = False
     def get_item(self, item_id):
         return SimpleNamespace(title="Episode", media_type="tv", metadata={"jellyfin_type": "Episode"})
-    def get_retention_context(self, item_id):
+    def get_retention_context(self, item_id, *, include_series_tmdb_id=False):
         if self.fail: raise MediaProviderError("Parent mismatch")
-        return {"item_type": "episode", "series_id": "verified-series"}
+        assert include_series_tmdb_id
+        return {"item_type": "episode", "series_id": "verified-series", "series_tmdb_id": "62425"}
     def list_series_episodes(self, series_id):
         assert series_id == "verified-series"
         return tuple({"id": identity} for identity in self.ids)
@@ -28,6 +29,7 @@ class EpisodeControlsTest(unittest.TestCase):
     def test_first_skips_missing_episode(self):
         s=self.session("e1")
         self.assertEqual((s.series_id,s.previous_target_id,s.next_target_id),("verified-series",None,"e3"))
+        self.assertEqual(s.series_tmdb_id, "62425")
     def test_exact_episode_has_previous_and_next_across_seasons(self):
         s=self.session("e3")
         self.assertEqual((s.previous_target_id,s.next_target_id),("e1","s2e1"))

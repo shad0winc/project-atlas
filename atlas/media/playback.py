@@ -59,6 +59,7 @@ class PlaybackSession:
     directors: tuple[str, ...] = ()
     producers: tuple[str, ...] = ()
     production_locations: tuple[str, ...] = ()
+    series_tmdb_id: str | None = None
     video_width: int | None = None
     video_height: int | None = None
 
