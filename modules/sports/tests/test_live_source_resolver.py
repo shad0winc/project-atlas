@@ -730,6 +730,36 @@ def test_old_dated_event_slot_does_not_pollute_team_fallback() -> None:
     ]
 
 
+def test_nba_month_named_slots_do_not_hide_persistent_team_feeds() -> None:
+    event = {
+        "provider": "espn",
+        "provider_event_id": "basketball-nba-401909973",
+        "name": "Orlando Magic at Utah Jazz",
+        "sport": "Basketball",
+        "league": "NBA",
+        "start_at": "2026-11-12T02:00:00Z",
+        "home_team": "Utah Jazz",
+        "away_team": "Orlando Magic",
+    }
+    streams = tuple(
+        _stream(stream_id, name, 2, group="AM | USA NBA")
+        for stream_id, name in (
+            (290, "US| NBA UTAH JAZZ (HD)"),
+            (283, "US| NBA ORLANDO MAGIC (HD)"),
+            (208, "US| NBA LIVE [KM] 05 [Sacramento Kings vs Orlando Magic @ Nov 10 10:00 PM]"),
+            (207, "US| NBA LIVE [KM] 04 [Utah Jazz vs Miami Heat @ Nov 10 9:00 PM]"),
+        )
+    )
+
+    result = resolve_live_source_content(
+        event=event, sources=(_source("evestv", 2, priority=100),), streams=streams,
+    )
+
+    assert result is not None
+    assert result.match_kind is LiveSourceMatchKind.TEAM_FALLBACK
+    assert [stream.stream_id for stream in result.matches[0].streams] == [290, 283]
+
+
 @pytest.mark.parametrize(
     "event_name",
     (
