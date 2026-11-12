@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import os
 from typing import Any, Callable
 from types import MappingProxyType
@@ -645,6 +645,22 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
                 "Jellyseerr TV detail seasons must be an array"
             )
 
+        next_episode = resource.get("nextEpisodeToAir")
+        next_season_number = None
+        next_air_date = None
+        if isinstance(next_episode, dict):
+            number = next_episode.get("seasonNumber")
+            air_date = next_episode.get("airDate")
+            if type(number) is int and number > 0 and isinstance(air_date, str):
+                try:
+                    parsed = date.fromisoformat(air_date)
+                except ValueError:
+                    pass
+                else:
+                    if parsed.isoformat() == air_date and air_date >= self._timestamp()[:10]:
+                        next_season_number = number
+                        next_air_date = air_date
+
         normalized_seasons: list[
             MediaSeriesSeason
         ] = []
@@ -735,6 +751,9 @@ class JellyseerrMediaRequestProvider(BaseMediaRequestHTTPProvider):
                             season.get("airDate"),
                             "Jellyseerr TV detail "
                             f"seasons[{index}].airDate",
+                        ),
+                        next_episode_air_date=(
+                            next_air_date if season_number == next_season_number else None
                         ),
                     )
                 )

@@ -24,6 +24,7 @@ export type MediaSeriesSeason = Readonly<{
   requestabilityKnown: boolean;
   requestEligible: boolean;
   airDate?: string;
+  nextEpisodeAirDate?: string;
 }>;
 
 export type MediaSeriesDetail = Readonly<{
@@ -152,6 +153,7 @@ export function createMediaSeriesSeason(season: MediaSeriesSeason): MediaSeriesS
   );
   const requestEligible = normalizeBoolean(season.requestEligible, "season.requestEligible");
   const airDate = normalizeAirDate(season.airDate);
+  const nextEpisodeAirDate = normalizeAirDate(season.nextEpisodeAirDate);
 
   if (!requestabilityKnown && requestEligible) {
     throw new Error("season.requestEligible cannot be true when requestability is unknown.");
@@ -173,7 +175,8 @@ export function createMediaSeriesSeason(season: MediaSeriesSeason): MediaSeriesS
     availability,
     requestabilityKnown,
     requestEligible,
-    ...(airDate === undefined ? {} : { airDate })
+    ...(airDate === undefined ? {} : { airDate }),
+    ...(nextEpisodeAirDate === undefined ? {} : { nextEpisodeAirDate })
   });
 }
 

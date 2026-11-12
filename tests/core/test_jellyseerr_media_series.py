@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 import pytest
@@ -122,6 +123,23 @@ def test_tv_detail_uses_provider_endpoint_and_normalizes_metadata() -> None:
             is True
         )
         assert season.request_eligible is True
+
+
+@pytest.mark.parametrize(("next_episode", "expected"), [
+    ({"seasonNumber": 2, "airDate": "2026-11-14"}, "2026-11-14"),
+    ({"seasonNumber": 2, "airDate": "2026-11-10"}, None),
+    ({"seasonNumber": 2, "airDate": "2026-11-31"}, None),
+    ({"seasonNumber": 0, "airDate": "2026-11-14"}, None),
+])
+def test_next_episode_date_is_attached_only_to_the_matching_season(next_episode, expected):
+    provider = JellyseerrMediaRequestProvider(
+        base_url="http://jellyseerr:5055", api_key="secret",
+        clock=lambda: datetime(2026, 11, 11, tzinfo=timezone.utc),
+    )
+    with patch.object(JellyseerrMediaRequestProvider, "_get_json",
+                      return_value={**_detail(), "nextEpisodeToAir": next_episode}):
+        seasons = provider.get_tv_detail(1399).seasons
+    assert [season.next_episode_air_date for season in seasons] == [None, expected]
 
 
 def test_tv_detail_maps_ended_non_anime_series() -> None:

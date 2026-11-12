@@ -194,6 +194,10 @@ function TvSeasonSelection({
   }
 
   const detail = seriesState.detail;
+  const nextSeason = detail.isOngoing
+    ? detail.seasons.find(season => season.nextEpisodeAirDate !== undefined)
+    : undefined;
+  const nextEpisodeAirDate = nextSeason?.nextEpisodeAirDate;
 
   return (
     <section aria-label={`Seasons for ${item.title}`} className="media-discovery-request-area">
@@ -201,6 +205,24 @@ function TvSeasonSelection({
         {detail.isAnime ? "Anime series" : "TV series"}
         {detail.isOngoing ? " · Ongoing" : ""}
       </p>
+      {nextSeason && nextEpisodeAirDate ? (
+        <p className="media-discovery-request-message">
+          Next episode ({nextSeason.name}) airs{" "}
+          <time dateTime={nextEpisodeAirDate}>
+            {new Intl.DateTimeFormat(undefined, { dateStyle: "long", timeZone: "UTC" })
+              .format(new Date(`${nextEpisodeAirDate}T00:00:00Z`))}
+          </time>
+          .
+        </p>
+      ) : detail.isOngoing ? (
+        <p className="media-discovery-request-message">Next episode air date is unavailable.</p>
+      ) : null}
+
+      {detail.isOngoing ? (
+        <p className="media-discovery-request-message">
+          For monitored seasons, episodes are expected within 24 hours of airing when an eligible release is available.
+        </p>
+      ) : null}
 
       {detail.seasons.length === 0 ? (
         <p className="media-discovery-request-message">

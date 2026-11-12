@@ -37,6 +37,7 @@ class MediaSeriesSeason:
     requestability_known: bool
     request_eligible: bool
     air_date: str | None = None
+    next_episode_air_date: str | None = None
 
     def __post_init__(self) -> None:
         season_number = _positive_integer(
@@ -126,6 +127,10 @@ class MediaSeriesSeason:
             "air_date",
             air_date,
         )
+        object.__setattr__(
+            self, "next_episode_air_date",
+            _optional_date(self.next_episode_air_date, "next_episode_air_date"),
+        )
 
     def to_dict(
         self,
@@ -147,6 +152,8 @@ class MediaSeriesSeason:
                 self.request_eligible,
             "air_date":
                 self.air_date,
+            **({"next_episode_air_date": self.next_episode_air_date}
+               if self.next_episode_air_date is not None else {}),
         }
 
 

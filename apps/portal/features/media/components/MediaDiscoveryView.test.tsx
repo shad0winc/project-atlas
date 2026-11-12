@@ -278,6 +278,7 @@ describe("Media discovery presentation", () => {
 
     expect(markup).toContain("This season is already available.");
     expect(markup).toContain("Request Season 2");
+    expect(markup).not.toContain("within 24 hours");
     expect(markup).toContain("Request availability is currently unavailable for this season.");
     expect(markup).toContain("Season selection controls this Atlas request only.");
     expect(markup).not.toContain("Request Season 1");
@@ -286,10 +287,16 @@ describe("Media discovery presentation", () => {
     expect(markup).not.toContain("1396");
   });
 
-  it("renders server-provided anime classification without title inference", () => {
+  it.each(["2026-11-14", undefined])("renders verified anime classification and next-airing guidance (%s)", (airDate) => {
+    const previous = tvDetail();
     const detail = createMediaSeriesDetail({
-      ...tvDetail(),
-      isAnime: true
+      ...previous,
+      status: "returning",
+      isOngoing: true,
+      isAnime: true,
+      seasons: previous.seasons.map(season => season.seasonNumber === 2
+        ? { ...season, nextEpisodeAirDate: airDate }
+        : season)
     });
 
     const markup = render(
@@ -321,6 +328,13 @@ describe("Media discovery presentation", () => {
     );
 
     expect(markup).toContain("Anime series");
+    if (airDate) {
+      expect(markup).toContain("Next episode (Season 2) airs");
+      expect(markup).toContain(`dateTime="${airDate}"`);
+    } else {
+      expect(markup).toContain("Next episode air date is unavailable.");
+    }
+    expect(markup).toContain("expected within 24 hours of airing");
     expect(markup).not.toContain("1396");
   });
 

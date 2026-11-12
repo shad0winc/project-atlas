@@ -106,6 +106,7 @@ def series_detail(
                 requestability_known=True,
                 request_eligible=True,
                 air_date="2012-04-01",
+                next_episode_air_date="2026-11-14",
             ),
         ),
     )
@@ -340,6 +341,7 @@ class MediaDiscoveryEndpointTests(
                         "requestability_known": True,
                         "request_eligible": True,
                         "air_date": "2011-04-17",
+                        "next_episode_air_date": None,
                     },
                     {
                         "season_number": 2,
@@ -349,6 +351,7 @@ class MediaDiscoveryEndpointTests(
                         "requestability_known": True,
                         "request_eligible": True,
                         "air_date": "2012-04-01",
+                        "next_episode_air_date": "2026-11-14",
                     },
                 ],
             },

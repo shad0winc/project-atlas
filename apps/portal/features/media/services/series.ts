@@ -16,6 +16,7 @@ type MediaSeriesSeasonTransportResponse = Readonly<{
   requestability_known: boolean;
   request_eligible: boolean;
   air_date: string | null;
+  next_episode_air_date?: string | null;
 }>;
 
 type MediaSeriesDetailTransportResponse = Readonly<{
@@ -46,7 +47,8 @@ function mapSeason(response: MediaSeriesSeasonTransportResponse): MediaSeriesSea
     availability: response.availability as MediaSeriesSeason["availability"],
     requestabilityKnown: response.requestability_known,
     requestEligible: response.request_eligible,
-    ...(response.air_date === null ? {} : { airDate: response.air_date })
+    ...(response.air_date === null ? {} : { airDate: response.air_date }),
+    ...(response.next_episode_air_date == null ? {} : { nextEpisodeAirDate: response.next_episode_air_date })
   };
 }
 

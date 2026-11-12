@@ -111,6 +111,7 @@ class MediaSeriesSeasonResponse(
     requestability_known: bool
     request_eligible: bool
     air_date: str | None
+    next_episode_air_date: str | None = None
 
     @classmethod
     def from_domain(
@@ -137,6 +138,7 @@ class MediaSeriesSeasonResponse(
             air_date=(
                 season.air_date
             ),
+            next_episode_air_date=season.next_episode_air_date,
         )
 
 
