@@ -282,6 +282,24 @@ describe("mounted player continuity",()=>{
     expect(container.querySelector('.atlas-theater-video-shell [role="status"]')).toBeNull();
     await act(async()=>video.play());expect(video.paused).toBe(false);
   });
+  it("keeps the current stream and caption selection when negotiation fails", async () => {
+    hlsMock.supported = true;
+    const resolver = vi.fn().mockRejectedValue(new Error("Unavailable"));
+    await act(async () => root.render(<AtlasTheaterPlayer session={session} sessionResolver={resolver} />));
+    await flush();
+    const video = container.querySelector("video")!;
+    video.currentTime = 128;
+    const menu = container.querySelector("select")!;
+    await act(async () => {
+      menu.value = "3";
+      menu.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(menu.value).toBe("auto");
+    expect(video.currentTime).toBe(128);
+    expect(video.paused).toBe(false);
+    expect(hlsMock.destroy).not.toHaveBeenCalled();
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("previous selection is still active");
+  });
   it("keeps playing through caption replacement",async()=>{
     await act(async()=>root.render(<AtlasTheaterPlayer session={session} sessionResolver={async()=>({...session})}/>));await flush();
     const video=container.querySelector("video")!;video.currentTime=128;

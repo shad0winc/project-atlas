@@ -113,6 +113,8 @@ export function AtlasTheaterPlayer({
   const [subtitleSelection, setSubtitleSelection] = useState<SubtitleSelection>("auto");
 
   const [subtitleChanging, setSubtitleChanging] = useState(false);
+  const [captionError, setCaptionError] = useState(false);
+  const previousCaptionSelectionRef = useRef<SubtitleSelection | null>(null);
   const captionStartupRef = useRef(false);
   const [captionPreparing, setCaptionPreparing] = useState(false);
 
@@ -132,6 +134,8 @@ export function AtlasTheaterPlayer({
 
   async function retryPlayback(): Promise<void> {
     if (retryRequestRef.current !== null) return;
+    const previousCaptionSelection = previousCaptionSelectionRef.current;
+    const retrySelection = previousCaptionSelection ?? subtitleSelection;
     rememberPlaybackPosition();
     const controller = new AbortController();
     retryRequestRef.current = controller;
@@ -144,9 +148,15 @@ export function AtlasTheaterPlayer({
       const refreshed = await refreshPlaybackForRetry(
         activeSession,
         sessionResolver,
-        subtitleSelection,
+        retrySelection,
         controller.signal
       );
+      if (previousCaptionSelection !== null) {
+        previousCaptionSelectionRef.current = null;
+        captionStartupRef.current = false;
+        setCaptionError(false);
+        setSubtitleSelection(previousCaptionSelection);
+      }
       setActiveSession(refreshed);
     } catch (error: unknown) {
       if (!controller.signal.aborted) {
@@ -244,6 +254,15 @@ export function AtlasTheaterPlayer({
     }
     let restoring = false;
     let restored = false;
+    let nativeCaptionStartup = false;
+    const confirmNativeCaptions = () => {
+      if (!disposed && nativeCaptionStartup) {
+        nativeCaptionStartup = false;
+        previousCaptionSelectionRef.current = null;
+        captionStartupRef.current = false;
+      }
+    };
+    video.addEventListener("canplay", confirmNativeCaptions);
     let lastSaved = 0;
     let lastLivePosition: number | null = null;
     setAutoplayBlocked(false);
@@ -315,6 +334,7 @@ export function AtlasTheaterPlayer({
         // Prefer managed HLS for both library and live streams. Native HLS
         // remains the fallback when MediaSource playback is unavailable.
         if (nativeHls && !managedHls) {
+          nativeCaptionStartup = previousCaptionSelectionRef.current !== null;
           setCaptionPreparing(false);
           video.crossOrigin = "use-credentials";
           video.src = streamUrl;
@@ -355,6 +375,9 @@ export function AtlasTheaterPlayer({
             fragmentStart: data.frag.start, fragmentDuration: data.frag.duration });
         });
         hls.on(Hls.Events.FRAG_BUFFERED, (_event, data) => {
+          if (!disposed && !terminalErrorReported && data.frag.type === "main") {
+            previousCaptionSelectionRef.current = null;
+          }
           if (activeSession.sourceType === "live" && data.frag.type === "main") {
             void restorePlaybackPosition();
           }
@@ -414,6 +437,7 @@ export function AtlasTheaterPlayer({
       for (const event of ["loadedmetadata", "canplay", "progress", "durationchange"]) {
         video.removeEventListener(event, restorePlaybackPosition);
       }
+      video.removeEventListener("canplay", confirmNativeCaptions);
       video.removeEventListener("timeupdate", updatePosition);
       video.removeEventListener("seeking", guardLiveSeek);
       video.removeEventListener("pause", pausePlayback);
@@ -427,16 +451,8 @@ export function AtlasTheaterPlayer({
   }, [activeSession, viewerId]);
 
   async function changeSubtitle(selection: SubtitleSelection): Promise<void> {
-    const video = videoRef.current;
-
-    if (video !== null && Number.isFinite(video.currentTime)) {
-      resumeAtRef.current = retryResumePosition(activeSession.canSeek, video.currentTime, resumeAtRef.current);
-      shouldPlayRef.current = !video.paused;
-    }
-
-    setSubtitleSelection(selection);
+    setCaptionError(false);
     setSubtitleChanging(true);
-    setState({ status: "connecting" });
 
     try {
       const refreshed = await sessionResolver(
@@ -450,13 +466,21 @@ export function AtlasTheaterPlayer({
         throw new Error("Playback is not currently available.");
       }
 
-      captionStartupRef.current = refreshed.sourceType === "library" && typeof selection === "number";
+      const video = videoRef.current;
+      if (video !== null && Number.isFinite(video.currentTime)) {
+        rememberPlaybackPosition();
+        shouldPlayRef.current = !video.paused;
+      }
+      const startsLibraryCaptions = refreshed.sourceType === "library" && typeof selection === "number";
+      previousCaptionSelectionRef.current = startsLibraryCaptions
+        ? previousCaptionSelectionRef.current ?? subtitleSelection
+        : null;
+      captionStartupRef.current = startsLibraryCaptions;
+      setSubtitleSelection(selection);
+      setState({ status: "connecting" });
       setActiveSession(refreshed);
-    } catch (error: unknown) {
-      setState({
-        status: "error",
-        message: error instanceof Error ? error.message : "Atlas could not change closed captions."
-      });
+    } catch {
+      setCaptionError(true);
     } finally {
       setSubtitleChanging(false);
     }
@@ -511,7 +535,9 @@ export function AtlasTheaterPlayer({
               }}
               type="button"
             >
-              Retry playback
+              {previousCaptionSelectionRef.current === null
+                ? "Retry playback"
+                : "Resume with previous captions"}
             </button>
           </div>
         ) : null}
@@ -600,6 +626,7 @@ export function AtlasTheaterPlayer({
           <span>Closed captions unavailable</span>
         )}
 
+        {captionError ? <span role="alert">Atlas could not change closed captions. The previous selection is still active.</span> : null}
         {subtitleChanging ? <span role="status">Changing captions…</span> : null}
         {captionPreparing ? <span role="status">Preparing captions…</span> : null}
       </div>
