@@ -70,39 +70,44 @@ function renderRequest(
 }
 
 describe("Request lifecycle progress presentation", () => {
-  it("moves a ready request into history exactly 24 hours after availability", async () => {
-    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-09-14T04:44:59Z"));
-    const container = document.createElement("div");
-    const root = createRoot(container);
-    const available = request({
-      status: "available", terminal: true, active: false, canCancel: false,
-      availableAt: "2026-09-13T04:45:00Z", updatedAt: "2026-09-13T04:45:00Z"
-    });
-    try {
-      await act(async () => root.render(
-        <RequestsContent
-          blockedCancellationIds={[]} canCancel={true} cancellingRequestId={null}
-          mutationFailure={null} onBeginCancellation={() => undefined}
-          onCancelConfirmation={() => undefined} onConfirmCancellation={() => undefined}
-          onRetry={() => undefined} pendingCancellationId={null}
-          state={{ status: "ready", data: [available] }}
-        />
-      ));
-      await act(async () => vi.advanceTimersByTimeAsync(999));
-      expect(container.querySelector('[aria-label="Your media requests"]')?.textContent).toContain("Interstellar");
-      expect(container.querySelector("details")).toBeNull();
-      await act(async () => vi.advanceTimersByTimeAsync(1));
-      expect(container.querySelector('[aria-label="Your media requests"]')?.textContent).not.toContain("Interstellar");
-      expect(container.querySelector("details summary")?.textContent).toBe("Archived requests (1)");
-      expect(container.querySelector('[aria-label="Archived media requests"]')?.textContent).toContain("Interstellar");
-    } finally {
-      await act(async () => root.unmount());
-      vi.useRealTimers();
-      vi.unstubAllGlobals();
+  it.each(["available", "cancelled"] as const)(
+    "moves a %s request into history exactly 24 hours after its status change",
+    async status => {
+      vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-09-14T04:44:59Z"));
+      const container = document.createElement("div");
+      const root = createRoot(container);
+      const completedAt = "2026-09-13T04:45:00Z";
+      const completed = request({
+        status, terminal: true, active: false, canCancel: false,
+        updatedAt: completedAt,
+        ...(status === "available" ? { availableAt: completedAt } : {})
+      });
+      try {
+        await act(async () => root.render(
+          <RequestsContent
+            blockedCancellationIds={[]} canCancel={true} cancellingRequestId={null}
+            mutationFailure={null} onBeginCancellation={() => undefined}
+            onCancelConfirmation={() => undefined} onConfirmCancellation={() => undefined}
+            onRetry={() => undefined} pendingCancellationId={null}
+            state={{ status: "ready", data: [completed] }}
+          />
+        ));
+        await act(async () => vi.advanceTimersByTimeAsync(999));
+        expect(container.querySelector('[aria-label="Your media requests"]')?.textContent).toContain("Interstellar");
+        expect(container.querySelector("details")).toBeNull();
+        await act(async () => vi.advanceTimersByTimeAsync(1));
+        expect(container.querySelector('[aria-label="Your media requests"]')?.textContent).not.toContain("Interstellar");
+        expect(container.querySelector("details summary")?.textContent).toBe("Archived requests (1)");
+        expect(container.querySelector('[aria-label="Archived media requests"]')?.textContent).toContain("Interstellar");
+      } finally {
+        await act(async () => root.unmount());
+        vi.useRealTimers();
+        vi.unstubAllGlobals();
+      }
     }
-  });
+  );
 
   it("renders Processing in Jellyfin as the current request stage", () => {
     const markup = renderRequest(

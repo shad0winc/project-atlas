@@ -37,8 +37,11 @@ export type RequestsContentProps = Readonly<{
 const REQUEST_ARCHIVE_DELAY_MS = 24 * 60 * 60 * 1000;
 
 function archiveTime(request: MediaRequest): number {
-  return request.status === "available" && request.availableAt
-    ? Date.parse(request.availableAt) + REQUEST_ARCHIVE_DELAY_MS
+  const archivedAfter = request.status === "available" ? request.availableAt
+    : request.status === "cancelled" ? request.updatedAt
+    : undefined;
+  return archivedAfter
+    ? Date.parse(archivedAfter) + REQUEST_ARCHIVE_DELAY_MS
     : Number.POSITIVE_INFINITY;
 }
 
