@@ -924,6 +924,7 @@ a {
 
 .portal-nav-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.25rem;
 }
 
@@ -964,7 +965,9 @@ a {
 }
 
 .portal-nav-copy {
+  flex: 1;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .portal-nav-label,
@@ -979,11 +982,9 @@ a {
 
 .portal-nav-description {
   margin-top: 0.1rem;
-  overflow: hidden;
   color: #64748b;
   font-size: 0.72rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
 }
 
 .portal-sidebar-footer {
