@@ -26,7 +26,7 @@ export type LiveAvailabilityRefreshOptions = Readonly<{
 /**
  * Refresh only followed-event playback eligibility.
  *
- * Each refresh invalidates previously published availability.
+ * Retain the last result during one poll. Failed or overdue polls clear it.
  * Aborted and superseded requests cannot publish stale results.
  * This service never creates a playback session or bypasses
  * the Sports backend's authoritative availability response.
@@ -65,6 +65,7 @@ export function startLiveAvailabilityRefresh({
       return;
     }
 
+    const overdue = activeController !== null;
     activeController?.abort();
 
     const controller = new AbortController();
@@ -72,8 +73,9 @@ export function startLiveAvailabilityRefresh({
 
     const currentGeneration = ++generation;
 
-    // Previous availability is not authorization for this refresh.
-    publish({});
+    if (currentGeneration === 1 || overdue) {
+      publish({});
+    }
 
     const results = await Promise.all(
       eventFollows.map(async (follow) => {
