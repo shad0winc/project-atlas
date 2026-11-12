@@ -8,10 +8,12 @@ export function SportsCurrentlyLive({
   availability,
   unavailable,
   onWatchLive,
+  scopeLabel,
 }: Readonly<{
   events: readonly SportsEvent[];
   availability: Readonly<Record<string, SportsLiveAvailability>>;
   unavailable: boolean;
+  scopeLabel?: string;
   onWatchLive: (channelId: string) => Promise<void>;
 }>): React.ReactElement {
   return (
@@ -21,9 +23,10 @@ export function SportsCurrentlyLive({
     >
       <h2 id="sports-currently-live">Currently Live</h2>
       <p>
-        Provider-reported live events from your followed teams, leagues, and
-        events. Start times use your device timezone. Channels appear here only
-        when their current program is verified.
+        {scopeLabel
+          ? `Provider-reported live events for ${scopeLabel}.`
+          : "Provider-reported live events from your followed teams, leagues, and events."}
+        {" "}Start times use your device timezone. Channels appear here only when their current program is verified.
       </p>
       {unavailable ? (
         <p role="status">
@@ -31,7 +34,9 @@ export function SportsCurrentlyLive({
         </p>
       ) : null}
       {events.length === 0 ? (
-        <p>No followed events are currently verified live.</p>
+        <p>{scopeLabel
+          ? `No events for ${scopeLabel} are currently verified live.`
+          : "No followed events are currently verified live."}</p>
       ) : (
         <div className="requests-grid">
           {events.map((event) => {

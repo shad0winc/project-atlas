@@ -98,6 +98,10 @@ export function SportsPageClient(): React.ReactElement {
     () => followedLiveEvents(mergeSportsObservations(freshFollowedEvents, curatedEvents), follows),
     [freshFollowedEvents, curatedEvents, follows],
   );
+  const selectedLiveFollow = browsedSports && follows.find(follow =>
+    follow.enabled && follow.provider === browsedSports.provider &&
+    follow.type === browsedSports.type && follow.providerId === browsedSports.providerId,
+  );
   const liveEventFollows = useMemo(
     () =>
       currentLiveEvents.map((event): SportsFollow => ({
@@ -744,12 +748,14 @@ export function SportsPageClient(): React.ReactElement {
         <p role="status">{curatedEnabled === true ? "Saved Sports from search update when you choose View upcoming. For shared schedules, choose a competition above." : "Shared schedules are temporarily unavailable. Choose View upcoming on a saved Sport to load its schedule."}</p>
       ) : null}
 
-      <SportsCurrentlyLive
-        events={currentLiveEvents}
-        availability={liveAvailabilityByEvent}
-        unavailable={liveMetadataUnavailable}
-        onWatchLive={handleWatchLive}
-      />
+      {!selectedLiveFollow && (
+        <SportsCurrentlyLive
+          events={currentLiveEvents}
+          availability={liveAvailabilityByEvent}
+          unavailable={liveMetadataUnavailable}
+          onWatchLive={handleWatchLive}
+        />
+      )}
 
       {loading ? (
         <section
@@ -784,6 +790,15 @@ export function SportsPageClient(): React.ReactElement {
           scheduleRefreshing={scheduleRefreshing}
           scheduleLoadedAt={upcomingLoadedAt}
           upcomingScopeLabel={upcomingScopeLabel}
+          selectedLiveEvents={selectedLiveFollow && (
+            <SportsCurrentlyLive
+              events={followedLiveEvents(currentLiveEvents, [selectedLiveFollow])}
+              availability={liveAvailabilityByEvent}
+              unavailable={liveMetadataUnavailable}
+              onWatchLive={handleWatchLive}
+              scopeLabel={selectedLiveFollow.name}
+            />
+          )}
           allFollowedSelected={browsedSports === undefined}
           onViewAllUpcoming={() => setBrowsedSports(undefined)}
           discoveryState={discovery?.state}
