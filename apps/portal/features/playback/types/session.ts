@@ -10,6 +10,12 @@ export type PlaybackTrack = Readonly<{
   forced: boolean;
 }>;
 
+export type PlaybackVersion = Readonly<{
+  id: string;
+  width: number;
+  height: number;
+}>;
+
 export type PlaybackSession = Readonly<{
   available: boolean;
   action: PlaybackActionKind;
@@ -27,6 +33,8 @@ export type PlaybackSession = Readonly<{
   productionLocations?: readonly string[];
   videoWidth?: number;
   videoHeight?: number;
+  versions?: readonly PlaybackVersion[];
+  selectedVersionId?: string;
   mediaType: string;
   durationTicks?: number;
   canSeek: boolean;

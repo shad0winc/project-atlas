@@ -253,6 +253,57 @@ describe("mounted player continuity",()=>{
     expect(container.querySelector('[role="alert"]')?.textContent).toContain("cannot play");
     expect(hlsMock.constructed).not.toHaveBeenCalled();
   });
+  it("plays a direct-stream version without sending the file to the HLS parser", async () => {
+    hlsMock.supported = true;
+    const directStream = "https://playback.example.test/videos/e1/stream?Static=true&MediaSourceId=hd";
+    vi.mocked(bootstrapPlaybackStream).mockResolvedValueOnce({ streamUrl: directStream });
+    await act(async () => root.render(
+      <AtlasTheaterPlayer session={{ ...session, selectedVersionId: "hd" }} />
+    ));
+    await flush();
+
+    expect(container.querySelector("video")?.src).toBe(directStream);
+    expect(hlsMock.constructed).not.toHaveBeenCalled();
+  });
+
+  it("switches versions without losing paused position and pins later caption changes", async () => {
+    const original: PlaybackSession = {
+      ...session,
+      versions: [
+        { id: "uhd", width: 3840, height: 2160 },
+        { id: "hd", width: 1920, height: 1080 }
+      ],
+      selectedVersionId: "uhd"
+    };
+    const replacement = { ...original, selectedVersionId: "hd", playbackCapability: "hd-playback" };
+    const resolver = vi.fn(async () => replacement);
+    await act(async () => root.render(<AtlasTheaterPlayer session={original} sessionResolver={resolver} />));
+    await flush();
+
+    const video = container.querySelector("video")!;
+    const quality = container.querySelector<HTMLSelectElement>('select[aria-label="Quality version"]')!;
+    expect(Array.from(quality.options, (option) => option.text)).toEqual(["3840 × 2160", "1920 × 1080"]);
+    await act(async () => {
+      video.currentTime = 128;
+      video.pause();
+      quality.value = "hd";
+      quality.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await flush();
+    expect(resolver).toHaveBeenCalledWith("jellyfin", "e1", expect.any(AbortSignal), "auto", "hd");
+    expect(quality.value).toBe("hd");
+    expect(video.currentTime).toBe(128);
+    expect(video.paused).toBe(true);
+
+    const captions = container.querySelector<HTMLSelectElement>('select[aria-label="Closed captions"]')!;
+    await act(async () => {
+      captions.value = "3";
+      captions.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await flush();
+    expect(resolver).toHaveBeenLastCalledWith("jellyfin", "e1", undefined, 3, "hd");
+  });
+
   it("preserves paused position during caption replacement on managed HLS", async () => {
     hlsMock.supported=true;
     await act(async()=>root.render(<AtlasTheaterPlayer session={session} sessionResolver={async()=>({...session})}/>));await flush();

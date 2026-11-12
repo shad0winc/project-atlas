@@ -1,6 +1,4 @@
-from types import SimpleNamespace
-
-from atlas.media import PlaybackTrack
+from atlas.media import PlaybackActionKind, PlaybackSession, PlaybackSourceType, PlaybackTrack
 from atlas_api.schemas.playback import PlaybackSessionResponse
 
 
@@ -24,12 +22,12 @@ def test_playback_session_response_serializes_slotted_tracks() -> None:
         forced=True,
     )
 
-    session = SimpleNamespace(
+    session = PlaybackSession(
         available=True,
-        action=SimpleNamespace(value="watch"),
+        action=PlaybackActionKind.WATCH_NOW,
         label="Watch Now",
         backend="jellyfin",
-        source_type=SimpleNamespace(value="on_demand"),
+        source_type=PlaybackSourceType.LIBRARY,
         provider="jellyfin",
         requested_target_id="series-id",
         playable_target_id="episode-id",

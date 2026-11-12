@@ -12,6 +12,7 @@ import { resolvePlaybackSession } from "../services/session";
 import type { SubtitleSelection } from "../services/session";
 import { bootstrapPlaybackStream } from "../services/stream";
 import { adminPlaybackRefreshDelay, refreshPlaybackForRetry, retryResumePosition } from "../services/retry";
+import type { PlaybackSessionResolver } from "../services/retry";
 import { createPlaybackDiagnostics } from "../services/diagnostics";
 import { captionStartupPolicy } from "../services/caption-startup";
 import { safeLiveSeekPosition } from "../services/live-seek";
@@ -81,12 +82,7 @@ export function AtlasTheaterPlayer({
   viewerId?: string;
   onNextEpisode?: (itemId: string) => void;
   autoAdvance?: boolean;
-  sessionResolver?: (
-    provider: string,
-    itemId: string,
-    signal?: AbortSignal,
-    subtitle?: SubtitleSelection
-  ) => Promise<PlaybackSession>;
+  sessionResolver?: PlaybackSessionResolver;
   liveSessionRenewer?: (signal: AbortSignal) => Promise<PlaybackSession>;
   retention?: MediaRetention | null;
   canFavorite?: boolean;
@@ -114,6 +110,9 @@ export function AtlasTheaterPlayer({
 
   const [subtitleChanging, setSubtitleChanging] = useState(false);
   const [captionError, setCaptionError] = useState(false);
+  const [versionChanging, setVersionChanging] = useState(false);
+  const [versionError, setVersionError] = useState(false);
+  const versionRequestRef = useRef<AbortController | null>(null);
   const previousCaptionSelectionRef = useRef<SubtitleSelection | null>(null);
   const captionStartupRef = useRef(false);
   const [captionPreparing, setCaptionPreparing] = useState(false);
@@ -122,7 +121,10 @@ export function AtlasTheaterPlayer({
     status: "connecting"
   });
 
-  useEffect(() => () => retryRequestRef.current?.abort(), []);
+  useEffect(() => () => {
+    retryRequestRef.current?.abort();
+    versionRequestRef.current?.abort();
+  }, []);
 
   function rememberPlaybackPosition(): void {
     resumeAtRef.current = retryResumePosition(
@@ -133,7 +135,7 @@ export function AtlasTheaterPlayer({
   }
 
   async function retryPlayback(): Promise<void> {
-    if (retryRequestRef.current !== null) return;
+    if (retryRequestRef.current !== null || versionRequestRef.current !== null) return;
     const previousCaptionSelection = previousCaptionSelectionRef.current;
     const retrySelection = previousCaptionSelection ?? subtitleSelection;
     rememberPlaybackPosition();
@@ -175,7 +177,7 @@ export function AtlasTheaterPlayer({
     const streamUrl = streamUrlRef.current;
     const initialToken = adminAccessToken(viewerId);
     const live = activeSession.sourceType === "live";
-    if (state.status !== "ready" || subtitleChanging || (live && !liveSessionRenewer) ||
+    if (state.status !== "ready" || subtitleChanging || versionChanging || (live && !liveSessionRenewer) ||
         !streamUrl || !initialToken) return;
 
     const videoScope = new URL(streamUrl).pathname.split("/")[2];
@@ -192,7 +194,7 @@ export function AtlasTheaterPlayer({
     }
 
     async function renew() {
-      if (signal.aborted || renewing || retryRequestRef.current) return;
+      if (signal.aborted || renewing || retryRequestRef.current || versionRequestRef.current) return;
       renewing = true;
       window.clearTimeout(timer);
       try {
@@ -233,7 +235,7 @@ export function AtlasTheaterPlayer({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [activeSession, liveSessionRenewer, state.status, subtitleChanging, subtitleSelection, viewerId]);
+  }, [activeSession, liveSessionRenewer, state.status, subtitleChanging, subtitleSelection, versionChanging, viewerId]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -322,6 +324,15 @@ export function AtlasTheaterPlayer({
           return;
         }
         streamUrlRef.current = streamUrl;
+
+        if (activeSession.selectedVersionId && !new URL(streamUrl).pathname.toLowerCase().endsWith(".m3u8")) {
+          video.crossOrigin = "use-credentials";
+          video.src = streamUrl;
+          sourceAttached = true;
+          video.load();
+          setState({ status: "ready" });
+          return;
+        }
 
         const { default: Hls } = await import("hls.js");
 
@@ -458,14 +469,12 @@ export function AtlasTheaterPlayer({
     setSubtitleChanging(true);
 
     try {
+      const versionId = activeSession.selectedVersionId;
       const refreshed = await sessionResolver(
-        activeSession.provider,
-        activeSession.playableTargetId,
-        undefined,
-        selection
+        activeSession.provider, activeSession.playableTargetId, undefined, selection,
+        ...(versionId === undefined ? [] : [versionId])
       );
-
-      if (!refreshed.available) {
+      if (!refreshed.available || (versionId !== undefined && refreshed.selectedVersionId !== versionId)) {
         throw new Error("Playback is not currently available.");
       }
 
@@ -489,6 +498,37 @@ export function AtlasTheaterPlayer({
     }
   }
 
+  async function changeVersion(versionId: string): Promise<void> {
+    if (versionRequestRef.current || versionId === activeSession.selectedVersionId ||
+        !activeSession.versions?.some((version) => version.id === versionId)) return;
+
+    const controller = new AbortController();
+    versionRequestRef.current = controller;
+    setVersionChanging(true);
+    setVersionError(false);
+    // Explicit track indexes belong to the old copy. Off is valid for any copy.
+    const nextSubtitle = subtitleSelection === "off" ? "off" : "auto";
+    try {
+      const refreshed = await refreshPlaybackForRetry(
+        activeSession, sessionResolver, nextSubtitle, controller.signal, versionId
+      );
+      rememberPlaybackPosition();
+      if (videoRef.current) shouldPlayRef.current = !videoRef.current.paused;
+      previousCaptionSelectionRef.current = null;
+      captionStartupRef.current = false;
+      setCaptionError(false);
+      setSubtitleSelection(nextSubtitle);
+      setState({ status: "connecting" });
+      setActiveSession(refreshed);
+    } catch {
+      if (!controller.signal.aborted) setVersionError(true);
+    } finally {
+      versionRequestRef.current = null;
+      if (!controller.signal.aborted) setVersionChanging(false);
+    }
+  }
+
+  const versions = activeSession.sourceType === "library" ? activeSession.versions ?? [] : [];
   const hasSubtitleTracks = activeSession.subtitleTracks.length > 0;
 
   return (
@@ -603,12 +643,35 @@ export function AtlasTheaterPlayer({
 
         {activeSession.canSeek ? <span>Seeking available</span> : null}
 
+        {versions.length > 1 ? (
+          <label>
+            <span>Quality version</span>{" "}
+            <select
+              aria-label="Quality version"
+              disabled={subtitleChanging || versionChanging || captionPreparing || state.status === "connecting"}
+              onChange={(event) => void changeVersion(event.currentTarget.value)}
+              value={activeSession.selectedVersionId}
+            >
+              {versions.map((version, index) => (
+                <option key={version.id} value={version.id}>
+                  {version.width} × {version.height}
+                  {versions.some((other) => other.id !== version.id &&
+                    other.width === version.width && other.height === version.height)
+                    ? ` (version ${index + 1})` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        {versionChanging ? <span role="status">Changing quality version…</span> : null}
+        {versionError ? <span role="alert">Atlas could not switch quality versions. Try again.</span> : null}
+
         {hasSubtitleTracks ? (
           <label>
             <span>Closed captions</span>{" "}
             <select
               aria-label="Closed captions"
-              disabled={subtitleChanging || captionPreparing || state.status === "connecting"}
+              disabled={subtitleChanging || versionChanging || captionPreparing || state.status === "connecting"}
               onChange={(event) => {
                 void changeSubtitle(parseSubtitleSelection(event.currentTarget.value));
               }}
