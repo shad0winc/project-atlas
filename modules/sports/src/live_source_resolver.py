@@ -704,6 +704,14 @@ def _looks_event_specific(
             r"\b20\d{2}-\d{2}-\d{2}\b",
             name,
         )
+        # Numbered NBA provider slots can use a month-name kickoff,
+        # for example "[Sacramento Kings vs Orlando Magic @ Nov 10 10:00 PM]".
+        or re.search(
+            r"@\s*(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|"
+            r"jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|"
+            r"nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}\b",
+            name,
+        )
         or "start:" in name
         or "stop:" in name
         or "event only" in name
