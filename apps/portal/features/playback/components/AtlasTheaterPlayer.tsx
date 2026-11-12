@@ -22,7 +22,7 @@ import type { PlaybackSession, PlaybackTrack } from "../types/session";
 type PlayerState =
   | Readonly<{ status: "connecting" }>
   | Readonly<{ status: "ready" }>
-  | Readonly<{ status: "error"; message: string }>;
+  | Readonly<{ status: "error"; message: string; canRestorePreviousCaptions?: boolean }>;
 
 function subtitleOptionLabel(track: PlaybackTrack): string {
   const qualifiers = [track.default ? "Default" : "", track.forced ? "Forced" : ""].filter(Boolean);
@@ -162,6 +162,7 @@ export function AtlasTheaterPlayer({
       if (!controller.signal.aborted) {
         setState({
           status: "error",
+          canRestorePreviousCaptions: previousCaptionSelectionRef.current !== null,
           message: error instanceof Error ? error.message : "Atlas could not renew playback."
         });
       }
@@ -403,6 +404,7 @@ export function AtlasTheaterPlayer({
           );
           setState({
             status: "error",
+            canRestorePreviousCaptions: previousCaptionSelectionRef.current !== null,
             message: "Jellyfin playback encountered a fatal stream error."
           });
 
@@ -425,6 +427,7 @@ export function AtlasTheaterPlayer({
         setCaptionPreparing(false);
         setState({
           status: "error",
+          canRestorePreviousCaptions: previousCaptionSelectionRef.current !== null,
           message: error instanceof Error ? error.message : "Atlas could not start playback."
         });
       });
@@ -511,6 +514,7 @@ export function AtlasTheaterPlayer({
             rememberPlaybackPosition();
             setState({
               status: "error",
+              canRestorePreviousCaptions: previousCaptionSelectionRef.current !== null,
               message: "The browser could not play this stream."
             });
           }}
@@ -535,9 +539,7 @@ export function AtlasTheaterPlayer({
               }}
               type="button"
             >
-              {previousCaptionSelectionRef.current === null
-                ? "Retry playback"
-                : "Resume with previous captions"}
+              {state.canRestorePreviousCaptions ? "Resume with previous captions" : "Retry playback"}
             </button>
           </div>
         ) : null}
