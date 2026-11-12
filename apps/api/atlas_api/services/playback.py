@@ -125,9 +125,9 @@ class PlaybackService:
             for episode in episodes
         )
 
-    def _episode_navigation(self, item_id: str) -> tuple[str, str | None, str | None]:
+    def _episode_navigation(self, item_id: str) -> tuple[str, str | None, str | None, str | None]:
         """Resolve neighbors from a verified parent and its ordered inventory."""
-        context = self._jellyfin.get_retention_context(item_id)
+        context = self._jellyfin.get_retention_context(item_id, include_series_tmdb_id=True)
         if context.get("item_type") != "episode" or not context.get("series_id"):
             raise MediaProviderError("Episode parent is unavailable")
         series_id = context["series_id"]
@@ -139,7 +139,7 @@ class PlaybackService:
             raise MediaProviderError("Episode inventory identity mismatch")
         index = canonical.index(target)
         return (series_id, ids[index - 1] if index else None,
-                ids[index + 1] if index + 1 < len(ids) else None)
+                ids[index + 1] if index + 1 < len(ids) else None, context.get("series_tmdb_id"))
 
     def resolve_library_session(
         self,
@@ -185,6 +185,7 @@ class PlaybackService:
             previous_target_id = None
             next_target_id = None
             series_id = None
+            series_tmdb_id = None
 
             jellyfin_type = str(
                 item.metadata.get("jellyfin_type") or ""
@@ -192,13 +193,14 @@ class PlaybackService:
 
             if jellyfin_type == "episode":
                 try:
-                    series_id, previous_target_id, next_target_id = self._episode_navigation(normalized_item_id)
+                    series_id, previous_target_id, next_target_id, series_tmdb_id = self._episode_navigation(normalized_item_id)
                 except MediaProviderError:
                     # Optional navigation failure must not prevent playback.
                     pass
 
             if jellyfin_type == "series":
                 series_id = normalized_item_id
+                series_tmdb_id = item.metadata.get("series_tmdb_id")
                 episodes = self._jellyfin.list_series_episodes(
                     normalized_item_id
                 )
@@ -287,6 +289,7 @@ class PlaybackService:
             previous_target_id=previous_target_id,
             next_target_id=next_target_id,
             series_id=series_id,
+            series_tmdb_id=series_tmdb_id,
             overview=overview if isinstance(overview, str) else None,
             cast=credits.get("cast", ()),
             directors=credits.get("directors", ()),
