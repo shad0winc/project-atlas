@@ -61,7 +61,7 @@ describe("curated schedule actions and cache refresh", () => {
   it("does not open a player without verified availability", async () => {
     await mount(); await click("Check live playback");
     expect(loadSportsLiveAvailability).toHaveBeenLastCalledWith("espn", "basketball-nba-401909900");
-    expect(onWatchLive).not.toHaveBeenCalled(); expect(container.textContent).toContain("No verified Atlas channel");
+    expect(onWatchLive).not.toHaveBeenCalled(); expect(container.textContent).toContain("Atlas has no available channel for this event yet.");
   });
   it("opens only the channel returned by availability", async () => {
     vi.mocked(loadSportsLiveAvailability).mockResolvedValue({ available: true, atlasChannelId: "sports-live-fixture" });
