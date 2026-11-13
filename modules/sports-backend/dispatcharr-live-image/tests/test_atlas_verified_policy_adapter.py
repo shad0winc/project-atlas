@@ -73,6 +73,14 @@ class AdapterTests(unittest.TestCase):
                          "https://provider.example/live/play-user/private-play-password/1234.ts")
         self.assertNotIn("private-play-password", repr(result))
 
+    def test_pinned_stream_rejects_drift_even_on_the_same_account(self):
+        self.claim.stream_id = self.values["stream"].id
+        result = self.invoke(self.adapter(claims=(self.claim,)))
+        self.assertEqual(result.spec.stream_id, self.claim.stream_id)
+        self.values["stream"].id += 1
+        with self.assertRaises(fixture.policy.VerifiedLivePolicyUnavailable):
+            self.invoke(self.adapter(claims=(self.claim,)))
+
     def test_missing_realm_stale_limit_and_unrelated_account_fail_closed(self):
         variants = (
             self.adapter(claims=()),

@@ -43,7 +43,7 @@ def main():
         harness = '''import sys,unittest
 suite=unittest.defaultTestLoader.discover(sys.argv[1],pattern='test_*.py')
 result=unittest.TextTestRunner(verbosity=1).run(suite)
-assert result.testsRun==98,(result.testsRun, 'Expected all historical and HEAD tests')
+assert result.testsRun==100,(result.testsRun, 'Expected all historical and HEAD tests')
 assert not result.skipped, 'Source tests must not be skipped'
 raise SystemExit(not result.wasSuccessful())
 '''
@@ -52,7 +52,7 @@ raise SystemExit(not result.wasSuccessful())
                                 env=dict(os.environ, PYTHONDONTWRITEBYTECODE='1'))
         if result.returncode:
             raise SystemExit(result.returncode)
-    print('DISPATCHARR_SOURCE_TESTS_PASSED=98')
+    print('DISPATCHARR_SOURCE_TESTS_PASSED=100')
 
 
 if __name__ == '__main__':

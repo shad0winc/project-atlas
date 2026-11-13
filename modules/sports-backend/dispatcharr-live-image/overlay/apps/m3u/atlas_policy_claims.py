@@ -30,6 +30,7 @@ class AtlasPolicyClaim:
     provider_event_id: str | None
     identity_kind: str = "event"
     standalone_channel_id: str | None = None
+    stream_id: int | None = None
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -101,6 +102,10 @@ class AtlasPolicyClaimClient:
             common = {"channel_uuid", "source_id", "account_id", "configured_max_connections", "credential_realm"}
             if not isinstance(row, dict):
                 raise AtlasPolicyUnavailable("Atlas policy claim invalid")
+            if "stream_id" in row:
+                if len(rows) != 1 or type(row["stream_id"]) is not int or row["stream_id"] <= 0:
+                    raise AtlasPolicyUnavailable("Atlas policy stream identity invalid")
+                common.add("stream_id")
             event = set(row) == common | {"provider", "provider_event_id"}
             standalone = set(row) == common | {"identity_kind", "standalone_channel_id"}
             if not (event or standalone):

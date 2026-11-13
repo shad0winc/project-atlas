@@ -59,6 +59,36 @@ class ClaimTests(unittest.TestCase):
                 with self.assertRaises(AtlasLivePolicyUnavailable):
                     self.claim(**change)
 
+    def test_options_pin_each_route_to_its_own_account_and_stream(self):
+        backup_uuid = str(uuid4())
+        primary = Row(**dict(self.binding.__dict__, dispatcharr_channel_id=8))
+        backup = Row(atlas_channel_id=primary.atlas_channel_id + "--backup-1",
+                     dispatcharr_channel_uuid=backup_uuid, dispatcharr_channel_id=9)
+        secondary_source = Row(**dict(self.source.__dict__, source_id="second",
+                                      backend_reference="dispatcharr:m3u:7"))
+
+        def option(binding, source, stream_id):
+            return Row(channel_id=lambda root: binding.atlas_channel_id,
+                       dispatcharr_channel_id=binding.dispatcharr_channel_id,
+                       dispatcharr_channel_uuid=binding.dispatcharr_channel_uuid,
+                       dispatcharr_stream_id=stream_id, resource_source_id=source.source_id,
+                       stream_url=f"http://dispatcharr.invalid/proxy/ts/stream/{binding.dispatcharr_channel_uuid}")
+
+        live = Row(**dict(self.live.__dict__, resource_source_ids=(self.source_id, "second"),
+                          playback_options=(option(primary, self.source, 2121),
+                                            option(backup, secondary_source, 2239))))
+        def claims(binding):
+            return claims_for_channel(channel_uuid=binding.dispatcharr_channel_uuid,
+                                      lifecycle_sources=(self.source, secondary_source),
+                                      channel_bindings=(primary, backup), live_sources=(live,))
+
+        self.assertEqual([(row.account_id, row.stream_id) for row in claims(primary)], [(5, 2121)])
+        self.assertEqual([(row.account_id, row.stream_id) for row in claims(backup)], [(7, 2239)])
+        self.assertEqual(claims(backup)[0].to_mapping()["stream_id"], 2239)
+        live.playback_options[1].dispatcharr_channel_id = 10
+        with self.assertRaises(AtlasLivePolicyUnavailable):
+            claims(backup)
+
     def test_invalid_request_identity(self):
         for change in (dict(channel_uuid="bad"), dict(source_id="../bad")):
             with self.assertRaises(AtlasLivePolicyUnavailable):
