@@ -102,21 +102,22 @@ export function SportsPageClient(): React.ReactElement {
     follow.enabled && follow.provider === browsedSports.provider &&
     follow.type === browsedSports.type && follow.providerId === browsedSports.providerId,
   );
-  const liveEventFollows = useMemo(
-    () =>
-      currentLiveEvents.map((event): SportsFollow => ({
-        subscriptionId: `live:${event.provider}:${event.providerEventId}`,
-        type: "event",
-        provider: event.provider,
-        providerId: event.providerEventId,
-        name: event.name,
-        userId: "",
-        enabled: true,
-        record: false,
-        createdAt: null,
-      })),
-    [currentLiveEvents],
-  );
+  const liveEventKeys = JSON.stringify(currentLiveEvents
+    .map(event => [event.provider, event.providerEventId]).sort());
+  const liveEventFollows = useMemo(() => {
+    const identities: [string, string][] = JSON.parse(liveEventKeys);
+    return identities.map(([provider, providerId]): SportsFollow => ({
+      subscriptionId: `live:${provider}:${providerId}`,
+      type: "event",
+      provider,
+      providerId,
+      name: "",
+      userId: "",
+      enabled: true,
+      record: false,
+      createdAt: null,
+    }));
+  }, [liveEventKeys]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
