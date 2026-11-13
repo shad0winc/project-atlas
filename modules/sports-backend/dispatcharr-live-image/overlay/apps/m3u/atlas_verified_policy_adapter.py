@@ -50,6 +50,9 @@ class AtlasVerifiedPolicyAdapter:
             claim = matches[0]
             if claim.channel_uuid != channel_uuid:
                 raise VerifiedLivePolicyUnavailable("Atlas channel identity changed")
+            pinned_stream_id = getattr(claim, "stream_id", None)
+            if pinned_stream_id is not None and stream.id != pinned_stream_id:
+                raise VerifiedLivePolicyUnavailable("Atlas stream identity changed")
             realm = getattr(claim, "credential_realm", None)
             if not isinstance(realm, str) or not re.fullmatch(
                 r"[a-z0-9][a-z0-9.-]{0,127}", realm
