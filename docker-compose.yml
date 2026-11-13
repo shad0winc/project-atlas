@@ -71,6 +71,12 @@ services:
     volumes:
       - ${CONFIG}/prowlarr:/config
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "code=$$(curl --noproxy '*' -sS --max-time 4 -o /dev/null -w '%{http_code}' http://127.0.0.1:9696/ping) && test \"$$code\" = 200"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
 
   flaresolverr:
@@ -110,6 +116,12 @@ services:
       - ${ATLAS_MEDIA_ROOT:?ATLAS_MEDIA_ROOT is required}:/media
       - ${DOWNLOADS}:/downloads
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "code=$$(curl --noproxy '*' -sS --max-time 4 -o /dev/null -w '%{http_code}' http://127.0.0.1:8989/ping) && test \"$$code\" = 200"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   sonarr-anime:
     image: lscr.io/linuxserver/sonarr:latest
@@ -126,6 +138,12 @@ services:
       - ${ATLAS_MEDIA_ROOT:?ATLAS_MEDIA_ROOT is required}:/media
       - ${DOWNLOADS}:/downloads
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "code=$$(curl --noproxy '*' -sS --max-time 4 -o /dev/null -w '%{http_code}' http://127.0.0.1:8989/ping) && test \"$$code\" = 200"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   radarr:
     image: lscr.io/linuxserver/radarr:latest
@@ -142,6 +160,12 @@ services:
       - ${ATLAS_MEDIA_ROOT:?ATLAS_MEDIA_ROOT is required}:/media
       - ${DOWNLOADS}:/downloads
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "code=$$(curl --noproxy '*' -sS --max-time 4 -o /dev/null -w '%{http_code}' http://127.0.0.1:7878/ping) && test \"$$code\" = 200"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   radarr-anime:
     image: lscr.io/linuxserver/radarr:latest
@@ -158,6 +182,12 @@ services:
       - ${ATLAS_MEDIA_ROOT:?ATLAS_MEDIA_ROOT is required}:/media
       - ${DOWNLOADS}:/downloads
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "code=$$(curl --noproxy '*' -sS --max-time 4 -o /dev/null -w '%{http_code}' http://127.0.0.1:7878/ping) && test \"$$code\" = 200"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   gluetun:
     image: qmcgaw/gluetun:latest
@@ -200,6 +230,12 @@ services:
       - ${CONFIG}/qbittorrent:/config
       - ${DOWNLOADS}:/downloads
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL","code=$$(curl --noproxy '*' -sS --max-time 4 -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/) && test \"$$code\" = 200"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     depends_on:
       gluetun:
         condition: service_healthy
@@ -244,6 +280,12 @@ services:
       - ${CONFIG}/bazarr:/config
       - ${ATLAS_MEDIA_ROOT:?ATLAS_MEDIA_ROOT is required}:/media
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "code=$$(curl --noproxy '*' -sS --max-time 4 -o /dev/null -w '%{http_code}' http://127.0.0.1:6767/) && test \"$$code\" = 200"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   maintainerr:
     image: ghcr.io/maintainerr/maintainerr:3.21.1@sha256:811a580fdf479e8582d3c97047b1aa8930fc5523f63143498020864ad6a7cd80
@@ -276,6 +318,12 @@ services:
     volumes:
       - ${CONFIG}/tautulli:/config
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "code=$$(curl --noproxy '*' -sS --max-time 4 -o /dev/null -w '%{http_code}' http://127.0.0.1:8181/status) && test \"$$code\" = 200"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     depends_on:
       - jellyfin
 
@@ -348,6 +396,12 @@ services:
     environment:
       - DOZZLE_REMOTE_HOST=tcp://atlas-docker-socket-proxy:2375
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD","/dozzle","healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   atlas-docker-socket-proxy:
     image: ghcr.io/tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
@@ -382,3 +436,9 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL","body=$$(wget -Y off -q -T 4 -O - http://127.0.0.1:2375/_ping) && test \"$$body\" = OK"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
