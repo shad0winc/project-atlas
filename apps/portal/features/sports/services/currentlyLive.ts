@@ -1,5 +1,12 @@
 import type { SportsEvent, SportsFollow } from "../types/sports";
 
+export function matchesSportsFollow(event: SportsEvent, follow: SportsFollow): boolean {
+  return follow.enabled && follow.provider === event.provider &&
+    ((follow.type === "event" && follow.providerId === event.providerEventId) ||
+      (follow.type === "team" && (follow.providerId === event.homeTeamId || follow.providerId === event.awayTeamId)) ||
+      (follow.type === "league" && follow.providerId === event.providerLeagueId));
+}
+
 export function followedLiveEvents(
   events: readonly SportsEvent[],
   follows: readonly SportsFollow[],
@@ -25,18 +32,7 @@ export function followedLiveEvents(
         start > now
       )
         return false;
-      const matched = follows.some(
-        (follow) =>
-          follow.enabled &&
-          follow.provider === event.provider &&
-          ((follow.type === "event" &&
-            follow.providerId === event.providerEventId) ||
-            (follow.type === "team" &&
-              (follow.providerId === event.homeTeamId ||
-                follow.providerId === event.awayTeamId)) ||
-            (follow.type === "league" &&
-              follow.providerId === event.providerLeagueId)),
-      );
+      const matched = follows.some(follow => matchesSportsFollow(event, follow));
       if (matched) seen.add(key);
       return matched;
     })
