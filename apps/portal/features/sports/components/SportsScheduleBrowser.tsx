@@ -42,7 +42,10 @@ export function SportsScheduleBrowser({ follows, onFollow, onCatalogAvailability
   const [following, setFollowing] = useState(false);
   const [pendingEvent, setPendingEvent] = useState<string | null>(null);
   const [availability, setAvailability] = useState<LiveAvailabilitySnapshot>({});
-  const [playbackMessage, setPlaybackMessage] = useState<string | null>(null);
+  const [playbackMessage, setPlaybackMessage] = useState<{
+    eventId: string;
+    message: string;
+  } | null>(null);
   const [refresh, setRefresh] = useState(0);
   const nextRefresh = useRef(0);
   const [refreshAt, setRefreshAt] = useState(0);
@@ -191,8 +194,10 @@ export function SportsScheduleBrowser({ follows, onFollow, onCatalogAvailability
     try {
       const available = await loadSportsLiveAvailability(event.provider, event.providerEventId);
       if (available.available && available.atlasChannelId) await onWatchLive(available.atlasChannelId);
-      else setPlaybackMessage("No verified Atlas channel is linked to this ESPN event. Browse configured channels below; a schedule listing does not confirm stream availability.");
-    } catch { setPlaybackMessage("Atlas could not verify live playback availability. Please try again."); }
+      else setPlaybackMessage({ eventId: event.providerEventId, message: "Atlas has no available channel for this event yet." });
+    } catch {
+      setPlaybackMessage({ eventId: event.providerEventId, message: "Atlas could not check playback availability. Please try again." });
+    }
     finally { setPendingEvent(null); }
   };
   const unsupported = competition?.status === "unsupported";
@@ -231,7 +236,6 @@ export function SportsScheduleBrowser({ follows, onFollow, onCatalogAvailability
           <p>Source: ESPN. Times use your device timezone ({Intl.DateTimeFormat().resolvedOptions().timeZone}). {snapshot.observedAt ? `Last observed: ${new Date(snapshot.observedAt).toLocaleString()}.` : "No completed observation yet."}</p>
           {snapshot.status !== "ready" || snapshot.retained || (!!snapshot.expiresAt && Date.parse(snapshot.expiresAt) <= now) ? <p role="status">Schedule status: {snapshot.status}. Coverage may be incomplete or out of date. Loaded events remain available.</p> : null}
           {period === "week" ? <p>This window starts now and excludes games whose scheduled start has passed. Choose Today for games already started.</p> : null}
-          {playbackMessage ? <p role="status">{playbackMessage}</p> : null}
           {events.length ? <div className="requests-grid">{events.map(event => {
             const check = availability[`${event.provider}:${event.providerEventId}`];
             const canWatch = inPlaybackWindow(event, now) && check?.available === true && Boolean(check.atlasChannelId);
@@ -254,10 +258,11 @@ export function SportsScheduleBrowser({ follows, onFollow, onCatalogAvailability
                 onClick={() => { void request(event); }}>
                 {follows.some(item => item.enabled && item.type === "event" && item.provider === event.provider && item.providerId === event.providerEventId) ? "Following event" : pendingEvent === event.providerEventId ? "Checking…" : "Follow event"}
               </button>
-              {canWatch || (event.status === "live" && curatedEventFresh(event, now)) ? <button type="button" className="requests-refresh-button"
+              {canWatch || (inPlaybackWindow(event, now) && curatedEventFresh(event, now)) ? <button type="button" className="requests-refresh-button"
                 disabled={pendingEvent !== null} onClick={() => { void checkLive(event); }}>
                 {canWatch ? "Watch Live" : "Check live playback"}
               </button> : null}
+              {playbackMessage?.eventId === event.providerEventId ? <p role="status">{playbackMessage.message}</p> : null}
               <p>Recording is unavailable for ESPN schedule-only events.</p>
             </article>;
           })}</div> : snapshot.coverageComplete ? <p>No events in the loaded schedule match this selection.</p> : <p>The schedule is being prepared or is temporarily unavailable. This does not confirm that there are no events.</p>}

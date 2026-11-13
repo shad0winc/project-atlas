@@ -28,7 +28,7 @@ describe("Sports page UX coordination", () => {
   it("loads followed-event metadata independently of discovery", () => {
     expect(source).toContain("setFollowedEvents");
     expect(source).toContain("setFreshFollowedEvents");
-    expect(source).toContain("setFreshFollowedEvents([])");
+    expect(source).toContain("retainFollowedLiveObservations(current, providers, results)");
     expect(source).toContain(
       "followedEvents={followedEvents}"
     );

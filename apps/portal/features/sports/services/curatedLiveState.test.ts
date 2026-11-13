@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import { curatedEventFresh, curatedStartLabel, mergeSportsObservations } from "./curatedLiveState";
+import { curatedEventFresh, curatedStartLabel, mergeSportsObservations, retainFollowedLiveObservations } from "./curatedLiveState";
 import { followedLiveEvents } from "./currentlyLive";
 import type { SportsEvent, SportsFollow } from "../types/sports";
 
@@ -13,6 +13,17 @@ const follow: SportsFollow = { subscriptionId: "fixture", type: "team", provider
   name: "Cavaliers", userId: "fixture", enabled: true, record: false, createdAt: null };
 
 describe("curated live observation integration", () => {
+  it("retains a followed event on lookup failure only while its observation is fresh", () => {
+    const rows = retainFollowedLiveObservations([event], ["espn"], [
+      { status: "rejected", reason: new Error("503") },
+    ]);
+    assert.deepEqual(followedLiveEvents(rows, [follow], now), [event]);
+    assert.deepEqual(followedLiveEvents(rows, [follow], now + 300_000), []);
+    const ended = { ...event, status: "final", metadataObservedAt: "2026-11-01T00:11:00Z" };
+    const refreshed = retainFollowedLiveObservations(rows, ["espn"], [{ status: "fulfilled", value: [ended] }]);
+    assert.deepEqual(followedLiveEvents(refreshed, [follow], now), []);
+  });
+
   it("accepts a current provider observation", () => assert.equal(curatedEventFresh(event, now), true));
   it("does not keep expired live claims", () => assert.equal(curatedEventFresh(event, now + 300_000), false));
   it("does not accept missing observation ages", () => assert.equal(curatedEventFresh({ ...event, metadataObservedAt: undefined }, now), false));

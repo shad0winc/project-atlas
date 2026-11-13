@@ -41,7 +41,7 @@ import { PORTAL_ROUTES } from "../../../../lib/navigation/portal";
 import { loadSportsDiscoveryProviders } from "../../../../features/sports/services/sports";
 import { searchFederatedSports, type SportsDiscoverySnapshot } from "../../../../features/sports/services/federatedDiscovery";
 
-import { mergeSportsObservations } from "../../../../features/sports/services/curatedLiveState";
+import { mergeSportsObservations, retainFollowedLiveObservations } from "../../../../features/sports/services/curatedLiveState";
 import { followedLiveEvents } from "../../../../features/sports/services/currentlyLive";
 import { SportsCurrentlyLive } from "../../../../features/sports/components/SportsCurrentlyLive";
 import { SportsScheduleBrowser } from "../../../../features/sports/components/SportsScheduleBrowser";
@@ -94,9 +94,19 @@ export function SportsPageClient(): React.ReactElement {
     readonly SportsEvent[]
   >([]);
   const [liveMetadataUnavailable, setLiveMetadataUnavailable] = useState(false);
+  const [liveNow, setLiveNow] = useState(Date.now);
+  useEffect(() => {
+    const update = () => setLiveNow(Date.now());
+    const timer = window.setInterval(update, 30_000);
+    document.addEventListener("visibilitychange", update);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", update);
+    };
+  }, []);
   const currentLiveEvents = useMemo(
-    () => followedLiveEvents(mergeSportsObservations(freshFollowedEvents, curatedEvents), follows),
-    [freshFollowedEvents, curatedEvents, follows],
+    () => followedLiveEvents(mergeSportsObservations(freshFollowedEvents, curatedEvents), follows, liveNow),
+    [freshFollowedEvents, curatedEvents, follows, liveNow],
   );
   const selectedLiveFollow = browsedSports && follows.find(follow =>
     follow.enabled && follow.provider === browsedSports.provider &&
@@ -485,18 +495,8 @@ export function SportsPageClient(): React.ReactElement {
       onRefreshing: setScheduleRefreshing,
       cooldowns: scheduleCooldowns.current,
       publish: (providers, results) => {
-        if (results === null) {
-          setFreshFollowedEvents([]);
-          return;
-        }
-        const refreshedEvents = results.flatMap((result, index) =>
-          result.status === "fulfilled"
-            ? result.value.filter(
-                (event) => event.provider === providers[index],
-              )
-            : [],
-        );
-        setFreshFollowedEvents(refreshedEvents);
+        if (results === null) return;
+        setFreshFollowedEvents(current => retainFollowedLiveObservations(current, providers, results));
         setUpcomingSnapshot(current => reconcileUpcomingSchedule(current, providers, results));
         setLiveMetadataUnavailable(
           results.some((result) => result.status === "rejected"),
