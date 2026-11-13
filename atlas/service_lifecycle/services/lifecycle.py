@@ -13,6 +13,7 @@ from ..dependency_models import (
 from ..models import (
     ManagedService,
     ServiceHealth,
+    ServiceHealthStatus,
     ServiceLifecycleError,
     ServiceRuntime,
 )
@@ -101,7 +102,9 @@ class InfrastructureHealthReport:
             "unknown": 0,
         }
         for entry in self.entries:
-            counts[entry.health.status.value] += 1
+            status = entry.health.status
+            bucket = "unhealthy" if status is ServiceHealthStatus.UNAVAILABLE else status.value
+            counts[bucket] += 1
         return counts
 
     @property
@@ -560,24 +563,22 @@ class ServiceLifecycleService:
         return InfrastructureHealthReport(
             entries=entries,
             score=score,
-            status=_aggregate_status(entries, score),
+            status=_aggregate_status(entries),
             evaluated_at=evaluated_at,
         )
 
 
-def _aggregate_status(
-    entries: tuple[ServiceHealthEntry, ...],
-    score: int,
-) -> str:
-    if not entries:
-        return "unknown"
-    if any(entry.health.errors for entry in entries):
+def _aggregate_status(entries: tuple[ServiceHealthEntry, ...]) -> str:
+    statuses = {entry.health.status for entry in entries}
+    if statuses & {ServiceHealthStatus.UNHEALTHY, ServiceHealthStatus.UNAVAILABLE} or any(
+        entry.health.errors for entry in entries
+    ):
         return "unhealthy"
-    if score >= 90:
-        return "healthy"
-    if score >= 70:
+    if not statuses or statuses == {ServiceHealthStatus.UNKNOWN}:
+        return "unknown"
+    if any(entry.requires_attention for entry in entries):
         return "degraded"
-    return "unhealthy"
+    return "healthy"
 
 
 def _utc_now() -> str:
