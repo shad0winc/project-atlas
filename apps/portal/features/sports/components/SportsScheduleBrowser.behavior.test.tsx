@@ -59,13 +59,45 @@ describe("curated schedule actions and cache refresh", () => {
   });
   it("does not open a player without verified availability", async () => {
     await mount(); await click("Check live playback");
-    expect(loadSportsLiveAvailability).toHaveBeenCalledWith("espn", "basketball-nba-401909900");
+    expect(loadSportsLiveAvailability).toHaveBeenLastCalledWith("espn", "basketball-nba-401909900");
     expect(onWatchLive).not.toHaveBeenCalled(); expect(container.textContent).toContain("No verified Atlas channel");
   });
   it("opens only the channel returned by availability", async () => {
     vi.mocked(loadSportsLiveAvailability).mockResolvedValue({ available: true, atlasChannelId: "sports-live-fixture" });
-    await mount(); await click("Check live playback"); expect(onWatchLive).toHaveBeenCalledWith("sports-live-fixture");
+    await mount(); await click("Watch Live"); expect(onWatchLive).toHaveBeenCalledWith("sports-live-fixture");
   });
+  it("offers verified pregame playback when the event enters the 60-minute window", async () => {
+    vi.mocked(loadCuratedSchedule).mockResolvedValue({ ...snapshot, events: snapshot.events.map(item => ({
+      ...item, startAt: "2026-11-01T01:12:30Z", status: "scheduled"
+    })) });
+    vi.mocked(loadSportsLiveAvailability).mockResolvedValue({ available: true, atlasChannelId: "sports-live-fixture" });
+    await mount();
+    expect(loadSportsLiveAvailability).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain("Watch Live");
+    await act(async () => vi.advanceTimersByTimeAsync(30_000));
+    expect(container.textContent).toContain("Watch Live");
+    vi.mocked(loadSportsLiveAvailability).mockResolvedValue({ available: false, atlasChannelId: null });
+    await click("Watch Live");
+    expect(onWatchLive).not.toHaveBeenCalled();
+  });
+
+  it("keeps verified playback visible across a schedule cache refresh", async () => {
+    const pendingPoll = new Promise<never>(() => {});
+    vi.mocked(loadSportsLiveAvailability).mockResolvedValueOnce({
+      available: true, atlasChannelId: "sports-live-fixture"
+    }).mockImplementation(() => pendingPoll);
+    const updated = { ...snapshot, events: snapshot.events.map(item => ({ ...item })) };
+    vi.mocked(loadCuratedSchedule).mockResolvedValueOnce(snapshot).mockResolvedValue(updated);
+    await mount();
+    expect(container.textContent).toContain("Watch Live");
+    // The first 30-second availability poll succeeds, the next stays pending.
+    vi.mocked(loadSportsLiveAvailability).mockResolvedValueOnce({ available: true, atlasChannelId: "sports-live-fixture" });
+    await act(async () => vi.advanceTimersByTimeAsync(60_000));
+    expect(loadCuratedSchedule).toHaveBeenCalledTimes(2);
+    expect(container.textContent).toContain("Watch Live");
+    expect(loadSportsLiveAvailability).toHaveBeenCalledTimes(3);
+  });
+
   it("does not offer a live action for expired status", async () => {
     vi.mocked(loadCuratedSchedule).mockResolvedValue({ ...snapshot, events: snapshot.events.map(item => ({ ...item, metadataExpiresAt: "2026-11-01T00:11:00Z" })) });
     await mount(); expect(container.textContent).toContain("status needs refresh");
