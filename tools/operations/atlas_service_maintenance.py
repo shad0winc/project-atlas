@@ -174,13 +174,24 @@ def scan_entry(entry):
         "status_message": None,
     }
     service["compose_project"] = (row["Config"].get("Labels") or {}).get("com.docker.compose.project")
-    state = "healthy" if running and health == "healthy" else "degraded" if running else "unavailable"
-    if health == "unhealthy":
-        state = "unhealthy"
+    warnings, errors = [], []
+    if not running or row["State"]["Status"] != "running":
+        state, score = "unavailable", 0
+        errors.append("Container is not running.")
+    elif health == "healthy":
+        state, score = "healthy", 100
+    elif health == "unhealthy":
+        state, score = "unhealthy", 0
+        errors.append("Docker reported the container as unhealthy.")
+    elif health == "starting":
+        state, score = "degraded", 70
+        warnings.append("Docker health check is still starting.")
+    else:
+        state, score = "unknown", 50
+        warnings.append("Container has no Docker health check." if health == "unknown"
+                        else "Docker returned an unrecognized health state.")
     result["health"] = {
-        "status": state, "score": 100 if state == "healthy" else 90 if state == "degraded" else 0,
-        "warnings": ["Container has no Docker health check."] if running and health == "unknown" else [],
-        "errors": [] if running else ["Container is not running."],
+        "status": state, "score": score, "warnings": warnings, "errors": errors,
         "details": {"service_identifier": identifier, "docker_health": health},
         "evaluated_at": timestamp,
     }
