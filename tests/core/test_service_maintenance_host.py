@@ -71,6 +71,7 @@ class HostTests(unittest.TestCase):
             entry = host.scan_entry(self.entry())
         self.assertEqual(IMAGE, entry["runtime"]["image"]["image_id"])
         self.assertEqual("current", entry["update"]["status"])
+        self.assertEqual("unknown", entry["health"]["status"])
         self.assertEqual(IMAGE, entry["update"]["details"]["local_descriptor_digest"])
         self.validate(entry)
 
