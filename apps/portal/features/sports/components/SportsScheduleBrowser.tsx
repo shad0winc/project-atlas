@@ -57,16 +57,12 @@ export function SportsScheduleBrowser({ follows, onFollow, onCatalogAvailability
 
   useEffect(() => {
     const ids: string[] = JSON.parse(playbackEventIds);
-    if (ids.length === 0) {
-      setAvailability({});
-      return;
-    }
     return startLiveAvailabilityRefresh({
       follows: ids.map(id => ({
         subscriptionId: id, type: "event", provider: "espn", providerId: id,
         name: "", userId: "", enabled: true, record: false, createdAt: null,
       })),
-      load: loadSportsLiveAvailability,
+      load: (...args) => loadSportsLiveAvailability(...args),
       publish: setAvailability,
     });
   }, [playbackEventIds]);
