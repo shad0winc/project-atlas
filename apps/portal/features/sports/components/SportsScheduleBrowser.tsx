@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { SportsEvent, SportsFollow } from "../types/sports";
 import { loadSportsLiveAvailability } from "../services/sports";
 import { startLiveAvailabilityRefresh, type LiveAvailabilitySnapshot } from "../services/liveAvailabilityRefresh";
-import { curatedEventFresh, curatedStartLabel } from "../services/curatedLiveState";
+import { curatedEventFresh, curatedStartLabel, mergeSportsObservations } from "../services/curatedLiveState";
 import {
   filterCuratedTeam, loadCuratedCatalog, loadCuratedSchedule, loadCuratedTeams,
   retainCuratedSchedule, type CuratedCatalog, type CuratedPeriod,
@@ -52,6 +52,15 @@ export function SportsScheduleBrowser({ follows, onFollow, onCatalogAvailability
   const snapshot = result?.key === key ? result.snapshot : null;
   const teams = directory?.competitionId === competitionId ? directory : null;
   const events = filterCuratedTeam(snapshot, teamId);
+
+  const followedCompetitionsKey = JSON.stringify((catalog?.enabled ? catalog.competitions : [])
+    .filter(({ status, providerLeagueId }) => {
+      if (status !== "configured" || !providerLeagueId) return false;
+      const prefix = providerLeagueId.replace("/", "-") + "-";
+      return follows.some(follow => follow.enabled && follow.provider === "espn" &&
+        (follow.type === "league" ? follow.providerId === providerLeagueId :
+          (follow.type === "team" || follow.type === "event") && follow.providerId.startsWith(prefix)));
+    }).map(({ id }) => id).sort());
 
   const playbackEventIds = JSON.stringify(events.filter(event => inPlaybackWindow(event, now)).map(event => event.providerEventId).sort());
 
@@ -121,8 +130,34 @@ export function SportsScheduleBrowser({ follows, onFollow, onCatalogAvailability
   }, [refreshAt, snapshot?.expiresAt, now]);
 
   useEffect(() => {
-    onScheduleChanged(snapshot?.events ?? []);
-  }, [snapshot, onScheduleChanged]);
+    const ids: string[] = JSON.parse(followedCompetitionsKey);
+    const snapshots = new Map<string, CuratedSchedule>();
+    let controller: AbortController | undefined;
+    const refresh = async () => {
+      if (document.visibilityState === "hidden" || controller) return;
+      const current = new AbortController();
+      controller = current;
+      await Promise.all(ids.map(async id => {
+        try {
+          const next = await loadCuratedSchedule(id, "today", current.signal);
+          if (!current.signal.aborted) snapshots.set(id, retainCuratedSchedule(snapshots.get(id) ?? null, next));
+        } catch { /* Keep prior metadata until its observation expires. */ }
+      }));
+      if (current.signal.aborted) return;
+      controller = undefined;
+      const now = Date.now();
+      onScheduleChanged(mergeSportsObservations(...Array.from(snapshots.values(), value =>
+        value.events.filter(event => curatedEventFresh(event, now)))));
+    };
+    void refresh();
+    const timer = window.setInterval(() => { void refresh(); }, 60_000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      controller?.abort();
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [followedCompetitionsKey, onScheduleChanged]);
 
   useEffect(() => {
     if (!competition || competition.status !== "configured") return;

@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SportsScheduleBrowser } from "./SportsScheduleBrowser";
 import { loadCuratedCatalog, loadCuratedSchedule, loadCuratedTeams, type CuratedSchedule } from "../services/curatedSchedule";
+import type { SportsFollow } from "../types/sports";
 import { loadSportsLiveAvailability } from "../services/sports";
 
 vi.mock("../services/curatedSchedule", async original => ({ ...await original<typeof import("../services/curatedSchedule")>(),
@@ -39,8 +40,8 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount()); container.remove(); vi.useRealTimers(); vi.resetAllMocks();
 });
-async function mount() {
-  await act(async () => root.render(<SportsScheduleBrowser follows={[]} onFollow={onFollow}
+async function mount(follows: readonly SportsFollow[] = []) {
+  await act(async () => root.render(<SportsScheduleBrowser follows={follows} onFollow={onFollow}
     onRequestEvent={onRequestEvent} onWatchLive={onWatchLive} onScheduleChanged={onScheduleChanged} />));
 }
 async function click(label: string) {
@@ -103,10 +104,26 @@ describe("curated schedule actions and cache refresh", () => {
     await mount(); expect(container.textContent).toContain("status needs refresh");
     expect(container.textContent).not.toContain("Check live playback");
   });
+  it("loads followed NBA events independently of the selected NFL schedule", async () => {
+    const nba = { id: "nba", sport: "Basketball", name: "NBA", provider: "espn" as const,
+      providerLeagueId: "basketball/nba", teamDirectorySupported: true, status: "configured" as const };
+    vi.mocked(loadCuratedCatalog).mockResolvedValue({ enabled: true, competitions: [
+      { ...nba, id: "nfl", sport: "Football", name: "NFL", providerLeagueId: "football/nfl" }, nba
+    ] });
+    vi.mocked(loadCuratedSchedule).mockImplementation(async id => id === "nba" ? snapshot :
+      { ...snapshot, competitionId: "nfl", providerLeagueId: "football/nfl", events: [] });
+    const event = snapshot.events[0];
+    await mount([{ subscriptionId: "follow-nba", provider: "espn", type: "event", providerId: event.providerEventId,
+      enabled: true, record: false, name: event.name, userId: "viewer", createdAt: null }]);
+    expect(container.textContent).not.toContain(event.name);
+    expect(loadCuratedSchedule).toHaveBeenCalledWith("nba", "today", expect.any(AbortSignal));
+    expect(onScheduleChanged).toHaveBeenLastCalledWith([event]);
+  });
+
   it("refreshes cache reads on a visible page without a click", async () => {
     await mount(); expect(loadCuratedSchedule).toHaveBeenCalledTimes(1);
     await act(async () => vi.advanceTimersByTimeAsync(60_000)); expect(loadCuratedSchedule).toHaveBeenCalledTimes(2);
-    expect(onScheduleChanged).toHaveBeenCalledWith(snapshot.events);
+    expect(onScheduleChanged).toHaveBeenCalledWith([]);
     expect(container.textContent).toContain("Recording is unavailable");
   });
 });
