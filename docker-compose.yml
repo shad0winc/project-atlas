@@ -230,6 +230,12 @@ services:
       - ${CONFIG}/qbittorrent:/config
       - ${DOWNLOADS}:/downloads
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL","code=$$(curl --noproxy '*' -sS --max-time 4 -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/) && test \"$$code\" = 200"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     depends_on:
       gluetun:
         condition: service_healthy
@@ -390,6 +396,12 @@ services:
     environment:
       - DOZZLE_REMOTE_HOST=tcp://atlas-docker-socket-proxy:2375
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD","/dozzle","healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   atlas-docker-socket-proxy:
     image: ghcr.io/tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
@@ -424,3 +436,9 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL","body=$$(wget -Y off -q -T 4 -O - http://127.0.0.1:2375/_ping) && test \"$$body\" = OK"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
