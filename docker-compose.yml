@@ -71,6 +71,12 @@ services:
     volumes:
       - ${CONFIG}/prowlarr:/config
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "code=$$(curl --noproxy '*' -sS --max-time 4 -o /dev/null -w '%{http_code}' http://127.0.0.1:9696/ping) && test \"$$code\" = 200"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
 
   flaresolverr:
@@ -110,6 +116,12 @@ services:
       - ${ATLAS_MEDIA_ROOT:?ATLAS_MEDIA_ROOT is required}:/media
       - ${DOWNLOADS}:/downloads
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "code=$$(curl --noproxy '*' -sS --max-time 4 -o /dev/null -w '%{http_code}' http://127.0.0.1:8989/ping) && test \"$$code\" = 200"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   sonarr-anime:
     image: lscr.io/linuxserver/sonarr:latest
@@ -126,6 +138,12 @@ services:
       - ${ATLAS_MEDIA_ROOT:?ATLAS_MEDIA_ROOT is required}:/media
       - ${DOWNLOADS}:/downloads
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "code=$$(curl --noproxy '*' -sS --max-time 4 -o /dev/null -w '%{http_code}' http://127.0.0.1:8989/ping) && test \"$$code\" = 200"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   radarr:
     image: lscr.io/linuxserver/radarr:latest
@@ -142,6 +160,12 @@ services:
       - ${ATLAS_MEDIA_ROOT:?ATLAS_MEDIA_ROOT is required}:/media
       - ${DOWNLOADS}:/downloads
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "code=$$(curl --noproxy '*' -sS --max-time 4 -o /dev/null -w '%{http_code}' http://127.0.0.1:7878/ping) && test \"$$code\" = 200"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   radarr-anime:
     image: lscr.io/linuxserver/radarr:latest
@@ -158,6 +182,12 @@ services:
       - ${ATLAS_MEDIA_ROOT:?ATLAS_MEDIA_ROOT is required}:/media
       - ${DOWNLOADS}:/downloads
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "code=$$(curl --noproxy '*' -sS --max-time 4 -o /dev/null -w '%{http_code}' http://127.0.0.1:7878/ping) && test \"$$code\" = 200"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   gluetun:
     image: qmcgaw/gluetun:latest
@@ -244,6 +274,12 @@ services:
       - ${CONFIG}/bazarr:/config
       - ${ATLAS_MEDIA_ROOT:?ATLAS_MEDIA_ROOT is required}:/media
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "code=$$(curl --noproxy '*' -sS --max-time 4 -o /dev/null -w '%{http_code}' http://127.0.0.1:6767/) && test \"$$code\" = 200"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   maintainerr:
     image: ghcr.io/maintainerr/maintainerr:3.21.1@sha256:811a580fdf479e8582d3c97047b1aa8930fc5523f63143498020864ad6a7cd80
@@ -276,6 +312,12 @@ services:
     volumes:
       - ${CONFIG}/tautulli:/config
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "code=$$(curl --noproxy '*' -sS --max-time 4 -o /dev/null -w '%{http_code}' http://127.0.0.1:8181/status) && test \"$$code\" = 200"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     depends_on:
       - jellyfin
 
