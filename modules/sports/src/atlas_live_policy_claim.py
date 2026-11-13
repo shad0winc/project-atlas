@@ -27,6 +27,7 @@ class AtlasLivePolicyClaim:
     provider_event_id: str | None
     identity_kind: str = "event"
     standalone_channel_id: str | None = None
+    stream_id: int | None = None
 
     def to_mapping(self) -> dict[str, object]:
         if self.identity_kind == "standalone":
@@ -37,6 +38,7 @@ class AtlasLivePolicyClaim:
                 "credential_realm": self.credential_realm,
                 "identity_kind": "standalone",
                 "standalone_channel_id": self.standalone_channel_id,
+                **({"stream_id": self.stream_id} if self.stream_id is not None else {}),
             }
         return {
             "channel_uuid": self.channel_uuid,
@@ -46,7 +48,36 @@ class AtlasLivePolicyClaim:
             "credential_realm": self.credential_realm,
             "provider": self.provider,
             "provider_event_id": self.provider_event_id,
+            **({"stream_id": self.stream_id} if self.stream_id is not None else {}),
         }
+
+
+def _published_route(channel_uuid, channel_bindings, live_sources):
+    bindings = [row for row in channel_bindings if row.dispatcharr_channel_uuid == channel_uuid]
+    if len(bindings) != 1:
+        raise AtlasLivePolicyUnavailable("Channel binding unavailable or ambiguous")
+    binding = bindings[0]
+    routes = []
+    for live in live_sources:
+        options = getattr(live, "playback_options", ())
+        if options:
+            for option in options:
+                if option.channel_id(live.atlas_channel_id) == binding.atlas_channel_id:
+                    routes.append((live, option))
+        elif live.atlas_channel_id == binding.atlas_channel_id:
+            routes.append((live, None))
+    if len(routes) != 1:
+        raise AtlasLivePolicyUnavailable("Published source unavailable or ambiguous")
+    live, option = routes[0]
+    if option is None:
+        return live, live.stream_url, live.resource_source_ids, None
+    if (option.dispatcharr_channel_uuid != channel_uuid
+            or option.dispatcharr_channel_id != binding.dispatcharr_channel_id
+            or type(option.dispatcharr_stream_id) is not int
+            or option.dispatcharr_stream_id <= 0
+            or option.resource_source_id not in live.resource_source_ids):
+        raise AtlasLivePolicyUnavailable("Playback option identity changed")
+    return live, option.stream_url, (option.resource_source_id,), option.dispatcharr_stream_id
 
 
 def claim_for_channel(*, channel_uuid: str, source_id: str,
@@ -62,23 +93,12 @@ def claim_for_channel(*, channel_uuid: str, source_id: str,
     ):
         raise AtlasLivePolicyUnavailable("Invalid source identity")
 
-    binding_rows = [
-        row for row in channel_bindings
-        if row.dispatcharr_channel_uuid == channel_uuid
-    ]
-    if len(binding_rows) != 1:
-        raise AtlasLivePolicyUnavailable("Channel binding unavailable or ambiguous")
-    binding = binding_rows[0]
-    matching_live = [
-        row for row in live_sources
-        if row.atlas_channel_id == binding.atlas_channel_id
-    ]
-    if len(matching_live) != 1:
-        raise AtlasLivePolicyUnavailable("Published source unavailable or ambiguous")
-    live = matching_live[0]
-    if source_id not in live.resource_source_ids or len(set(live.resource_source_ids)) != len(live.resource_source_ids):
+    live, stream_url, resources, stream_id = _published_route(
+        channel_uuid, channel_bindings, live_sources,
+    )
+    if source_id not in resources or len(set(resources)) != len(resources):
         raise AtlasLivePolicyUnavailable("Event source membership changed")
-    parsed = urlsplit(live.stream_url)
+    parsed = urlsplit(stream_url)
     if (parsed.scheme not in {"http", "https"} or not parsed.netloc
             or parsed.username is not None or parsed.password is not None
             or parsed.query or parsed.fragment or
@@ -122,7 +142,7 @@ def claim_for_channel(*, channel_uuid: str, source_id: str,
         channel_uuid, source_id, account_id, source.max_connections, realm,
         live.provider, live.provider_event_id,
         "standalone" if standalone else "event",
-        live.atlas_channel_id if standalone else None,
+        live.atlas_channel_id if standalone else None, stream_id,
     )
 
 
@@ -132,16 +152,13 @@ def claims_for_channel(*, channel_uuid: str, lifecycle_sources,
     bindings = tuple(channel_bindings)
     live_rows = tuple(live_sources)
     sources = tuple(lifecycle_sources)
-    matching = [row for row in bindings if row.dispatcharr_channel_uuid == channel_uuid]
-    if len(matching) != 1:
-        raise AtlasLivePolicyUnavailable("Channel binding unavailable or ambiguous")
-    published = [row for row in live_rows if row.atlas_channel_id == matching[0].atlas_channel_id]
-    if len(published) != 1 or not published[0].resource_source_ids:
-        raise AtlasLivePolicyUnavailable("Published source unavailable or ambiguous")
+    _, _, resources, _ = _published_route(channel_uuid, bindings, live_rows)
+    if not resources:
+        raise AtlasLivePolicyUnavailable("Published source has no authorized accounts")
     claims = tuple(claim_for_channel(
         channel_uuid=channel_uuid, source_id=source_id,
         lifecycle_sources=sources, channel_bindings=bindings, live_sources=live_rows,
-    ) for source_id in published[0].resource_source_ids)
+    ) for source_id in resources)
     if len({claim.account_id for claim in claims}) != len(claims):
         raise AtlasLivePolicyUnavailable("Multiple event sources share an account")
     return claims
