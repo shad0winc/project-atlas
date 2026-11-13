@@ -63,6 +63,15 @@ class ClaimClientTests(unittest.TestCase):
                          "http://atlas-sports-controller:9000/internal/v1/live-policy/" + self.uuid)
         self.assertNotIn("internal-test-token", repr(claim))
 
+    def test_single_pinned_stream_claim(self):
+        pinned = dict(self.rows[0], stream_id=2121)
+        self.opener.payload = json.dumps({"claims": [pinned]}).encode()
+        self.assertEqual(self.client.fetch(self.uuid)[0].stream_id, 2121)
+        for rows in ([dict(pinned, stream_id=True)], [pinned, self.rows[1]]):
+            self.opener.payload = json.dumps({"claims": rows}).encode()
+            with self.assertRaises(module.AtlasPolicyUnavailable):
+                self.client.fetch(self.uuid)
+
     def test_fail_closed_on_mismatch_duplicate_and_oversize(self):
         bad = (
             {"claims": [dict(self.rows[0], channel_uuid=str(uuid4()))]},
