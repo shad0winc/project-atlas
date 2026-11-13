@@ -473,7 +473,7 @@ def test_inspect_health_report_aggregates_services(
     report = service.inspect_health_report()
 
     assert report.score == 90
-    assert report.status == "healthy"
+    assert report.status == "degraded"
     assert report.counts == {
         "healthy": 1,
         "degraded": 1,
@@ -522,6 +522,20 @@ def test_inspect_health_report_errors_force_unhealthy(
     assert report.errors == (
         "sonarr: Container restart loop detected",
     )
+
+
+def test_inspect_health_report_counts_unavailable_as_unhealthy() -> None:
+    service, provider = make_service()
+    provider.services = [provider.service]
+    provider.health = ServiceHealth(
+        status=ServiceHealthStatus.UNAVAILABLE,
+        score=0,
+    )
+
+    report = service.inspect_health_report()
+
+    assert report.status == "unhealthy"
+    assert report.to_dict()["counts"]["unhealthy"] == 1
 
 
 def test_inspect_health_report_empty_inventory_is_unknown(
@@ -622,7 +636,7 @@ def test_inspect_summary_aggregates_runtime_and_health(
         "unknown": 0,
     }
     assert summary.health.score == 90
-    assert summary.health.status == "healthy"
+    assert summary.health.status == "degraded"
     assert summary.evaluated_at == "2026-08-01T22:00:00Z"
     assert summary.to_dict()["total_services"] == 2
     assert provider.calls == [
